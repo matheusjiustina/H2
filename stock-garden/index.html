@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#07090d" />
+    <meta name="description" content="Stock Garden — pick a stock, plant it, grow it, harvest it." />
+    <title>Stock Garden</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <div id="scene" aria-hidden="true"></div>
+      <div id="markers"></div>
+
+      <header class="hud" id="hud">
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 20v-8" />
+            <path class="leaf-a" d="M12 13c0-4 3-6.5 7-6.5 0 4-3 6.5-7 6.5z" />
+            <path class="leaf-b" d="M12 15c0-3-2.4-5-6-5 0 3 2.4 5 6 5z" />
+          </svg>
+          <span>STOCK GARDEN</span>
+        </div>
+        <div class="hud-right">
+          <div class="counter" id="counter" aria-live="polite">
+            <span class="counter-label">HARVESTS</span>
+            <span class="counter-value" id="counterValue">0</span>
+          </div>
+          <button class="vault-btn" id="vaultBtn" type="button" aria-label="Open Harvest Vault">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="6" width="14" height="14" rx="3" />
+              <path d="M8 6a4 4 0 0 1 8 0" />
+              <circle cx="12" cy="13" r="2" />
+            </svg>
+            <span>VAULT</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="hint" id="hint">PICK A PLOT TO START</div>
+
+      <div class="picker" id="picker" role="dialog" aria-label="Choose a stock to plant" aria-hidden="true">
+        <div class="picker-inner">
+          <div class="picker-grab" aria-hidden="true"></div>
+          <div class="picker-cards" id="pickerCards"></div>
+        </div>
+      </div>
+      <div class="scrim" id="scrim"></div>
+
+      <div class="vault-panel" id="vaultPanel" role="dialog" aria-modal="true" aria-labelledby="vaultTitle" aria-hidden="true">
+        <div class="vault-card">
+          <h2 id="vaultTitle">HARVEST VAULT</h2>
+          <ul class="vault-list" id="vaultList"></ul>
+          <div class="vault-total">
+            <span>TOTAL HARVESTS</span>
+            <strong id="vaultTotal">0</strong>
+          </div>
+          <button class="btn-close" id="vaultClose" type="button">CLOSE</button>
+        </div>
+      </div>
+
+      <footer class="disclaimer">
+        Stock Garden is a game experience. References to stocks or tickers are used as gameplay themes and do not
+        represent ownership of real securities or financial returns.
+      </footer>
+
+      <div class="intro" id="intro">
+        <div class="intro-logo">
+          <h1 class="intro-title"><span>STOCK</span> <span>GARDEN</span></h1>
+          <p class="intro-tag">GROW YOUR CONVICTION.</p>
+        </div>
+      </div>
+
+      <noscript><p class="noscript">Stock Garden needs JavaScript and WebGL to run.</p></noscript>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

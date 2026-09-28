@@ -1,0 +1,18 @@
+{
+  "name": "stock-garden",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stock Garden — pick a stock, plant it, grow it, harvest it.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}

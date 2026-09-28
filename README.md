@@ -64,3 +64,11 @@ src/
 ## Observação importante
 
 Os produtos em `src/data/products.ts` são **fictícios**, usados apenas para validar o layout (preços, condição, disponibilidade e fotos ilustrativas). Substitua pelo catálogo real antes de divulgar o site.
+
+## Stock Garden (mini game)
+
+A pasta [`stock-garden/`](stock-garden/) contém um mini game web independente (Vite + Three.js), sem relação com o build do site. Veja [`stock-garden/README.md`](stock-garden/README.md) para rodar:
+
+```bash
+cd stock-garden && npm install && npm run dev
+```
