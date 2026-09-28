@@ -1,0 +1,13 @@
+{
+  "name": "H2iStore — Seu Mundo Apple",
+  "short_name": "H2iStore",
+  "description": "iPhones, tecnologia e acessórios em Paranaíta, MT.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F7F7",
+  "theme_color": "#1D1D1F",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
