@@ -120,7 +120,7 @@ export class Boat {
 
     // interactable on the hull
     this.interactable = interaction.add({
-      object: this.hull, name: 'boat', interactionDistance: 3.4,
+      object: this.hull, name: 'boat', interactionDistance: 4.6,
       interactionLabel: () => 'Board the skiff',
       onInteract: (game) => this.board(game),
     });
@@ -130,7 +130,7 @@ export class Boat {
   }
 
   _buildModel(M) {
-    const paint = wornPaint(0x2f6f78, { bare: 0x8a6a48, wear: 0.32, rust: 0, scale: 0.8, bareMetal: 0, roughness: 0.6, metalness: 0 });
+    const paint = wornPaint(0xe4ddcb, { bare: 0x7a5c40, wear: 0.3, rust: 0, scale: 0.8, bareMetal: 0, roughness: 0.55, metalness: 0 });
     paint.side = THREE.DoubleSide;
     this.paint = paint;
     const innerWood = M.wood.clone();
@@ -236,6 +236,8 @@ export class Boat {
   board(game) {
     if (this.occupied) return;
     this.occupied = true;
+    this.boardedAt = game.time;
+    this.ignoreInteract = true;
     this.moored = false;
     game.player.mode = 'boat';
     game.player.vel.set(0, 0, 0);
@@ -286,7 +288,8 @@ export class Boat {
       const a = input.axis();
       this.throttle = damp(this.throttle, a.y, 2.5, dt);
       this.steer = damp(this.steer, -a.x, 5, dt);
-      if (input.wasPressed('interact')) { this.exit(game); return; }
+      if (input.wasPressed('interact') && !this.ignoreInteract) { this.exit(game); return; }
+      this.ignoreInteract = false;
     } else {
       this.throttle = damp(this.throttle, 0, 3, dt);
       this.steer = damp(this.steer, 0, 3, dt);
@@ -320,6 +323,7 @@ export class Boat {
 
     // prompt when standing nearby
     this.prompt = '';
+    game.ocean.uniforms.uBoat.value.set(this.pos.x, this.pos.z, this.heading, 1);
 
     // audio
     const speed = this.vel.length();

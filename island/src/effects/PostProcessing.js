@@ -148,6 +148,9 @@ void main() {
   vec3 j = s(vec2(-1, 1)), k = s(vec2(1, 1)), l = s(vec2(-1, -1)), m = s(vec2(1, -1));
   vec3 col;
   if (uFirst > 0.5) {
+    // never let a stray NaN/Inf spread through the bloom chain
+    if (any(isnan(e)) || any(isinf(e))) e = vec3(0.0);
+    if (any(isnan(a + b + c + d + f + g + h + i + j + k + l + m))) { gl_FragColor = vec4(karis(e) * 0.0, 1.0); return; }
     col = karis(e) * 0.125 + (karis(a) + karis(c) + karis(g) + karis(i)) * 0.03125 + (karis(b) + karis(d) + karis(f) + karis(h)) * 0.0625 + (karis(j) + karis(k) + karis(l) + karis(m)) * 0.125;
     float lum = luma(col);
     float knee = uThreshold * 0.6;
@@ -223,7 +226,10 @@ void main() {
     uv += vec2(sin(uv.y * 28.0 + uTime * 2.1), cos(uv.x * 24.0 + uTime * 1.7)) * 0.0018 * sub;
   }
   vec3 col = texture2D(tScene, uv).rgb;
-  col += texture2D(tBloom, uv).rgb * uBloom;
+  if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
+  vec3 bl = texture2D(tBloom, uv).rgb;
+  if (any(isnan(bl)) || any(isinf(bl))) bl = vec3(0.0);
+  col += bl * uBloom;
   col *= uExposure * (1.0 + uFlash);
   col *= uWhite;
   if (sub > 0.0) {

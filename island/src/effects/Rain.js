@@ -12,7 +12,7 @@ varying float vAlpha;
 varying float vAlong;
 void main() {
   // instances beyond the current rain amount collapse
-  float active = step(aSeed.w, uRain);
+  float act = step(aSeed.w, uRain);
   float speed = 9.0 + aSeed.z * 3.0;
   vec3 cam = cameraPosition;
   vec2 xz = mod(aSeed.xy * uBox - cam.xz, uBox) - uBox * 0.5 + cam.xz;
@@ -25,14 +25,14 @@ void main() {
   // occlusion: terrain, water and the camp roof
   float th = terrainData(p.xz).r;
   float hide = step(p.y, th + 0.02) + step(p.y, uWaterLevel) + (1.0 - shelterMask(vec3(p.x, min(p.y, uShelterY.y - 0.1), p.z))) * step(p.y, uShelterY.y + 0.2);
-  active *= 1.0 - clamp(hide, 0.0, 1.0);
+  act *= 1.0 - clamp(hide, 0.0, 1.0);
   vec3 dir = normalize(vel);
   vec3 toCam = normalize(cam - p);
   vec3 side = normalize(cross(dir, toCam));
   float len = 0.32 + aSeed.z * 0.25;
   float width = 0.0055;
-  vec3 wp = p + side * position.x * width * active + dir * position.y * len * active;
-  vAlpha = active * (0.5 + aSeed.z * 0.5) * (1.0 - smoothstep(10.0, 16.0, length(p - cam)));
+  vec3 wp = p + side * position.x * width * act + dir * position.y * len * act;
+  vAlpha = act * (0.5 + aSeed.z * 0.5) * (1.0 - smoothstep(10.0, 16.0, length(p - cam)));
   vAlong = position.y;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }`;
@@ -64,11 +64,11 @@ void main() {
   vec2 xz = cameraPosition.xz + vec2(cos(ang), sin(ang)) * rad;
   float th = terrainData(xz).r;
   float y = max(th, uWaterLevel) + 0.02;
-  float active = step(aSeed.w, uRain) * step(t, 0.18) * shelterMask(vec3(xz.x, y, xz.y));
-  float s = (0.04 + t * 0.5) * active;
+  float act = step(aSeed.w, uRain) * step(t, 0.18) * shelterMask(vec3(xz.x, y, xz.y));
+  float s = (0.04 + t * 0.5) * act;
   vec3 camRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
   vec3 wp = vec3(xz.x, y, xz.y) + camRight * position.x * s + vec3(0.0, 1.0, 0.0) * (position.y * 0.5 + 0.5) * s * 0.7;
-  vAlpha = active * (1.0 - t / 0.18);
+  vAlpha = act * (1.0 - t / 0.18);
   vUv = position.xy;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }`;

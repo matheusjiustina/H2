@@ -63,7 +63,7 @@ export class Pebbles {
       this.scene.add(g);
       this.piles.push(g);
       this.interaction.add({
-        object: g, name: 'pebbles', interactionLabel: 'Pick up pebble', interactionDistance: 2.3,
+        object: g, name: 'pebbles', interactionLabel: 'Pick up pebble', interactionDistance: 3.0, boxPadding: 0.15,
         onInteract: (game) => {
           if (game.inventory.count('pebble') >= 8) { game.toast('Pockets are full of pebbles.'); return; }
           game.rig.play('grab', { target: g.position.clone(), duration: 0.6, onPeak: () => { game.inventory.add('pebble', 1); game.audio?.play('pebble'); } });
@@ -167,7 +167,7 @@ export class Pebbles {
     this.active.splice(i, 1);
     const m = p.mesh;
     const it = this.interaction.add({
-      object: m, name: 'pebble', interactionLabel: 'Pick up pebble', interactionDistance: 2.2, boxPadding: 0.12,
+      object: m, name: 'pebble', interactionLabel: 'Pick up pebble', interactionDistance: 3.0, boxPadding: 0.15,
       onInteract: (g) => {
         g.rig.play('grab', { target: m.position.clone(), duration: 0.55, onPeak: () => {
           g.inventory.add('pebble', 1);

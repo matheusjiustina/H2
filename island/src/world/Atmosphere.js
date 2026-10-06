@@ -5,6 +5,7 @@ import { clamp, lerp, smoothstep } from '../utils/MathUtils.js';
 
 const _c = new THREE.Color();
 const _g = new THREE.Color();
+const _nightWhite = new THREE.Vector3(0.86, 0.95, 1.12);
 
 /**
  * Combines time of day + weather into the global lighting state: sun/moon light with
@@ -141,7 +142,7 @@ export class Atmosphere {
     const night = t.night;
     const golden = clamp(t.sunset.r * 1.2, 0, 1) * (1 - o);
     g.white.set(1 + golden * 0.04, 1, 1 - golden * 0.06);
-    if (night > 0) g.white.lerp(_c.setRGB(0.86, 0.95, 1.12), night);
+    if (night > 0) g.white.lerp(_nightWhite, night);
     g.shadowTint.set(-0.014, 0.004, 0.012).multiplyScalar(1 - o * 0.5);
     g.highlightTint.set(0.012 + golden * 0.01, 0.004, -0.012).multiplyScalar(1 - o * 0.6);
     g.saturation = lerp(1.1, 0.92, o) * lerp(1, 0.8, night);

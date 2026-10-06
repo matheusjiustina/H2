@@ -57,36 +57,42 @@ function forearm(len = 0.27) {
   return g;
 }
 
-/** Pose: wrist position/rotation in camera space + finger curls [thumb, index, middle, ring, pinky]. */
-const P = (x, y, z, rx, ry, rz, curl, thumb = curl, spread = 0) => ({ pos: new THREE.Vector3(x, y, z), rot: new THREE.Euler(rx, ry, rz, 'YXZ'), curl: [thumb, curl, curl, curl, curl], spread });
+/**
+ * Pose: wrist position in camera space, roll of the hand around the forearm axis,
+ * wrist bend (pitch, yaw) applied to the palm bone, finger curls [thumb, index..pinky].
+ * The forearm always points from the wrist towards an elbow anchor below the screen.
+ */
+const P = (x, y, z, roll, bp, by, curl, thumb = curl, spread = 0) => ({ pos: new THREE.Vector3(x, y, z), roll, bend: new THREE.Vector2(bp, by), curl: [thumb, curl, curl, curl, curl], spread });
 
 const POSES = {
-  rightIdle: P(0.2, -0.33, -0.33, 0.55, 0.28, -0.35, 0.38, 0.25),
-  leftIdle: P(-0.21, -0.34, -0.35, 0.55, -0.26, 0.38, 0.42, 0.25),
-  rightHold: P(0.15, -0.21, -0.33, 0.25, 0.35, -1.25, 0.62, 0.4),
-  rightGrip: P(0.17, -0.2, -0.38, 0.05, 0.05, -1.45, 0.92, 0.75),
-  rightPalmUp: P(0.12, -0.25, -0.33, 0.45, 0.2, Math.PI - 0.2, 0.32, 0.3),
-  rightLantern: P(0.17, -0.1, -0.41, 0.15, 0.1, -1.5, 0.95, 0.8),
-  rightMug: P(0.14, -0.18, -0.32, 0.2, 0.25, -1.4, 0.75, 0.6),
-  rightCamera: P(0.09, -0.14, -0.3, 0.25, 0.2, -1.35, 0.7, 0.5),
-  leftCamera: P(-0.09, -0.15, -0.3, 0.3, -0.25, 1.35, 0.55, 0.4),
-  rightCameraAim: P(0.075, -0.035, -0.17, 0.05, 0.05, -1.5, 0.7, 0.5),
-  leftCameraAim: P(-0.075, -0.045, -0.17, 0.05, -0.05, 1.5, 0.55, 0.4),
-  rightBino: P(0.06, -0.15, -0.28, 0.3, 0.1, -1.4, 0.8, 0.6),
-  leftBino: P(-0.06, -0.15, -0.28, 0.3, -0.1, 1.4, 0.8, 0.6),
-  rightBinoAim: P(0.04, -0.03, -0.14, 0.0, 0.0, -1.5, 0.8, 0.6),
-  leftBinoAim: P(-0.04, -0.03, -0.14, 0.0, 0.0, 1.5, 0.8, 0.6),
-  rightReach: P(0.12, -0.12, -0.5, -0.1, 0.1, -0.7, 0.12, 0.1),
-  rightThrowBack: P(0.27, -0.03, -0.12, 0.9, 0.1, -1.2, 0.85, 0.8),
-  rightThrowFwd: P(0.12, -0.12, -0.62, -0.5, 0.05, -1.0, 0.1, 0.1),
-  rightDrink: P(0.04, -0.07, -0.16, -0.3, 0.6, -1.4, 0.75, 0.6),
-  rightTiller: P(0.2, -0.36, -0.28, 0.9, 0.5, -1.2, 0.9, 0.7),
-  leftBoat: P(-0.26, -0.36, -0.3, 0.9, -0.4, 0.9, 0.55, 0.4),
-  rightSwim: P(0.18, -0.2, -0.45, -0.2, -0.3, -0.2, 0.15, 0.1),
-  leftSwim: P(-0.18, -0.2, -0.45, -0.2, 0.3, 0.2, 0.15, 0.1),
-  hidden: P(0.25, -0.75, -0.2, 0.9, 0.3, -0.4, 0.4),
-  hiddenL: P(-0.25, -0.75, -0.2, 0.9, -0.3, 0.4, 0.4),
+  rightIdle: P(0.16, -0.32, -0.33, -1.05, 0.05, 0.25, 0.38, 0.25),
+  leftIdle: P(-0.17, -0.33, -0.34, 1.05, 0.05, 0.25, 0.42, 0.25),
+  rightHold: P(0.13, -0.24, -0.33, -1.35, 0.2, 0.15, 0.6, 0.45),
+  rightPalmUp: P(0.1, -0.25, -0.33, -2.75, -0.15, 0.05, 0.3, 0.3),
+  rightGrip: P(0.15, -0.21, -0.36, -1.5, 0.0, 0.08, 0.92, 0.75),
+  rightLantern: P(0.16, -0.12, -0.38, -1.5, -0.25, 0.0, 0.95, 0.8),
+  rightMug: P(0.13, -0.2, -0.32, -1.45, 0.1, 0.2, 0.75, 0.6),
+  rightCamera: P(0.085, -0.16, -0.3, -1.55, 0.1, 0.25, 0.65, 0.5),
+  leftCamera: P(-0.085, -0.17, -0.3, 1.55, 0.1, 0.25, 0.55, 0.4),
+  rightCameraAim: P(0.07, -0.05, -0.18, -1.55, 0.0, 0.3, 0.65, 0.5),
+  leftCameraAim: P(-0.07, -0.055, -0.18, 1.55, 0.0, 0.3, 0.55, 0.4),
+  rightBino: P(0.05, -0.16, -0.27, -1.45, 0.1, 0.2, 0.8, 0.6),
+  leftBino: P(-0.05, -0.16, -0.27, 1.45, 0.1, 0.2, 0.8, 0.6),
+  rightBinoAim: P(0.04, -0.04, -0.13, -1.5, 0.0, 0.25, 0.8, 0.6),
+  leftBinoAim: P(-0.04, -0.04, -0.13, 1.5, 0.0, 0.25, 0.8, 0.6),
+  rightReach: P(0.12, -0.14, -0.45, -0.7, 0.0, 0.0, 0.12, 0.1),
+  rightThrowBack: P(0.24, -0.07, -0.13, -1.2, 0.4, 0.0, 0.85, 0.8),
+  rightThrowFwd: P(0.1, -0.13, -0.52, -0.9, -0.2, 0.0, 0.1, 0.1),
+  rightDrink: P(0.035, -0.09, -0.18, -1.5, 0.35, 0.6, 0.75, 0.6),
+  rightTiller: P(0.21, -0.4, -0.26, -1.1, 0.2, 0.2, 0.9, 0.7),
+  leftBoat: P(-0.25, -0.42, -0.29, 0.8, 0.2, 0.2, 0.55, 0.4),
+  rightSwim: P(0.14, -0.27, -0.44, -0.5, -0.1, 0.1, 0.12, 0.1),
+  leftSwim: P(-0.14, -0.27, -0.44, 0.5, -0.1, 0.1, 0.12, 0.1),
+  hidden: P(0.25, -0.8, -0.1, -0.9, 0.3, 0.2, 0.4),
+  hiddenL: P(-0.25, -0.8, -0.1, 0.9, 0.3, 0.2, 0.4),
 };
+const ELBOW = { right: new THREE.Vector3(0.24, -0.4, 0.2), left: new THREE.Vector3(-0.24, -0.4, 0.2) };
+const _Z = new THREE.Vector3(0, 0, 1);
 
 /**
  * One hand + forearm as a single SkinnedMesh with rigidly bound parts (one draw call
@@ -179,7 +185,7 @@ class Hand {
     this.grip.position.set(-0.004, -0.032, -0.07);
     this.palm.add(this.grip);
 
-    this.cur = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), curl: [0.3, 0.3, 0.3, 0.3, 0.3] };
+    this.cur = { pos: new THREE.Vector3(), roll: 0, bend: new THREE.Vector2(), quat: new THREE.Quaternion(), curl: [0.3, 0.3, 0.3, 0.3, 0.3] };
     this.vel = new THREE.Vector3();
   }
 
@@ -285,10 +291,21 @@ export class FirstPersonRig {
     cur.pos.x = damp(cur.pos.x, target.pos.x, stiff, dt);
     cur.pos.y = damp(cur.pos.y, target.pos.y, stiff, dt);
     cur.pos.z = damp(cur.pos.z, target.pos.z, stiff, dt);
-    this._q.setFromEuler(target.rot);
-    cur.quat.slerp(this._q, 1 - Math.exp(-stiff * dt));
+    cur.roll = damp(cur.roll, target.roll, stiff, dt);
+    cur.bend.x = damp(cur.bend.x, target.bend.x, stiff, dt);
+    cur.bend.y = damp(cur.bend.y, target.bend.y, stiff, dt);
     for (let i = 0; i < 5; i++) cur.curl[i] = damp(cur.curl[i], target.curl[i], stiff * 0.9, dt);
     hand.applyCurl(cur.curl, target.spread || 0);
+    hand.palm.rotation.set(cur.bend.x, cur.bend.y * (hand.side === 'left' ? 1 : 1), 0);
+  }
+
+  /** Orient a wrist so its forearm points at the elbow anchor, then roll around that axis. */
+  _orient(hand, pos) {
+    const elbow = ELBOW[hand.side];
+    const f = this._v.subVectors(elbow, pos).normalize();
+    hand.cur.quat.setFromUnitVectors(_Z, f);
+    this._q.setFromAxisAngle(f, hand.cur.roll);
+    hand.cur.quat.premultiply(this._q);
   }
 
   update(dt, game) {
@@ -318,13 +335,13 @@ export class FirstPersonRig {
       const k = a.t / a.duration;
       if (a.type === 'reach' || a.type === 'grab') {
         const reach = POSES.rightReach;
-        const custom = { ...reach, pos: reach.pos.clone() };
+        const custom = { ...reach, pos: reach.pos.clone(), bend: reach.bend.clone() };
         if (a.target) {
           // move the wrist towards the target, in camera space, clamped to arm reach
           const local = this.camera.worldToLocal(this._v.copy(a.target));
-          local.multiplyScalar(Math.min(1, 0.55 / Math.max(local.length(), 0.01)));
-          local.y -= 0.04; local.x += 0.03; local.z += 0.06;
-          custom.pos.lerpVectors(reach.pos, local, 0.85);
+          local.multiplyScalar(Math.min(1, 0.5 / Math.max(local.length(), 0.01)));
+          local.y -= 0.05; local.x += 0.04; local.z += 0.09;
+          custom.pos.lerpVectors(reach.pos, local, 0.8);
         }
         const out = k < 0.45;
         rt = out ? custom : rt;
@@ -373,6 +390,7 @@ export class FirstPersonRig {
         hand.cur.pos.y - this.swayY * 0.8 - bobY + breath - land - sprint * 0.03,
         hand.cur.pos.z + sprint * 0.04,
       );
+      this._orient(hand, hand.root.position);
       hand.root.quaternion.copy(hand.cur.quat);
       hand.root.rotateZ(sign * Math.cos(ph) * 0.03 * walk);
     }

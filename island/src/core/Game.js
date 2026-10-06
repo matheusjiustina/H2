@@ -459,5 +459,13 @@ export class Game {
   // ------------------------------------------------------------- debug helpers
   setTime(h) { this.timeOfDay.setHour(h); this.atmosphere.update(0, this.camera); this.atmosphere.updateEnvironment(); }
   setWeather(w, instant = true) { this.weather.set(w, instant); }
+  lookAt(x, y, z) {
+    const e = this.camera.position;
+    this.player.yaw = Math.atan2(-(x - e.x), -(z - e.z));
+    this.player.pitch = Math.atan2(y - e.y, Math.hypot(x - e.x, z - e.z));
+    this.player._updateCamera(0);
+    this.camera.updateMatrixWorld();
+  }
+
   teleport(x, z, yaw = this.player.yaw, pitch = 0) { if (this.boat.occupied) this.boat.exit(this); this.player.spawn(x, z, yaw, pitch); }
 }

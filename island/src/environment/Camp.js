@@ -396,35 +396,35 @@ export class Camp {
       },
     });
     const flIt = it(this.items.flashlight.group, {
-      name: 'flashlight', interactionLabel: 'Take', interactionDistance: 2.2,
+      name: 'flashlight', interactionLabel: 'Take', interactionDistance: 2.6, priority: 2,
       onInteract: (game) => game.pickUp('flashlight'),
     });
     this.items.flashlight.interactable = flIt;
     this.items.lantern.interactable = it(this.items.lantern.group, {
-      name: 'lantern', interactionLabel: 'Take',
+      name: 'lantern', priority: 1, interactionLabel: 'Take',
       secondaryLabel: () => (this.state.lanternLit ? 'Snuff' : 'Light'),
       onInteract: (game) => game.pickUp('lantern'),
       onSecondary: (game) => { this.state.lanternLit = !this.state.lanternLit; game.audio?.play(this.state.lanternLit ? 'ignite' : 'snuff', { position: this.items.lantern.group.position }); game.rig?.play('reach', { target: this.items.lantern.group.getWorldPosition(new THREE.Vector3()), duration: 0.45 }); },
     });
-    this.items.compass.interactable = it(this.items.compass.group, { name: 'compass', interactionLabel: 'Take', onInteract: (game) => game.pickUp('compass') });
-    this.items.camera.interactable = it(this.items.camera.group, { name: 'camera', interactionLabel: 'Take', onInteract: (game) => game.pickUp('camera') });
+    this.items.compass.interactable = it(this.items.compass.group, { name: 'compass', priority: 1, interactionLabel: 'Take', onInteract: (game) => game.pickUp('compass') });
+    this.items.camera.interactable = it(this.items.camera.group, { name: 'camera', priority: 1, interactionLabel: 'Take', onInteract: (game) => game.pickUp('camera') });
     this.items.mug.interactable = it(this.items.mug.group, {
-      name: 'mug', interactionLabel: 'Take', secondaryLabel: 'Drink',
+      name: 'mug', priority: 1, interactionLabel: 'Take', secondaryLabel: 'Drink',
       onInteract: (game) => game.pickUp('mug'),
       onSecondary: (game) => { game.rig?.play('reach', { target: this.items.mug.group.position.clone(), duration: 0.45 }); game.toast('Cold coffee. Strong enough to strip paint.'); },
     });
     this.items.notebook.interactable = it(this.items.notebook.group, {
-      name: 'notebook', interactionLabel: 'Read', secondaryLabel: 'Take',
+      name: 'notebook', priority: 1, interactionLabel: 'Read', secondaryLabel: 'Take',
       onInteract: (game) => game.ui.openNotebook(),
       onSecondary: (game) => game.pickUp('notebook'),
     });
     this.items.map.interactable = it(this.items.map.group, {
-      name: 'map', interactionLabel: 'Study', secondaryLabel: 'Take',
+      name: 'map', priority: 1, interactionLabel: 'Study', secondaryLabel: 'Take',
       onInteract: (game) => game.inspectMap(this.items.map.group),
       onSecondary: (game) => game.pickUp('map'),
     });
     it(radio.group, {
-      name: 'radio',
+      name: 'radio', priority: 1,
       interactionLabel: () => (this.state.radioOn ? 'Turn off' : 'Turn on'),
       secondaryLabel: () => (this.state.radioOn ? 'Tune' : null),
       onInteract: (game) => { this.state.radioOn = !this.state.radioOn; game.audio?.setRadio(this.state.radioOn, this.state.radioStation, radio.group.position); game.audio?.play('click', { position: radio.group.position }); game.rig?.play('reach', { target: radio.group.position.clone().add(new THREE.Vector3(0, 0.1, 0)), duration: 0.45 }); },

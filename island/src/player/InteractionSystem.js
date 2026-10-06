@@ -8,7 +8,7 @@ export class Interactable {
   constructor(opts) {
     this.name = '';
     this.object = null; // Object3D used for the ray test (its bounding box)
-    this.interactionDistance = 2.5;
+    this.interactionDistance = 2.7;
     this.interactionLabel = 'Interact';
     this.secondaryLabel = null;
     this.enabled = true;
@@ -16,6 +16,7 @@ export class Interactable {
     this.onSecondary = null; // (game) => void
     this.boxPadding = 0.04;
     this.hint = null; // optional reach target (world point) for the hand animation
+    this.priority = 0; // higher wins when several boxes are hit (items inside containers)
     Object.assign(this, opts);
     this._box = new THREE.Box3();
   }
@@ -61,7 +62,7 @@ export class InteractionSystem {
     const cam = game.camera;
     cam.getWorldDirection(this._dir);
     this.ray.set(cam.position, this._dir);
-    let best = null, bestD = Infinity;
+    let best = null, bestD = Infinity, bestP = -Infinity;
     const cp = cam.position;
     for (const it of this.items) {
       if (!it.enabled || !it.object || !it.object.visible) continue;
@@ -72,9 +73,11 @@ export class InteractionSystem {
       const hit = this.ray.intersectBox(box, this._hit);
       if (!hit) continue;
       const d = hit.distanceTo(cp);
-      if (d > it.interactionDistance || d >= bestD) continue;
+      if (d > it.interactionDistance) continue;
+      if (it.priority < bestP || (it.priority === bestP && d >= bestD)) continue;
       best = it;
       bestD = d;
+      bestP = it.priority;
       this.hitPoint.copy(hit);
     }
     // occlusion by solid world geometry (crate walls etc. are fine; terrain blocks)

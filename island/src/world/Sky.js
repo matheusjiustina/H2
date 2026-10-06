@@ -37,7 +37,8 @@ void main() {
 
   // stars + milky way at night
   if (uNight > 0.01 && dir.y > -0.05) {
-    float band = exp(-pow(dot(dir, normalize(vec3(0.4, 0.55, 0.73))) * 3.2, 2.0));
+    float bd = dot(dir, normalize(vec3(0.4, 0.55, 0.73))) * 3.2;
+    float band = exp(-bd * bd);
     float mw = texture2D(uNoiseTex, dir.xz * 1.7 + dir.y).g;
     vec3 stars = vec3(starField(dir)) * (1.0 - uEnvMode);
     col += (stars * 1.6 + vec3(0.16, 0.17, 0.24) * band * mw * 0.08) * uNight * smoothstep(-0.05, 0.25, dir.y) * (1.0 - uCloudCover * 0.9);

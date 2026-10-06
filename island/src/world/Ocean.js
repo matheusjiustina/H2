@@ -122,6 +122,7 @@ uniform sampler2D uRipples;
 uniform vec4 uRippleArea;
 uniform float uDetailLayers;
 uniform float uFar;
+uniform vec4 uBoat; // x, z, heading, active
 varying vec3 vWorld;
 varying vec2 vGrid;
 varying float vViewZ;
@@ -156,6 +157,18 @@ void main() {
   float distCam = length(toCam);
   vec3 V = toCam / distCam;
   bool below = uUnderwater > 0.5;
+  // keep the water out of the skiff's hull
+  if (uBoat.w > 0.5 && !below) {
+    vec2 bd = P.xz - uBoat.xy;
+    float bc = cos(uBoat.z), bs = sin(uBoat.z);
+    float lz = bd.x * bs + bd.y * bc;
+    float lx = bd.x * bc - bd.y * bs;
+    float bt = (lz + 2.2) / 4.4;
+    if (bt > 0.02 && bt < 0.97) {
+      float hb = 0.76 * pow(sin(3.14159 * (0.25 + 0.75 * bt)), 0.75) - 0.05;
+      if (abs(lx) < hb) discard;
+    }
+  }
   vec4 td = terrainData(grid);
   float energy = td.a;
   float depthV = max(P.y - td.r, 0.0);
@@ -320,6 +333,7 @@ export class Ocean {
       uFoamTex: { value: textures.foam },
       uDetailLayers: { value: 3 },
       uFar: { value: 5000 },
+      uBoat: { value: new THREE.Vector4(0, 0, 0, 0) },
       ...ripples.uniforms,
     };
     this.material = new THREE.ShaderMaterial({

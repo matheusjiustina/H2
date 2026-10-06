@@ -49,7 +49,7 @@ export class Collectibles {
       m.layers.set(LAYER.DETAIL);
       scene.add(m);
       const it = interaction.add({
-        object: m, name: 'shell', interactionLabel: 'Collect shell', interactionDistance: 2.4, boxPadding: 0.15,
+        object: m, name: 'shell', interactionLabel: 'Collect shell', interactionDistance: 3.0, boxPadding: 0.18, priority: 1,
         onInteract: (g) => {
           g.rig.play('grab', { target: m.position.clone(), duration: 0.6, onPeak: () => {
             scene.remove(m);
