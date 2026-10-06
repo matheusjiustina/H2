@@ -97,6 +97,11 @@ const TERRAIN_FRAG_MAIN = /* glsl */ `
   float puddle = smoothstep(0.58, 0.68, puddleN + uWetness * 0.12) * flatness * uWetness * (1.0 - sandness) * smoothstep(0.3, 0.8, w[4] + w[2] + w[6]) * step(0.2, h);
   float wet = max(shoreWet * mix(0.7, 1.0, sandness), puddle);
 
+  // wrack line: seaweed, twigs and shell grit left at the high-water mark
+  float wrackBand = smoothstep(2.0, 3.5, shore) * (1.0 - smoothstep(5.5, 8.0, shore + macro2 * 3.0));
+  float wrackN = texture2D(uNoiseTex, vWPos.xz * 0.9).g * 0.6 + texture2D(uNoiseTex, vWPos.xz * 3.1).b * 0.4;
+  float wrack = smoothstep(0.58, 0.72, wrackN) * wrackBand * sandness;
+  alb = mix(alb, mix(vec3(0.08, 0.07, 0.04), vec3(0.22, 0.16, 0.09), micro), wrack * 0.85);
   diffuseColor.rgb = alb * mix(1.0, 0.62, wet);
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.55, 0.62, 0.68), puddle * 0.8);
   _terrRough = mix(rough, 0.08, wet * 0.85);

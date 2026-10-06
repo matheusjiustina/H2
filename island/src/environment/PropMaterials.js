@@ -61,6 +61,8 @@ export function createPropMaterials(textures) {
   patchMaterial(M.olive, { wet: 1.0, key: 'olive' });
   M.blueTarp = new THREE.MeshPhysicalMaterial({ map: textures.fabric, normalMap: textures.fabricNormal, color: new THREE.Color(0.16, 0.36, 0.5), roughness: 0.8, sheen: 0.2, side: THREE.DoubleSide });
   patchMaterial(M.blueTarp, { wind: 'cloth', wet: 1.0, key: 'blueTarp' });
+  M.hammock = new THREE.MeshPhysicalMaterial({ map: textures.fabric, normalMap: textures.fabricNormal, color: new THREE.Color(0xb5643a), roughness: 0.95, sheen: 0.5, sheenColor: new THREE.Color(0xffc49a), side: THREE.DoubleSide });
+  patchMaterial(M.hammock, { wet: 1.0, translucency: 0.35, key: 'hammock' });
   M.cloth = new THREE.MeshPhysicalMaterial({ map: textures.fabric, color: new THREE.Color(0.75, 0.32, 0.22), roughness: 0.95, sheen: 0.5, sheenColor: new THREE.Color(1, 0.7, 0.6), side: THREE.DoubleSide });
   patchMaterial(M.cloth, { wind: 'cloth', wet: 1.0, translucency: 0.3, key: 'clothRed' });
   M.rope = new THREE.MeshStandardMaterial({ map: textures.fabric, color: new THREE.Color(0.62, 0.5, 0.34), roughness: 0.95 });

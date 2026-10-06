@@ -11,11 +11,11 @@ const E = (x, y, z) => new THREE.Euler(x, y, z, 'YXZ');
 const OFFSETS = {
   lantern: { pos: V(-0.03, -0.31, -0.075), rot: E(0, 0.3, 0) },
   flashlight: { pos: V(-0.02, -0.035, -0.02), rot: E(0.04, Math.PI, 0) },
-  compass: { pos: V(0.005, 0.012, -0.075), rot: E(0.35, 0, 0) },
+  compass: { pos: V(-0.015, 0.03, -0.055), rot: E(0.35, 0, 0) },
   camera: { pos: V(-0.085, 0.015, -0.035), rot: E(0, Math.PI, 0) },
   binoculars: { pos: V(-0.055, 0.015, -0.04), rot: E(0, 0, 0) },
   mug: { pos: V(-0.03, -0.075, -0.06), rot: E(0, -1.2, 0) },
-  pebble: { pos: V(0.0, 0.012, -0.07), rot: E(0.3, 0.4, 0.1) },
+  pebble: { pos: V(-0.01, 0.022, -0.06), rot: E(0.3, 0.4, 0.1) },
 };
 
 /** Behaviour + view models of hand-held items. */

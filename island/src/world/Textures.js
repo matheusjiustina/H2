@@ -12,9 +12,9 @@ void layer(vec2 uv, out vec3 col, out float h, out float r) {
   float mac = pfbm(uv, 3.0, 4, 0.55) * 0.5 + 0.5;
   vec2 w = vec2(pfbm(uv, 3.0, 3, 0.5), pfbm(uv + 0.37, 3.0, 3, 0.5));
   float rip = sin(2.0 * PI * (uv.x * 19.0 + uv.y * 7.0) + w.x * 6.0 + w.y * 3.0) * 0.5 + 0.5;
-  rip = pow(rip, 1.7) * (0.55 + 0.45 * mac);
-  h = rip * 0.4 + fine * 0.3 + grains * 0.3;
-  vec3 base = mix(vec3(0.93, 0.87, 0.74), vec3(0.84, 0.76, 0.61), mac * 0.7);
+  rip = pow(rip, 1.7) * smoothstep(0.25, 0.75, mac);
+  h = rip * 0.22 + fine * 0.38 + grains * 0.4;
+  vec3 base = mix(vec3(0.97, 0.9, 0.75), vec3(0.87, 0.77, 0.6), mac * 0.75);
   base *= 0.9 + grains * 0.18 + (fine - 0.5) * 0.1;
   float speck = step(0.94, hash1(floor(uv * 512.0)));
   base = mix(base, vec3(0.42, 0.38, 0.34), speck * 0.45);
@@ -33,8 +33,8 @@ void layer(vec2 uv, out vec3 col, out float h, out float r) {
   float blades = pnoise(vec2(uv.x * 384.0, uv.y * 96.0), vec2(384.0, 96.0)) * 0.5 + 0.5;
   float blades2 = pnoise(vec2(uv.x * 96.0 + uv.y * 96.0, uv.y * 384.0), vec2(96.0, 384.0)) * 0.5 + 0.5;
   float b = max(blades, blades2);
-  vec3 g1 = vec3(0.24, 0.33, 0.10);
-  vec3 g2 = vec3(0.42, 0.47, 0.17);
+  vec3 g1 = vec3(0.26, 0.37, 0.10);
+  vec3 g2 = vec3(0.45, 0.52, 0.17);
   vec3 dry = vec3(0.55, 0.50, 0.28);
   col = mix(g1, g2, n1);
   col = mix(col, dry, smoothstep(0.62, 0.85, n2) * 0.55);
@@ -46,11 +46,11 @@ void layer(vec2 uv, out vec3 col, out float h, out float r) {
 }`,
   forest: /* glsl */ `
 vec3 leafPalette(float t) {
-  if (t < 0.25) return vec3(0.42, 0.27, 0.13);
-  if (t < 0.45) return vec3(0.25, 0.17, 0.09);
-  if (t < 0.62) return vec3(0.55, 0.42, 0.18);
-  if (t < 0.8) return vec3(0.30, 0.31, 0.12);
-  return vec3(0.50, 0.22, 0.10);
+  if (t < 0.25) return vec3(0.38, 0.27, 0.15);
+  if (t < 0.45) return vec3(0.24, 0.18, 0.11);
+  if (t < 0.62) return vec3(0.48, 0.40, 0.22);
+  if (t < 0.8) return vec3(0.29, 0.30, 0.14);
+  return vec3(0.42, 0.25, 0.13);
 }
 void leafLayer(vec2 uv, float cells, float seed, inout vec3 col, inout float h, inout float top) {
   vec2 p = uv * cells;
@@ -195,7 +195,7 @@ void main() {
 }`;
 }
 
-const NORMAL_STRENGTH = { sand: 5, grass: 7, forest: 9, rock: 14, dirt: 8, coral: 10, mud: 4 };
+const NORMAL_STRENGTH = { sand: 3.2, grass: 7, forest: 9, rock: 14, dirt: 8, coral: 10, mud: 4 };
 
 // ---------------------------------------------------------------- other maps
 const NOISE_FRAG = /* glsl */ `
@@ -267,15 +267,15 @@ void wood(vec2 uv, out vec3 col, out float h, out float r) {
   vec4 kv = pvoronoi(vec2(uv.x, uv.y * 4.0), 3.0, 0.8);
   float knot = smoothstep(0.22, 0.05, kv.x) * step(0.72, kv.z);
   float knotRing = sin(kv.x * 90.0) * 0.5 + 0.5;
-  vec3 light = vec3(0.62, 0.55, 0.46);
-  vec3 warm = vec3(0.50, 0.37, 0.24);
-  vec3 dark = vec3(0.30, 0.23, 0.17);
+  vec3 light = vec3(0.74, 0.65, 0.53);
+  vec3 warm = vec3(0.6, 0.45, 0.3);
+  vec3 dark = vec3(0.36, 0.27, 0.19);
   col = mix(light, warm, grain * 0.55 + rings * 0.15);
   col = mix(col, dark, pow(grain, 6.0) * 0.6);
   col *= 0.86 + fibre * 0.22;
   col = mix(col, dark * (0.7 + 0.5 * knotRing), knot);
   float weather = pfbm(uv, 3.0, 4, 0.5) * 0.5 + 0.5;
-  col = mix(col, vec3(0.58, 0.57, 0.55), smoothstep(0.4, 0.8, weather) * 0.45);
+  col = mix(col, vec3(0.68, 0.66, 0.61), smoothstep(0.4, 0.8, weather) * 0.4);
   float stain = smoothstep(0.62, 0.8, pfbm(uv + 0.47, 5.0, 4, 0.55) * 0.5 + 0.5);
   col *= 1.0 - stain * 0.35;
   h = grain * 0.4 + fibre * 0.4 - knot * 0.2 + (1.0 - weather) * 0.1;

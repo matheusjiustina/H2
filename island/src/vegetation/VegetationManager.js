@@ -231,8 +231,8 @@ export class VegetationManager {
       if (this._excluded(x, z)) return null;
       const s = this._site(x, z);
       if (s.dc < 24 || s.sl > 0.62 || s.pd < 1.3 || s.h < 1.0) return null;
-      const p = 0.08 + s.s.canopy * 0.75 + (1 - smoothstep(0, 18, Math.hypot(x - WATERFALL.x, z - WATERFALL.z) - WATERFALL.poolRadius)) * 0.6;
-      if (rv > p * 0.85) return null;
+      const p = 0.1 + s.s.canopy * 0.85 + (1 - smoothstep(0, 18, Math.hypot(x - WATERFALL.x, z - WATERFALL.z) - WATERFALL.poolRadius)) * 0.6 + (1 - smoothstep(2, 6, s.pd)) * 0.25;
+      if (rv > p * 0.9) return null;
       return { x, y: s.h - 0.05, z, rot: r() * 6.28, scale: 0.7 + r() * 0.65, variant: Math.floor(r() * 3), tint: [0.85 + r() * 0.25, 0.95 + r() * 0.1, 0.8 + r() * 0.2] };
     }).forEach((o) => add('fern', o));
     progress(0.7);
@@ -242,7 +242,7 @@ export class VegetationManager {
       if (this._excluded(x, z)) return null;
       const s = this._site(x, z);
       if (s.dc < 28 || s.sl > 0.5 || s.pd < 1.6 || s.h < 1.0) return null;
-      const p = 0.04 + s.s.canopy * 0.42;
+      const p = 0.05 + s.s.canopy * 0.5 + (1 - smoothstep(2, 7, s.pd)) * 0.15;
       if (rv > p) return null;
       return { x, y: s.h - 0.05, z, rot: r() * 6.28, scale: 0.75 + r() * 0.7, variant: Math.floor(r() * 2), tint: [0.9 + r() * 0.15, 1, 0.9 + r() * 0.15] };
     }).forEach((o) => add('bigleaf', o));
@@ -254,7 +254,7 @@ export class VegetationManager {
       if (s.sl > 0.5 || s.pd < 1.6 || s.h < 0.9) return null;
       const edge = smoothstep(14, 22, s.dc) * (1 - smoothstep(48, 80, s.dc));
       const beach = smoothstep(7, 11, s.dc) * (1 - smoothstep(17, 24, s.dc));
-      const p = edge * 0.55 + beach * 0.32 + 0.05 * smoothstep(60, 80, s.dc);
+      const p = edge * 0.6 + beach * 0.32 + 0.12 * smoothstep(60, 80, s.dc) * (0.4 + s.s.canopy);
       if (rv > p) return null;
       const v = beach > edge ? 3 : Math.floor(r() * 3);
       return { x, y: s.h - 0.08, z, rot: r() * 6.28, scale: 0.7 + r() * 0.7, variant: v, tint: [0.9 + r() * 0.2, 0.95 + r() * 0.1, 0.9 + r() * 0.15] };

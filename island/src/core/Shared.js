@@ -112,14 +112,20 @@ float shelterMask(vec3 wp) {
 }
 
 // Cloud layer shared by sky, cloud shadows and reflections. p in kilometres.
+// Domain-warped fbm masses + voronoi puffs give billowy cumulus shapes.
 float cloudDensity(vec2 p) {
   vec2 q = p + uCloudOffset;
-  float n = texture2D(uNoiseTex, q * 0.11).r * 0.55
-          + texture2D(uNoiseTex, q * 0.29 + vec2(0.31, 0.17)).g * 0.30
-          + texture2D(uNoiseTex, q * 0.83 - uCloudOffset * 0.6).b * 0.15;
+  vec2 w = vec2(texture2D(uNoiseTex, q * 0.045).g, texture2D(uNoiseTex, q * 0.045 + 0.5).b) - 0.5;
+  q += w * 1.4;
+  float base = texture2D(uNoiseTex, q * 0.05).r;
+  float mid = texture2D(uNoiseTex, q * 0.15 + vec2(0.31, 0.17)).g;
+  float puff = 1.0 - clamp(texture2D(uNoiseTex, q * 0.2 + 0.17).a * 1.5, 0.0, 1.0);
+  float fine = texture2D(uNoiseTex, q * 0.6 - uCloudOffset * 0.4).b;
+  float n = base * 0.5 + mid * 0.22 + puff * 0.18 + fine * 0.1;
+  n = (n - 0.5) * 1.8 + 0.5;
   float cov = clamp(uCloudCover, 0.0, 1.0);
-  float lo = mix(0.78, 0.18, cov);
-  return smoothstep(lo, lo + mix(0.18, 0.4, cov), n);
+  float lo = mix(0.86, 0.12, cov);
+  return smoothstep(lo, lo + mix(0.14, 0.42, cov), n);
 }
 const float CLOUD_HEIGHT = 1.6; // km
 

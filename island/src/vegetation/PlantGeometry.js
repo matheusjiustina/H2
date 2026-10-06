@@ -346,14 +346,14 @@ export function buildTree(seed, lod = 0, opts = {}) {
     }
   }
   // leaf cards around branch ends, forming a broad umbrella crown
-  const cardsPer = [16, 10, 6][lod];
+  const cardsPer = [20, 12, 7][lod];
   const atlasCell = r() < 0.5 ? 0 : 1;
   for (const e of ends) {
     const n = Math.round(cardsPer * (e.t === 1 ? 1 : 0.6));
     for (let k = 0; k < n; k++) {
       const off = new THREE.Vector3((r() - 0.5) * 3.0, (r() - 0.35) * 1.6, (r() - 0.5) * 3.0);
       const c = e.p.clone().add(off);
-      const size = (lod === 2 ? 4.2 : lod === 1 ? 3.2 : 2.6) + r() * 1.2;
+      const size = (lod === 2 ? 4.6 : lod === 1 ? 3.6 : 2.9) + r() * 1.3;
       const nd = new THREE.Vector3((r() - 0.5) * 1.2, 0.8 + r() * 0.5, (r() - 0.5) * 1.2);
       const d = c.clone().sub(crownCenter);
       const ao = 0.55 + 0.45 * smoothstep(0.2, 1.0, d.length() / crownR);
@@ -363,7 +363,7 @@ export function buildTree(seed, lod = 0, opts = {}) {
     }
   }
   // crown fill cards (inner volume)
-  const fill = [18, 9, 5][lod];
+  const fill = [24, 12, 6][lod];
   for (let k = 0; k < fill; k++) {
     const a = r() * Math.PI * 2, d = Math.sqrt(r()) * crownR * 0.7;
     const c = crownCenter.clone().add(new THREE.Vector3(Math.cos(a) * d, (r() - 0.2) * 1.8, Math.sin(a) * d));

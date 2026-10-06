@@ -517,6 +517,86 @@ export class Camp {
     shirt.quaternion.copy(towel.quaternion);
     this.group.add(shirt);
 
+    // hammock between a palm and a driven pole
+    {
+      const a = new THREE.Vector3(-6.3, ground(-6.3, 9.8) + 1.75, 9.8);
+      const px = -10.2, pz = 11.6;
+      const poleY = ground(px, pz);
+      const pole = staticMesh(place(woodCylinder(0.08, 0.07, 2.4, { seed: 71, radial: 8 }), px, poleY + 1.0, pz, 0.08, 0, -0.1), M.woodDark, LAYER.DETAIL);
+      this.group.add(pole);
+      this.collision.addCylinder({ x: px, z: pz, r: 0.1, y0: poleY - 1, y1: poleY + 2.2, surface: 'wood' });
+      const b = new THREE.Vector3(px + 0.1, poleY + 1.85, pz);
+      const dir = new THREE.Vector3().subVectors(b, a);
+      const len = dir.length();
+      dir.normalize();
+      const side = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+      const s0 = a.clone().addScaledVector(dir, 0.75), s1 = b.clone().addScaledVector(dir, -0.75);
+      s0.y -= 0.35; s1.y -= 0.35;
+      const hb = new GeoBuilder();
+      const nu = 16, nv = 6;
+      for (let i = 0; i <= nu; i++) {
+        const t = i / nu;
+        const c = new THREE.Vector3().lerpVectors(s0, s1, t);
+        c.y -= Math.sin(t * Math.PI) * 0.55;
+        for (let j = 0; j <= nv; j++) {
+          const v = j / nv - 0.5;
+          const w = 0.45 * (0.75 + 0.25 * Math.sin(t * Math.PI));
+          const p = c.clone().addScaledVector(side, v * w * 2);
+          p.y += v * v * 0.35 * Math.sin(t * Math.PI);
+          hb.v(p, new THREE.Vector3(0, 1, 0), t * 2, j / nv, [1, 1, 1], [0, 0.15 * Math.sin(t * Math.PI), 0.3, 0]);
+        }
+      }
+      for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) { const k = i * (nv + 1) + j; hb.quad(k, k + nv + 1, k + nv + 2, k + 1); }
+      const hg = hb.build();
+      hg.computeVertexNormals();
+      this.group.add(staticMesh(hg, M.hammock, LAYER.DETAIL));
+      const ropes = [];
+      for (const [end, anchor] of [[s0, a], [s1, b]]) {
+        for (const k of [-1, -0.33, 0.33, 1]) ropes.push(ropeGeometry(anchor, end.clone().addScaledVector(side, k * 0.34), 0.02, 0.006, 4));
+        ropes.push(place(woodCylinder(0.02, 0.02, 0.75, { radial: 5 }), end.x, end.y, end.z, 0, Math.atan2(side.x, side.z), Math.PI / 2));
+      }
+      this.group.add(staticMesh(merge(ropes), M.rope, LAYER.DETAIL));
+      const hammockProxy = new THREE.Mesh(new THREE.BoxGeometry(len * 0.6, 0.5, 0.9), new THREE.MeshBasicMaterial({ visible: false }));
+      hammockProxy.position.copy(new THREE.Vector3().lerpVectors(s0, s1, 0.5)).add(new THREE.Vector3(0, -0.3, 0));
+      hammockProxy.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI / 2;
+      this.group.add(hammockProxy);
+      this.interaction.add({ object: hammockProxy, name: 'hammock', interactionLabel: 'Rest in the hammock', interactionDistance: 3.0, onInteract: (game) => game.rest() });
+    }
+
+    // supply pile under a blue tarp
+    {
+      const cx = 5.6, cz = 6.4;
+      const gy = ground(cx, cz);
+      const boxes = [[0, 0, 0.8, 0.55, 0.6], [0.55, 0.2, 0.5, 0.42, 0.5], [-0.2, -0.3, 0.6, 0.35, 0.45], [0.1, 0.05, 0.55, 0.32, 0.5, 0.55]];
+      const heightAt = (x, z) => {
+        let h = 0;
+        for (const [bx, bz, w, hh, d, oy = 0] of boxes) if (Math.abs(x - bx) < w / 2 + 0.06 && Math.abs(z - bz) < d / 2 + 0.06) h = Math.max(h, hh + oy);
+        return h;
+      };
+      const tb = new GeoBuilder();
+      const n = 18;
+      const size = 2.0;
+      for (let j = 0; j <= n; j++) {
+        for (let i = 0; i <= n; i++) {
+          const x = (i / n - 0.5) * size, z = (j / n - 0.5) * size * 0.85;
+          let h = 0;
+          for (let k = -1; k <= 1; k++) for (let l = -1; l <= 1; l++) h += heightAt(x + k * 0.09, z + l * 0.09);
+          h = h / 9 + 0.015 + Math.sin(x * 9) * 0.008;
+          const edge = Math.max(Math.abs(x) / (size / 2), Math.abs(z) / (size * 0.425));
+          if (edge > 0.82) h *= Math.max(0, 1 - (edge - 0.82) * 4);
+          tb.v(new THREE.Vector3(cx + x, gy + h, cz + z), new THREE.Vector3(0, 1, 0), i / n * 2, j / n * 2, [1, 1, 1], [0, 0.04, 0.5, 0]);
+        }
+      }
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * (n + 1) + i; tb.quad(k, k + n + 1, k + n + 2, k + 1); }
+      const tg = tb.build();
+      tg.computeVertexNormals();
+      this.group.add(staticMesh(tg, M.blueTarp, LAYER.DETAIL));
+      this.collision.addBox({ x: cx, y: gy + 0.3, z: cz, hx: 0.75, hy: 0.32, hz: 0.6, surface: 'cloth' });
+      const bucket = staticMesh(new THREE.CylinderGeometry(0.15, 0.12, 0.3, 14, 1, true), M.metalOlive, LAYER.DETAIL);
+      bucket.position.set(cx - 1.25, gy + 0.15, cz - 0.4);
+      this.group.add(bucket);
+    }
+
     // sign at the trailhead
     const sign = buildSign(M, 'FALLS  ↑\nLOOKOUT  →');
     sign.position.set(3.6, ground(3.6, 12.2), 12.2);

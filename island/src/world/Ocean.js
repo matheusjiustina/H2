@@ -207,7 +207,7 @@ void main() {
   vec3 L = normalize(uSunDir);
   float NdV = max(dot(N, V), 0.0);
   float fresnel = 0.02 + 0.98 * pow(1.0 - NdV, 5.0);
-  fresnel = min(fresnel, 0.92);
+  fresnel = min(fresnel, mix(0.9, 0.62, smoothstep(60.0, 700.0, distCam)));
 
   // ----- refraction
   vec2 suv = gl_FragCoord.xy / uResolution;
@@ -224,9 +224,9 @@ void main() {
   vec3 absorb = vec3(0.39, 0.085, 0.062) * (1.0 + uRain * 0.6);
   vec3 T = exp(-absorb * pathLen);
   float dmix = smoothstep(0.3, 22.0, depthV);
-  vec3 shallowCol = vec3(0.025, 0.42, 0.40);
-  vec3 midCol = vec3(0.0, 0.2, 0.34);
-  vec3 deepCol = vec3(0.0, 0.035, 0.11);
+  vec3 shallowCol = vec3(0.02, 0.5, 0.47);
+  vec3 midCol = vec3(0.0, 0.22, 0.38);
+  vec3 deepCol = vec3(0.0, 0.045, 0.15);
   vec3 scatter = mix(shallowCol, midCol, smoothstep(0.0, 0.35, dmix));
   scatter = mix(scatter, deepCol, smoothstep(0.25, 1.0, dmix));
   vec3 lightIn = uAmbient * 0.75 + uSunColor * max(L.y, 0.0) * 0.16 * cloudShadowAt(P);

@@ -145,8 +145,8 @@ export class Atmosphere {
     if (night > 0) g.white.lerp(_nightWhite, night);
     g.shadowTint.set(-0.014, 0.004, 0.012).multiplyScalar(1 - o * 0.5);
     g.highlightTint.set(0.012 + golden * 0.01, 0.004, -0.012).multiplyScalar(1 - o * 0.6);
-    g.saturation = lerp(1.1, 0.92, o) * lerp(1, 0.8, night);
-    g.contrast = lerp(1.07, 1.02, o);
+    g.saturation = lerp(1.14, 0.92, o) * lerp(1, 0.8, night);
+    g.contrast = lerp(1.1, 1.02, o);
     g.flash = this.weather.lightning * 0.9;
   }
 

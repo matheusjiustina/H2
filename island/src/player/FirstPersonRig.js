@@ -65,8 +65,8 @@ function forearm(len = 0.27) {
 const P = (x, y, z, roll, bp, by, curl, thumb = curl, spread = 0) => ({ pos: new THREE.Vector3(x, y, z), roll, bend: new THREE.Vector2(bp, by), curl: [thumb, curl, curl, curl, curl], spread });
 
 const POSES = {
-  rightIdle: P(0.16, -0.32, -0.33, -1.05, 0.05, 0.25, 0.38, 0.25),
-  leftIdle: P(-0.17, -0.33, -0.34, 1.05, 0.05, 0.25, 0.42, 0.25),
+  rightIdle: P(0.17, -0.43, -0.3, -1.05, 0.05, 0.25, 0.38, 0.25),
+  leftIdle: P(-0.18, -0.44, -0.31, 1.05, 0.05, 0.25, 0.42, 0.25),
   rightHold: P(0.13, -0.24, -0.33, -1.35, 0.2, 0.15, 0.6, 0.45),
   rightPalmUp: P(0.1, -0.25, -0.33, -2.75, -0.15, 0.05, 0.3, 0.3),
   rightGrip: P(0.15, -0.21, -0.36, -1.5, 0.0, 0.08, 0.92, 0.75),
@@ -88,6 +88,8 @@ const POSES = {
   leftBoat: P(-0.25, -0.42, -0.29, 0.8, 0.2, 0.2, 0.55, 0.4),
   rightSwim: P(0.14, -0.27, -0.44, -0.5, -0.1, 0.1, 0.12, 0.1),
   leftSwim: P(-0.14, -0.27, -0.44, 0.5, -0.1, 0.1, 0.12, 0.1),
+  rightRun: P(0.19, -0.34, -0.32, -1.25, 0.1, 0.2, 0.7, 0.55),
+  leftRun: P(-0.2, -0.35, -0.33, 1.25, 0.1, 0.2, 0.7, 0.55),
   hidden: P(0.25, -0.8, -0.1, -0.9, 0.3, 0.2, 0.4),
   hiddenL: P(-0.25, -0.8, -0.1, 0.9, 0.3, 0.2, 0.4),
 };
@@ -130,11 +132,31 @@ class Hand {
     this.thumb = [tb, t1, t2];
     wrist.updateMatrixWorld(true);
 
-    // parts per material group: [geometry in bone space, bone]
+    // parts per material group: [geometry in bone space, bone]; skin parts get vertex tints
+    const tint = (g, fn) => {
+      const p = g.attributes.position;
+      const c = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) { const t = fn(p.getX(i), p.getY(i), p.getZ(i)); c[i * 3] = t[0]; c[i * 3 + 1] = t[1]; c[i * 3 + 2] = t[2]; }
+      g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+      return g;
+    };
+    const phal = (r, len, distal) => {
+      const g = tint(capsule(r, len), (x, y, z) => {
+        const joint = Math.exp(-((z + 0.004) ** 2) / 0.00008);
+        return [1.0 + joint * 0.06, 0.97 - joint * 0.08, 0.95 - joint * 0.09];
+      });
+      if (!distal) return g;
+      const nail = new THREE.SphereGeometry(r * 0.78, 8, 5);
+      nail.scale(1, 0.32, 1.15);
+      nail.translate(0, r * 0.72, -len + r * 1.25);
+      tint(nail, () => [1.28, 1.12, 1.05]);
+      return mergeGeometries([g.index ? g.toNonIndexed() : g, nail.toNonIndexed()], false);
+    };
     const groups = [[], [], []];
-    groups[0].push([forearm(), wrist], [roundedPalm(), this.palm]);
-    this.fingers.forEach((joints, fi) => joints.forEach((j, s) => groups[0].push([capsule(FINGERS[fi].r * (1 - s * 0.08), FINGERS[fi].len[s]), j])));
-    this.thumb.forEach((j, s) => groups[0].push([capsule(THUMB.r * (1 - s * 0.1), THUMB.len[s]), j]));
+    groups[0].push([tint(forearm(), (x, y) => (y > 0 ? [0.96, 0.92, 0.9] : [1.03, 0.98, 0.96])), wrist]);
+    groups[0].push([tint(roundedPalm(), (x, y, z) => (y > 0.004 ? [0.94, 0.9, 0.88] : [1.1, 0.98, 0.95])), this.palm]);
+    this.fingers.forEach((joints, fi) => joints.forEach((j, s) => groups[0].push([phal(FINGERS[fi].r * (1 - s * 0.08), FINGERS[fi].len[s], s === 2), j])));
+    this.thumb.forEach((j, s) => groups[0].push([phal(THUMB.r * (1 - s * 0.1), THUMB.len[s], s === 2), j]));
     const sl = new THREE.CylinderGeometry(0.046, 0.05, 0.12, 14, 1, true);
     sl.rotateX(Math.PI / 2);
     sl.translate(0, 0.002, 0.27);
@@ -154,8 +176,9 @@ class Hand {
       let count = 0;
       for (const [g0, b] of list) {
         const g = (g0.index ? g0.toNonIndexed() : g0).clone();
-        for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+        for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(k)) g.deleteAttribute(k);
         if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+        if (!g.attributes.color) g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3).fill(1), 3));
         g.applyMatrix4(b.matrixWorld);
         const n = g.attributes.position.count;
         const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
@@ -213,7 +236,7 @@ export class FirstPersonRig {
     this.group = new THREE.Group();
     this.group.name = 'viewmodel';
     camera.add(this.group);
-    const skin = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0xb27a5c), roughness: 0.55, sheen: 0.25, sheenColor: new THREE.Color(0xff8a6a), sheenRoughness: 0.6 });
+    const skin = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0xc39377), roughness: 0.5, sheen: 0.2, sheenColor: new THREE.Color(0xffb09a), sheenRoughness: 0.55, vertexColors: true });
     patchMaterial(skin, { translucency: 0.35, wet: 0.6, canopy: false, caustics: false, fog: true, key: 'skin' });
     const sleeve = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0x8c8466), roughness: 0.92, sheen: 0.5, sheenColor: new THREE.Color(0xd8d4c0), side: THREE.DoubleSide });
     patchMaterial(sleeve, { wet: 1.0, canopy: false, caustics: false, key: 'sleeve' });
@@ -316,6 +339,16 @@ export class FirstPersonRig {
 
     // choose targets
     let rt = POSES.rightIdle, lt = POSES.leftIdle;
+    const running = player.sprinting && player.onGround && player.speed01 > 0.5;
+    if (running) {
+      // arms swing into view with the stride
+      const sw = Math.sin(player.bobPhase);
+      this._runR = this._runR || { ...POSES.rightRun, pos: POSES.rightRun.pos.clone() };
+      this._runL = this._runL || { ...POSES.leftRun, pos: POSES.leftRun.pos.clone() };
+      this._runR.pos.copy(POSES.rightRun.pos).add(this._v.set(0, sw * 0.05, -sw * 0.07));
+      this._runL.pos.copy(POSES.leftRun.pos).add(this._v.set(0, -sw * 0.05, sw * 0.07));
+      rt = this._runR; lt = this._runL;
+    }
     if (player.mode === 'boat') { rt = POSES.rightTiller; lt = POSES.leftBoat; } else if (player.mode === 'swim') { rt = POSES.rightSwim; lt = POSES.leftSwim; }
     if (held && player.mode !== 'swim') {
       const p = held.pose || 'hold';

@@ -9,6 +9,7 @@ import { bakeTextures } from '../world/Textures.js';
 import { TerrainData } from '../world/TerrainData.js';
 import { Terrain } from '../world/Terrain.js';
 import { Sky } from '../world/Sky.js';
+import { CloudBillboards } from '../world/CloudBillboards.js';
 import { TimeOfDay } from '../world/TimeOfDay.js';
 import { Weather } from '../world/Weather.js';
 import { Atmosphere } from '../world/Atmosphere.js';
@@ -90,6 +91,7 @@ export class Game {
     this.scene.add(this.terrain.group);
     this.sky = new Sky();
     this.scene.add(this.sky.mesh);
+    this.clouds = new CloudBillboards(this.scene);
     this.timeOfDay = new TimeOfDay(params.has('time') ? parseFloat(params.get('time')) : 9.7);
     this.weather = new Weather();
     if (params.has('weather')) { this.weather.set(params.get('weather'), true); this.weather.auto = false; }
@@ -254,6 +256,7 @@ export class Game {
 
   pause() {
     if (this.state !== 'playing') return;
+    this.input.unlock();
     this.setState('paused');
   }
 
@@ -424,6 +427,7 @@ export class Game {
     this.ocean.update(this.camera, this.weather.p.waves, this.weather.p.wind);
     this.ripples.update(simDt, this.camera.position.x, this.camera.position.z);
     this.sky.update(this.camera);
+    this.clouds.update(simDt, this.camera);
     this.distant.update(this.camera);
 
     const cp = this.camera.position;

@@ -68,15 +68,16 @@ void main() {
     float dl = cloudDensity(p + L.xz * 0.05);
     float dl2 = cloudDensity(p + L.xz * 0.12);
     float lit = clamp(0.62 + (d - dl) * 1.6 + (d - dl2) * 0.9, 0.0, 1.25);
-    vec3 cc = mix(uCloudDark, uCloudLit, lit);
+    float core = smoothstep(0.45, 1.0, d) * smoothstep(0.2, -0.2, d - dl2);
+    vec3 cc = mix(uCloudDark, uCloudLit, lit * (1.0 - core * 0.45));
     float mu = max(sd, 0.0);
     // silver lining towards the sun
     cc += uSunGlow * (pow(mu, 6.0) * 0.9 + pow(mu, 40.0) * 1.8) * (1.0 - smoothstep(0.2, 0.9, d)) * (1.0 - uNight);
     // cirrus streaks
     float ci = texture2D(uNoiseTex, vec2(p.x * 0.06, p.y * 0.25) + uCloudOffset * 0.3).b;
     float cirrus = smoothstep(0.55, 0.8, ci) * 0.35 * (1.0 - uCloudCover * 0.7);
-    float fade = smoothstep(0.008, 0.2, dir.y);
-    float horizonHaze = 1.0 - exp(-dir.y * 9.0);
+    float fade = smoothstep(0.004, 0.07, dir.y);
+    float horizonHaze = 1.0 - exp(-dir.y * 14.0);
     cloudAlpha = clamp(d + cirrus * (1.0 - d), 0.0, 1.0) * fade;
     vec3 cloud = mix(cc, mix(uCloudLit, cc, 0.5), cirrus * (1.0 - d));
     cloud = mix(uFogColor * 1.05, cloud, horizonHaze);
