@@ -1,9 +1,12 @@
 import * as THREE from 'three';
-import { GENERATORS, footstep } from './ProceduralSounds.js';
+import { GENERATORS, footstep, RADIAL_RPM } from './ProceduralSounds.js';
 import { clamp, smoothstep, lerp } from '../utils/MathUtils.js';
 import { WATERFALL } from '../world/Layout.js';
 
 const SR = 22050;
+// overall output trim under the Master slider: the island sits well below full scale so the
+// seaplane, loud as a real one, has room above it
+const OUTPUT_TRIM = 0.55;
 const LOOPS = ['ocean', 'shore', 'wind', 'rain', 'tarpRain', 'storm', 'jungle', 'night', 'underwater'];
 const SURFACES = ['sand', 'grass', 'leaves', 'dirt', 'rock', 'wood', 'metal', 'cloth', 'water', 'swim', 'terrain'];
 
@@ -46,7 +49,9 @@ export class AudioManager {
     this.uwFilter.frequency.value = 20000;
     this.uwFilter.Q.value = 0.5;
     this.uwFilter.connect(this.master);
-    this.amb = ctx.createGain(); this.amb.connect(this.uwFilter);
+    // ambience goes through a ducker: in a running seaplane the engine drowns out the island
+    this.ambDuck = ctx.createGain(); this.ambDuck.connect(this.uwFilter);
+    this.amb = ctx.createGain(); this.amb.connect(this.ambDuck);
     this.sfx = ctx.createGain(); this.sfx.connect(this.uwFilter);
     this.music = ctx.createGain(); this.music.connect(this.uwFilter);
     this.applyVolumes();
@@ -89,7 +94,7 @@ export class AudioManager {
     if (!this.ctx) return;
     const s = this.settings.values;
     const t = this.ctx.currentTime;
-    this.master.gain.setTargetAtTime(s.master, t, 0.1);
+    this.master.gain.setTargetAtTime(s.master * OUTPUT_TRIM, t, 0.1);
     this.amb.gain.setTargetAtTime(s.ambience, t, 0.1);
     this.sfx.gain.setTargetAtTime(s.effects, t, 0.1);
     this.music.gain.setTargetAtTime(s.music, t, 0.1);
@@ -147,11 +152,18 @@ export class AudioManager {
     this.enginePanner = this._panner(null, 3, 1.2);
     this.enginePanner.connect(this.sfx);
     this.engine = this._loop('engine', this.enginePanner, { gain: 0 });
-    // seaplane: radial engine (positional), airflow and stall horn (heard in the cabin)
+    // seaplane: exhaust, propeller and combustion roar mixed, placed at the aircraft, then
+    // shaped for cabin or outside; airflow and the stall horn are heard in the cabin
+    this.planeBus = ctx.createGain(); this.planeBus.gain.value = 1; this.planeBus.connect(this.sfx);
+    this.planeTone = ctx.createBiquadFilter(); this.planeTone.type = 'lowpass'; this.planeTone.frequency.value = 5000; this.planeTone.Q.value = 0.5;
+    this.planeBody = ctx.createBiquadFilter(); this.planeBody.type = 'lowshelf'; this.planeBody.frequency.value = 160; this.planeBody.gain.value = 0;
+    this.planeTone.connect(this.planeBody).connect(this.planeBus);
     this.planePanner = this._panner(null, 6, 1.0);
     this.planePanner.maxDistance = 2500;
-    this.planePanner.connect(this.sfx);
-    this.planeEngine = this._loop('radial', this.planePanner, { gain: 0, filter: { type: 'lowpass', freq: 2400 } });
+    this.planePanner.connect(this.planeTone);
+    this.planeEngine = this._loop('radial', this.planePanner, { gain: 0 });
+    this.planeProp = this._loop('prop', this.planePanner, { gain: 0 });
+    this.planeRoar = this._loop('wind', this.planePanner, { gain: 0, filter: { type: 'bandpass', freq: 420, q: 0.7 } });
     this.planeAir = this._loop('wind', this.sfx, { gain: 0, filter: { type: 'bandpass', freq: 900, q: 0.6 } });
     this.planeHorn = this._loop('stallHorn', this.sfx, { gain: 0 });
     if (this._pendingFire) this.setFire(...this._pendingFire);
@@ -221,16 +233,30 @@ export class AudioManager {
    * Seaplane audio. rpm drives pitch and loudness of the radial; airspeed (m/s) the rush of air;
    * inside = listener is in the cabin (muffled engine, louder airflow).
    */
-  setPlane({ rpm = 0, airspeed = 0, stall = 0, inside = false, position }) {
+  setPlane({ rpm = 0, throttle = 0, airspeed = 0, stall = 0, inside = false, occupied = false, position }) {
     if (!this.planeEngine) return;
     const t = this.ctx.currentTime;
     if (position) { this.planePanner.positionX.value = position.x; this.planePanner.positionY.value = position.y; this.planePanner.positionZ.value = position.z; }
-    const run = Math.min(1, rpm / 500);
-    this.planeEngine.gain.gain.setTargetAtTime(run * (0.35 + Math.min(1, rpm / 2300) * 0.75), t, 0.12);
-    this.planeEngine.src.playbackRate.setTargetAtTime(Math.max(0.2, rpm / 1080), t, 0.08);
-    if (this.planeEngine.filter) this.planeEngine.filter.frequency.setTargetAtTime(inside ? 900 : 2600, t, 0.1);
+    const run = Math.min(1, rpm / 450);
+    const n = Math.min(1.15, rpm / 2300);
+    const rate = Math.max(0.12, rpm / RADIAL_RPM);
+    // exhaust: always there once she runs, harder with rpm and with load (manifold pressure)
+    this.planeEngine.gain.gain.setTargetAtTime(run * (0.5 + 0.35 * n + 0.4 * throttle), t, 0.08);
+    this.planeEngine.src.playbackRate.setTargetAtTime(rate, t, 0.05);
+    // propeller: grows steeply with tip speed, and dominates from outside at full power
+    this.planeProp.gain.gain.setTargetAtTime(run * (0.03 + n * n * (inside ? 0.45 : 0.85)), t, 0.08);
+    this.planeProp.src.playbackRate.setTargetAtTime(rate, t, 0.05);
+    // combustion roar under load
+    this.planeRoar.gain.gain.setTargetAtTime(run * throttle * (0.2 + 0.5 * n), t, 0.12);
+    this.planeRoar.src.playbackRate.setTargetAtTime(0.6 + 0.5 * n, t, 0.12);
+    // cabin: the airframe filters the top end and booms in the low end; outside it is open
+    this.planeTone.frequency.setTargetAtTime(inside ? 1700 : 6000, t, 0.1);
+    this.planeBody.gain.setTargetAtTime(inside ? 7 : 1, t, 0.1);
+    // the aircraft you are in is the loudest thing around, and the island fades behind it
+    this.planeBus.gain.setTargetAtTime(occupied ? (inside ? 2.3 : 1.8) : 1.3, t, 0.25);
+    this.ambDuck.gain.setTargetAtTime(occupied ? 1 - 0.65 * run * (inside ? 1 : 0.6) : 1, t, 0.5);
     const air = Math.min(1, airspeed / 70);
-    this.planeAir.gain.gain.setTargetAtTime(air * air * (inside ? 0.55 : 0.9), t, 0.2);
+    this.planeAir.gain.gain.setTargetAtTime(air * air * (inside ? 0.7 : 0.9) * (occupied ? 1.4 : 1), t, 0.2);
     this.planeAir.src.playbackRate.setTargetAtTime(0.7 + air * 0.9, t, 0.2);
     this.planeHorn.gain.gain.setTargetAtTime(stall > 0.5 ? 0.35 : 0, t, 0.04);
   }

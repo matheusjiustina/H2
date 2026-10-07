@@ -42,7 +42,11 @@ export class UI {
       <b>Flying</b> <span class="k">W</span><span class="k">S</span> pitch · <span class="k">A</span><span class="k">D</span> roll (steer on water) · <span class="k">Z</span><span class="k">X</span> rudder ·
       <span class="k">R</span><span class="k">F</span> or wheel throttle · <span class="k">G</span><span class="k">B</span> flaps · hold <span class="k">Q</span> start (tap to stop) ·
       <span class="k">U</span> water rudders · <span class="k">L</span> lights · <span class="k">[</span><span class="k">]</span> trim · hold <span class="k">RMB</span> mouse yoke ·
-      <span class="k">V</span> chase cam · <span class="k">O</span> orbit · hold <span class="k">E</span> get out`);
+      <span class="k">V</span> chase cam · <span class="k">O</span> orbit · <span class="k">E</span> get out (stopped on the water)`);
+    this.prompt.addEventListener('click', () => {
+      const g = this.game;
+      if (g.player.mode === 'plane' && g.seaplane.canExit()) g.seaplane.exit(g);
+    });
     this.hud.append(this.reticle, this.prompt, this.hint, this.toastBox, this.discovery, this.fps, this.lockHint, this.flightStatus, this.flightHelp);
     r.append(this.hud);
     this.flash = h('div', 'flash');
@@ -69,12 +73,14 @@ export class UI {
     this.pauseMain = h('div', 'menu', `
       <div class="menu-title">Paused</div>
       <button data-a="continue">Continue</button>
+      <button data-a="leavePlane" hidden>Get out of the seaplane</button>
       <button data-a="settings">Settings</button>
       <button data-a="controls">Controls</button>
       <button data-a="restart">Restart</button>`);
     this.pauseMain.addEventListener('click', (e) => {
       const a = e.target.dataset.a;
       if (a === 'continue') this.game.resume();
+      if (a === 'leavePlane' && this.game.seaplane.canExit()) { this.game.resume(); this.game.seaplane.exit(this.game); }
       if (a === 'settings') this.showPanel('settings');
       if (a === 'controls') this.showPanel('controls');
       if (a === 'restart') this.game.restart();
@@ -99,7 +105,7 @@ export class UI {
         <div><b>G / B</b><span>Flaps up / down</span></div><div><b>[ ] · PgUp / PgDn</b><span>Elevator trim</span></div>
         <div><b>Hold Q</b><span>Start engine (tap to stop)</span></div><div><b>U</b><span>Water rudders</span></div>
         <div><b>L</b><span>Lights</span></div><div><b>Hold right mouse</b><span>Fly with the mouse</span></div>
-        <div><b>V · O</b><span>Cockpit / chase · orbit camera</span></div><div><b>Hold E</b><span>Climb out</span></div>
+        <div><b>V · O</b><span>Cockpit / chase · orbit camera</span></div><div><b>E</b><span>Climb out (stopped on the water)</span></div>
       </div>
       <button data-a="back">Back</button>`);
     this.controlsPanel.addEventListener('click', (e) => { if (e.target.dataset.a === 'back') this.showPanel('main'); });
@@ -224,6 +230,17 @@ export class UI {
 
   showPanel(which) {
     this.pauseMain.style.display = which === 'main' ? '' : 'none';
+    if (which === 'main') {
+      // in the seaplane: offer to climb out (only once she is stopped on the water)
+      const sp = this.game.seaplane;
+      const leave = this.pauseMain.querySelector('[data-a=leavePlane]');
+      const aboard = this.game.player.mode === 'plane' && !!sp;
+      leave.hidden = !aboard;
+      if (aboard) {
+        leave.disabled = !sp.canExit();
+        leave.textContent = sp.canExit() ? 'Get out of the seaplane' : 'Get out (stop on the water first)';
+      }
+    }
     this.settingsPanel.style.display = which === 'settings' ? '' : 'none';
     this.controlsPanel.style.display = which === 'controls' ? '' : 'none';
     if (which === 'settings') this.refreshSettings();
@@ -278,9 +295,14 @@ export class UI {
     } else if (g.boat && g.boat.prompt && g.state === 'playing') {
       html = g.boat.prompt;
     }
+    // stopped on the water in the seaplane: a "get out" button (E, or click it when the mouse is free)
+    const canLeave = g.state === 'playing' && g.player.mode === 'plane' && !!g.seaplane?.canExit();
+    if (canLeave) html = '<span class="k">E</span>Get out of the plane';
     if (html !== this._lastPrompt) {
       this.prompt.innerHTML = html;
       this.prompt.classList.toggle('show', !!html);
+      this.prompt.classList.toggle('button', canLeave);
+      this.prompt.classList.toggle('interactive', canLeave);
       this._lastPrompt = html;
     }
     this.reticle.classList.toggle('active', !!it);

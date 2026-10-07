@@ -49,6 +49,25 @@ function makeLoop(d, sr, fade = 0.5) {
   return out;
 }
 
+/**
+ * Run a looping buffer through a chain of filters twice and keep the second pass, so the
+ * filter state at the loop point carries over and the loop has no click.
+ */
+function loopFilter(d, filters) {
+  const out = new Float32Array(d.length);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < d.length; i++) {
+      let x = d[i];
+      for (const f of filters) x = f.p(x);
+      out[i] = x;
+    }
+  }
+  return out;
+}
+
+/** The engine rpm the radial and propeller loops are synthesised at. */
+export const RADIAL_RPM = 1200;
+
 function brown(n, seed) {
   const r = rand(seed);
   const d = new Float32Array(n);
@@ -243,27 +262,86 @@ export const GENERATORS = {
     }
     return normalize(d, 0.8);
   },
-  // nine-cylinder radial at ~1100 rpm: uneven firing pulses, exhaust rumble and propeller beat.
-  // Played back faster or slower to follow the real rpm.
+  // Nine-cylinder radial at RADIAL_RPM (1200 rpm), as heard near the exhaust stacks. The nine
+  // cylinders fire in turn every two crank revolutions (90 Hz). Each firing is a sharp crack
+  // that rings in the collector ring, and no two are quite alike: the uneven cylinders and the
+  // cycle-to-cycle spread give a radial its lumpy, throbbing voice. Pulses wrap around the
+  // buffer and every periodic part fits it exactly, so it loops without a seam. It is played
+  // faster or slower to follow the real rpm.
   radial(sr) {
-    const n = sr * 2;
+    const secs = 3;
+    const n = sr * secs;
     const d = new Float32Array(n);
     const r = rand(131);
-    const lp = new Biquad('lp', 620, 0.9, sr);
-    const hp = new Biquad('hp', 38, 0.7, sr);
-    // 1080 rpm: 9 cylinders fire every two turns (81 Hz), 3 blades pass at 54 Hz; both loop cleanly in 2 s
-    const fire = 81;
-    const prop = 54;
+    const u = () => (r() + 1) / 2;
+    const rev = RADIAL_RPM / 60; // 20 crank revolutions per second
+    const fire = rev * 4.5; // 90 firings per second
+    const period = sr / fire;
+    const order = [0, 2, 4, 6, 8, 1, 3, 5, 7];
+    const cylAmp = [1.0, 0.84, 0.97, 1.1, 0.9, 1.04, 0.82, 0.95, 1.06];
+    const cylRing = [168, 181, 160, 175, 188, 164, 171, 184, 158];
+    const len = Math.round(sr * 0.024);
+    const pulses = Math.round(secs * fire);
+    for (let k = 0; k < pulses; k++) {
+      const cyl = order[k % 9];
+      const a = cylAmp[cyl] * (0.78 + 0.3 * u());
+      const start = Math.round(k * period + r() * period * 0.05);
+      const f1 = cylRing[cyl] * (0.97 + 0.06 * u());
+      const f2 = 430 + 90 * u();
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const crack = Math.exp(-t / 0.0032);
+        const thump = Math.exp(-t / 0.007) * (1 - Math.exp(-t / 0.0005));
+        const v = thump * 1.1 + crack * (Math.sin(TAU * f1 * t) * 0.7 + Math.sin(TAU * f2 * t) * 0.28 + r() * 0.45);
+        d[(((start + i) % n) + n) % n] += v * a;
+      }
+    }
+    // valve train: small ticks between the firings
+    const hpTick = new Biquad('hp', 2600, 0.7, sr);
     for (let i = 0; i < n; i++) {
       const t = i / sr;
-      const ph = (t * fire) % 1;
-      const cyl = Math.floor(t * fire) % 9;
-      const amp = 0.8 + 0.25 * Math.sin(cyl * 2.3); // cylinders never fire quite alike
-      const pulse = (Math.exp(-ph * 7) - 0.15) * amp;
-      const beat = Math.sin(TAU * prop * t) * 0.35 * (0.6 + 0.4 * Math.sin(TAU * 2.5 * t));
-      d[i] = hp.p(lp.p(pulse * 0.9 + beat + Math.sin(TAU * fire * 0.5 * t) * 0.25 + r() * 0.12));
+      const ph = (t * fire + 0.5) % 1;
+      d[i] += hpTick.p(r()) * Math.exp(-ph * 40) * 0.08;
+      // one-per-rev and cam-rate throb from imbalance and the uneven cylinders
+      d[i] *= 1 + 0.12 * Math.sin(TAU * rev * t) + 0.08 * Math.sin(TAU * rev * 0.5 * t + 1.1);
     }
-    return normalize(d, 0.85);
+    const out = loopFilter(d, [new Biquad('hp', 30, 0.7, sr), new Biquad('lp', 2800, 0.6, sr)]);
+    // the stacks overdrive a little: harmonics and growl
+    for (let i = 0; i < n; i++) out[i] = Math.tanh(out[i] * 1.8);
+    return normalize(out, 0.9);
+  },
+  // Three-blade propeller at RADIAL_RPM: the blade-passing tone (60 Hz) with its harmonics and
+  // the swish of each blade through the air. Periodic in its 2 s, played at the engine's rate.
+  prop(sr) {
+    const secs = 2;
+    const n = sr * secs;
+    const d = new Float32Array(n);
+    const r = rand(151);
+    const bpf = (RADIAL_RPM / 60) * 3;
+    const bp = new Biquad('bp', 900, 0.6, sr);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const w = TAU * bpf * t;
+      const tone = Math.sin(w) + Math.sin(2 * w + 0.6) * 0.55 + Math.sin(3 * w + 1.3) * 0.32 + Math.sin(4 * w + 0.2) * 0.18 + Math.sin(6 * w + 2.1) * 0.08;
+      const swish = bp.p(r()) * (0.5 + 0.5 * Math.cos(w)) ** 3;
+      d[i] = tone * 0.5 + swish * 1.4;
+    }
+    const out = loopFilter(d, [new Biquad('hp', 35, 0.7, sr), new Biquad('lp', 3200, 0.6, sr)]);
+    return normalize(out, 0.85);
+  },
+  // a single backfire through the stacks (throttle chopped, or a lean idle)
+  backfire(sr) {
+    const n = Math.floor(sr * 0.35);
+    const d = new Float32Array(n);
+    const r = rand(161);
+    const lp = new Biquad('lp', 1400, 0.7, sr);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const bang = r() * Math.exp(-t / 0.012) + Math.sin(TAU * 62 * t) * Math.exp(-t / 0.05) * 0.9;
+      const pop2 = t > 0.07 ? r() * Math.exp(-(t - 0.07) / 0.008) * 0.6 : 0;
+      d[i] = lp.p(bang + pop2);
+    }
+    return normalize(d, 0.9);
   },
   // electric starter grinding, a few coughs, then the engine catches
   starter(sr) {

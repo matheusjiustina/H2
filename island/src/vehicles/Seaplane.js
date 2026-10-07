@@ -145,10 +145,17 @@ export class Seaplane {
     game.toast(this.fm.engine === 'running' ? 'Engine running. R / F throttle.' : 'Hold Q to start the engine.');
   }
 
+  /** Someone aboard and she is (nearly) stopped on the water or beached: they can step out. */
+  canExit() {
+    const fm = this.fm;
+    // speed over the water, not airspeed: a plane sitting still in a breeze still has airspeed
+    return this.occupied && !this.broken && Math.hypot(fm.vel.x, fm.vel.z) <= 3 && (fm.out.onWater || fm.out.onGround);
+  }
+
   exit(game, force = false) {
     const fm = this.fm;
-    if (!force && (fm.out.airspeed > 4 || !(fm.out.onWater || fm.out.onGround))) {
-      game.toast('Bring her to a stop on the water before you step out.');
+    if (!force && !this.canExit()) {
+      game.toast('Bring her to a stop on the water before you step out: throttle to idle (F) and wait.');
       return;
     }
     const fwd = this._fwd().clone(); fwd.y = 0; fwd.normalize();
@@ -225,8 +232,32 @@ export class Seaplane {
       p.prevPos.copy(p.pos);
       this.status = this._statusLine();
     }
-    game.audio?.setPlane({ rpm: fm.engine === 'off' ? Math.min(fm.rpm, 0) : fm.rpm, airspeed: fm.out.airspeed, stall: this.occupied ? fm.out.stall : 0, inside: this.occupied && this.view === 'cockpit', position: fm.pos });
+    game.audio?.setPlane({
+      rpm: fm.engine === 'off' ? Math.min(fm.rpm, 0) : fm.rpm, throttle: fm.engine === 'running' ? fm.throttle : 0,
+      airspeed: fm.out.airspeed, stall: this.occupied ? fm.out.stall : 0,
+      inside: this.occupied && this.view === 'cockpit', occupied: this.occupied, position: fm.pos,
+    });
+    this._pops(dt, game);
     this._mooringRope(dt);
+  }
+
+  // A radial pops and crackles through its stacks when the throttle is pulled back from
+  // high power, and now and then at a lean idle.
+  _pops(dt, game) {
+    const fm = this.fm;
+    const last = this.lastThrottle ?? fm.throttle;
+    this.lastThrottle = fm.throttle;
+    if (fm.engine !== 'running') { this.popCharge = 0; return; }
+    const cut = last - fm.throttle;
+    if (cut > 0 && fm.rpm > 1300) this.popCharge = Math.min(4, (this.popCharge || 0) + cut * 7);
+    let p = 0;
+    if (this.popCharge > 0.5) p = 5 * dt;
+    else if (fm.rpm < 800 && fm.throttle < 0.08) p = 0.1 * dt;
+    if (Math.random() < p) {
+      this.popCharge = Math.max(0, (this.popCharge || 0) - 1);
+      const at = this._v2.set(-0.5, -0.3, 2.3).applyQuaternion(fm.quat).add(fm.pos);
+      game.audio?.play('backfire', { position: at, volume: this.occupied && this.view === 'cockpit' ? 0.45 : 0.85, rate: 0.85 + Math.random() * 0.3 });
+    }
   }
 
   _controls(dt, game) {
@@ -312,13 +343,9 @@ export class Seaplane {
       this.holdQ = 0;
     }
 
-    // hold E to climb out
-    if (key('KeyE')) {
-      if (this.holdE >= 0) {
-        this.holdE += dt;
-        if (this.holdE > 0.45) { this.holdE = -1; this.exit(game); }
-      }
-    } else this.holdE = 0;
+    // E: climb out (the press that boarded doesn't count until the key is let go)
+    if (tap('KeyE') && this.holdE >= 0) this.exit(game);
+    if (!key('KeyE')) this.holdE = 0;
   }
 
   _notch() {

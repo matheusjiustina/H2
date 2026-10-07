@@ -82,7 +82,7 @@ The floatplane PT-ILH is tied up on the west side of the pier. Walk up to it and
 | Hold right mouse | Fly with the mouse (mouse yoke) |
 | V | Cockpit or chase camera |
 | O | Orbit camera (wheel zooms) |
-| Hold E | Climb out (only once she has stopped) |
+| E | Climb out (once she has stopped on the water). A "Get out of the plane" button also appears, and the pause menu has the same option |
 
 To take off, start the engine, set 20° of flaps (press B twice) and open the throttle
 (R). She climbs onto the step at about 25 kt. Ease back (S) at about 55 kt and she lifts
@@ -91,6 +91,11 @@ about 72 kt. The lagoon is only about 300 m deep straight out from the pier, so 
 and take off east or west along the middle of the lagoon, where you have more than
 600 m. To land, come down with flaps and power at around 65 kt and flare so you touch the
 water gently, nose slightly up.
+
+The engine sound is a synthesized nine-cylinder radial. The cylinders fire unevenly through the
+exhaust stacks, the three-blade propeller adds its blade-passing tone, and the engine roars
+under load and pops when you chop the throttle. Inside the cabin the engine is muffled but
+loud, and the island's ambience fades behind it.
 
 The flight model has six degrees of freedom. Lift and drag come from the angle of
 attack, with a stall break and wing drop, induced drag and ground effect. The propeller
