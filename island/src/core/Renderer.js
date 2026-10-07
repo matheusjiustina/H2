@@ -124,6 +124,7 @@ export class Renderer {
 
   applySettings(s) {
     Object.assign(this.settings, s);
+    this.shadowWarm = 2;
     if (this.sceneRT.samples !== this.settings.msaa) {
       this.sceneRT.dispose();
       this.sceneRT = new THREE.WebGLRenderTarget(4, 4, {
@@ -229,7 +230,9 @@ export class Renderer {
     r.info.reset();
 
     // ---------------------------------------------------------------- opaque
-    r.shadowMap.needsUpdate = s.shadowEveryFrame || (this.frame % 2 === 0);
+    // a settings change can drop the shadow maps; rebuild them before any frame samples them
+    r.shadowMap.needsUpdate = s.shadowEveryFrame || (this.frame % 2 === 0) || this.shadowWarm > 0;
+    if (this.shadowWarm > 0) this.shadowWarm--;
     camera.layers.disableAll();
     camera.layers.enable(LAYER.WORLD);
     camera.layers.enable(LAYER.DETAIL);

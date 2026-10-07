@@ -28,6 +28,7 @@ import { InteractionSystem } from '../player/InteractionSystem.js';
 import { Inventory, ITEMS } from '../player/Inventory.js';
 import { Tools } from '../player/Tools.js';
 import { SPAWN } from '../world/Layout.js';
+import { TouchControls } from '../ui/TouchControls.js';
 import { VegetationManager } from '../vegetation/VegetationManager.js';
 import { GrassSystem } from '../vegetation/GrassSystem.js';
 import { createPropMaterials } from '../environment/PropMaterials.js';
@@ -152,6 +153,7 @@ export class Game {
     } else this.player.spawn(SPAWN.x, SPAWN.z, SPAWN.yaw, SPAWN.pitch);
 
     this.ui = new UI(this, this.uiRoot);
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) this.touch = new TouchControls(this, this.uiRoot);
     this.input.onLockChange = (locked) => {
       if (!locked && this.state === 'playing' && !this.ui.open) this.pause();
     };
@@ -227,6 +229,8 @@ export class Game {
     this.renderer.applySettings({
       renderScale: s.renderScale, ssao: post.ssao, bloom: post.bloom, fxaa: post.fxaa, sharpen: post.sharpen,
       reflections: water.reflections, reflectionScale: water.reflectionScale,
+      // below High the sun's shadow maps refresh every other frame (moving leaf shadows at 30 Hz)
+      shadowEveryFrame: s.shadows === 'high' || s.shadows === 'ultra',
     });
     this.atmosphere.setShadowQuality(s.shadows);
     this.ocean.setQuality(water.grid);
@@ -454,6 +458,7 @@ export class Game {
     if (this.camp.state.fireLit) this.particles.fire(this.camp.firePos, 1, simDt);
     this.audio.update(dt, this);
     this.ui.update(dt);
+    this.touch?.update();
   }
 
   render() {
@@ -466,6 +471,20 @@ export class Game {
       this.ui.photoFlash();
       this.toast('Photograph taken. See it in the inventory (Tab).');
     }
+  }
+
+  /** Where the player is and what the world looks like, for restoring after a page update. */
+  saveState() {
+    if (!this.player) return null;
+    const p = this.player.pos;
+    return { x: p.x, z: p.z, yaw: this.player.yaw, pitch: this.player.pitch, hour: this.timeOfDay.hour, weather: this.weather.state };
+  }
+
+  restoreState(s) {
+    if (!s || ![s.x, s.z, s.yaw, s.pitch, s.hour].every(Number.isFinite)) return;
+    this.teleport(s.x, s.z, s.yaw, s.pitch);
+    this.setTime(s.hour);
+    if (s.weather) this.weather.set(s.weather, true);
   }
 
   // ------------------------------------------------------------- debug helpers

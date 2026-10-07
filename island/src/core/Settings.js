@@ -58,6 +58,8 @@ export class Settings {
 
   detectPreset() {
     try {
+      // phones and tablets: keep it light, they share a small power and heat budget
+      if (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) return 'low';
       const c = document.createElement('canvas');
       const gl = c.getContext('webgl2');
       if (!gl) return 'low';

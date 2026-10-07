@@ -36,7 +36,8 @@ export class UI {
     this.toastBox = h('div', 'toasts');
     this.discovery = h('div', 'discovery');
     this.fps = h('div', 'fps');
-    this.hud.append(this.reticle, this.prompt, this.hint, this.toastBox, this.discovery, this.fps);
+    this.lockHint = h('div', 'lock-hint', 'Click the view to capture the mouse · or drag to look around');
+    this.hud.append(this.reticle, this.prompt, this.hint, this.toastBox, this.discovery, this.fps, this.lockHint);
     r.append(this.hud);
     this.flash = h('div', 'flash');
     this.fade = h('div', 'fade');
@@ -51,6 +52,7 @@ export class UI {
         <div class="title-sub">a lagoon field journal</div>
         <button class="title-start">Begin</button>
         <div class="title-keys">WASD move · Mouse look · Shift sprint · Space jump · E interact · F use · R put down · Q stow · Tab inventory · M map · N notebook · Esc pause</div>
+        <div class="title-keys touch-only">Left thumb moves, push to the rim to run · Right thumb looks around · E interacts, F uses what you hold</div>
       </div>`);
     this.title.querySelector('.title-start').addEventListener('click', (e) => { e.stopPropagation(); this.game.start(); });
     this.title.addEventListener('click', () => this.game.start());
@@ -280,6 +282,12 @@ export class UI {
       this.hint.classList.toggle('show', !!hint);
       this._lastHint = hint;
     }
+    // the mouse is free (capture refused or not yet requested): say how to look around
+    const needLock = g.state === 'playing' && !g.input.locked && !g.touch?.active && !g.autostart;
+    if (needLock !== this._lastLock) {
+      this.lockHint.classList.toggle('show', needLock);
+      this._lastLock = needLock;
+    }
     // fps / debug
     if (this.debug.classList.contains('show')) {
       const info = g.renderer.renderer.info.render;
@@ -311,7 +319,7 @@ export class UI {
         <div class="panel-head"><span>Inventory</span><span class="dim">${shells}/12 shells · ${found}/${POIS.length} places</span></div>
         <div class="inv-grid">${items}</div>
         ${photos ? `<div class="panel-head small">Photographs</div><div class="photos">${photos}</div>` : ''}
-        <div class="close-hint">Tab to close</div>
+        <button type="button" class="close-hint" data-close>Close · Tab</button>
       </div>`;
     this.inv.querySelectorAll('.inv-item').forEach((el) => el.addEventListener('click', () => {
       const id = el.dataset.id;
@@ -330,7 +338,7 @@ export class UI {
       <div class="book">
         <div class="book-head">Field Notebook</div>
         ${entries.map((e) => `<div class="entry"><div class="entry-title">${e.title}</div><div class="entry-text">${e.text.replace(/\n/g, '<br>')}</div></div>`).join('')}
-        <div class="close-hint">N or Esc to close</div>
+        <button type="button" class="close-hint" data-close>Close · N</button>
       </div>`;
     this._open('note');
   }
@@ -346,7 +354,7 @@ export class UI {
       <div class="map-wrap">
         <img src="${camp.mapCanvas.toDataURL('image/jpeg', 0.9)}">
         <div class="you" style="left:${px}%;top:${pz}%;transform:translate(-50%,-50%) rotate(${yawDeg}deg)"></div>
-        <div class="close-hint">M or Esc to close</div>
+        <button type="button" class="close-hint" data-close>Close · M</button>
       </div>`;
     this._open('map');
   }
@@ -355,6 +363,7 @@ export class UI {
     this.closeAll(false);
     const el = which === 'inv' ? this.inv : which === 'note' ? this.note : this.map;
     el.classList.add('show');
+    el.querySelector('[data-close]')?.addEventListener('click', () => this.closeAll());
     this.open = which;
     this.game.setMenuOpen(true);
   }

@@ -10,7 +10,13 @@ lagoon, a long pier with a skiff tied to it, and a reef line with deep blue wate
 Behind it are jungle valleys, a waterfall and a headland viewpoint. Crossing the island
 on foot takes about five minutes.
 
-## Running
+## Playing
+
+The quickest way is the single-file build: `dist/tidemark.html` holds the whole game
+(about 940 KB). Double-click it to open it in a browser. It needs no server and no
+install, and it can be uploaded as-is to any static host.
+
+## Running from source
 
 ```bash
 cd island
@@ -20,9 +26,18 @@ npm run build      # production build in dist/
 npm run preview    # serve the production build
 ```
 
+`npm run build` writes three things to `dist/`:
+
+| Output | Use |
+| --- | --- |
+| `index.html` + `assets/` | Regular static site, for any web host |
+| `tidemark.html` | Whole game in one file; opens straight from disk |
+| `tidemark.fragment.html` | Same page without the `<html>`/`<head>`/`<body>` wrapper, for hosts that add their own |
+
 You need a browser with WebGL2: a current Chrome, Edge, Firefox or Safari. The first
 load generates all textures and geometry on the GPU, which takes a few seconds on a
-desktop GPU.
+desktop GPU. The game picks a quality preset from the GPU it finds (phones and tablets
+start on Low) and remembers any change you make in Settings.
 
 ## Controls
 
@@ -48,6 +63,13 @@ desktop GPU.
 | F1 | Hide the HUD |
 
 In the boat: W/S set the throttle, A/D steer, and E steps out.
+
+If the browser won't capture the mouse (some embedded pages refuse it), drag on the view
+to look around instead.
+
+**Touch screens** get on-screen controls. Your left thumb moves you (push to the rim of
+the stick to run) and your right thumb looks around. The buttons for jump, E, F and dive
+show up only when they do something. The top corner has your bag and pause.
 
 ## What's in the island
 

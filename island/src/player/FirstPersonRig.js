@@ -248,7 +248,8 @@ export class FirstPersonRig {
     this.group = new THREE.Group();
     this.group.name = 'viewmodel';
     camera.add(this.group);
-    const skin = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0xc39377), roughness: 0.5, sheen: 0.2, sheenColor: new THREE.Color(0xffb09a), sheenRoughness: 0.55, vertexColors: true });
+    // sun-tanned skin: a little rougher and with a soft warm sheen so it reads as skin rather than vinyl
+    const skin = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0xb7866a), roughness: 0.6, sheen: 0.4, sheenColor: new THREE.Color(0xe39a7c), sheenRoughness: 0.42, specularIntensity: 0.6, vertexColors: true });
     patchMaterial(skin, { translucency: 0.35, wet: 0.6, canopy: false, caustics: false, fog: true, key: 'skin' });
     const sleeve = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(0x8c8466), roughness: 0.92, sheen: 0.5, sheenColor: new THREE.Color(0xd8d4c0), side: THREE.DoubleSide });
     patchMaterial(sleeve, { wet: 1.0, canopy: false, caustics: false, key: 'sleeve' });

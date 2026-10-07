@@ -39,6 +39,9 @@ export class Input {
     this.sensitivity = 1;
     this.invertY = false;
     this.onLockChange = null;
+    // analog movement from the touch stick (overrides keys while active)
+    this.virtualAxis = null;
+    this._dragging = false;
 
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Tab' || e.code === 'Space' || e.code === 'F1' || e.code === 'F2' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -50,9 +53,10 @@ export class Input {
       this.down.delete(e.code);
       this.released.add(e.code);
     });
-    window.addEventListener('blur', () => { this.down.clear(); this.mouseDown = [false, false, false]; });
+    window.addEventListener('blur', () => { this.down.clear(); this.mouseDown = [false, false, false]; this._dragging = false; this.virtualAxis = null; });
     window.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      // without pointer lock (refused or unsupported) dragging on the view still turns the camera
+      if (!this.locked && !this._dragging) return;
       // ignore absurd spikes some browsers emit on lock
       if (Math.abs(e.movementX) > 400 || Math.abs(e.movementY) > 400) return;
       this.mouseDX += e.movementX;
@@ -62,11 +66,13 @@ export class Input {
       if (e.button > 2) return;
       this.mouseDown[e.button] = true;
       this.mousePressed[e.button] = true;
+      if (e.target === this.el && !this.locked) this._dragging = true;
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button > 2) return;
       this.mouseDown[e.button] = false;
       this.mouseReleased[e.button] = true;
+      if (!this.mouseDown.some(Boolean)) this._dragging = false;
     });
     window.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); }, { passive: true });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -95,10 +101,16 @@ export class Input {
   wasReleased(action) { return BINDINGS[action].some((c) => this.released.has(c)); }
 
   axis() {
+    if (this.virtualAxis) return { x: this.virtualAxis.x, y: this.virtualAxis.y };
     const x = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);
     const y = (this.isDown('forward') ? 1 : 0) - (this.isDown('back') ? 1 : 0);
     return { x, y };
   }
+
+  /** Touch / on-screen buttons feed the same key codes as the keyboard. */
+  pressCode(code) { this.down.add(code); this.pressed.add(code); }
+  releaseCode(code) { this.down.delete(code); this.released.add(code); }
+  addLook(dx, dy) { this.mouseDX += dx; this.mouseDY += dy; }
 
   consumeMouse() {
     const s = 0.0022 * this.sensitivity;

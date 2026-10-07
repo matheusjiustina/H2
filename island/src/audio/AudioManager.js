@@ -70,6 +70,8 @@ export class AudioManager {
 
   async _loadManifest() {
     // Optional recorded assets: public/sounds/manifest.json -> { "name": "file.ogg" }
+    // opened straight from disk (file://) there is nothing to fetch: procedural sounds only
+    if (location.protocol === 'file:') return;
     try {
       const res = await fetch('./sounds/manifest.json', { cache: 'no-cache' });
       if (!res.ok) return;
