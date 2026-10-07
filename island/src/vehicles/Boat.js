@@ -311,7 +311,7 @@ export class Boat {
       const { dx, dy } = input.consumeMouse();
       this.lookYaw = clamp(this.lookYaw - dx, -2.4, 2.4);
       this.lookPitch = clamp(this.lookPitch - dy, -1.2, 1.1);
-      const seat = new THREE.Vector3(0.02, 0.98, -1.55).applyEuler(this.group.rotation).add(this.group.position);
+      const seat = (this._seat ||= new THREE.Vector3()).set(0.02, 0.98, -1.55).applyEuler(this.group.rotation).add(this.group.position);
       game.camera.position.copy(seat);
       game.camera.rotation.set(this.lookPitch + this.pitch * 0.6, this.heading + Math.PI + this.lookYaw, this.roll * 0.6, 'YXZ');
       player.pos.set(seat.x, seat.y - 1.6, seat.z);

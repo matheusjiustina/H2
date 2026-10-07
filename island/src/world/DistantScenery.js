@@ -16,7 +16,8 @@ const ISLANDS = [
 
 function islandGeometry(o) {
   const n = new Noise(o.seed);
-  const seg = 110;
+  // ~15 m between vertices is finer than a pixel at these distances
+  const seg = Math.round(clamp(o.w / 15, 40, 100));
   const g = new THREE.PlaneGeometry(o.w, o.d, seg, Math.round(seg * o.d / o.w));
   g.rotateX(-Math.PI / 2);
   const p = g.attributes.position;
@@ -38,6 +39,14 @@ function islandGeometry(o) {
     col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  // drop triangles lying entirely under deep water: the ocean hides them anyway
+  const idx = g.index.array;
+  const keep = [];
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+    if (Math.max(p.getY(a), p.getY(b), p.getY(c)) > -12) keep.push(a, b, c);
+  }
+  g.setIndex(keep);
   g.computeVertexNormals();
   return g;
 }

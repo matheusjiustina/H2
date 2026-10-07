@@ -198,7 +198,9 @@ float causticsAt(vec3 wp) {
   float a = texture2D(uCausticsTex, p * s + vec2(uTime * 0.021, uTime * 0.013)).r;
   float b = texture2D(uCausticsTex, p * s * 1.37 - vec2(uTime * 0.017, -uTime * 0.024)).r;
   float c = min(a, b);
-  return c * c * 3.2;
+  // a low sun spreads and weakens the pattern; moonlight barely focuses at all
+  float strength = smoothstep(0.12, 0.6, L.y) * (1.0 - uNight * 0.9);
+  return c * c * 3.2 * strength;
 }
 #endif
 `;

@@ -271,7 +271,8 @@ void main() {
   float sw = swash(grid, shore);
   // shoreline foam bands moving landward
   float bands = sin(-shore * 1.25 - uTime * 1.1 + f2.a * 5.0) * 0.5 + 0.5;
-  float shoreFoam = (1.0 - smoothstep(0.0, 0.55 + energy * 0.8, depthV)) * (0.35 + 0.65 * bands);
+  // calm lagoon shallows keep only a thin lace at the waterline; exposed shores get a wide surf band
+  float shoreFoam = (1.0 - smoothstep(0.0, 0.18 + energy * 1.2, depthV)) * (0.35 + 0.65 * bands) * mix(0.45, 1.0, smoothstep(0.05, 0.35, energy));
   float edgeLine = (1.0 - smoothstep(0.0, 0.07, depthV)) * step(0.0, sw + 0.03);
   // waves breaking over the reef crest (shallow but energetic water)
   float reef = smoothstep(1.6, 0.25, depthV) * smoothstep(0.24, 0.55, energy) * smoothstep(-5.0, -0.1, td.r);
