@@ -1,17 +1,28 @@
 import { create } from 'zustand'
 import type { ConfigMap, SavedOption, SlotChoice } from '../data/configuration'
 import type { SlotId } from '../data/materials'
+import { CAMERA_BY_ID } from '../data/cameras'
 
 export type Mode = 'exterior' | 'interior'
 export type Nav = 'orbit' | 'walk'
 export type Quality = 'auto' | 'high' | 'medium' | 'low'
 export type Tier = 'high' | 'medium' | 'low'
 export type Panel = null | 'ambientes' | 'acabamentos' | 'opcoes' | 'vistas'
+export type TimeOfDay = 'dia' | 'entardecer' | 'noite'
+export const TIME_VALUE: Record<TimeOfDay, number> = { dia: 0, entardecer: 1, noite: 2 }
 
 interface CameraRequest {
   id: string
   ts: number
   instant?: boolean
+  /** slow, cinematic transition (intro / presentation) */
+  slow?: boolean
+}
+
+export interface FocusRequest {
+  center: [number, number, number]
+  radius: number
+  ts: number
 }
 
 interface State {
@@ -28,7 +39,7 @@ interface State {
   cameraRequest: CameraRequest | null
   walkTeleport: { x: number; z: number; yaw: number; ts: number } | null
   // visuals
-  night: boolean
+  time: TimeOfDay
   shadows: boolean
   quality: Quality
   autoTier: Tier
@@ -38,14 +49,28 @@ interface State {
   options: Record<1 | 2 | 3, SavedOption | null>
   activeOption: 1 | 2 | 3 | null
   showOriginal: boolean
+  // presentation / camera helpers
+  presentation: boolean
+  presentationStep: number
+  fading: boolean
+  intro: boolean
+  focusRequest: FocusRequest | null
+  focusActive: boolean
+  returnRequest: number
+  hoverId: string | null
+  // performance
+  dprScale: number
   // misc
   capturing: boolean
+  captureHQ: boolean
   toast: string | null
   dev: boolean
   isTouch: boolean
 
   set: (p: Partial<State>) => void
-  goCamera: (id: string, instant?: boolean) => void
+  goCamera: (id: string, instant?: boolean, slow?: boolean) => void
+  /** jump to a preset from anywhere (orbit navigation, correct mode) */
+  visit: (camId: string, slow?: boolean) => void
   select: (id: string | null) => void
   setChoice: (slot: SlotId, choice: SlotChoice | null) => void
   resetSlots: (slots: SlotId[]) => void
@@ -89,9 +114,9 @@ export const useStore = create<State>((set, get) => ({
   panel: null,
   plan: false,
   currentRoom: null,
-  cameraRequest: { id: 'hero', ts: 0, instant: true },
+  cameraRequest: { id: 'intro', ts: 0, instant: true },
   walkTeleport: null,
-  night: false,
+  time: (params.get('t') as TimeOfDay) || 'dia',
   shadows: true,
   quality: (params.get('q') as Quality) || 'auto',
   autoTier: 'medium',
@@ -100,14 +125,31 @@ export const useStore = create<State>((set, get) => ({
   options: { 1: null, 2: null, 3: null },
   activeOption: null,
   showOriginal: false,
+  presentation: false,
+  presentationStep: 0,
+  fading: false,
+  intro: !params.has('nointro'),
+  focusRequest: null,
+  focusActive: false,
+  returnRequest: 0,
+  hoverId: null,
+  dprScale: 1,
   capturing: false,
+  captureHQ: false,
   toast: null,
   dev: params.has('dev'),
   isTouch: typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0) && matchMedia('(pointer: coarse)').matches,
   ...loadPersisted(),
 
   set: (p) => set(p),
-  goCamera: (id, instant) => set({ cameraRequest: { id, ts: performance.now(), instant } }),
+  goCamera: (id, instant, slow) => set({ cameraRequest: { id, ts: performance.now(), instant, slow }, focusActive: false }),
+  visit: (camId, slow) => {
+    const p = CAMERA_BY_ID[camId]
+    if (!p) return
+    const exterior = p.group === 'exterior' || p.group === 'plan'
+    set({ nav: 'orbit', plan: false, mode: exterior ? 'exterior' : 'interior', currentRoom: exterior ? null : p.group })
+    get().goCamera(camId, false, slow)
+  },
   select: (id) => set({ selectedId: id, panel: id ? 'acabamentos' : get().panel }),
   setChoice: (slot, choice) => {
     const cfg = { ...get().clientConfig }

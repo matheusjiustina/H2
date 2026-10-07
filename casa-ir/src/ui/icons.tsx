@@ -65,3 +65,16 @@ export const IconCompare = () => (
 )
 export const IconCheck = () => <I d="M5 12.5l4.5 4.5L19 7.5" />
 export const IconBack = () => <I d="M15 5l-7 7 7 7" />
+export const IconSunset = () => (
+  <I>
+    <path d="M7.5 16a4.5 4.5 0 0 1 9 0" />
+    <path d="M3 19h18M12 6.5V9M5.6 10.1l1.6 1.6M18.4 10.1l-1.6 1.6M2.5 16h2M19.5 16h2" />
+  </I>
+)
+export const IconPlay = () => <I d="M8 5.5v13l10.5-6.5z" />
+export const IconStop = () => (
+  <I>
+    <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" />
+  </I>
+)
+export const IconFocus = () => <I d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />

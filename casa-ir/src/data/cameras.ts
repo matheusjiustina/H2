@@ -17,6 +17,7 @@ const C = (id: string, label: string, group: string, pos: [number, number, numbe
 
 export const CAMERAS: CameraPreset[] = [
   // ── Exterior ────────────────────────────────────────────────────────────
+  C('intro', 'Abertura', 'exterior', [72, 14, 30], [33.5, 3.4, 9.4], 'ARQ p.4', 34),
   C('hero', 'Vista principal', 'exterior', [55, 8.5, 27], [30.5, 3.0, 8.5], 'ARQ p.11', 38),
   C('fachada_frontal', 'Fachada frontal', 'exterior', [56, 2.3, 14.5], [33.5, 3.6, 9.2], 'ARQ p.4', 38),
   C('fachada_frontal_02', 'Fachada frontal — frontal', 'exterior', [60, 2.0, 9.8], [34, 3.4, 9.6], 'ARQ p.5', 36),
@@ -83,6 +84,35 @@ export const CAMERAS: CameraPreset[] = [
   C('q02_view_01', 'Quarto 02', 'q02', [29.5, 1.55, 5.05], [26.6, 1.0, 2.4], 'ARQ p.2', 66),
   C('hall_view_01', 'Hall de entrada', 'hall', [39.2, 1.6, 9.4], [33.3, 2.0, 9.4], 'ARQ p.5', 55),
   C('garage_view_01', 'Garagem', 'garagem', [39.8, 1.7, 15.8], [29.5, 1.6, 13.6], 'ARQ p.5', 55),
+]
+
+/** Curated still-image framings offered in CAPTURAR (archviz photography). */
+export const SHOTS: { id: string; label: string; cam: string }[] = [
+  { id: 'fachada_frontal', label: 'Fachada — frontal', cam: 'fachada_frontal_02' },
+  { id: 'fachada_angular', label: 'Fachada — angular', cam: 'fachada_frontal' },
+  { id: 'piscina_gourmet', label: 'Piscina — vista gourmet', cam: 'fachada_posterior_02' },
+  { id: 'gourmet_interior', label: 'Gourmet — interior', cam: 'gourmet_view_01' },
+  { id: 'sala_tv', label: 'Sala TV — principal', cam: 'tv_view_01' },
+  { id: 'master_cama', label: 'Master — cama', cam: 'master_view_02' },
+  { id: 'master_tv', label: 'Master — TV', cam: 'master_view_03' },
+  { id: 'closet', label: 'Closet — principal', cam: 'closet_view_01' },
+  { id: 'banho_master', label: 'Banho master', cam: 'masterbath_view_01' },
+]
+
+/** APRESENTAÇÃO — guided tour, in visiting order. */
+export const TOUR: { cam: string; label: string; hold: number }[] = [
+  { cam: 'fachada_frontal', label: 'Fachada frontal', hold: 7 },
+  { cam: 'hall_view_01', label: 'Entrada', hold: 6 },
+  { cam: 'patio_interno', label: 'Pátio interno', hold: 7 },
+  { cam: 'tv_view_01', label: 'Sala de TV', hold: 7 },
+  { cam: 'kitchen_view_04', label: 'Cozinha', hold: 6 },
+  { cam: 'gourmet_view_01', label: 'Área gourmet', hold: 7 },
+  { cam: 'piscina', label: 'Piscina', hold: 7 },
+  { cam: 'game_view_01', label: 'Sala de jogos', hold: 6 },
+  { cam: 'master_view_02', label: 'Suíte master', hold: 7 },
+  { cam: 'closet_view_01', label: 'Closet', hold: 6 },
+  { cam: 'masterbath_view_01', label: 'Banho master', hold: 6 },
+  { cam: 'fachada_posterior', label: 'Fachada posterior e piscina', hold: 8 },
 ]
 
 export const CAMERA_BY_ID = Object.fromEntries(CAMERAS.map((c) => [c.id, c])) as Record<string, CameraPreset>

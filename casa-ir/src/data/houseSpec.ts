@@ -350,8 +350,10 @@ export const BOUNDARY: Rect[] = [
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sun (A-01: plan top = north; southern hemisphere → sun to the north)
+// Sun (A-01: plan top = north; southern hemisphere → sun to the north).
+// DIA: sun from the north-east, front façade lit as in ARQ p.4/p.5.
+// ENTARDECER: low sun from the west-north-west (see scene/timeOfDay.ts).
 // ─────────────────────────────────────────────────────────────────────────────
-export const SUN = { azimuthDeg: 300, elevationDeg: 42 }
+export const SUN = { azimuthDeg: 58, elevationDeg: 50 }
 
 export const HOUSE_CENTER: [number, number, number] = [20, 2, 9]

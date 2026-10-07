@@ -1,25 +1,26 @@
 /**
  * Lighting rig.
  *
- *  - Sun (directional, shadowed) + hemisphere sky fill + image based lighting.
- *  - Smooth DAY ↔ NIGHT transition driven by a single `nightFactor`.
- *  - "Light pool": a FIXED number of warm point lights that are re-assigned to
- *    the architectural light anchors nearest to the camera. Keeping the light
- *    count constant avoids shader recompilation hitches while still letting
- *    every room have real light when you are in it.
+ *  - Sun (directional, soft shadows) following DIA → ENTARDECER → NOITE.
+ *  - Hemisphere sky fill + image based lighting regenerated from the same
+ *    procedural sky (PMREM), so reflections always match the time of day.
+ *  - "Light pool": a FIXED number of warm point lights re-assigned to the
+ *    architectural light anchors (pendants, coves, spots, garden lights)
+ *    nearest to the camera. A constant light count avoids shader recompiles.
+ *  - Exposure balances bright exteriors and interiors (no washed-out rooms).
  */
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Environment } from '@react-three/drei'
 import * as THREE from 'three'
-import { useStore, effectiveTier } from '../app/store'
-import { ROOMS, SUN, HEIGHTS } from '../data/houseSpec'
-import { setNightFactor } from '../materials/library'
+import { useStore, effectiveTier, TIME_VALUE } from '../app/store'
+import { ROOMS } from '../data/houseSpec'
+import { setLightFactors } from '../materials/library'
 import { EXTERIOR_LIGHTS } from './lightAnchors'
+import { lightState, updateFactors, sunDirection, SKY_GLSL, skyUniforms, syncSkyUniforms } from './timeOfDay'
 
-export const lightState = { night: 0 }
+export { lightState }
 
-const POOL_SIZE = { high: 10, medium: 7, low: 4 }
+const POOL_SIZE = { high: 14, medium: 8, low: 4 }
 
 interface Anchor {
   p: THREE.Vector3
@@ -29,31 +30,42 @@ interface Anchor {
   interior: boolean
 }
 
-const WARM = new THREE.Color('#ffc58c')
-const WARM_EXT = new THREE.Color('#ffd2a0')
+const WARM = new THREE.Color('#ffc387')
+const WARM_EXT = new THREE.Color('#ffcf9c')
+const SUN_DAY = new THREE.Color('#fff1df')
+const SUN_SET = new THREE.Color('#ffae6b')
+const HEMI_DAY = new THREE.Color('#cfe0ee')
+const HEMI_SET = new THREE.Color('#e9c4a6')
+const HEMI_NIGHT = new THREE.Color('#2a3550')
+const _c = new THREE.Color()
 
 export function Lighting() {
   const sun = useRef<THREE.DirectionalLight>(null)
   const hemi = useRef<THREE.HemisphereLight>(null)
   const moon = useRef<THREE.DirectionalLight>(null)
   const { scene, gl, camera } = useThree()
-  const night = useStore((s) => s.night)
+  const time = useStore((s) => s.time)
   const shadows = useStore((s) => s.shadows)
+  const captureHQ = useStore((s) => s.captureHQ)
   const tier = useStore(effectiveTier)
   const poolSize = POOL_SIZE[tier]
 
   const anchors = useMemo<Anchor[]>(() => {
     const a: Anchor[] = []
-    for (const r of ROOMS) for (const l of r.lights ?? []) a.push({ p: new THREE.Vector3(l[0], l[1], l[2]), i: l[3], color: WARM, dist: r.id === 'sala' ? 11 : 7.5, interior: r.interior })
+    for (const r of ROOMS) for (const l of r.lights ?? []) a.push({ p: new THREE.Vector3(l[0], l[1], l[2]), i: l[3], color: WARM, dist: r.id === 'sala' ? 11 : 6.5, interior: r.interior })
     for (const l of EXTERIOR_LIGHTS) a.push({ p: new THREE.Vector3(l[0], l[1], l[2]), i: l[3], color: WARM_EXT, dist: l[4] ?? 7, interior: false })
     return a
   }, [])
 
-  const pool = useMemo(() => Array.from({ length: poolSize }, () => {
-    const l = new THREE.PointLight(WARM, 0, 7, 2)
-    l.castShadow = false
-    return l
-  }), [poolSize])
+  const pool = useMemo(
+    () =>
+      Array.from({ length: poolSize }, () => {
+        const l = new THREE.PointLight(WARM, 0, 7, 2)
+        l.castShadow = false
+        return l
+      }),
+    [poolSize],
+  )
 
   useEffect(() => {
     const g = new THREE.Group()
@@ -65,33 +77,28 @@ export function Lighting() {
     }
   }, [pool, scene])
 
-  // sun direction
-  const sunPos = useMemo(() => {
-    const az = (SUN.azimuthDeg * Math.PI) / 180
-    const el = (SUN.elevationDeg * Math.PI) / 180
-    // azimuth measured from north (−Z) clockwise towards east (+X)
-    return new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).multiplyScalar(60)
-  }, [])
-
+  // shadow quality per tier (+ temporary boost for high-quality captures)
   useEffect(() => {
     const s = sun.current
     if (!s) return
-    const size = tier === 'high' ? 4096 : tier === 'medium' ? 2048 : 1024
+    const size = captureHQ ? 4096 : tier === 'high' ? 4096 : tier === 'medium' ? 2048 : 1024
     s.shadow.mapSize.set(size, size)
     s.shadow.map?.dispose()
     s.shadow.map = null as unknown as THREE.WebGLRenderTarget
-    s.shadow.camera.left = -27
-    s.shadow.camera.right = 27
-    s.shadow.camera.top = 22
-    s.shadow.camera.bottom = -22
+    const half = 30
+    s.shadow.camera.left = -half
+    s.shadow.camera.right = half
+    s.shadow.camera.top = half
+    s.shadow.camera.bottom = -half
     s.shadow.camera.near = 1
-    s.shadow.camera.far = 140
+    s.shadow.camera.far = 220
     s.shadow.camera.updateProjectionMatrix()
-    s.shadow.bias = -0.00025
-    s.shadow.normalBias = tier === 'low' ? 0.05 : 0.025
+    s.shadow.bias = -0.0002
+    s.shadow.normalBias = tier === 'low' ? 0.05 : 0.022
+    s.shadow.radius = tier === 'high' ? 3 : 2
     s.target.position.set(20, 0, 9)
     s.target.updateMatrixWorld()
-  }, [tier])
+  }, [tier, captureHQ])
 
   useEffect(() => {
     gl.shadowMap.enabled = shadows
@@ -103,35 +110,82 @@ export function Lighting() {
     })
   }, [shadows, tier, gl, scene])
 
+  // ── procedural IBL environment (re-generated while the time changes) ──
+  const env = useMemo(() => {
+    const envScene = new THREE.Scene()
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: skyUniforms(),
+      vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
+      fragmentShader: `${SKY_GLSL}
+        varying vec3 vP;
+        void main(){ gl_FragColor = vec4(skyColor(normalize(vP), 30.0), 1.0); }`,
+    })
+    envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 48, 24), mat))
+    return { envScene, mat, pmrem: new THREE.PMREMGenerator(gl), rt: null as THREE.WebGLRenderTarget | null, lastT: -1 }
+  }, [gl])
+  useEffect(
+    () => () => {
+      env.rt?.dispose()
+      env.pmrem.dispose()
+    },
+    [env],
+  )
+
   const tick = useRef(0)
-  const insideK = useRef(0)
   const assigned = useRef<(Anchor | null)[]>([])
+  const insideK = useRef(0)
+  const tState = useRef(TIME_VALUE[useStore.getState().time])
+  const sunDir = useMemo(() => new THREE.Vector3(), [])
 
-  useFrame((_, dt) => {
-    // animate night factor
-    const target = night ? 1 : 0
-    const nf = THREE.MathUtils.damp(lightState.night, target, 2.2, Math.min(dt, 0.3))
-    const changed = Math.abs(nf - lightState.night) > 1e-4
-    lightState.night = Math.abs(nf - target) < 0.002 ? target : nf
-    const n = lightState.night
-    if (changed) setNightFactor(n)
+  useFrame((_, dtRaw) => {
+    const dt = Math.min(dtRaw, 0.3)
+    // ── animate the time of day (≈1.5 s between neighbouring states) ──
+    const target = TIME_VALUE[time]
+    let t = tState.current
+    if (Math.abs(target - t) > 0.0005) {
+      t = THREE.MathUtils.damp(t, target, 3.2, dt)
+      if (Math.abs(target - t) < 0.002) t = target
+      tState.current = t
+    }
+    updateFactors(t)
+    const { day, sunset, night, lights } = lightState
+    setLightFactors(lights, day)
 
+    // environment map
+    if (Math.abs(env.lastT - t) > 0.025 || !env.rt) {
+      syncSkyUniforms(env.mat.uniforms as ReturnType<typeof skyUniforms>)
+      const rt = env.pmrem.fromScene(env.envScene, 0, 0.1, 100)
+      env.rt?.dispose()
+      env.rt = rt
+      scene.environment = rt.texture
+      env.lastT = t
+    }
+
+    // sun
+    sunDirection(t, sunDir)
     if (sun.current) {
-      sun.current.intensity = THREE.MathUtils.lerp(3.1, 0, n)
-      sun.current.color.setRGB(1, THREE.MathUtils.lerp(0.95, 0.8, n), THREE.MathUtils.lerp(0.88, 0.7, n))
-      sun.current.castShadow = shadows && n < 0.95
+      sun.current.position.set(20, 0, 9).addScaledVector(sunDir, 90)
+      sun.current.intensity = 3.0 * day + 2.3 * sunset
+      sun.current.color.copy(SUN_DAY).multiplyScalar(day).add(_c.copy(SUN_SET).multiplyScalar(sunset))
+      if (day + sunset > 0) sun.current.color.multiplyScalar(1 / (day + sunset))
+      sun.current.castShadow = shadows && night < 0.95
     }
-    if (moon.current) moon.current.intensity = n * 0.22
+    if (moon.current) moon.current.intensity = night * 0.2
     if (hemi.current) {
-      hemi.current.intensity = THREE.MathUtils.lerp(0.42, 0.05, n)
-      hemi.current.color.set('#cfe0ee').lerp(new THREE.Color('#33415a'), n)
+      hemi.current.intensity = 0.42 * day + 0.3 * sunset + 0.06 * night
+      hemi.current.color.copy(HEMI_DAY).multiplyScalar(day).add(_c.copy(HEMI_SET).multiplyScalar(sunset)).add(_c.copy(HEMI_NIGHT).multiplyScalar(night))
     }
+
+    // interior / exterior exposure balance
     const room = useStore.getState().currentRoom
     const inside = room ? ROOMS.find((r) => r.id === room)?.interior ?? false : false
-    insideK.current = THREE.MathUtils.damp(insideK.current, inside ? 1 : 0, 2.5, Math.min(dt, 0.1))
+    insideK.current = THREE.MathUtils.damp(insideK.current, inside ? 1 : 0, 2.5, dt)
     const k = insideK.current
-    scene.environmentIntensity = THREE.MathUtils.lerp(0.62, 0.07, n) * THREE.MathUtils.lerp(1, 0.5, k)
-    gl.toneMappingExposure = THREE.MathUtils.lerp(1.0, 1.25, n) * THREE.MathUtils.lerp(1, 1.12, k)
+    scene.environmentIntensity = (0.62 * day + 0.42 * sunset + 0.07 * night) * THREE.MathUtils.lerp(1, 0.55, k)
+    // interiors: slightly brighter by day, lower at night so warm lamps read as pools of light
+    gl.toneMappingExposure = (1.0 * day + 1.12 * sunset + 1.25 * night) * THREE.MathUtils.lerp(1, 1.1 * day + 1.0 * sunset + 0.8 * night, k)
 
     // light pool re-assignment at ~4 Hz
     tick.current += dt
@@ -143,7 +197,6 @@ export function Lighting() {
         .sort((p, q) => p.d - q.d)
         .slice(0, pool.length)
         .map((r) => r.a)
-      // keep stable assignment where possible
       const next: (Anchor | null)[] = new Array(pool.length).fill(null)
       const remaining = new Set(ranked)
       assigned.current.forEach((a, i) => {
@@ -156,7 +209,6 @@ export function Lighting() {
       for (let i = 0; i < next.length; i++) if (!next[i]) next[i] = rest.shift() ?? null
       assigned.current = next
     }
-    const dayInt = 0.28
     pool.forEach((l, i) => {
       const a = assigned.current[i]
       if (!a) {
@@ -166,53 +218,18 @@ export function Lighting() {
       l.position.copy(a.p)
       l.distance = a.dist
       l.color.copy(a.color)
-      const k = a.interior ? THREE.MathUtils.lerp(dayInt, 1, n) : n
-      const targetI = a.i * 26 * k
+      // exterior garden/facade lights only from golden hour on
+      const kk = a.interior ? lights : Math.max(0, lights - 0.35) / 0.65
+      const targetI = a.i * 24 * kk
       l.intensity = THREE.MathUtils.damp(l.intensity, targetI, 6, dt)
     })
   })
 
   return (
     <>
-      <directionalLight ref={sun} position={sunPos.clone().add(new THREE.Vector3(20, 0, 9))} intensity={3.1} castShadow={shadows} />
+      <directionalLight ref={sun} position={[60, 60, -20]} intensity={3} castShadow={shadows} />
       <directionalLight ref={moon} position={[-30, 40, 30]} intensity={0} color="#9fb4d8" />
-      <hemisphereLight ref={hemi} args={['#cfe0ee', '#8b7e6c', 0.55]} />
-      <Environment resolution={tier === 'low' ? 64 : 128} frames={1}>
-        <EnvDome />
-      </Environment>
+      <hemisphereLight ref={hemi} args={['#cfe0ee', '#8b7e6c', 0.42]} />
     </>
   )
 }
-
-/** Gradient dome used only to generate the IBL environment map. */
-function EnvDome() {
-  const mat = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        side: THREE.BackSide,
-        depthWrite: false,
-        uniforms: {},
-        vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);} ',
-        fragmentShader: `varying vec3 vP;
-          void main(){
-            float h = vP.y;
-            vec3 zenith = vec3(0.38,0.56,0.82);
-            vec3 horizon = vec3(0.92,0.92,0.9);
-            vec3 ground = vec3(0.36,0.33,0.28);
-            vec3 c = h > 0.0 ? mix(horizon, zenith, pow(h, 0.6)) : mix(horizon*0.8, ground, pow(-h, 0.4));
-            vec3 sunDir = normalize(vec3(-0.6, 0.67, -0.43));
-            float s = pow(max(dot(normalize(vP), sunDir), 0.0), 220.0);
-            c += vec3(1.0,0.93,0.82) * s * 40.0;
-            gl_FragColor = vec4(c, 1.0);
-          }`,
-      }),
-    [],
-  )
-  return (
-    <mesh material={mat} scale={50}>
-      <sphereGeometry args={[1, 48, 24]} />
-    </mesh>
-  )
-}
-
-export const INTERIOR_FLOOR = HEIGHTS.floor

@@ -32,6 +32,16 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 .ui { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
 .ui > * { pointer-events: auto; }
 .ui--hidden { opacity: 0; }
+.ui { transition: opacity 0.9s ease; }
+.ui--intro { opacity: 0; pointer-events: none; }
+.ui--intro > * { pointer-events: none; }
+.ui--hidden { transition: none; }
+.fade { position: absolute; inset: 0; z-index: 9; background: #0e0d0c; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+.fade.is-on { opacity: 1; }
+.present { position: absolute; left: 50%; bottom: calc(26px + var(--safe-b)); transform: translateX(-50%); display: flex; align-items: center; gap: 16px; padding: 8px 8px 8px 20px; background: var(--glass); border: 1px solid var(--line); border-radius: 999px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.present__label { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; animation: fade-in 0.8s ease; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.present__count { color: var(--accent); margin-right: 12px; font-variant-numeric: tabular-nums; }
 .topbar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 22px; pointer-events: none; background: linear-gradient(to bottom, rgba(10, 9, 8, 0.38), rgba(10, 9, 8, 0)); }
 .topbar > * { pointer-events: auto; }
 .brand { font-weight: 300; font-size: 20px; letter-spacing: 0.34em; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35); cursor: pointer; user-select: none; white-space: nowrap; }
@@ -133,6 +143,15 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 .popover { position: absolute; bottom: calc(100% + 10px); right: 0; min-width: 190px; padding: 6px; background: var(--glass-strong); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(14px); display: flex; flex-direction: column; }
 .popover button { text-align: left; border: 0; background: none; padding: 11px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); }
 .popover button.is-active { color: var(--text); background: rgba(205, 184, 154, 0.16); }
+.popover button:hover { color: var(--text); }
+.popover button small { display: block; margin-top: 2px; font-size: 11px; color: rgba(241, 236, 228, 0.45); }
+.popover--wide { min-width: 300px; }
+.popover__title { padding: 8px 12px 4px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+.popover__sep { height: 1px; background: var(--line); margin: 6px 4px; }
+.popover__grid { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px 8px; }
+.popover__grid .mini { padding: 7px 10px; font-size: 11.5px; }
+.tod { display: flex; gap: 2px; }
+.tool--tod { min-width: 74px; }
 .restore { position: absolute; left: 20px; bottom: calc(22px + var(--safe-b)); }
 .btn--restore { background: var(--glass-strong); color: var(--text); border: 1px solid var(--line); backdrop-filter: blur(12px); font-size: 11.5px; padding: 12px 16px; }
 .btn--restore:hover { border-color: var(--accent); }

@@ -11,6 +11,8 @@ import * as THREE from 'three'
 
 export type TextureKey =
   | 'wood'
+  | 'wood_b'
+  | 'foliage'
   | 'wood_fine'
   | 'wood_slats'
   | 'deck'
@@ -139,6 +141,49 @@ const generators: Record<TextureKey, Gen> = {
       const val = 205 + ring * 22 + (fine - 0.5) * 40 + (n2(u, v * 0.2) - 0.5) * 30
       return grey(val)
     })
+  },
+  // straighter, finer figure (walnut, cumaru) — so different woods never share one pattern
+  wood_b: (S) => {
+    const n1 = makeNoise(6, 15)
+    const n2 = makeNoise(24, 16)
+    const n3 = makeNoise(96, 17)
+    return pixelFill(S, (u, v) => {
+      const warp = fbm([n1, n2], u * 0.7, v * 0.12) * 1.6
+      const ring = Math.sin((u * 42 + warp * 2.4) * Math.PI)
+      const streak = n3(u * 3, v * 0.08)
+      const val = 208 + ring * 15 + (streak - 0.5) * 46 + (n2(u * 0.5, v * 0.15) - 0.5) * 22
+      return grey(val)
+    })
+  },
+  // alpha-tested foliage card (tree canopies)
+  foliage: (S) => {
+    const { c, ctx } = canvas(S)
+    ctx.clearRect(0, 0, S, S)
+    const r = rng(301)
+    const greens = ['#5f7a45', '#4f6a3a', '#6f8a52', '#41592f', '#7a9356', '#566f3e']
+    for (let i = 0; i < 230; i++) {
+      const cx = S * (0.12 + r() * 0.76)
+      const cy = S * (0.12 + r() * 0.76)
+      const dx = cx - S / 2
+      const dy = cy - S / 2
+      if (dx * dx + dy * dy > (S * 0.42) ** 2) continue
+      const len = S * (0.035 + r() * 0.035)
+      ctx.save()
+      ctx.translate(cx, cy)
+      ctx.rotate(r() * Math.PI * 2)
+      ctx.fillStyle = greens[Math.floor(r() * greens.length)]
+      ctx.beginPath()
+      ctx.ellipse(0, 0, len, len * 0.42, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(30,40,20,0.35)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(-len, 0)
+      ctx.lineTo(len, 0)
+      ctx.stroke()
+      ctx.restore()
+    }
+    return c
   },
   wood_fine: (S) => {
     const n1 = makeNoise(8, 21)
@@ -578,6 +623,79 @@ export function textureMean(key: TextureKey): number {
   const m = Math.max(0.05, s / n)
   means.set(key, m)
   return m
+}
+
+// ── derived PBR maps (normal + roughness) from the procedural height ──
+const derived = new Map<string, THREE.Texture>()
+
+function heightData(key: TextureKey) {
+  const img = getTexture(key).image as HTMLCanvasElement
+  const ctx = img.getContext('2d')!
+  const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height)
+  const h = new Float32Array(width * height)
+  for (let i = 0; i < width * height; i++) h[i] = (0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]) / 255
+  return { h, width, height }
+}
+
+/** Tangent-space normal map derived from the texture's luminance. */
+export function getNormalMap(key: TextureKey): THREE.Texture {
+  const id = `n:${key}@${baseSize}`
+  const hit = derived.get(id)
+  if (hit) return hit
+  const { h, width: W, height: H } = heightData(key)
+  const c = document.createElement('canvas')
+  c.width = W
+  c.height = H
+  const ctx = c.getContext('2d')!
+  const img = ctx.createImageData(W, H)
+  const k = 3.2
+  const at = (x: number, y: number) => h[((y + H) % H) * W + ((x + W) % W)]
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * k
+      const dy = (at(x, y + 1) - at(x, y - 1)) * k
+      const l = Math.hypot(dx, dy, 1)
+      const i = (y * W + x) * 4
+      img.data[i] = (-dx / l * 0.5 + 0.5) * 255
+      img.data[i + 1] = (dy / l * 0.5 + 0.5) * 255
+      img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255
+      img.data[i + 3] = 255
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.colorSpace = THREE.NoColorSpace
+  t.anisotropy = 8
+  derived.set(id, t)
+  return t
+}
+
+/** Roughness multiplier map (dark pores / grain slightly rougher). */
+export function getRoughnessMap(key: TextureKey): THREE.Texture {
+  const id = `r:${key}@${baseSize}`
+  const hit = derived.get(id)
+  if (hit) return hit
+  const { h, width: W, height: H } = heightData(key)
+  let mean = 0
+  for (let i = 0; i < h.length; i++) mean += h[i]
+  mean /= h.length
+  const c = document.createElement('canvas')
+  c.width = W
+  c.height = H
+  const ctx = c.getContext('2d')!
+  const img = ctx.createImageData(W, H)
+  for (let i = 0; i < W * H; i++) {
+    const v = Math.max(0.7, Math.min(1, 0.9 + (mean - h[i]) * 0.6)) * 255
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v
+    img.data[i * 4 + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.colorSpace = THREE.NoColorSpace
+  derived.set(id, t)
+  return t
 }
 
 /** Pre-generates every texture, yielding to the browser between items so the

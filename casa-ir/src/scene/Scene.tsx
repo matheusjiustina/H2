@@ -1,8 +1,8 @@
 import { Suspense, useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useStore, activeConfig } from '../app/store'
-import { applyConfig } from '../materials/library'
+import { useStore, activeConfig, effectiveTier } from '../app/store'
+import { applyConfig, setGlassQuality } from '../materials/library'
 import { Lighting } from './Lighting'
 import { Sky } from './Sky'
 import { Site } from './Site'
@@ -17,10 +17,18 @@ import { Effects } from './Effects'
 import { QualityManager } from './QualityManager'
 import { RoomTracker } from '../controls/RoomTracker'
 import { CaptureBridge } from '../utils/screenshot'
+import { RenderLoop } from './RenderLoop'
 
 export function Scene() {
   const nav = useStore((s) => s.nav)
   const gl = useThree((s) => s.gl)
+  const tier = useStore(effectiveTier)
+  const captureHQ = useStore((s) => s.captureHQ)
+
+  // physically based glass in the photorealistic tier and in HQ captures
+  useEffect(() => {
+    setGlassQuality(tier === 'high' || captureHQ)
+  }, [tier, captureHQ])
 
   // configuration → materials (mutated in place, no re-render needed)
   useEffect(() => {
@@ -54,6 +62,7 @@ export function Scene() {
       <Effects />
       <QualityManager />
       <CaptureBridge />
+      <RenderLoop />
     </>
   )
 }

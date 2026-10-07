@@ -14,6 +14,7 @@ import { Toolbar } from './Toolbar'
 import { WalkOverlay } from './WalkOverlay'
 import { CompareBadge } from './CompareBadge'
 import { DevOverlay } from './DevOverlay'
+import { IntroController, PresentationCaption, PresentationController } from './Presentation'
 
 export function UI() {
   const progress = useStore((s) => s.progress)
@@ -21,20 +22,31 @@ export function UI() {
   const panel = useStore((s) => s.panel)
   const toast = useStore((s) => s.toast)
   const dev = useStore((s) => s.dev)
+  const intro = useStore((s) => s.intro)
+  const presentation = useStore((s) => s.presentation)
+  const fading = useStore((s) => s.fading)
   const loaded = progress >= 1
   return (
     <>
+      <div className={`fade${fading && !capturing ? ' is-on' : ''}`} aria-hidden="true" />
       {!loaded && <Loading />}
+      <IntroController />
+      <PresentationController />
       {loaded && (
-        <div className={`ui${capturing ? ' ui--hidden' : ''}`}>
-          <TopBar />
-          <ViewChips />
-          <CompareBadge />
-          {panel === 'ambientes' && <RoomsPanel />}
-          {panel === 'acabamentos' && <FinishPanel />}
-          {panel === 'opcoes' && <OptionsPanel />}
-          <Toolbar />
-          <WalkOverlay />
+        <div className={`ui${capturing ? ' ui--hidden' : ''}${intro ? ' ui--intro' : ''}`}>
+          {!presentation && (
+            <>
+              <TopBar />
+              <ViewChips />
+              <CompareBadge />
+              {panel === 'ambientes' && <RoomsPanel />}
+              {panel === 'acabamentos' && <FinishPanel />}
+              {panel === 'opcoes' && <OptionsPanel />}
+              <Toolbar />
+              <WalkOverlay />
+            </>
+          )}
+          <PresentationCaption />
           {toast && <div className="toast">{toast}</div>}
           {dev && <DevOverlay />}
         </div>
