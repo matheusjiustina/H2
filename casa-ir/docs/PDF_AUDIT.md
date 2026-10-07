@@ -228,3 +228,27 @@ Todos os ambientes listados no briefing e todos os encontrados na auditoria fora
 Sala de TV · Lavanderia · Cozinha · Área Gourmet · Banho Externo · Despensa · Depósito · Sala de Jogos · Banho Social · Suíte Master (dormitório, closet, banho) · Quarto 01 · Quarto 02 · Circulações (íntima e serviço) · Hall · Garagem · Pátio interno / Jardim central · Deck · Praia de areia · Piscina · Jardins · Chuveiro externo · Fachada frontal · Fachada posterior · Fachadas laterais · Volume alto/pórtico · Marquise · Pérgolas · Caixa d’água · Muros de divisa · Calçada e rua.
 
 A rastreabilidade por ambiente (array `sources`) está em `src/data/houseSpec.ts → ROOMS` e é exibida no painel de ambientes.
+
+---
+
+## 8. Validação visual (cena 3D × referências do PDF)
+
+Cada vista curada (`src/data/cameras.ts`, campo `source`) foi renderizada e comparada com a página correspondente. A interface mostra a referência ("Referência: INT p.X") sempre que uma vista curada está ativa.
+
+| Vista | Referência | Resultado / correções aplicadas |
+|---|---|---|
+| `fachada_frontal`, `fachada_frontal_02` | ARQ p.4, p.5 | Massas, marquise, laje alta com brise, pilar de pedra, pele de vidro, porta pivotante e poltronas conferem. Adicionado ripado sob a laje alta sobre a garagem. |
+| `fachada_posterior`, `_02` | ARQ p.7, p.8, p.9 | Pórtico da suíte, ombrelone, pérgola, recuo em seixo com poltrona suspensa e portas de correr da gourmet conferem. |
+| `patio_interno` | ARQ p.6 | Janelas estreitas do closet, árvore do jardim central e pele de vidro alta da sala conferem. |
+| `piscina` | ARQ p.10 | Maciço tropical, pedras, praia de areia, mesa com ombrelone e painel do chuveiro conferem. |
+| `vista_superior` | ARQ p.16 | Composição das coberturas, pérgolas, caixa d'água e piscina conferem. |
+| `planta3d` | ARQ p.2 | Todos os ambientes, paredes e mobiliário legíveis em corte. |
+| `tv_view_01…05` | INT p.5–9 | Pé-direito duplo, parede de linho com blocos de nogueira, painel grafite com travertino e LED, cluster de pendentes âmbar. **Correção:** a laje da marquise atravessava a sala (dividida em 3 partes). Enquadramentos rebaixados. |
+| `kitchen_view_01…04` | INT p.19–23 | Torre de forno, coifa em terrazzo, ilha de nogueira, mesa com tampo de vidro, 5 pendentes globo. |
+| `gourmet_view_01…04` | INT p.24–28 | Forro de madeira, ventiladores, pendentes cônicos, churrasqueira em terrazzo, ilha orgânica, cadeiras de corda verde. |
+| `laundry_view_01…03` | INT p.13–15 | Porta de correr para as bananeiras, painéis de nogueira, armários areia, tanques. |
+| `closet_view_01…03`, `masterbath_view_01` | INT p.45–56 | Corredor em U com portas espelhadas, nicho de nogueira iluminado, penteadeira com espelho suspenso, revestimento 3D no box. |
+| `master_view_01…04` | INT p.57–62 | Cabeceira em tecido com moldura e LED, criados ovais, TV em pórtico de latão com vista da piscina. |
+| `q01_view_01` | ARQ p.2 | **Correção:** câmera estava dentro do armário — reposicionada. |
+
+Testes funcionais realizados: navegação por vistas, Planta 3D, Dia/Noite, seleção + troca de acabamento + restauração, comparação Projeto Original × Opção, layout mobile (390×844), passeio em primeira pessoa com colisão, build de produção.
