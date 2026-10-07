@@ -28,6 +28,7 @@ import { InteractionSystem } from '../player/InteractionSystem.js';
 import { Inventory, ITEMS } from '../player/Inventory.js';
 import { Tools } from '../player/Tools.js';
 import { SPAWN } from '../world/Layout.js';
+import { smoothstep, damp } from '../utils/MathUtils.js';
 import { TouchControls } from '../ui/TouchControls.js';
 import { Seaplane } from '../vehicles/Seaplane.js';
 import { VegetationManager } from '../vegetation/VegetationManager.js';
@@ -43,6 +44,9 @@ import { AudioManager } from '../audio/AudioManager.js';
 import { UI } from '../ui/UI.js';
 
 const params = new URLSearchParams(location.search);
+// closest the eye may sit to the water surface: clears the near plane's corners (near 0.08 m,
+// up to 93° vertical FOV) in any pitch, plus the waterline wobble of the composite pass
+const SURFACE_GAP = 0.13;
 
 /**
  * Top level game object: owns every system and the single central update loop.
@@ -60,6 +64,8 @@ export class Game {
     this.U = U;
     this.perf = new PerformanceMonitor();
     this.autostart = params.has('autostart');
+    this.camUnder = false;
+    this.reflectionFade = 1;
   }
 
   async init() {
@@ -449,8 +455,21 @@ export class Game {
     this.distant.update(this.camera);
 
     const cp = this.camera.position;
-    this.waterYAtCamera = this.ocean.heightAt(cp.x, cp.z);
-    U.uUnderwater.value = cp.y < this.waterYAtCamera - 0.02 ? 1 : 0;
+    const wy = this.waterYAtCamera = this.ocean.heightAt(cp.x, cp.z);
+    // Keep the eye out of the water surface itself. Inside that thin band the near plane cuts
+    // the surface, so the view shows neither the water from above nor from below. The camera
+    // is held just above or just below it and crosses in one step once it is clearly through.
+    if (this.camUnder ? cp.y > wy + SURFACE_GAP : cp.y < wy - SURFACE_GAP) this.camUnder = !this.camUnder;
+    const held = this.camUnder ? Math.min(cp.y, wy - SURFACE_GAP) : Math.max(cp.y, wy + SURFACE_GAP);
+    if (held !== cp.y) { cp.y = held; this.camera.updateMatrixWorld(); }
+    U.uUnderwater.value = this.camUnder ? 1 : 0;
+    // The planar reflection is mirrored about the mean sea level, so it only lines up with the
+    // waves when the eye is well above them. Close to the surface (swimming, or out at sea)
+    // it fades to the analytic sky instead of smearing into streaks.
+    const above = cp.y - U.uWaterLevel.value;
+    const swell = Math.max(this.ocean.amplitudeAt(cp.x, cp.z) * 0.5, 0.02);
+    const trust = this.camUnder || above < 0.08 ? 0 : smoothstep(0.08, 0.16, above) * smoothstep(0.8, 2.2, above / swell);
+    this.reflectionFade = trust < this.reflectionFade ? (trust === 0 ? 0 : damp(this.reflectionFade, trust, 8, dt)) : damp(this.reflectionFade, trust, 2, dt);
 
     this.interaction.update(simDt, this);
     for (const sys of this.systems) if (sys.update) sys.update(simDt, this);
@@ -468,7 +487,7 @@ export class Game {
   }
 
   render() {
-    this.renderer.render({ scene: this.scene, camera: this.camera, water: this.ocean, waterYAtCamera: this.waterYAtCamera, time: this.time });
+    this.renderer.render({ scene: this.scene, camera: this.camera, water: this.ocean, waterYAtCamera: this.waterYAtCamera, reflectionFade: this.reflectionFade, time: this.time });
     if (this.tools.photoPending) {
       this.tools.photoPending = false;
       const url = this.renderer.snapshot(420);

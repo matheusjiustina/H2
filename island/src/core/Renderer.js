@@ -223,7 +223,7 @@ export class Renderer {
    * Render one frame.
    * world: { scene, camera, water (Ocean), waterHeightAtCamera, time }
    */
-  render({ scene, camera, water, waterYAtCamera = 0, time = 0 }) {
+  render({ scene, camera, water, waterYAtCamera = 0, reflectionFade = 1, time = 0 }) {
     const r = this.renderer;
     const s = this.settings;
     this.frame++;
@@ -274,7 +274,7 @@ export class Renderer {
     // ---------------------------------------------------------------- planar reflection
     const uw = U.uUnderwater.value > 0.5;
     let hasReflection = false;
-    if (s.reflections !== 'off' && !uw && water) {
+    if (s.reflections !== 'off' && !uw && water && reflectionFade > 0.01) {
       this._updateReflectionCamera(camera, U.uWaterLevel.value);
       const rc = this.reflectionCamera;
       rc.layers.disableAll();
@@ -291,6 +291,7 @@ export class Renderer {
       water.setPassInputs({
         refraction: this.refrRT.texture,
         reflection: hasReflection ? this.reflRT.texture : null,
+        reflectionFade,
         reflectionMatrix: this.reflectionMatrix,
         resolution: this.internal,
         near: camera.near,

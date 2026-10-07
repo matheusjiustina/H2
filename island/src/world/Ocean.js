@@ -96,7 +96,9 @@ void main() {
   vec3 d = gerstner(grid, td.a, spacing);
   d.y += swash(grid, td.b);
   vec2 ruv = (grid - uRippleArea.xy) / uRippleArea.z + 0.5;
-  if (ruv.x > 0.0 && ruv.y > 0.0 && ruv.x < 1.0 && ruv.y < 1.0) d.y += textureLod(uRipples, ruv, 0.0).r * 0.6;
+  // ripples only shade the water right around the eye: lifting the surface there (a swimmer's
+  // own splashes) would put it over the camera, which the CPU height query can't see
+  if (ruv.x > 0.0 && ruv.y > 0.0 && ruv.x < 1.0 && ruv.y < 1.0) d.y += textureLod(uRipples, ruv, 0.0).r * 0.6 * smoothstep(0.7, 3.0, r);
   vec3 wp = vec3(grid.x, uWaterLevel, grid.y) + d;
   vWorld = wp;
   vGrid = grid;
@@ -114,7 +116,7 @@ ${WAVE_GLSL}
 uniform sampler2D uRefraction;
 uniform sampler2D uReflection;
 uniform mat4 uReflMatrix;
-uniform float uHasReflection;
+uniform float uHasReflection; // planar reflection weight (0 = analytic sky only)
 uniform vec2 uResolution;
 uniform sampler2D uNormalMap;
 uniform sampler2D uFoamTex;
@@ -246,16 +248,14 @@ void main() {
   // ----- reflection
   vec3 R = reflect(-V, N);
   R.y = abs(R.y);
-  vec3 refl;
-  if (uHasReflection > 0.5 && !below) {
+  vec3 refl = skyWithClouds(R, P);
+  if (uHasReflection > 0.0 && !below) {
     vec4 pr = uReflMatrix * vec4(P.x, uWaterLevel, P.z, 1.0);
     vec2 ruv2 = pr.xy / pr.w + (N.xz - vec2(0.0)) * 0.05 * (1.0 - far * 0.7);
     ruv2 = clamp(ruv2, vec2(0.001), vec2(0.999));
-    refl = texture2D(uReflection, ruv2).rgb;
-    // blend toward the analytic sky for very distorted / far samples
-    refl = mix(refl, skyWithClouds(R, P), far * 0.15);
-  } else {
-    refl = skyWithClouds(R, P);
+    // blend toward the analytic sky for very distorted / far samples, and when the eye is
+    // too close to the waves for the mirrored camera to line up with them
+    refl = mix(refl, texture2D(uReflection, ruv2).rgb, (1.0 - far * 0.15) * uHasReflection);
   }
 
   // ----- sun specular (GGX)
@@ -396,10 +396,10 @@ export class Ocean {
     this.uniforms.uDetailLayers.value = q === 'low' ? 2 : 3;
   }
 
-  setPassInputs({ refraction, reflection, reflectionMatrix, resolution, far }) {
+  setPassInputs({ refraction, reflection, reflectionFade = 1, reflectionMatrix, resolution, far }) {
     this.uniforms.uRefraction.value = refraction;
     this.uniforms.uReflection.value = reflection;
-    this.uniforms.uHasReflection.value = reflection ? 1 : 0;
+    this.uniforms.uHasReflection.value = reflection ? Math.min(Math.max(reflectionFade, 0), 1) : 0;
     this.uniforms.uReflMatrix.value.copy(reflectionMatrix);
     this.uniforms.uResolution.value.copy(resolution);
     this.uniforms.uFar.value = far;
@@ -455,6 +455,14 @@ export class Ocean {
     }
     this._displace(px, pz, t, d);
     return U.uWaterLevel.value + d.y;
+  }
+
+  /** Sum of the wave amplitudes at (x,z): how far the surface can stray from the mean level. */
+  amplitudeAt(x, z) {
+    const energy = this.td.energyAt(x, z);
+    let a = 0;
+    for (let i = 0; i < NW; i++) a += this._amp(i, energy);
+    return a;
   }
 
   /** Approximate surface normal at (x,z). */

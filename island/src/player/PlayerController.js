@@ -249,7 +249,8 @@ export class PlayerController {
     const fast = input.isDown('sprint');
     const max = fast ? 3.0 : 1.9;
     // 3D swim direction when underwater, surface swimming otherwise
-    const surfaceFeet = this.waterSurface - 1.48;
+    // floating: the eye rides about 0.22 m over the waves, head and shoulders out
+    const surfaceFeet = this.waterSurface - 1.42;
     const diving = input.isDown('crouch');
     const rising = input.isDown('jump');
     let ty = 0;
