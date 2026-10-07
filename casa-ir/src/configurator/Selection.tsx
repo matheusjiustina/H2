@@ -13,13 +13,10 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore } from '../app/store'
 
-function findSelectable(o: THREE.Object3D | null): string | null {
+export function findSelectable(o: THREE.Object3D | null): string | null {
   while (o) {
     const s = o.userData?.selectable
     if (s) return s as string
-    if (s === null && o.userData && 'selectable' in o.userData && o.type === 'Mesh') {
-      // explicit null on a mesh: keep walking (group may define it)
-    }
     o = o.parent
   }
   return null
@@ -31,7 +28,8 @@ export function Pickable({ children }: { children: ReactNode }) {
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
     if (e.delta > 6) return
-    if (nav === 'walk' && document.pointerLockElement) return
+    // desktop walk mode: clicks capture the mouse; picking uses the crosshair (WalkControls)
+    if (nav === 'walk' && !useStore.getState().isTouch) return
     const hit = e.intersections.find((i) => !i.object.userData?.noPick && (i.object as THREE.Mesh).visible !== false && isVisible(i.object))
     const id = hit ? findSelectable(hit.object) : null
     select(id)
@@ -43,7 +41,7 @@ export function Pickable({ children }: { children: ReactNode }) {
   )
 }
 
-function isVisible(o: THREE.Object3D | null): boolean {
+export function isVisible(o: THREE.Object3D | null): boolean {
   while (o) {
     if (!o.visible) return false
     o = o.parent

@@ -110,7 +110,7 @@ export function Lighting() {
   useFrame((_, dt) => {
     // animate night factor
     const target = night ? 1 : 0
-    const nf = THREE.MathUtils.damp(lightState.night, target, 2.2, Math.min(dt, 0.1))
+    const nf = THREE.MathUtils.damp(lightState.night, target, 2.2, Math.min(dt, 0.3))
     const changed = Math.abs(nf - lightState.night) > 1e-4
     lightState.night = Math.abs(nf - target) < 0.002 ? target : nf
     const n = lightState.night

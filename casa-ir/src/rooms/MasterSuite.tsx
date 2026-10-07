@@ -112,8 +112,8 @@ export function MasterSuite() {
       <Prefab id="mFicus" build={ficus(1.4)} position={[18.15, F, 5.85]} />
       <Prefab id="mHead" build={sculptureHead()} position={[X0 + 0.3, F + 0.55, 3.35]} rotation={90} />
       <Prefab id="mBooks" build={bookStack(2, 0.28)} position={[X0 + 0.25, F + 0.32, 5.85]} rotation={90} />
-      <Prefab id="mAC" build={splitAC()} position={[20.6, 2.42, Z1 - 0.02]} rotation={180} />
-      <PrefabInstances id="dl_m" build={downlight()} items={spots} cast={false} />
+      <Prefab id="mAC" cut build={splitAC()} position={[20.6, 2.42, Z1 - 0.02]} rotation={180} />
+      <PrefabInstances id="dl_m" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }
@@ -129,7 +129,7 @@ function TvPortal() {
   }
   return (
     <group>
-      <Prefab id="mPortal" build={build} position={[X0 + 0.62, F, 4.55]} selectable="master_rack" />
+      <Prefab id="mPortal" cut build={build} position={[X0 + 0.62, F, 4.55]} selectable="master_rack" />
       <Prefab id="mTV" build={tvScreen(1.3, 0.74)} position={[X0 + 0.64, 1.62, 4.55]} rotation={90} />
     </group>
   )

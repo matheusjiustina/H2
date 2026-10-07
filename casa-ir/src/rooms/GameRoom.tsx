@@ -98,17 +98,17 @@ export function GameRoom() {
       <Prefab id="jOffice" build={officeChair()} position={[7.55, F, 14.2]} rotation={180} />
       <Prefab id="jSofa" build={boucleLoveseat('game_sofa')} position={[X0 + 0.45, F, 12.28]} rotation={90} selectable="game_sofa" />
       <PrefabInstances id="jSide" build={pedestalTable('walnut_fixed', 0.2, 0.52)} items={[{ p: [5.15, F, 11.45] }, { p: [5.45, F, 11.6], s: 0.85 }]} />
-      <Prefab id="jPendant" build={drumPendant(1.05)} position={[6.4, 2.8, 12.9]} selectable={null} />
+      <Prefab id="jPendant" cut build={drumPendant(1.05)} position={[6.4, 2.8, 12.9]} selectable={null} />
       <PrefabInstances id="jGuitar" build={acousticGuitar()} items={[{ p: [X0 + 0.02, 1.55, 11.55], r: 90 }, { p: [X0 + 0.02, 0.62, 11.55], r: 90 }]} />
       <Prefab id="jElectric" build={electricGuitar()} position={[6.17, 1.0, Z1 - 0.2]} rotation={180} />
       <PrefabInstances id="jFrames" build={frame(0.34, 0.36)} items={frames} />
-      <Prefab id="jAC" build={splitAC()} position={[X0 + 0.02, 2.45, 12.3]} rotation={90} />
+      <Prefab id="jAC" cut build={splitAC()} position={[X0 + 0.02, 2.45, 12.3]} rotation={90} />
       <Prefab id="jBooks" build={bookRow(0.55)} position={[7.9, 1.83, Z1 - 0.17]} rotation={180} />
       <Prefab id="jBooks2" build={bookStack(3, 0.26)} position={[7.35, 1.43, Z1 - 0.17]} />
       <Prefab id="jVase" build={vase(0.22, 0.07, 'linen_dark')} position={[7.0, 2.23, Z1 - 0.17]} />
       <Prefab id="jPothos" build={pothos(0.6)} position={[7.1, 2.23, Z1 - 0.2]} />
       <Prefab id="jPlant" build={smallPlant()} position={[5.13, 2.15, Z1 - 0.22]} />
-      <PrefabInstances id="dl_j" build={downlight()} items={spots} cast={false} />
+      <PrefabInstances id="dl_j" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }

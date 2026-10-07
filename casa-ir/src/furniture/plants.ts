@@ -109,14 +109,14 @@ export const canopyTree = (scale = 1, s = 5): PrefabFn => (b) => {
     const yaw = (i / branches) * 360 + rnd() * 40
     b.at(0, h * 0.75, 0, yaw, () => b.cyl('trunk', 0, 0, 0, 0.03 * scale, 0.06 * scale, 1.1 * scale, 8), 35 + rnd() * 15)
   }
-  const blobs = 9
+  const blobs = 22
   for (let i = 0; i < blobs; i++) {
-    const a = (i / blobs) * Math.PI * 2
-    const r = (0.55 + rnd() * 0.45) * scale
-    const x = Math.cos(a) * r * 0.9
-    const z = Math.sin(a) * r * 0.9
-    const y = h + (0.45 + rnd() * 0.9) * scale
-    const sz = (0.75 + rnd() * 0.45) * scale
+    const a = (i / blobs) * Math.PI * 2 * 3.1
+    const r = (0.35 + rnd() * 0.85) * scale
+    const x = Math.cos(a) * r
+    const z = Math.sin(a) * r
+    const y = h + (0.35 + rnd() * 1.2) * scale
+    const sz = (0.42 + rnd() * 0.3) * scale
     b.geo('leaf_olive', rockGeometry(10 + (i % 5)), new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd(), rnd() * 6, 0)), new THREE.Vector3(sz, sz * 1.25, sz)), [2, 2])
   }
   b.geo('leaf_olive', rockGeometry(17), new THREE.Matrix4().compose(new THREE.Vector3(0, h + 1.35 * scale, 0), new THREE.Quaternion(), new THREE.Vector3(1.1 * scale, 1.0 * scale, 1.1 * scale)), [2, 2])

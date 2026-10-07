@@ -87,7 +87,7 @@ export function Laundry() {
       <Prefab id="lBasket" build={basket(0.2, 0.32)} position={[X0 + 0.25, F, 15.8]} />
       <Prefab id="lTowel" build={towel(0.35, 0.8)} position={[X0 + 0.08, 1.64, 15.65]} rotation={90} />
       <Prefab id="lPothos" build={pothos(0.5)} position={[X1 - 0.18, 2.03, 15.25]} />
-      <PrefabInstances id="dl_l" build={downlight()} items={spots} cast={false} />
+      <PrefabInstances id="dl_l" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }

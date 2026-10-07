@@ -66,7 +66,7 @@ export function SocialBathroom() {
       <Prefab id="bsShower" build={showerHead('chrome')} position={[30.75, 2.25, Z0 + 0.02]} />
       <PrefabInstances id="bsSconce" build={sconce()} items={[{ p: [X1 - 0.05, 1.75, 3.86], r: -90 }, { p: [X1 - 0.05, 2.2, 3.86], r: -90 }]} cast={false} />
       <Prefab id="bsTowel" build={towel(0.32, 0.6)} position={[X1 - 0.12, 1.55, 5.25]} />
-      <PrefabInstances id="dl_bs" build={downlight()} items={spots} cast={false} />
+      <PrefabInstances id="dl_bs" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }

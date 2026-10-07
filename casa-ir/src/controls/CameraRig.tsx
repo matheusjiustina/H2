@@ -20,6 +20,7 @@ export function CameraRig() {
   const req = useStore((s) => s.cameraRequest)
   const isTouch = useStore((s) => s.isTouch)
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
+  const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height))
   const fovTarget = useRef(40)
   const interior = useRef(false)
   const pendingPivot = useRef<{ pos: THREE.Vector3; dir: THREE.Vector3 } | null>(null)
@@ -33,7 +34,7 @@ export function CameraRig() {
     const tgt = new THREE.Vector3(...p.target)
     const isInterior = p.group !== 'exterior' && p.group !== 'plan'
     interior.current = isInterior
-    fovTarget.current = p.fov ?? (isInterior ? 62 : 40)
+    fovTarget.current = fitFov(p.fov ?? (isInterior ? 62 : 40), aspect, isInterior)
     configure(c, isInterior, p.group === 'plan', isTouch)
     const smooth = !req.instant
     if (isInterior) {
@@ -57,6 +58,14 @@ export function CameraRig() {
     }
   }, [req, camera, isTouch])
 
+  // keep the framing when the viewport changes (e.g. phone rotation)
+  useEffect(() => {
+    const p = req ? CAMERA_BY_ID[req.id] : null
+    if (!p) return
+    const isInterior = p.group !== 'exterior' && p.group !== 'plan'
+    fovTarget.current = fitFov(p.fov ?? (isInterior ? 62 : 40), aspect, isInterior)
+  }, [aspect, req])
+
   useFrame((_, dt) => {
     if (Math.abs(camera.fov - fovTarget.current) > 0.05) {
       camera.fov = THREE.MathUtils.damp(camera.fov, fovTarget.current, 4, dt)
@@ -65,6 +74,18 @@ export function CameraRig() {
   })
 
   return <CameraControls ref={ref} makeDefault smoothTime={0.55} draggingSmoothTime={0.12} />
+}
+
+/**
+ * Presets are authored for a 16:9 frame. On narrower (portrait) screens keep
+ * most of the horizontal field of view so façades and rooms stay readable.
+ */
+function fitFov(vFov: number, aspect: number, interior: boolean) {
+  const ref = 16 / 9
+  if (aspect >= ref * 0.85) return vFov
+  const h = 2 * Math.atan(Math.tan((vFov * Math.PI) / 360) * ref)
+  const v = (2 * Math.atan(Math.tan(h / 2) / aspect) * 180) / Math.PI
+  return Math.min(v, interior ? 88 : 72)
 }
 
 function configure(c: CameraControlsImpl, interior: boolean, plan: boolean, touch: boolean) {

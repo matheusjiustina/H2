@@ -81,7 +81,7 @@ export function buildHouse(): HouseBuild {
     cut.box(f, [x1, y0, z1 + t], [x1 + t, top, z2 - t])
     cut.box(f, [x2 - t, y0, z1 + t], [x2, top, z2 - t])
     // roof membrane (light grey gravel look) inside parapet
-    cut.box({ py: 'gravel' }, [x1 + t, y0, z1 + t], [x2 - t, y0 + 0.02, z2 - t])
+    cut.box({ py: 'roof' }, [x1 + t, y0, z1 + t], [x2 - t, y0 + 0.02, z2 - t])
   }
 
   function buildWall(w: WallDef) {

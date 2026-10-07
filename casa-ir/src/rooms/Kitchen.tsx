@@ -128,9 +128,9 @@ export function Kitchen() {
       <Prefab id="kFaucet" build={kitchenFaucet('steel')} position={[24.3, CT, Z1 - 0.08]} rotation={180} />
       <Prefab id="kPothos" build={pothos(0.55)} position={[23.05, 2.23, Z1 - 0.3]} />
       <Prefab id="kVase" build={vase(0.25, 0.08)} position={[22.95, 1.33, Z1 - 0.3]} />
-      <Prefab id="kAC" build={splitAC()} position={[X0 + 0.02, 2.4, 15.6]} rotation={90} />
-      <PrefabInstances id="kPend" build={globePendant(0.85)} items={pendants} cast={false} />
-      <PrefabInstances id="dl_k" build={downlight()} items={spots} cast={false} />
+      <Prefab id="kAC" cut build={splitAC()} position={[X0 + 0.02, 2.4, 15.6]} rotation={90} />
+      <PrefabInstances id="kPend" cut build={globePendant(0.85)} items={pendants} cast={false} />
+      <PrefabInstances id="dl_k" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }

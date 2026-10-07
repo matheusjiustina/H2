@@ -180,6 +180,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
   @keyframes sheet-in { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
   .swatches { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); }
   .toast { bottom: calc(160px + var(--safe-b)); }
-  .btn--exit { top: 104px; }
+  .btn--exit { top: 104px; left: 12px; transform: none; }
+  .ui:has(.btn--exit) .restore { display: none; }
   .walk-hint { display: none; }
 }

@@ -119,7 +119,7 @@ export function MasterCloset() {
       <Prefab id="cSink" build={vesselSink(0.42, 0.34)} position={[23.4, 0.8, 4.35]} rotation={90} />
       <Prefab id="cFaucet" build={faucet('closet_handles', true)} position={[22.98, 0.8, 4.35]} rotation={90} />
       <Prefab id="cVase" build={vase(0.16, 0.06, 'paper')} position={[23.4, 0.8, 5.15]} />
-      <PrefabInstances id="dl_c" build={downlight()} items={spots} cast={false} />
+      <PrefabInstances id="dl_c" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }

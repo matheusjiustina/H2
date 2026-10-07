@@ -8,6 +8,7 @@ import * as THREE from 'three'
 import { GeoBuilder } from '../architecture/builder'
 import { getMat } from '../materials/library'
 import type { SlotId } from '../data/materials'
+import { useStore } from '../app/store'
 
 export type PrefabFn = (b: GeoBuilder) => void
 type Geos = Map<SlotId, THREE.BufferGeometry>
@@ -34,13 +35,16 @@ interface PrefabProps {
   scale?: number | [number, number, number]
   selectable?: string | null
   cast?: boolean
+  /** ceiling-hung: hidden in PLANTA 3D */
+  cut?: boolean
 }
 
 /** Single placed prefab. */
-export function Prefab({ id, build, position = [0, 0, 0], rotation = 0, scale = 1, selectable = null, cast = true }: PrefabProps) {
+export function Prefab({ id, build, position = [0, 0, 0], rotation = 0, scale = 1, selectable = null, cast = true, cut = false }: PrefabProps) {
   const geos = useMemo(() => buildPrefab(id, build), [id, build])
+  const plan = useStore((s) => s.plan)
   return (
-    <group position={position} rotation={[0, (rotation * Math.PI) / 180, 0]} scale={scale} userData={{ selectable }}>
+    <group visible={!(cut && plan)} position={position} rotation={[0, (rotation * Math.PI) / 180, 0]} scale={scale} userData={{ selectable }}>
       {[...geos.entries()].map(([slot, g]) => {
         const m = getMat(slot)
         return <mesh key={slot} geometry={g} material={m} castShadow={cast && !NO_CAST.has(slot) && !m.transparent} receiveShadow userData={{ slot }} />
@@ -56,10 +60,11 @@ export interface Placement {
 }
 
 /** Many copies of a prefab, rendered as one InstancedMesh per slot. */
-export function PrefabInstances({ id, build, items, selectable = null, cast = true }: { id: string; build: PrefabFn; items: Placement[]; selectable?: string | null; cast?: boolean }) {
+export function PrefabInstances({ id, build, items, selectable = null, cast = true, cut = false }: { id: string; build: PrefabFn; items: Placement[]; selectable?: string | null; cast?: boolean; cut?: boolean }) {
   const geos = useMemo(() => buildPrefab(id, build), [id, build])
+  const plan = useStore((s) => s.plan)
   return (
-    <group userData={{ selectable }}>
+    <group visible={!(cut && plan)} userData={{ selectable }}>
       {[...geos.entries()].map(([slot, g]) => (
         <Inst key={slot} slot={slot} geo={g} items={items} cast={cast && !NO_CAST.has(slot)} />
       ))}

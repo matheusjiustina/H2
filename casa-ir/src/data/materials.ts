@@ -206,7 +206,7 @@ export const FINISHES = {
   plastic_gray: F({ label: 'Plástico Cinza', family: 'misc', color: '#7d7f80', roughness: 0.5 }),
 
   // ── Exterior grounds ───────────────────────────────────────────────────
-  grass: F({ label: 'Grama Esmeralda', family: 'ground', color: '#86936a', tex: 'grass', texScale: 2.2, roughness: 1, swatch: '#5d7a3e' }),
+  grass: F({ label: 'Grama Esmeralda', family: 'ground', color: '#c6ccb2', tex: 'grass', texScale: 2.2, roughness: 1, swatch: '#5d7a3e' }),
   sand: F({ label: 'Areia', family: 'ground', color: '#ffffff', tex: 'sand', texScale: 2.4, roughness: 1, swatch: '#e6dcc6' }),
   gravel: F({ label: 'Brita Branca', family: 'ground', color: '#ffffff', tex: 'gravel', texScale: 1.4, roughness: 1, bump: 0.6 }),
   pavers: F({ label: 'Piso Intertravado', family: 'ground', color: '#b8b5ae', tex: 'pavers', texScale: 1.6, roughness: 0.95 }),
@@ -216,13 +216,14 @@ export const FINISHES = {
   pool_tile: F({ label: 'Pastilha Piscina', family: 'ceramic', color: '#ffffff', tex: 'pool_tile', texScale: 1.0, roughness: 0.25, swatch: '#bfe3e6' }),
   coping_stone: F({ label: 'Borda Pedra Natural', family: 'stone', color: '#e3dccd', tex: 'travertine', texScale: 1.0, roughness: 0.7 }),
   rock: F({ label: 'Pedra Natural', family: 'stone', color: '#958e84', tex: 'stone_rough', texScale: 1.2, roughness: 0.9, bump: 0.8 }),
+  roof_membrane: F({ label: 'Cobertura (manta/brita)', family: 'ground', color: '#aaa7a0', tex: 'gravel', texScale: 1.6, roughness: 1 }),
   soil: F({ label: 'Terra', family: 'ground', color: '#5b4a3b', tex: 'concrete', texScale: 1, roughness: 1 }),
 
   // ── Plants ─────────────────────────────────────────────────────────────
   leaf_green: F({ label: 'Folhagem', family: 'plant', color: '#4f6d36', tex: 'leaf', texScale: 1, roughness: 0.75 }),
   leaf_dark: F({ label: 'Folhagem Escura', family: 'plant', color: '#2f4b2b', tex: 'leaf', texScale: 1, roughness: 0.75 }),
   leaf_light: F({ label: 'Folhagem Clara', family: 'plant', color: '#6e8d42', tex: 'leaf', texScale: 1, roughness: 0.75 }),
-  leaf_olive: F({ label: 'Copa Oliveira', family: 'plant', color: '#6b7a55', roughness: 0.85 }),
+  leaf_olive: F({ label: 'Copa Oliveira', family: 'plant', color: '#6e8058', tex: 'stone_rough', texScale: 0.45, roughness: 0.9, bump: 0.8 }),
   trunk: F({ label: 'Tronco', family: 'plant', color: '#7c6a57', tex: 'stone_rough', texScale: 0.6, roughness: 0.95 }),
   palm_trunk: F({ label: 'Estipe Palmeira', family: 'plant', color: '#a49a8c', tex: 'stone_rough', texScale: 0.5, roughness: 0.95 }),
 
@@ -436,6 +437,7 @@ export const SLOTS = {
   coping: S('Borda da piscina', 'coping_stone'),
   rock: S('Pedras', 'rock'),
   soil: S('Terra', 'soil'),
+  roof: S('Cobertura', 'roof_membrane'),
   leaf: S('Folhas', 'leaf_green'),
   leaf_dark: S('Folhas escuras', 'leaf_dark'),
   leaf_light: S('Folhas claras', 'leaf_light'),

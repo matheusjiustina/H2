@@ -31,11 +31,11 @@ export const CAMERAS: CameraPreset[] = [
   C('planta3d', 'Planta 3D', 'plan', [20, 34, 30], [20, 0, 9.4], 'ARQ p.2', 40),
 
   // ── Sala de TV ──────────────────────────────────────────────────────────
-  C('tv_view_01', 'Vista para o pátio', 'sala', [33.0, 1.45, 8.9], [27.8, 2.5, 8.85], 'INT p.5', 62),
-  C('tv_view_02', 'Painel da TV', 'sala', [30.4, 1.45, 7.0], [30.4, 2.7, 11.0], 'INT p.6', 64),
-  C('tv_view_03', 'Parede de linho', 'sala', [30.4, 1.45, 10.75], [30.5, 2.7, 6.7], 'INT p.7', 64),
-  C('tv_view_04', 'Diagonal', 'sala', [32.6, 1.5, 10.6], [28.6, 2.5, 7.1], 'INT p.8', 62),
-  C('tv_view_05', 'Porta pivotante', 'sala', [28.2, 1.45, 8.6], [33.3, 2.0, 9.2], 'INT p.9', 62),
+  C('tv_view_01', 'Vista para o pátio', 'sala', [33.05, 1.4, 8.9], [27.8, 2.1, 8.85], 'INT p.5', 66),
+  C('tv_view_02', 'Painel da TV', 'sala', [30.4, 1.4, 6.95], [30.4, 2.1, 11.0], 'INT p.6', 68),
+  C('tv_view_03', 'Parede de linho', 'sala', [30.4, 1.4, 10.85], [30.5, 2.0, 6.7], 'INT p.7', 70),
+  C('tv_view_04', 'Diagonal', 'sala', [32.7, 1.45, 10.7], [28.6, 1.9, 7.1], 'INT p.8', 66),
+  C('tv_view_05', 'Porta pivotante', 'sala', [28.15, 1.4, 8.6], [33.3, 1.8, 9.2], 'INT p.9', 66),
 
   // ── Cozinha ─────────────────────────────────────────────────────────────
   C('kitchen_view_01', 'Vista leste', 'cozinha', [21.95, 1.5, 13.6], [26.7, 1.6, 13.6], 'INT p.19', 64),
@@ -79,7 +79,7 @@ export const CAMERAS: CameraPreset[] = [
   C('masterbath_view_01', 'Box', 'suite_bath', [22.3, 1.55, 3.82], [22.3, 1.35, 1.8], 'INT p.55', 74),
 
   // ── Quartos / hall / garagem ────────────────────────────────────────────
-  C('q01_view_01', 'Quarto 01', 'q01', [34.9, 1.55, 6.25], [32.0, 1.0, 2.6], 'ARQ p.2', 66),
+  C('q01_view_01', 'Quarto 01', 'q01', [34.7, 1.55, 5.55], [31.9, 1.0, 2.8], 'ARQ p.2', 66),
   C('q02_view_01', 'Quarto 02', 'q02', [29.5, 1.55, 5.05], [26.6, 1.0, 2.4], 'ARQ p.2', 66),
   C('hall_view_01', 'Hall de entrada', 'hall', [39.2, 1.6, 9.4], [33.3, 2.0, 9.4], 'ARQ p.5', 55),
   C('garage_view_01', 'Garagem', 'garagem', [39.8, 1.7, 15.8], [29.5, 1.6, 13.6], 'ARQ p.5', 55),

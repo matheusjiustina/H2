@@ -126,8 +126,8 @@ export function Gourmet() {
       <Prefab id="gPothos2" build={pothos(0.5)} position={[21.33, 1.83, Z1 - 0.2]} />
       <Prefab id="gVase" build={vase(0.26, 0.08, 'linen_dark')} position={[18.2, 1.98, Z1 - 0.15]} />
       <Prefab id="gBottles" build={bottles()} position={[21.25, 0.93, Z1 - 0.2]} />
-      <PrefabInstances id="gCone" build={wickerCone(1.25)} items={cones} cast={false} />
-      <PrefabInstances id="gFan" build={ceilingFan()} items={fans} />
+      <PrefabInstances id="gCone" cut build={wickerCone(1.25)} items={cones} cast={false} />
+      <PrefabInstances id="gFan" cut build={ceilingFan()} items={fans} />
     </group>
   )
 }

@@ -50,7 +50,7 @@ export function Bedrooms() {
       <PrefabInstances id="qBed" build={simpleBed(1.6, 'bedroom_bedding', 'bedroom_joinery')} items={[{ p: [32.8, F, 3.6], r: 90 }, { p: [27.3, F, 3.6], r: 90 }]} selectable="bedroom_beds" />
       <PrefabInstances id="qLamp" build={tableLamp('brass')} items={[{ p: [32.0, 0.55, 2.3] }, { p: [32.0, 0.55, 4.9] }, { p: [26.5, 0.55, 2.3] }, { p: [26.5, 0.55, 4.9] }]} cast={false} />
       <Prefab id="q1Arm" build={loungeChair('fab_sand_fixed', 'walnut_fixed')} position={[34.6, F, 4.9]} rotation={-120} />
-      <PrefabInstances id="dl_q" build={downlight()} items={spots} cast={false} />
+      <PrefabInstances id="dl_q" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }

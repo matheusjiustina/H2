@@ -19,7 +19,7 @@ export function WalkOverlay() {
       {!isTouch && !locked && (
         <div className="walk-hint">
           <b>Passeio</b>
-          <span>Clique na cena para olhar com o mouse · W A S D para caminhar · Shift para acelerar · Esc para liberar o cursor</span>
+          <span>Clique na cena para olhar com o mouse · W A S D para caminhar · Shift para acelerar · mire em um objeto e clique para personalizar · Esc para liberar o cursor</span>
         </div>
       )}
       {!isTouch && locked && <div className="crosshair" />}

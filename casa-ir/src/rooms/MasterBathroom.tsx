@@ -42,7 +42,7 @@ export function MasterBathroom() {
       <PartsMeshes parts={parts} />
       <Prefab id="mbWC" build={toilet()} position={[X1 - 0.02, F, 3.45]} rotation={-90} />
       <Prefab id="mbShower" build={showerHead('masterbath_metal')} position={[22.45, 2.3, Z0 + 0.04]} selectable="masterbath_metal" />
-      <PrefabInstances id="dl_mb" build={downlight()} items={spots} cast={false} />
+      <PrefabInstances id="dl_mb" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }

@@ -153,8 +153,9 @@ export const useStore = create<State>((set, get) => ({
 }))
 
 /** The configuration currently rendered (original project while comparing). */
+const ORIGINAL: ConfigMap = Object.freeze({}) as ConfigMap
 export function activeConfig(s: Pick<State, 'showOriginal' | 'clientConfig'>): ConfigMap {
-  return s.showOriginal ? {} : s.clientConfig
+  return s.showOriginal ? ORIGINAL : s.clientConfig
 }
 
 export function effectiveTier(s: Pick<State, 'quality' | 'autoTier'>): Tier {

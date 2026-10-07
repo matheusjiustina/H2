@@ -13,12 +13,13 @@ import { walkInput } from './walkInput'
 import { roomAt, HEIGHTS } from '../data/houseSpec'
 import { pointInPoly } from '../architecture/shapes'
 import { DECK, SAND } from '../data/site'
+import { findSelectable, isVisible } from '../configurator/Selection'
 
 const EYE = 1.6
 const RADIUS = 0.24
 
 export function WalkControls() {
-  const { camera, gl } = useThree()
+  const { camera, gl, scene } = useThree()
   const isTouch = useStore((s) => s.isTouch)
   const teleport = useStore((s) => s.walkTeleport)
   const yaw = useRef(0)
@@ -36,10 +37,17 @@ export function WalkControls() {
     let x = camera.position.x
     let z = camera.position.z
     const outside = x < 0.4 || x > 56 || z < -20 || z > 38 || camera.position.y > 3
+    const [rx, rz] = resolve(x, z, RADIUS)
+    const blocked = Math.hypot(rx - x, rz - z) > 0.05 || !roomAt(rx, rz, 1)
+    const room = roomAt(x, z, 1)
     if (outside) {
       x = 39.2
       z = 9.4
       yaw.current = Math.PI / 2
+    } else if (blocked && room?.spawn) {
+      x = room.spawn[0]
+      z = room.spawn[1]
+      yaw.current = (room.spawn[2] * Math.PI) / 180
     }
     pos.current.set(x, 0, z)
     const pc = camera as THREE.PerspectiveCamera
@@ -58,8 +66,21 @@ export function WalkControls() {
   useEffect(() => {
     if (isTouch) return
     const el = gl.domElement
+    const ray = new THREE.Raycaster()
     const onClick = () => {
-      if (!locked.current) el.requestPointerLock?.()
+      if (!locked.current) {
+        el.requestPointerLock?.()
+        return
+      }
+      // pick what is under the crosshair
+      ray.setFromCamera(new THREE.Vector2(0, 0), camera)
+      ray.far = 12
+      const hit = ray.intersectObjects(scene.children, true).find((i) => !i.object.userData?.noPick && isVisible(i.object))
+      const id = hit ? findSelectable(hit.object) : null
+      if (id) {
+        useStore.getState().select(id)
+        document.exitPointerLock()
+      }
     }
     const onLock = () => {
       locked.current = document.pointerLockElement === el
@@ -78,7 +99,7 @@ export function WalkControls() {
       document.removeEventListener('mousemove', onMove)
       if (document.pointerLockElement === el) document.exitPointerLock()
     }
-  }, [gl, isTouch])
+  }, [gl, isTouch, camera, scene])
 
   // keyboard
   useEffect(() => {

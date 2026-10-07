@@ -49,7 +49,7 @@ export function StorageRoom() {
       <PrefabInstances id="dBox" build={storageBox(0.42, 0.28, 0.32, 'plastic')} items={[{ p: [5.2, 0.475, 15.5] }, { p: [5.7, 0.475, 15.5] }, { p: [6.35, 1.475, 15.5] }]} />
       <PrefabInstances id="dBox2" build={storageBox(0.4, 0.22, 0.3, 'red')} items={[{ p: [5.25, 1.475, 15.5] }, { p: [5.7, 1.475, 15.5] }]} />
       <PrefabInstances id="dBox3" build={storageBox(0.36, 0.2, 0.3, 'paper')} items={[{ p: [6.4, 0.975, 15.5] }, { p: [6.4, 1.975, 15.5] }, { p: [5.4, 1.975, 15.5] }]} />
-      <PrefabInstances id="dl_s" build={downlight()} items={[{ p: [6.55, 2.79, 15.75] }, { p: [10.1, 2.79, 14.8] }]} cast={false} />
+      <PrefabInstances id="dl_s" cut build={downlight()} items={[{ p: [6.55, 2.79, 15.75] }, { p: [10.1, 2.79, 14.8] }]} cast={false} />
     </group>
   )
 }

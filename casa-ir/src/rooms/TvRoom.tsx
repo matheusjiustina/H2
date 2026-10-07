@@ -110,8 +110,8 @@ export function TvRoom() {
       <Prefab id="tvBooks" build={bookStack(3, 0.3)} position={[30.4, 0.595, Z1 - 0.25]} />
       <Prefab id="tvCandle" build={candle()} position={[30.5, 0.68, Z1 - 0.25]} />
       <group visible>
-        <Prefab id="dropCluster" build={dropCluster(CEIL)} position={[30.55, 0, 8.85]} />
-        <PrefabInstances id="dl_sala" build={downlight()} items={spots} cast={false} />
+        <Prefab id="dropCluster" cut build={dropCluster(CEIL)} position={[30.55, 0, 8.85]} />
+        <PrefabInstances id="dl_sala" cut build={downlight()} items={spots} cast={false} />
         {/* AC cassette (INT p.7) */}
         <mesh position={[32.1, CEIL - 0.13, 8.0]} userData={{ noPick: true }}>
           <boxGeometry args={[0.62, 0.02, 0.62]} />

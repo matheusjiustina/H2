@@ -63,7 +63,7 @@ export function ExternalBathroom() {
       <Prefab id="beBasket2" build={basket(0.12, 0.18)} position={[X1 - 0.22, F + 0.16, 14.05]} />
       <Prefab id="bePlant" build={smallPlant()} position={[X1 - 0.12, 1.78, 13.52]} />
       <Prefab id="beTowel" build={towel(0.4, 0.7)} position={[X0 + 0.06, 1.5, 14.6]} rotation={90} />
-      <PrefabInstances id="dl_be" build={downlight()} items={spots} cast={false} />
+      <PrefabInstances id="dl_be" cut build={downlight()} items={spots} cast={false} />
     </group>
   )
 }

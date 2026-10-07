@@ -406,7 +406,7 @@ const generators: Record<TextureKey, Gen> = {
     return pixelFill(S, (u, v) => {
       const f = fbm([n1, n2], u, v)
       const blade = r() * 40
-      return [clamp(72 + f * 40 + blade * 0.4), clamp(108 + f * 50 + blade), clamp(48 + f * 20)]
+      return [clamp(92 + f * 34 + blade * 0.35), clamp(112 + f * 40 + blade * 0.8), clamp(70 + f * 18 + blade * 0.2)]
     })
   },
   sand: (S) => {
