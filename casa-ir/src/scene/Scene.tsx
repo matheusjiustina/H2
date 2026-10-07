@@ -18,6 +18,7 @@ import { QualityManager } from './QualityManager'
 import { RoomTracker } from '../controls/RoomTracker'
 import { CaptureBridge } from '../utils/screenshot'
 import { RenderLoop } from './RenderLoop'
+import { PlanLabels } from './PlanLabels'
 
 export function Scene() {
   const nav = useStore((s) => s.nav)
@@ -57,6 +58,7 @@ export function Scene() {
         <Landscaping />
       </Pickable>
       <SelectionHighlight />
+      <PlanLabels />
       {nav === 'walk' ? <WalkControls /> : <CameraRig />}
       {nav !== 'walk' && <RoomTracker />}
       <Effects />
