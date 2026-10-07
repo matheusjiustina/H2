@@ -181,6 +181,14 @@ vec3 objectNormal = vec3(_gc * normal.x`);
 
   update(dt, game) {
     const cam = game.camera;
+    // from the air the grass is sub-pixel: skip it entirely
+    const high = cam.position.y - this.td.heightAt(cam.position.x, cam.position.z) > 60;
+    if (high !== this._high) {
+      this._high = high;
+      for (const m of this.meshes) m.visible = !high && m.count > 0;
+      if (!high) this.lastCam.set(1e9, 0, 0);
+    }
+    if (high) return;
     const dir = cam.getWorldDirection(this._v);
     const moved = cam.position.distanceToSquared(this.lastCam) > 0.36;
     const turned = dir.dot(this.lastDir) < 0.998;

@@ -39,6 +39,7 @@ const DEFAULTS = {
   invertY: false,
   fov: 72,
   showFps: false,
+  flightAssist: 'normal',
 };
 
 const KEY = 'tidemark-settings-v1';

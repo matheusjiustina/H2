@@ -37,7 +37,13 @@ export class UI {
     this.discovery = h('div', 'discovery');
     this.fps = h('div', 'fps');
     this.lockHint = h('div', 'lock-hint', 'Click the view to capture the mouse · or drag to look around');
-    this.hud.append(this.reticle, this.prompt, this.hint, this.toastBox, this.discovery, this.fps, this.lockHint);
+    this.flightStatus = h('div', 'flight-status');
+    this.flightHelp = h('div', 'flight-help', `
+      <b>Flying</b> <span class="k">W</span><span class="k">S</span> pitch · <span class="k">A</span><span class="k">D</span> roll (steer on water) · <span class="k">Z</span><span class="k">X</span> rudder ·
+      <span class="k">R</span><span class="k">F</span> or wheel throttle · <span class="k">G</span><span class="k">B</span> flaps · hold <span class="k">Q</span> start (tap to stop) ·
+      <span class="k">U</span> water rudders · <span class="k">L</span> lights · <span class="k">[</span><span class="k">]</span> trim · hold <span class="k">RMB</span> mouse yoke ·
+      <span class="k">V</span> chase cam · <span class="k">O</span> orbit · hold <span class="k">E</span> get out`);
+    this.hud.append(this.reticle, this.prompt, this.hint, this.toastBox, this.discovery, this.fps, this.lockHint, this.flightStatus, this.flightHelp);
     r.append(this.hud);
     this.flash = h('div', 'flash');
     this.fade = h('div', 'fade');
@@ -86,6 +92,15 @@ export class UI {
         <div><b>N</b><span>Field notebook</span></div><div><b>Esc</b><span>Pause</span></div>
         <div><b>In the boat</b><span>W/S throttle · A/D steer · E leave</span></div><div><b>F2</b><span>Developer panel</span></div>
       </div>
+      <div class="menu-sub">Flying the seaplane</div>
+      <div class="keys">
+        <div><b>W / S</b><span>Pitch (push / pull)</span></div><div><b>A / D</b><span>Roll · steer on the water</span></div>
+        <div><b>Z / X</b><span>Rudder</span></div><div><b>R / F · wheel</b><span>Throttle</span></div>
+        <div><b>G / B</b><span>Flaps up / down</span></div><div><b>[ ] · PgUp / PgDn</b><span>Elevator trim</span></div>
+        <div><b>Hold Q</b><span>Start engine (tap to stop)</span></div><div><b>U</b><span>Water rudders</span></div>
+        <div><b>L</b><span>Lights</span></div><div><b>Hold right mouse</b><span>Fly with the mouse</span></div>
+        <div><b>V · O</b><span>Cockpit / chase · orbit camera</span></div><div><b>Hold E</b><span>Climb out</span></div>
+      </div>
       <button data-a="back">Back</button>`);
     this.controlsPanel.addEventListener('click', (e) => { if (e.target.dataset.a === 'back') this.showPanel('main'); });
     this.pause.append(this.pauseMain, this.settingsPanel, this.controlsPanel);
@@ -131,6 +146,7 @@ export class UI {
       <div class="section">Input</div>
       ${range('sensitivity', 'Mouse sensitivity', 0.2, 2.5, 0.05)}
       ${opt('invertY', 'Invert Y', [['false', 'Off'], ['true', 'On']])}
+      ${opt('flightAssist', 'Flight assist', [['off', 'Off'], ['normal', 'Normal'], ['high', 'High']])}
       <button data-a="back">Back</button>`;
     const refresh = () => {
       el.querySelectorAll('.seg').forEach((seg) => {
@@ -180,7 +196,8 @@ export class UI {
       <div class="dbg-row"><label>Speed</label><button data-s="0">pause</button><button data-s="1">1×</button><button data-s="20">20×</button><button data-s="120">120×</button><button data-s="600">600×</button></div>
       <div class="dbg-row wrap">${timeBtns}</div>
       <div class="dbg-row wrap">${weatherBtns}<button data-wa="1">auto</button><button data-wf="1">fast transitions</button></div>
-      <div class="dbg-row wrap">${poiBtns}</div>`;
+      <div class="dbg-row wrap">${poiBtns}</div>
+      <div class="dbg-row wrap"><label>Plane</label><button data-sp="pier">Moored at pier</button><button data-sp="air">Airborne 300 m</button><button data-sp="repair">Repair</button></div>`;
     el.addEventListener('click', (e) => {
       const b = e.target;
       const g = this.game;
@@ -188,6 +205,9 @@ export class UI {
       if (b.dataset.wa) g.weather.auto = true;
       if (b.dataset.wf) { g.weather.transitionRate = g.weather.transitionRate > 0.1 ? 0.035 : 0.4; b.classList.toggle('on', g.weather.transitionRate > 0.1); }
       if (b.dataset.t) g.setTime(parseFloat(b.dataset.t));
+      if (b.dataset.sp === 'pier') { if (g.seaplane.occupied) g.seaplane.exit(g, true); g.seaplane.atPier(); }
+      if (b.dataset.sp === 'air') { if (g.boat.occupied) g.boat.exit(g); if (!g.seaplane.occupied) g.seaplane.board(g); g.seaplane.airborne(300); }
+      if (b.dataset.sp === 'repair') g.seaplane.repair();
       if (b.dataset.s !== undefined) {
         const sp = parseFloat(b.dataset.s);
         g.timeOfDay.paused = sp === 0;
@@ -288,6 +308,16 @@ export class UI {
       this.lockHint.classList.toggle('show', needLock);
       this._lastLock = needLock;
     }
+    // seaplane instruments line
+    const flying = g.player.mode === 'plane' && g.seaplane;
+    if (flying) {
+      if (g.seaplane.status !== this._lastStatus) { this.flightStatus.innerHTML = g.seaplane.status; this._lastStatus = g.seaplane.status; }
+    }
+    if (flying !== this._lastFlying) {
+      this._lastFlying = flying;
+      this.flightStatus.classList.toggle('show', !!flying);
+      this.reticle.style.display = flying ? 'none' : '';
+    }
     // fps / debug
     if (this.debug.classList.contains('show')) {
       const info = g.renderer.renderer.info.render;
@@ -300,6 +330,14 @@ export class UI {
   }
 
   toggleDebug() { this.debug.classList.toggle('show'); }
+
+  /** The flight controls card shows while flying and fades to a reminder after a while. */
+  showFlightHelp(on) {
+    clearTimeout(this._helpTimer);
+    this.flightHelp.classList.toggle('show', on);
+    this.flightHelp.classList.remove('dim');
+    if (on) this._helpTimer = setTimeout(() => this.flightHelp.classList.add('dim'), 25000);
+  }
 
   // ---------------------------------------------------------------- inventory
   openInventory() {

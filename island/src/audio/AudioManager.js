@@ -147,6 +147,13 @@ export class AudioManager {
     this.enginePanner = this._panner(null, 3, 1.2);
     this.enginePanner.connect(this.sfx);
     this.engine = this._loop('engine', this.enginePanner, { gain: 0 });
+    // seaplane: radial engine (positional), airflow and stall horn (heard in the cabin)
+    this.planePanner = this._panner(null, 6, 1.0);
+    this.planePanner.maxDistance = 2500;
+    this.planePanner.connect(this.sfx);
+    this.planeEngine = this._loop('radial', this.planePanner, { gain: 0, filter: { type: 'lowpass', freq: 2400 } });
+    this.planeAir = this._loop('wind', this.sfx, { gain: 0, filter: { type: 'bandpass', freq: 900, q: 0.6 } });
+    this.planeHorn = this._loop('stallHorn', this.sfx, { gain: 0 });
     if (this._pendingFire) this.setFire(...this._pendingFire);
     if (this._pendingRadio) this.setRadio(...this._pendingRadio);
   }
@@ -208,6 +215,24 @@ export class AudioManager {
     const t = this.ctx.currentTime;
     if (position) { this.firePanner.positionX.value = position.x; this.firePanner.positionY.value = position.y; this.firePanner.positionZ.value = position.z; }
     this.fire.gain.gain.setTargetAtTime(on ? 0.9 : 0, t, on ? 1.2 : 0.6);
+  }
+
+  /**
+   * Seaplane audio. rpm drives pitch and loudness of the radial; airspeed (m/s) the rush of air;
+   * inside = listener is in the cabin (muffled engine, louder airflow).
+   */
+  setPlane({ rpm = 0, airspeed = 0, stall = 0, inside = false, position }) {
+    if (!this.planeEngine) return;
+    const t = this.ctx.currentTime;
+    if (position) { this.planePanner.positionX.value = position.x; this.planePanner.positionY.value = position.y; this.planePanner.positionZ.value = position.z; }
+    const run = Math.min(1, rpm / 500);
+    this.planeEngine.gain.gain.setTargetAtTime(run * (0.35 + Math.min(1, rpm / 2300) * 0.75), t, 0.12);
+    this.planeEngine.src.playbackRate.setTargetAtTime(Math.max(0.2, rpm / 1080), t, 0.08);
+    if (this.planeEngine.filter) this.planeEngine.filter.frequency.setTargetAtTime(inside ? 900 : 2600, t, 0.1);
+    const air = Math.min(1, airspeed / 70);
+    this.planeAir.gain.gain.setTargetAtTime(air * air * (inside ? 0.55 : 0.9), t, 0.2);
+    this.planeAir.src.playbackRate.setTargetAtTime(0.7 + air * 0.9, t, 0.2);
+    this.planeHorn.gain.gain.setTargetAtTime(stall > 0.5 ? 0.35 : 0, t, 0.04);
   }
 
   setEngine(level, position) {

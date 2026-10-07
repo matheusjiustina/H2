@@ -14,6 +14,17 @@ const ISLANDS = [
   { x: -900, z: -1350, w: 260, d: 180, h: 60, seed: 19, rot: 0.2 },
 ];
 
+/** Height of an island's surface at local coordinates (same formula as the mesh). */
+function islandHeight(o, n, x, z) {
+  const nx = x / (o.w * 0.5), nz = z / (o.d * 0.5);
+  const r = Math.sqrt(nx * nx + nz * nz) * (1 + 0.25 * n.noise2(nx * 2, nz * 2));
+  const base = Math.pow(clamp(1 - r, 0, 1), 1.25);
+  const ridge = n.ridge2(nx * 2.2 + 3, nz * 2.2, 5);
+  const spires = Math.pow(Math.max(0, n.noise2(nx * 3.5, nz * 3.5)), 2) * 0.6;
+  const h = o.h * base * (0.45 + 0.75 * ridge + spires) - 30 * (1 - base);
+  return r > 0.92 ? -40 : h;
+}
+
 function islandGeometry(o) {
   const n = new Noise(o.seed);
   // ~15 m between vertices is finer than a pixel at these distances
@@ -27,10 +38,7 @@ function islandGeometry(o) {
     const nx = x / (o.w * 0.5), nz = z / (o.d * 0.5);
     const r = Math.sqrt(nx * nx + nz * nz) * (1 + 0.25 * n.noise2(nx * 2, nz * 2));
     const base = Math.pow(clamp(1 - r, 0, 1), 1.25);
-    const ridge = n.ridge2(nx * 2.2 + 3, nz * 2.2, 5);
-    const spires = Math.pow(Math.max(0, n.noise2(nx * 3.5, nz * 3.5)), 2) * 0.6;
-    let h = o.h * base * (0.45 + 0.75 * ridge + spires) - 30 * (1 - base);
-    if (r > 0.92) h = -40;
+    const h = islandHeight(o, n, x, z);
     p.setY(i, h);
     const rock = smoothstep(0.55, 0.9, h / o.h) * 0.7 + (1 - base) * 0.0;
     const beach = h < 6 && h > -2 ? 1 : 0;
@@ -68,6 +76,23 @@ export class DistantScenery {
       this.group.add(m);
     }
     scene.add(this.group);
+    this.noises = ISLANDS.map((o) => new Noise(o.seed));
+  }
+
+  /** Surface height of the far islands at a world point (-50 = open sea), for collisions. */
+  heightAt(x, z) {
+    let best = -50;
+    for (let i = 0; i < ISLANDS.length; i++) {
+      const o = ISLANDS[i];
+      const dx = x - o.x, dz = z - o.z;
+      if (Math.abs(dx) > o.w * 0.6 + o.d * 0.2 || Math.abs(dz) > o.w * 0.6 + o.d * 0.2) continue;
+      // undo the mesh's rotation about Y
+      const c = Math.cos(o.rot), s = Math.sin(o.rot);
+      const lx = dx * c - dz * s, lz = dx * s + dz * c;
+      if (Math.abs(lx) > o.w / 2 || Math.abs(lz) > o.d / 2) continue;
+      best = Math.max(best, islandHeight(o, this.noises[i], lx, lz));
+    }
+    return best;
   }
 
   update() {}

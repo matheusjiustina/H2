@@ -64,6 +64,47 @@ start on Low) and remembers any change you make in Settings.
 
 In the boat: W/S set the throttle, A/D steer, and E steps out.
 
+### Flying the seaplane
+
+The floatplane PT-ILH is tied up on the west side of the pier. Walk up to it and press E.
+
+| Input | Action |
+| --- | --- |
+| Hold Q | Start the engine (tap Q to stop it) |
+| W / S | Pitch: push the nose down / pull it up |
+| A / D | Roll (on the water they steer) |
+| Z / X | Rudder |
+| R / F or mouse wheel | Throttle |
+| G / B | Flaps up / down (0°, 10°, 20°, 30°) |
+| [ / ] or PgDn / PgUp | Elevator trim |
+| U | Raise / lower the water rudders |
+| L | Navigation lights and strobes |
+| Hold right mouse | Fly with the mouse (mouse yoke) |
+| V | Cockpit or chase camera |
+| O | Orbit camera (wheel zooms) |
+| Hold E | Climb out (only once she has stopped) |
+
+To take off, start the engine, set 20° of flaps, open the throttle and hold a little
+back pressure. She climbs onto the step at about 13 m/s (25 kt) and lifts off at about
+30 m/s (60 kt). The lagoon is about 300 m long straight out from the pier. For a longer
+run, head northeast through the reef channel into open water. To land, come down with
+flaps and power at around 65 kt and flare so you touch the water gently, nose slightly
+up.
+
+The flight model has six degrees of freedom. Lift and drag come from the angle of
+attack, with a stall break and wing drop, induced drag and ground effect. The propeller
+has limited power and its slipstream acts on the tail, and the engine adds a little
+torque. The floats have buoyancy, hump drag, planing lift and water rudders. Wind and
+gusts follow the weather. **Flight assist** (Settings → Input) can be Off, Normal (turn
+coordinator and yaw damper) or High (also wing leveller, attitude hold and stall
+protection).
+
+Hard landings crack the windshield, and more damage makes the engine run rough and
+smoke. A real crash breaks the airframe apart: wings, floats and fuselage tumble, float
+and slowly sink, and you end up in the water. The plane is recovered and moored at the
+pier again a little later. The developer panel (F2) can also put the seaplane at the
+pier, put it in the air at 300 m, or repair it.
+
 If the browser won't capture the mouse (some embedded pages refuse it), drag on the view
 to look around instead.
 
@@ -86,6 +127,9 @@ show up only when they do something. The top corner has your bag and pause.
 - **Pebbles:** pick them up from piles on the beach and throw them. They splash, make
   ripples and sink, and a low, fast throw skips them. Thrown pebbles can be picked up
   again.
+- **Seaplane:** a high-wing radial floatplane with a realistic six-degree-of-freedom flight
+  model, full cockpit with working instruments, chase and orbit cameras, damage and
+  break-up. See *Flying the seaplane*.
 - **Boat:** buoyancy sampled at the hull points gives pitch and roll. It has a wake
   ribbon, spray, grounding in shallow water, a throttle and steering.
 - **Vegetation:** palms, broadleaf trees, banana plants, ferns, big-leaf plants, bushes
@@ -114,7 +158,7 @@ src/
   player/      PlayerController (fixed 120 Hz step), Collision, InteractionSystem,
                Inventory, Tools (held items), FirstPersonRig (skinned hands)
   environment/ Camp, props, prop materials, pebbles, wildlife, collectibles
-  vehicles/    Boat
+  vehicles/    Boat, Seaplane (FlightModel = 6-DOF physics, SeaplaneModel = procedural airframe + cockpit)
   effects/     Post-processing passes, particles, rain, ripple simulation, footprints
   audio/       AudioManager (layered ambience, HRTF 3D sounds, underwater filter),
                ProceduralSounds (all default sounds are synthesized)

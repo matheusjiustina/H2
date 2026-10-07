@@ -243,6 +243,75 @@ export const GENERATORS = {
     }
     return normalize(d, 0.8);
   },
+  // nine-cylinder radial at ~1100 rpm: uneven firing pulses, exhaust rumble and propeller beat.
+  // Played back faster or slower to follow the real rpm.
+  radial(sr) {
+    const n = sr * 2;
+    const d = new Float32Array(n);
+    const r = rand(131);
+    const lp = new Biquad('lp', 620, 0.9, sr);
+    const hp = new Biquad('hp', 38, 0.7, sr);
+    // 1080 rpm: 9 cylinders fire every two turns (81 Hz), 3 blades pass at 54 Hz; both loop cleanly in 2 s
+    const fire = 81;
+    const prop = 54;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const ph = (t * fire) % 1;
+      const cyl = Math.floor(t * fire) % 9;
+      const amp = 0.8 + 0.25 * Math.sin(cyl * 2.3); // cylinders never fire quite alike
+      const pulse = (Math.exp(-ph * 7) - 0.15) * amp;
+      const beat = Math.sin(TAU * prop * t) * 0.35 * (0.6 + 0.4 * Math.sin(TAU * 2.5 * t));
+      d[i] = hp.p(lp.p(pulse * 0.9 + beat + Math.sin(TAU * fire * 0.5 * t) * 0.25 + r() * 0.12));
+    }
+    return normalize(d, 0.85);
+  },
+  // electric starter grinding, a few coughs, then the engine catches
+  starter(sr) {
+    const n = Math.floor(sr * 1.8);
+    const d = new Float32Array(n);
+    const r = rand(141);
+    const bp = new Biquad('bp', 900, 1.4, sr);
+    const lp = new Biquad('lp', 500, 0.8, sr);
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const whine = Math.sin(TAU * (280 + 120 * Math.min(1, t / 1.2)) * t) * 0.25 * (t < 1.3 ? 1 : Math.max(0, 1 - (t - 1.3) * 4));
+      const crank = (t < 1.3) ? Math.max(0, Math.sin(TAU * 7 * t)) ** 6 * 0.6 : 0;
+      ph += (t < 1.25 ? 30 : 82) / sr;
+      const catchUp = t > 1.0 ? Math.min(1, (t - 1.0) * 2.5) : 0;
+      const pulse = (Math.exp(-(ph % 1) * 7) - 0.15) * catchUp * (Math.random() < 0.97 ? 1 : 2.2);
+      d[i] = bp.p(whine + r() * 0.05) + lp.p(crank + pulse * 0.9 + r() * 0.06 * catchUp);
+    }
+    return normalize(d, 0.85);
+  },
+  // stall warning horn: a reedy tone
+  stallHorn(sr) {
+    const n = sr;
+    const d = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const f = 720;
+      d[i] = (Math.sin(TAU * f * t) + 0.45 * Math.sin(TAU * f * 2 * t) + 0.2 * Math.sign(Math.sin(TAU * f * 3 * t))) * 0.3;
+    }
+    return normalize(d, 0.6);
+  },
+  // metal and spars tearing apart
+  crash(sr) {
+    const n = sr * 2;
+    const d = new Float32Array(n);
+    const r = rand(151);
+    const b = brown(n, 152);
+    const bp = new Biquad('bp', 1400, 0.9, sr);
+    const lp = new Biquad('lp', 380, 0.8, sr);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const e = Math.exp(-t * 2.2);
+      const screech = Math.sin(TAU * (900 - 300 * t) * t + Math.sin(t * 90) * 3) * Math.exp(-t * 3) * 0.3;
+      const clank = (Math.random() < 0.004 * e ? 1 : 0) * r() * 3;
+      d[i] = lp.p(b[i] * 2.4 * e) + bp.p(r() * e * 0.8 + clank) + screech;
+    }
+    return normalize(d, 0.95);
+  },
   static(sr) {
     const n = sr * 4;
     const r = rand(121);

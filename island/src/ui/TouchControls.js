@@ -7,6 +7,13 @@ const BUTTONS = [
   { id: 'interact', code: 'KeyE', label: 'E' },
   { id: 'use', code: 'KeyF', label: 'F' },
   { id: 'dive', code: 'KeyC', label: 'Dive' },
+  // seaplane
+  { id: 'thrUp', code: 'KeyR', label: 'Thr +', plane: true },
+  { id: 'thrDown', code: 'KeyF', label: 'Thr \u2212', plane: true },
+  { id: 'flaps', code: 'FlapsCycle', label: 'Flaps', plane: true },
+  { id: 'start', code: 'KeyQ', label: 'Start', plane: true },
+  { id: 'view', code: 'KeyV', label: 'View', plane: true },
+  { id: 'exit', code: 'KeyE', label: 'Exit', plane: true },
 ];
 
 export class TouchControls {
@@ -19,7 +26,7 @@ export class TouchControls {
     this.el.innerHTML = `
       <div class="touch-look"></div>
       <div class="touch-move"><div class="touch-stick"><div class="touch-knob"></div></div></div>
-      <div class="touch-buttons">${BUTTONS.map((b) => `<button type="button" class="touch-btn" data-id="${b.id}">${b.label}</button>`).join('')}</div>
+      <div class="touch-buttons">${BUTTONS.map((b) => `<button type="button" class="touch-btn" data-id="${b.id}"${b.plane ? " hidden" : ""}>${b.label}</button>`).join('')}</div>
       <div class="touch-top">
         <button type="button" class="touch-btn small" data-act="inventory">Bag</button>
         <button type="button" class="touch-btn small" data-act="pause">II</button>
@@ -73,8 +80,10 @@ export class TouchControls {
           this.knob.style.transform = `translate(${dx}px, ${dy}px)`;
           this.input.virtualAxis = { x: dx / R, y: -dy / R };
           // push the stick to the rim to sprint
-          if (len > R * 1.15) this.input.pressCode('ShiftLeft');
-          else if (this.input.down.has('ShiftLeft')) this.input.releaseCode('ShiftLeft');
+          if (this.game.player.mode !== 'plane') {
+            if (len > R * 1.15) this.input.pressCode('ShiftLeft');
+            else if (this.input.down.has('ShiftLeft')) this.input.releaseCode('ShiftLeft');
+          }
         } else if (this.lookTouch && t.identifier === this.lookTouch.id) {
           e.preventDefault();
           this.input.addLook((t.clientX - this.lookTouch.x) * 2.2, (t.clientY - this.lookTouch.y) * 2.2);
@@ -122,10 +131,12 @@ export class TouchControls {
     if (!playing) return;
     const swim = g.player.mode === 'swim';
     const boat = g.player.mode === 'boat';
+    const plane = g.player.mode === 'plane';
     this._toggle('dive', swim);
-    this._toggle('jump', !boat);
-    this._toggle('interact', !!g.interaction.focus || boat);
-    this._toggle('use', !!(g.inventory.equippedDef && g.inventory.equippedDef.use) || !!(g.interaction.focus && g.interaction.focus.label2(g)));
+    this._toggle('jump', !boat && !plane);
+    this._toggle('interact', !plane && (!!g.interaction.focus || boat));
+    this._toggle('use', !plane && (!!(g.inventory.equippedDef && g.inventory.equippedDef.use) || !!(g.interaction.focus && g.interaction.focus.label2(g))));
+    for (const b of BUTTONS) if (b.plane) this._toggle(b.id, plane);
   }
 
   _toggle(id, on) {

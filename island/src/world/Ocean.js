@@ -180,6 +180,11 @@ void main() {
   vec2 wd = uWind.xy;
   float wind = uWind.z;
   float far = smoothstep(30.0, 600.0, distCam);
+  // break up the regular swell seen from the air: the slope strength wanders in broad patches
+  // (shading only - the displaced surface the physics reads is untouched)
+  float macro = texture2D(uNoiseTex, grid * 0.0021 + wd * uTime * 0.002).r * 0.6 + texture2D(uNoiseTex, grid * 0.0047 - wd * uTime * 0.003 + 0.4).g * 0.4;
+  N.xz *= mix(0.4, 1.3, macro) * (1.0 - far * 0.45);
+  N = normalize(N);
   vec2 n1 = texture2D(uNormalMap, grid * 0.045 + wd * uTime * 0.022).xy * 2.0 - 1.0;
   vec2 n2 = texture2D(uNormalMap, grid * 0.13 + vec2(-wd.y, wd.x) * uTime * 0.04 + 0.37).xy * 2.0 - 1.0;
   vec2 det = n1 * 0.55 + n2 * 0.45;
@@ -189,6 +194,8 @@ void main() {
   }
   float detStrength = (0.42 + wind * 0.85) * mix(1.0, 0.35, far) * mix(0.55, 1.0, smoothstep(0.0, 2.5, depthV));
   det *= detStrength;
+  // a broad, slow layer that reads at altitude
+  det += (texture2D(uNormalMap, grid * 0.009 + wd * uTime * 0.005 + 0.13).xy * 2.0 - 1.0) * 0.32 * far * (0.6 + wind);
   if (uRain > 0.01) det += rainRipples(grid) * uRain * (1.0 - far) * 1.3;
   vec2 ruv = (grid - uRippleArea.xy) / uRippleArea.z + 0.5;
   float simFoam = 0.0;

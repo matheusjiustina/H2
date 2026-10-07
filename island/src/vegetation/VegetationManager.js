@@ -397,7 +397,9 @@ export class VegetationManager {
     this._pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this._pm);
     const cx = cam.position.x, cz = cam.position.z, cy = cam.position.y;
-    const maxBig = q.maxDist, lod0 = q.lod0, lod1 = q.lod1, plant = q.plantDist;
+    // seen from the air the canopy has to reach much further (far trees are cheap cards)
+    const above = Math.max(0, cy - Math.max(0, this.td.heightAt(cx, cz)));
+    const maxBig = q.maxDist + Math.min(1300, above * 3.5), lod0 = q.lod0, lod1 = q.lod1, plant = q.plantDist;
     const counts = this.tv.map(() => [0, 0, 0]);
     const bounds = this.tv.map(() => [[Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity, 0], [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity, 0], [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity, 0]]);
     const shadowRadius = 45;

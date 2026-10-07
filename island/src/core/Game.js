@@ -29,6 +29,7 @@ import { Inventory, ITEMS } from '../player/Inventory.js';
 import { Tools } from '../player/Tools.js';
 import { SPAWN } from '../world/Layout.js';
 import { TouchControls } from '../ui/TouchControls.js';
+import { Seaplane } from '../vehicles/Seaplane.js';
 import { VegetationManager } from '../vegetation/VegetationManager.js';
 import { GrassSystem } from '../vegetation/GrassSystem.js';
 import { createPropMaterials } from '../environment/PropMaterials.js';
@@ -139,6 +140,7 @@ export class Game {
     this.tools = new Tools(this);
     this.pebbles = new Pebbles({ scene: this.scene, materials: this.materials, terrainData: this.terrainData, ocean: this.ocean, collision: this.collision, particles: this.particles, ripples: this.ripples, interaction: this.interaction, audio: this.audio });
     this.boat = new Boat({ scene: this.scene, materials: this.materials, textures: this.textures, ocean: this.ocean, terrainData: this.terrainData, collision: this.collision, particles: this.particles, ripples: this.ripples, interaction: this.interaction, camp: this.camp });
+    this.seaplane = new Seaplane({ scene: this.scene, materials: this.materials, ocean: this.ocean, terrainData: this.terrainData, collision: this.collision, particles: this.particles, ripples: this.ripples, interaction: this.interaction, distant: this.distant, game: this });
     this.wildlife = new Wildlife({ scene: this.scene, terrainData: this.terrainData, ocean: this.ocean });
     this.collectibles = new Collectibles({ scene: this.scene, materials: this.materials, terrainData: this.terrainData, interaction: this.interaction, game: this });
     this.weather.onThunder = (d, i) => this.audio.thunder(d, i);
@@ -276,6 +278,8 @@ export class Game {
   restart() {
     this.ui.closeAll(false);
     if (this.boat.occupied) this.boat.exit(this);
+    if (this.seaplane.occupied) this.seaplane.exit(this, true);
+    this.seaplane.atPier();
     this.player.spawn(SPAWN.x, SPAWN.z, SPAWN.yaw, SPAWN.pitch);
     this.setTime(9.7);
     this.weather.set('CLEAR', true);
@@ -383,6 +387,7 @@ export class Game {
       return;
     }
     if (this.state !== 'playing') return;
+    if (this.player.mode === 'plane') return; // the seaplane reads its own keys
     if (inp.wasPressed('timeBack')) this.setTime(this.timeOfDay.hour - 1);
     if (inp.wasPressed('timeFwd')) this.setTime(this.timeOfDay.hour + 1);
     if (this.player.mode === 'boat') return; // the boat handles its own input
@@ -422,7 +427,7 @@ export class Game {
     this.timeOfDay.update(simDt);
     this.weather.update(simDt);
 
-    if (playing && this.player.mode !== 'boat') {
+    if (playing && this.player.mode !== 'boat' && this.player.mode !== 'plane') {
       this.player.look(dt, this.input.locked || this.autostart);
       this.player.update(dt);
     } else if (this.state === 'title') {
@@ -432,6 +437,7 @@ export class Game {
       this.input.consumeMouse();
     }
     this.boat.update(simDt, this);
+    this.seaplane.update(simDt, this);
     U.uPlayerPos.value.copy(this.player.pos);
     this.camera.updateMatrixWorld();
 
@@ -498,5 +504,9 @@ export class Game {
     this.camera.updateMatrixWorld();
   }
 
-  teleport(x, z, yaw = this.player.yaw, pitch = 0) { if (this.boat.occupied) this.boat.exit(this); this.player.spawn(x, z, yaw, pitch); }
+  teleport(x, z, yaw = this.player.yaw, pitch = 0) {
+    if (this.boat.occupied) this.boat.exit(this);
+    if (this.seaplane.occupied) this.seaplane.exit(this, true);
+    this.player.spawn(x, z, yaw, pitch);
+  }
 }

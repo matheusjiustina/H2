@@ -347,6 +347,9 @@ export class FirstPersonRig {
   update(dt, game) {
     this.time += dt;
     const player = game.player;
+    // flying: the hands are on the yoke out of sight, the cockpit is the view model
+    this.group.visible = player.mode !== 'plane';
+    if (player.mode === 'plane') return;
     const held = game.inventory ? game.inventory.equippedDef : null;
     const aiming = held && held.aim && game.input.mouseDown[2] && game.state === 'playing';
 
