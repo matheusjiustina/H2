@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FlightModel } from './FlightModel.js';
+import { FlightAssist } from './FlightAssist.js';
 import { buildSeaplane } from './SeaplaneModel.js';
 import { U } from '../core/Shared.js';
 import { clamp, damp, lerp, smoothstep } from '../utils/MathUtils.js';
@@ -33,6 +34,8 @@ export class Seaplane {
     this.model = buildSeaplane(materials);
     scene.add(this.model.root);
     this.fm = new FlightModel();
+    this.assist = new FlightAssist();
+    this.tipShown = false;
 
     this.occupied = false;
     this.moored = true;
@@ -43,7 +46,6 @@ export class Seaplane {
     this.orbit = { yaw: 0.6, pitch: 0.25, dist: 18 };
     this.yoke = new THREE.Vector2();
     this.input = { elev: 0, ail: 0, rud: 0 };
-    this.autoTrim = 0;
     this.lightsOn = false;
     this.holdE = 0; this.holdQ = 0;
     this.warnTimer = 0;
@@ -93,6 +95,7 @@ export class Seaplane {
     this._reassemble();
     const water = this.ocean.heightAt(MOOR.x, MOOR.z);
     this.fm.reset(new THREE.Vector3(MOOR.x, water + 1.9, MOOR.z), MOOR.heading);
+    this.assist.reset();
     this.moored = !this.occupied;
     this.damage = 0;
     this.broken = false;
@@ -105,6 +108,7 @@ export class Seaplane {
     const heading = this.occupied ? Math.atan2(this._fwd().x, this._fwd().z) : MOOR.heading;
     this.fm.reset(new THREE.Vector3(p.x, Math.max(alt, this.ground(p.x, p.z) + 120), p.z), heading, { speed: 50, engineOn: true });
     this.fm.trim = 0.05;
+    this.assist.reset();
     this.moored = false;
     this.broken = false;
     this._sync();
@@ -261,29 +265,13 @@ export class Seaplane {
     this.input.rud = approach(this.input.rud, ped, ped === 0 ? 4 : 2.5, dt);
 
     const out = fm.out;
-    const airborne = !out.onWater && !out.onGround && out.agl > 1.2;
-    let elev = this.input.elev, ail = this.input.ail, rud = this.input.rud;
-    if (!airborne) {
-      // on the water A/D steer with the water rudders (and the air rudder in the prop wash)
-      rud = clamp(rud + ail, -1, 1);
-    }
-    if (assist !== 'off' && airborne) {
-      // turn coordinator + yaw damper
-      rud = clamp(rud - out.beta * 3.2 + fm.omega.y * 0.6, -1, 1);
-    }
-    if (assist === 'high' && airborne) {
-      const right = this._v.set(-1, 0, 0).applyQuaternion(fm.quat);
-      const bank = Math.asin(clamp(-right.y, -1, 1));
-      if (Math.abs(this.input.ail) < 0.05) ail = clamp(-bank * 1.4 - fm.omega.z * 0.5, -0.6, 0.6);
-      // hold the attitude when the stick is released
-      if (Math.abs(this.input.elev) < 0.05) this.autoTrim = clamp(this.autoTrim + fm.omega.x * 1.2 * dt + (-out.vs * 0.004) * dt, -0.6, 0.6);
-      // stall protection
-      const lim = 0.22 - fm.flaps * 0.03;
-      if (out.alpha > lim) elev = Math.min(elev, -(out.alpha - lim) * 10);
-    } else this.autoTrim = damp(this.autoTrim, 0, 1, dt);
-    fm.elevator = clamp(elev + this.autoTrim, -1, 1);
-    fm.aileron = ail;
-    fm.rudder = rud;
+    const airborne = !out.onWater && !out.onGround && out.agl > 0.8;
+    const cmd = this._cmd || (this._cmd = { pitch: 0, roll: 0, yaw: 0 });
+    cmd.pitch = this.input.elev;
+    cmd.roll = this.input.ail;
+    // on the water A/D also steer with the water rudders (and the air rudder in the prop wash)
+    cmd.yaw = airborne ? this.input.rud : clamp(this.input.rud + this.input.ail, -1, 1);
+    this.assist.update(fm, cmd, assist, dt);
 
     // throttle: R / F or the mouse wheel (the wheel zooms the orbit camera instead)
     let thr = fm.throttle;
@@ -311,7 +299,13 @@ export class Seaplane {
       this.holdQ += dt;
       if (this.holdQ > 0.35 && fm.engine === 'off') {
         if (this.env.engineSubmerged || this.damage >= 90) game.toast('The engine won’t turn over.');
-        else { fm.engine = 'cranking'; fm.crankTime = 0; game.audio?.play('starter', { position: fm.pos, volume: 0.9 }); }
+        else {
+          fm.engine = 'cranking'; fm.crankTime = 0; game.audio?.play('starter', { position: fm.pos, volume: 0.9 });
+          if (!this.tipShown) {
+            this.tipShown = true;
+            setTimeout(() => game.toast('Take-off: flaps 20\u00b0 (B twice), full throttle (R), run east or west along the middle of the lagoon, ease back (S) at 55 kt.'), 2500);
+          }
+        }
       }
     } else {
       if (this.holdQ > 0 && this.holdQ < 0.3 && fm.engine !== 'off') { fm.engine = 'off'; game.audio?.play('click', { volume: 0.5 }); }
@@ -615,6 +609,7 @@ export class Seaplane {
       const heading = Math.atan2(-this.fm.pos.x, -this.fm.pos.z);
       const alt = Math.max(this.fm.pos.y, 120);
       this.fm.reset(new THREE.Vector3(this.fm.pos.x * k, alt, this.fm.pos.z * k), heading, { speed: Math.max(40, this.fm.out.airspeed), engineOn: this.fm.engine !== 'off' });
+      this.assist.reset();
       game.toast('You turned back for the island.');
     }
   }
@@ -640,7 +635,7 @@ export class Seaplane {
     const ft = Math.round(Math.max(0, fm.pos.y - 1.9) * FT);
     const fpm = Math.round(o.vs * FT * 60 / 10) * 10;
     const flaps = Math.round(fm.flaps * 30);
-    const trim = Math.round((fm.trim + this.autoTrim) * 100);
+    const trim = Math.round(fm.trim * 100);
     const eng = fm.engine === 'running' ? 'ENGINE RUNNING' : fm.engine === 'cranking' ? 'STARTING' : 'ENGINE OFF';
     let s = `<span>${kt} KT</span><span>${ft} FT</span><span>${fpm > 0 ? '+' : ''}${fpm} FPM</span><span>THR ${Math.round(fm.throttle * 100)}%</span><span>${Math.round(fm.rpm)} RPM</span><span>FLAPS ${flaps}°</span><span>TRIM ${trim > 0 ? '+' : ''}${trim}</span><span>W.RUD ${fm.waterRudders ? 'DN' : 'UP'}</span><span>${eng}</span>`;
     if (o.stall > 0.5 && !o.onWater) s += '<span class="warn">STALL</span>';
@@ -811,7 +806,7 @@ export class Seaplane {
     g.fillStyle = '#0c0d0d'; g.fillRect(-14, 0, 28, 150);
     g.fillStyle = '#9aa0a0'; g.font = '10px Arial'; g.textAlign = 'center'; g.fillText('TRIM', 0, 166);
     g.fillStyle = '#e8e4da'; g.fillRect(-14, 74, 28, 2);
-    g.fillStyle = '#ffb030'; g.fillRect(-10, 72 - clamp(fm.trim + this.autoTrim, -1, 1) * 70, 20, 6);
+    g.fillStyle = '#ffb030'; g.fillRect(-10, 72 - clamp(fm.trim, -1, 1) * 70, 20, 6);
     g.restore();
     // radio: an amber seven-segment style readout
     g.save(); g.translate(940, 300);

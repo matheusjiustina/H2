@@ -15,13 +15,13 @@ import { clamp, lerp, smoothstep } from '../utils/MathUtils.js';
 // (wing tips, tail, propeller arc, belly) that only report impacts.
 
 export const AIRFRAME = {
-  mass: 1950, // kg, pilot + fuel + floats
+  mass: 2100, // kg, pilot + fuel + floats
   inertia: new THREE.Vector3(4300, 8600, 5600), // pitch (x), yaw (y), roll (z) kg·m²
   wingArea: 23.2, span: 14.0, chord: 1.66,
   aspect: 14.0 * 14.0 / 23.2,
   oswald: 0.78,
   CL0: 0.32, CLa: 4.9, alphaStall: 0.27, alphaStallNeg: -0.21,
-  CD0: 0.05, CDflap: 0.05,
+  CD0: 0.068, CDflap: 0.05, // floats and struts are draggy
   CLflap: 0.72, // full flaps (30°)
   // pitch: wing-body (destabilising) + tail (stabilising, sits in the propeller slipstream)
   Cm0: 0.045, CmaWB: 0.25, CmaTail: -1.3, Cmq: -14, Cmde: 0.44, Cmflap: -0.05,
@@ -239,7 +239,7 @@ export class FlightModel {
           // buoyancy + heave damping, planing lift on the forebody
           let fy = kB * dc - 700 * vp.y * Math.min(1, d / 0.1);
           if (A.floats[i].z > -0.45) fy += 34 * dc * vLong * vLong * (A.floats[i].z > 2 ? 1.25 : 1);
-          const cLong = 16 * (1 - 0.72 * plane);
+          const cLong = 12 * (1 - 0.72 * plane);
           const fLong = -(cLong * dc * vLong * Math.abs(vLong) + 40 * dc * vLong);
           const fLat = -(300 * dc * vLat * Math.abs(vLat) + 520 * dc * vLat);
           _f.set(_fw.x * fLong + _rt.x * fLat, fy, _fw.z * fLong + _rt.z * fLat);

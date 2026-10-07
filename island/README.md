@@ -84,20 +84,31 @@ The floatplane PT-ILH is tied up on the west side of the pier. Walk up to it and
 | O | Orbit camera (wheel zooms) |
 | Hold E | Climb out (only once she has stopped) |
 
-To take off, start the engine, set 20° of flaps, open the throttle and hold a little
-back pressure. She climbs onto the step at about 13 m/s (25 kt) and lifts off at about
-30 m/s (60 kt). The lagoon is about 300 m long straight out from the pier. For a longer
-run, head northeast through the reef channel into open water. To land, come down with
-flaps and power at around 65 kt and flare so you touch the water gently, nose slightly
-up.
+To take off, start the engine, set 20° of flaps (press B twice) and open the throttle
+(R). She climbs onto the step at about 25 kt. Ease back (S) at about 55 kt and she lifts
+off near 60 kt after roughly 280 m of water. Without flaps she needs about 420 m and
+about 72 kt. The lagoon is only about 300 m deep straight out from the pier, so taxi out
+and take off east or west along the middle of the lagoon, where you have more than
+600 m. To land, come down with flaps and power at around 65 kt and flare so you touch the
+water gently, nose slightly up.
 
 The flight model has six degrees of freedom. Lift and drag come from the angle of
 attack, with a stall break and wing drop, induced drag and ground effect. The propeller
-has limited power and its slipstream acts on the tail, and the engine adds a little
-torque. The floats have buoyancy, hump drag, planing lift and water rudders. Wind and
-gusts follow the weather. **Flight assist** (Settings → Input) can be Off, Normal (turn
-coordinator and yaw damper) or High (also wing leveller, attitude hold and stall
-protection).
+has limited power and its slipstream acts on the tail, and the engine adds torque and
+p-factor. The floats have buoyancy, hump drag, planing lift and water rudders. Wind and
+gusts follow the weather. It flies like a heavy bush plane on floats: it climbs at about
+1,200 ft/min and cruises at about 100 kt.
+
+A keyboard key is either fully pressed or not pressed, so with **flight assist** on
+(Settings → Input) the keys fly the aircraft the way a fly-by-wire stick does:
+
+- **Normal** (default): W/S ask for a pitch rate and A/D for a roll rate. Let go and she
+  holds that attitude (pitch held within ±15°, bank settles to at most 30°). An
+  angle-of-attack limiter keeps the wing from stalling, the nose comes down by itself
+  if she gets too slow, and the rudder is coordinated automatically.
+- **High**: also levels the wings when you let go, with tighter pitch and bank limits.
+- **Off**: the keys move the control surfaces directly. This is the raw aircraft: you
+  can stall and spin it.
 
 Hard landings crack the windshield, and more damage makes the engine run rough and
 smoke. A real crash breaks the airframe apart: wings, floats and fuselage tumble, float
