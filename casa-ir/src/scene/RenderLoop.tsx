@@ -10,6 +10,7 @@ import { sharedUniforms } from '../materials/library'
 export function RenderLoop() {
   useFrame((state) => {
     sharedUniforms.uTime.value = state.clock.elapsedTime
+    renderState.scene = state.scene
     if (!renderState.composerActive) state.gl.render(state.scene, state.camera)
     if (renderState.capture) {
       const cb = renderState.capture
