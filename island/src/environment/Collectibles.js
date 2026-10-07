@@ -45,7 +45,7 @@ export class Collectibles {
       const y = terrainData.heightAt(x, z);
       m.position.set(x, y + 0.025, z);
       m.rotation.set(Math.random() * 0.4, Math.random() * 6.28, 0.2);
-      m.castShadow = true;
+      m.castShadow = false; // too small to matter, saves 24 shadow draws
       m.layers.set(LAYER.DETAIL);
       scene.add(m);
       const it = interaction.add({

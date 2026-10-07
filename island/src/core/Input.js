@@ -19,6 +19,7 @@ const BINDINGS = {
   hideHud: ['F1'],
   timeBack: ['BracketLeft'],
   timeFwd: ['BracketRight'],
+  pause: ['Escape', 'KeyP'],
 };
 
 export class Input {
@@ -76,12 +77,14 @@ export class Input {
   }
 
   lock() {
-    if (this.locked) return;
+    if (this.locked || !this.el.requestPointerLock) return;
+    // the browser can refuse (cool-down after Esc, unsupported raw input); never let that surface as an error
+    const plain = () => { try { const q = this.el.requestPointerLock(); if (q && q.catch) q.catch(() => {}); } catch { /* clicked again later */ } };
     try {
       const p = this.el.requestPointerLock({ unadjustedMovement: true });
-      if (p && p.catch) p.catch(() => this.el.requestPointerLock());
+      if (p && p.catch) p.catch(() => plain());
     } catch {
-      this.el.requestPointerLock();
+      plain();
     }
   }
 

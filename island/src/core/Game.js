@@ -155,6 +155,8 @@ export class Game {
     this.input.onLockChange = (locked) => {
       if (!locked && this.state === 'playing' && !this.ui.open) this.pause();
     };
+    // if the browser refused the lock (e.g. resumed too soon after Esc), a click on the view recaptures it
+    this.canvas.addEventListener('mousedown', () => { if (this.state === 'playing' && !this.input.locked) this.input.lock(); });
     this.systems.push(this.terrain, this.vegetation, this.grass, this.camp, this.rocks, this.waterfall, this.props);
 
     this.applySettings();
@@ -364,6 +366,12 @@ export class Game {
     const inp = this.input;
     if (inp.wasPressed('debug')) this.ui.toggleDebug();
     if (inp.wasPressed('hideHud')) this.ui.root.classList.toggle('hide-hud');
+    if (inp.wasPressed('pause')) {
+      // with pointer lock the browser eats Esc and the lock-change pauses; this covers lock-less play
+      if (this.state === 'playing') { this.pause(); return; }
+      if (this.state === 'menu') { this.ui.closeAll(); return; }
+      if (this.state === 'paused') { if (this.ui.pauseMain.style.display === 'none') this.ui.showPanel('main'); else this.resume(); return; }
+    }
     if (this.state === 'menu') {
       if (inp.wasPressed('inventory') && this.ui.open === 'inv') this.ui.closeAll();
       else if (inp.wasPressed('notebook') && this.ui.open === 'note') this.ui.closeAll();

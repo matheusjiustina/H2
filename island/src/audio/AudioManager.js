@@ -74,7 +74,7 @@ export class AudioManager {
       const res = await fetch('./sounds/manifest.json', { cache: 'no-cache' });
       if (!res.ok) return;
       const map = await res.json();
-      await Promise.all(Object.entries(map).map(async ([name, file]) => {
+      await Promise.all(Object.entries(map).filter(([name, file]) => !name.startsWith('_') && typeof file === 'string' && file).map(async ([name, file]) => {
         try {
           const ab = await (await fetch(`./sounds/${file}`)).arrayBuffer();
           this.buffers[name] = await this.ctx.decodeAudioData(ab);

@@ -138,14 +138,15 @@ export class Atmosphere {
 
     // --- colour grading
     const g = this.renderer.grade;
-    g.exposure = t.exposure * lerp(1, 1.3, o) * (U.uUnderwater.value > 0.5 ? 1.25 : 1);
+    const stormy = clamp((w.rain - 0.5) / 0.5, 0, 1) * o;
+    g.exposure = t.exposure * lerp(1, 1.3, o) * lerp(1, 0.8, stormy) * (U.uUnderwater.value > 0.5 ? 1.25 : 1);
     const night = t.night;
     const golden = clamp(t.sunset.r * 1.2, 0, 1) * (1 - o);
     g.white.set(1 + golden * 0.04, 1, 1 - golden * 0.06);
     if (night > 0) g.white.lerp(_nightWhite, night);
     g.shadowTint.set(-0.014, 0.004, 0.012).multiplyScalar(1 - o * 0.5);
     g.highlightTint.set(0.012 + golden * 0.01, 0.004, -0.012).multiplyScalar(1 - o * 0.6);
-    g.saturation = lerp(1.14, 0.92, o) * lerp(1, 0.8, night);
+    g.saturation = lerp(1.14, 0.92, o) * lerp(1, 0.88, stormy) * lerp(1, 0.8, night);
     g.contrast = lerp(1.1, 1.02, o);
     g.flash = this.weather.lightning * 0.9;
   }

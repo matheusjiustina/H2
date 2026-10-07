@@ -157,11 +157,23 @@ class Hand {
     groups[0].push([tint(roundedPalm(), (x, y, z) => (y > 0.004 ? [0.94, 0.9, 0.88] : [1.1, 0.98, 0.95])), this.palm]);
     this.fingers.forEach((joints, fi) => joints.forEach((j, s) => groups[0].push([phal(FINGERS[fi].r * (1 - s * 0.08), FINGERS[fi].len[s], s === 2), j])));
     this.thumb.forEach((j, s) => groups[0].push([phal(THUMB.r * (1 - s * 0.1), THUMB.len[s], s === 2), j]));
-    const sl = new THREE.CylinderGeometry(0.046, 0.05, 0.12, 14, 1, true);
+    // shirt sleeve rolled to mid forearm: loose, slightly creased fabric with a thick rolled cuff
+    const sl = new THREE.CylinderGeometry(0.056, 0.047, 0.21, 16, 6, true);
+    {
+      const p = sl.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const a = Math.atan2(p.getZ(i), p.getX(i)), y = p.getY(i);
+        const crease = 1 + 0.06 * Math.sin(a * 3 + y * 40) * Math.sin(y * 25 + 1.3);
+        p.setX(i, p.getX(i) * crease * 1.08);
+        p.setZ(i, p.getZ(i) * crease * 0.92);
+      }
+      sl.computeVertexNormals();
+    }
     sl.rotateX(Math.PI / 2);
-    sl.translate(0, 0.002, 0.27);
-    const cuff = new THREE.TorusGeometry(0.047, 0.009, 6, 16);
-    cuff.translate(0, 0.002, 0.212);
+    sl.translate(0, 0.003, 0.235);
+    const cuff = new THREE.TorusGeometry(0.05, 0.014, 8, 18);
+    cuff.scale(1.08, 0.92, 1.25);
+    cuff.translate(0, 0.003, 0.135);
     groups[1].push([sl, wrist], [cuff, wrist]);
     const materials = [skin, sleeve];
     if (extra) {

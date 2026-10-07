@@ -146,8 +146,10 @@ const AFTER_AO = /* glsl */ `
   float _canopy = texture2D(uTerrainSplatB, terrainUV(vWPos.xz)).g;
   float _above = vWPos.y - _td.r;
   float _occ = _canopy * (1.0 - smoothstep(2.0, 16.0, _above));
-  float _ao = 1.0 - 0.62 * _occ;
+  float _ao = 1.0 - 0.55 * _occ;
   reflectedLight.indirectDiffuse *= _ao;
+  // light filtered through the leaves: a soft green fill keeps the understory readable
+  reflectedLight.indirectDiffuse += diffuseColor.rgb * uAmbient * vec3(0.5, 0.78, 0.36) * 0.32 * _occ;
   reflectedLight.indirectSpecular *= _ao;
   reflectedLight.directDiffuse *= mix(1.0, 0.85, _occ);
 }

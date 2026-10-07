@@ -354,8 +354,9 @@ export function buildTree(seed, lod = 0, opts = {}) {
       const off = new THREE.Vector3((r() - 0.5) * 3.0, (r() - 0.35) * 1.6, (r() - 0.5) * 3.0);
       const c = e.p.clone().add(off);
       const size = (lod === 2 ? 4.6 : lod === 1 ? 3.6 : 2.9) + r() * 1.3;
-      const nd = new THREE.Vector3((r() - 0.5) * 1.2, 0.8 + r() * 0.5, (r() - 0.5) * 1.2);
       const d = c.clone().sub(crownCenter);
+      // tilt cards to follow the crown's rounded silhouette instead of stacking flat shelves
+      const nd = d.clone().normalize().multiplyScalar(0.75).add(new THREE.Vector3((r() - 0.5) * 0.9, 0.55 + r() * 0.4, (r() - 0.5) * 0.9));
       const ao = 0.55 + 0.45 * smoothstep(0.2, 1.0, d.length() / crownR);
       const tint = 0.9 + r() * 0.2;
       const cell = r() < 0.75 ? atlasCell : 1 - atlasCell;
@@ -367,7 +368,7 @@ export function buildTree(seed, lod = 0, opts = {}) {
   for (let k = 0; k < fill; k++) {
     const a = r() * Math.PI * 2, d = Math.sqrt(r()) * crownR * 0.7;
     const c = crownCenter.clone().add(new THREE.Vector3(Math.cos(a) * d, (r() - 0.2) * 1.8, Math.sin(a) * d));
-    card(leaves, c, 3.0 + r() * 1.2, new THREE.Vector3((r() - 0.5), 1, (r() - 0.5)), r() * 6.28, [atlasCell * 0.5, 0, atlasCell * 0.5 + 0.5, 1], [0.62, 0.62, 0.6], [0.3, 0.8, r(), 0.4], crownCenter);
+    card(leaves, c, 3.0 + r() * 1.2, new THREE.Vector3(Math.cos(a) * 0.6 + (r() - 0.5), 0.8, Math.sin(a) * 0.6 + (r() - 0.5)), r() * 6.28, [atlasCell * 0.5, 0, atlasCell * 0.5 + 0.5, 1], [0.62, 0.62, 0.6], [0.3, 0.8, r(), 0.4], crownCenter);
   }
   // hanging vines
   if (lod < 2 && (opts.vines ?? r() < 0.6)) {

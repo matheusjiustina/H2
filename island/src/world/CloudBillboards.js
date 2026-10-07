@@ -96,6 +96,7 @@ void main() {
   vec3 col = mix(uCloudDark * 0.85, uCloudLit, lit);
   float mu = max(dot(-V, L), 0.0);
   col += uSunGlow * pow(mu, 8.0) * (1.0 - a) * 1.4;
+  col *= mix(1.0, 0.42, uNight); // moonlit clouds stay dim silhouettes
   col = applyAtmosphere(col, vWorld);
   float alpha = smoothstep(0.08, 0.6, a) * show * 0.95;
   gl_FragColor = vec4(col, alpha);

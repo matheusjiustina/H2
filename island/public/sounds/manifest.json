@@ -1,0 +1,3 @@
+{
+  "_readme": "Optional recorded sounds. Map a procedural sound name to a file in this folder, e.g. \"ocean\": \"ocean_loop.ogg\". Unlisted names keep their generated fallback. Names: ocean shore wind rain tarpRain storm jungle night underwater fire waterfall engine static radio0 radio1 radio2 splash skip click creakOpen creakClose ignite snuff shutter sip cloth pebble knock thudSand whoosh thunder bird1 bird2 bird3 bird4 gull. Footsteps: step_<surface>_<n> is generated per surface (sand grass leaves dirt rock wood metal cloth water swim)."
+}

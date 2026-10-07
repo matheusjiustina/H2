@@ -303,11 +303,12 @@ void bark(vec2 uv, out vec3 col, out float h, out float r) {
   vec2 w = vec2(pfbm(uv, 4.0, 3, 0.5), 0.0) * 0.06;
   float fis = pridge(vec2(uv.x * 2.0, uv.y * 0.5) + w, 6.0, 5);
   float n = pfbm(uv, 6.0, 5, 0.55) * 0.5 + 0.5;
-  col = mix(vec3(0.20, 0.17, 0.14), vec3(0.46, 0.42, 0.36), fis * 0.8 + n * 0.2);
+  // smooth pale tropical hardwood bark with darker fissures
+  col = mix(vec3(0.30, 0.27, 0.22), vec3(0.62, 0.58, 0.5), fis * 0.75 + n * 0.25);
   float moss = smoothstep(0.55, 0.75, pfbm(uv + 0.6, 4.0, 4, 0.55) * 0.5 + 0.5);
-  col = mix(col, vec3(0.24, 0.32, 0.12), moss * 0.6);
-  float lich = smoothstep(0.7, 0.78, pfbm(uv + 0.1, 16.0, 3, 0.5) * 0.5 + 0.5);
-  col = mix(col, vec3(0.72, 0.74, 0.66), lich * 0.4);
+  col = mix(col, vec3(0.3, 0.38, 0.16), moss * 0.55);
+  float lich = smoothstep(0.66, 0.76, pfbm(uv + 0.1, 16.0, 3, 0.5) * 0.5 + 0.5);
+  col = mix(col, vec3(0.8, 0.8, 0.72), lich * 0.5);
   h = fis;
   r = 0.9;
 }`;
