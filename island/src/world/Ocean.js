@@ -98,7 +98,7 @@ void main() {
   vec2 ruv = (grid - uRippleArea.xy) / uRippleArea.z + 0.5;
   // ripples only shade the water right around the eye: lifting the surface there (a swimmer's
   // own splashes) would put it over the camera, which the CPU height query can't see
-  if (ruv.x > 0.0 && ruv.y > 0.0 && ruv.x < 1.0 && ruv.y < 1.0) d.y += textureLod(uRipples, ruv, 0.0).r * 0.6 * smoothstep(0.7, 3.0, r);
+  if (ruv.x > 0.0 && ruv.y > 0.0 && ruv.x < 1.0 && ruv.y < 1.0) d.y += clamp(textureLod(uRipples, ruv, 0.0).r, -0.8, 0.8) * 0.6 * smoothstep(0.7, 3.0, r);
   vec3 wp = vec3(grid.x, uWaterLevel, grid.y) + d;
   vWorld = wp;
   vGrid = grid;
@@ -206,8 +206,8 @@ void main() {
     vec4 rc = texture2D(uRipples, ruv);
     float hx = texture2D(uRipples, ruv + vec2(tx, 0.0)).r - texture2D(uRipples, ruv - vec2(tx, 0.0)).r;
     float hz = texture2D(uRipples, ruv + vec2(0.0, tx)).r - texture2D(uRipples, ruv - vec2(0.0, tx)).r;
-    det -= vec2(hx, hz) * 9.0;
-    simFoam = rc.b;
+    det -= clamp(vec2(hx, hz) * 9.0, vec2(-1.5), vec2(1.5));
+    simFoam = clamp(rc.b, 0.0, 1.0);
   }
   N = normalize(vec3(N.x + det.x, N.y, N.z + det.y));
   vec3 Ngeo = N;
