@@ -65,6 +65,8 @@ interface State {
   captureHQ: boolean
   toast: string | null
   dev: boolean
+  /** runtime resolution safeguard (disabled for automated visual QA) */
+  adaptive: boolean
   isTouch: boolean
 
   set: (p: Partial<State>) => void
@@ -138,6 +140,7 @@ export const useStore = create<State>((set, get) => ({
   captureHQ: false,
   toast: null,
   dev: params.has('dev'),
+  adaptive: !params.has('noadapt'),
   isTouch: typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0) && matchMedia('(pointer: coarse)').matches,
   ...loadPersisted(),
 

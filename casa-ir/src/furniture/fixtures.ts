@@ -3,6 +3,22 @@ import * as THREE from 'three'
 import type { SlotId } from '../data/materials'
 import type { PrefabFn } from './prefab'
 
+/** Smoked amber glass teardrop (INT p.5–p.9): 0.26 m wide, 0.36 m tall, origin at the bottom. */
+const TEARDROP = new THREE.LatheGeometry(
+  [
+    [0.0, 0.0],
+    [0.07, 0.012],
+    [0.115, 0.06],
+    [0.13, 0.13],
+    [0.118, 0.2],
+    [0.085, 0.26],
+    [0.045, 0.31],
+    [0.022, 0.35],
+    [0.02, 0.36],
+  ].map(([r, y]) => new THREE.Vector2(r, y)),
+  32,
+)
+
 /** INT p.5–9: cluster of amber glass "drop" pendants hanging from `ceil`. */
 export const dropCluster = (ceil: number): PrefabFn => (b) => {
   const drops: [number, number, number][] = [
@@ -14,10 +30,10 @@ export const dropCluster = (ceil: number): PrefabFn => (b) => {
   ]
   b.cyl('black_metal', 0, ceil - 0.03, 0, 0.12, 0.12, 0.03)
   for (const [x, z, y] of drops) {
-    b.cyl('black_metal', x, y + 0.3, z, 0.004, 0.004, ceil - y - 0.3)
-    b.cyl('brass', x, y + 0.28, z, 0.025, 0.03, 0.05)
-    b.sphere('glass_amber', x, y + 0.1, z, 0.16, 1, 1.25, 1, 20)
-    b.sphere('bulb', x, y + 0.1, z, 0.035, 1, 1.4, 1, 10)
+    b.cyl('black_metal', x, y + 0.38, z, 0.004, 0.004, ceil - y - 0.38)
+    b.cyl('brass', x, y + 0.34, z, 0.024, 0.024, 0.05)
+    b.geo('glass_amber', TEARDROP, new THREE.Matrix4().makeTranslation(x, y, z), [1, 1])
+    b.sphere('bulb', x, y + 0.1, z, 0.03, 1, 1.6, 1, 10)
   }
 }
 
@@ -32,8 +48,11 @@ export const globePendant = (drop: number): PrefabFn => (b) => {
 /** INT p.25–28: woven natural fibre cone pendant. */
 export const wickerCone = (drop: number): PrefabFn => (b) => {
   b.cyl('black_metal', 0, -drop + 0.3, 0, 0.004, 0.004, drop - 0.3)
+  // woven rattan cone with a glowing inner shade (INT p.25 / p.28)
   const g = new THREE.CylinderGeometry(0.03, 0.27, 0.42, 28, 1, true)
-  b.geo('wicker_fixed', g, new THREE.Matrix4().makeTranslation(0, -drop + 0.1, 0), [1.6, 0.6])
+  b.geo('rattan_fixed', g, new THREE.Matrix4().makeTranslation(0, -drop + 0.1, 0), [1.6, 0.6])
+  const gi = new THREE.CylinderGeometry(0.025, 0.24, 0.38, 24, 1, true)
+  b.geo('lamp_shade', gi, new THREE.Matrix4().makeTranslation(0, -drop + 0.1, 0), [1.4, 0.5])
   b.sphere('bulb', 0, -drop - 0.03, 0, 0.04)
 }
 
@@ -90,10 +109,12 @@ export const sconce = (): PrefabFn => (b) => {
 // ── Bathroom ──────────────────────────────────────────────────────────────
 /** Wall-hung WC, back against −Z. */
 export const toilet = (): PrefabFn => (b) => {
-  b.rbox('ceramic', 0, 0.36, -0.1, 0.36, 0.3, 0.2, 0.06)
-  const g = new THREE.SphereGeometry(0.2, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2)
-  b.geo('ceramic', g, new THREE.Matrix4().compose(new THREE.Vector3(0, 0.42, 0.12), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0)), new THREE.Vector3(0.9, 0.9, 1.35)), [1, 1])
-  b.rbox('ceramic', 0, 0.43, 0.1, 0.36, 0.035, 0.52, 0.03)
+  // back-to-wall pedestal toilet with rounded body and soft-close lid (INT p.30 / p.41 / p.55)
+  const body = new THREE.CylinderGeometry(0.175, 0.15, 0.4, 32)
+  b.geo('ceramic', body, new THREE.Matrix4().compose(new THREE.Vector3(0, 0.2, 0.06), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1.55)), [1, 0.4])
+  b.rbox('ceramic', 0, 0.2, -0.17, 0.35, 0.4, 0.12, 0.05, 4)
+  const lid = new THREE.SphereGeometry(1, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2)
+  b.geo('ceramic', lid, new THREE.Matrix4().compose(new THREE.Vector3(0, 0.4, 0.06), new THREE.Quaternion(), new THREE.Vector3(0.18, 0.035, 0.28)), [1, 1])
 }
 
 export const vesselSink = (w = 0.5, d = 0.36): PrefabFn => (b) => {

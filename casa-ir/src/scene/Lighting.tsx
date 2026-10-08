@@ -37,6 +37,9 @@ const SUN_SET = new THREE.Color('#ffae6b')
 const HEMI_DAY = new THREE.Color('#cfe0ee')
 const HEMI_SET = new THREE.Color('#e9c4a6')
 const HEMI_NIGHT = new THREE.Color('#2a3550')
+// ground (bounce) colour: soil/lawn outdoors, warm light floors indoors
+const GROUND_OUT = new THREE.Color('#8b7e6c')
+const GROUND_IN = new THREE.Color('#d9cfc1')
 const _c = new THREE.Color()
 
 export function Lighting() {
@@ -183,6 +186,11 @@ export function Lighting() {
     const inside = room ? ROOMS.find((r) => r.id === room)?.interior ?? false : false
     insideK.current = THREE.MathUtils.damp(insideK.current, inside ? 1 : 0, 2.5, dt)
     const k = insideK.current
+    // indoors the light-coloured floors bounce daylight onto ceilings and upper walls (INT renders)
+    if (hemi.current) {
+      hemi.current.groundColor.copy(GROUND_OUT).lerp(GROUND_IN, k)
+      hemi.current.intensity += k * (0.28 * day + 0.18 * sunset + 0.04 * night)
+    }
     scene.environmentIntensity = (0.62 * day + 0.42 * sunset + 0.07 * night) * THREE.MathUtils.lerp(1, 0.55, k)
     // interiors: slightly brighter by day, lower at night so warm lamps read as pools of light
     gl.toneMappingExposure = (1.0 * day + 1.12 * sunset + 1.25 * night) * THREE.MathUtils.lerp(1, 1.1 * day + 1.0 * sunset + 0.8 * night, k)

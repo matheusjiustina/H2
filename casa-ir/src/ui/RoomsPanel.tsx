@@ -6,8 +6,8 @@ import { IconClose } from './icons'
 /** Exterior "places" are groups of façade / landscape camera presets. */
 const EXTERIOR: { id: string; name: string; cams: string[]; source: string }[] = [
   { id: 'x_fachada', name: 'Fachada', cams: ['fachada_frontal', 'fachada_frontal_02', 'hero', 'lateral_norte', 'lateral_sul'], source: 'ARQ p.4 · p.5 · p.11 · p.12 · p.15' },
-  { id: 'x_piscina', name: 'Piscina', cams: ['piscina', 'fachada_posterior', 'fachada_posterior_02'], source: 'ARQ p.7 · p.8 · p.10' },
-  { id: 'x_patio', name: 'Pátio interno', cams: ['patio_interno'], source: 'ARQ p.6' },
+  { id: 'x_piscina', name: 'Piscina', cams: ['piscina', 'fachada_posterior', 'fachada_posterior_02', 'fachada_posterior_03'], source: 'ARQ p.7 · p.8 · p.9 · p.10' },
+  { id: 'x_patio', name: 'Pátio interno', cams: ['patio_interno', 'patio_piscina'], source: 'ARQ p.6 · p.14' },
   { id: 'x_aerea', name: 'Vista aérea', cams: ['aerea', 'vista_superior'], source: 'ARQ p.13 · p.16' },
 ]
 

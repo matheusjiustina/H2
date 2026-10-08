@@ -171,12 +171,14 @@ export const ficus = (height = 1.7, potSlot: SlotId = 'vase'): PrefabFn => (b) =
   b.cyl(potSlot, 0, 0, 0, 0.2, 0.15, 0.38, 20)
   b.cyl('soil', 0, 0.36, 0, 0.18, 0.18, 0.02, 16)
   b.cyl('trunk', 0, 0.37, 0, 0.02, 0.03, height - 0.5, 6)
-  for (let i = 0; i < 22; i++) {
-    const t = i / 22
-    const y = 0.75 + t * (height - 0.85)
+  // fiddle-leaf fig: few, large, broad leaves spread around the stem (INT p.5 / p.7 / p.9)
+  for (let i = 0; i < 16; i++) {
+    const t = i / 16
+    const y = 0.8 + t * (height - 0.9)
     const yaw = i * 2.4
-    const base = new THREE.Vector3(Math.sin(yaw) * 0.05, y, Math.cos(yaw) * 0.05)
-    addLeaf(b, i % 5 === 0 ? 'leaf_light' : 'leaf_dark', base, yaw, -0.6 + rnd() * 0.5, 0, 0.26 + rnd() * 0.08, 0.2)
+    const off = 0.06 + (1 - t) * 0.16
+    const base = new THREE.Vector3(Math.sin(yaw) * off, y, Math.cos(yaw) * off)
+    addLeaf(b, i % 4 === 0 ? 'leaf_light' : 'leaf', base, yaw, -0.35 + rnd() * 0.45, (rnd() - 0.5) * 0.4, 0.34 + rnd() * 0.08, 0.27)
   }
 }
 

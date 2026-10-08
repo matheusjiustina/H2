@@ -121,8 +121,8 @@ export function Gourmet() {
     <group>
       <PartsMeshes parts={parts} />
       <Prefab id="gTable" build={trestleTable('gourmet_table_wood', 3.62, 0.92)} position={[18.55, F, 13.78]} selectable="gourmet_table" />
-      <PrefabInstances id="gChair" build={ropeChair('gourmet_chairs', 'walnut_fixed')} items={chairs} selectable="gourmet_chairs" />
-      <PrefabInstances id="gStool" build={ropeStool('gourmet_chairs', 'walnut_fixed')} items={stools} selectable="gourmet_chairs" />
+      <PrefabInstances id="gChair" build={ropeChair('gourmet_chairs', 'teak_fixed')} items={chairs} selectable="gourmet_chairs" />
+      <PrefabInstances id="gStool" build={ropeStool('gourmet_chairs', 'teak_fixed')} items={stools} selectable="gourmet_chairs" />
       <Prefab id="gWine" build={wineCooler()} position={[20.85, F, Z1 - 0.02]} rotation={180} />
       <Prefab id="gGrill" build={churrasqueira()} position={[15.92, 0.95, Z1 - 0.85]} rotation={180} />
       <Prefab id="gCooktop" build={cooktop(0.6)} position={[19.9, CT, Z1 - 0.3]} />

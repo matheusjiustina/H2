@@ -19,16 +19,18 @@ export const CAMERAS: CameraPreset[] = [
   // ── Exterior ────────────────────────────────────────────────────────────
   C('intro', 'Abertura', 'exterior', [72, 14, 30], [33.5, 3.4, 9.4], 'ARQ p.4', 34),
   C('hero', 'Vista principal', 'exterior', [55, 8.5, 27], [30.5, 3.0, 8.5], 'ARQ p.11', 38),
-  C('fachada_frontal', 'Fachada frontal', 'exterior', [56, 2.3, 14.5], [33.5, 3.6, 9.2], 'ARQ p.4', 38),
+  C('fachada_frontal', 'Fachada frontal', 'exterior', [54, 1.7, 22.5], [33.0, 3.4, 9.2], 'ARQ p.4', 40),
   C('fachada_frontal_02', 'Fachada frontal — frontal', 'exterior', [60, 2.0, 9.8], [34, 3.4, 9.6], 'ARQ p.5', 36),
   C('fachada_posterior', 'Fachada posterior', 'exterior', [3.2, 1.75, 1.6], [16.5, 3.2, 10.5], 'ARQ p.7', 50),
-  C('fachada_posterior_02', 'Fachada posterior — gourmet', 'exterior', [9.2, 1.6, 3.4], [11.0, 2.4, 13.2], 'ARQ p.8', 50),
-  C('patio_interno', 'Pátio interno', 'exterior', [15.6, 1.6, 9.9], [27.7, 3.2, 8.6], 'ARQ p.6', 50),
+  C('fachada_posterior_02', 'Fachada posterior — serviço', 'exterior', [7.4, 1.55, 2.9], [12.2, 2.0, 13.0], 'ARQ p.8', 52),
+  C('fachada_posterior_03', 'Recuo de pedra', 'exterior', [12.6, 1.5, 6.4], [10.9, 1.8, 13.2], 'ARQ p.9', 55),
+  C('patio_interno', 'Pátio interno', 'exterior', [15.0, 1.6, 7.9], [27.7, 3.2, 8.6], 'ARQ p.6', 50),
+  C('patio_piscina', 'Pátio a partir da piscina', 'exterior', [5.6, 1.7, 5.1], [24, 2.6, 9.0], 'ARQ p.14', 55),
   C('piscina', 'Piscina', 'exterior', [17.2, 1.65, 9.2], [6.0, 2.0, 1.8], 'ARQ p.10', 52),
   C('aerea', 'Vista aérea', 'exterior', [-10, 21, -9], [17, 0, 8.5], 'ARQ p.13', 40),
-  C('lateral_norte', 'Fachada lateral norte', 'exterior', [47, 2.2, -7], [28, 2.8, 4.5], 'ARQ p.15', 45),
-  C('lateral_sul', 'Fachada lateral sul', 'exterior', [-6, 3.2, 27], [15, 2.2, 14], 'ARQ p.12', 45),
-  C('vista_superior', 'Vista superior', 'exterior', [20, 52, 9.6], [20, 0, 9], 'ARQ p.16', 35),
+  C('lateral_norte', 'Fachada lateral norte', 'exterior', [46, 6.5, -6], [27, 2.4, 3.5], 'ARQ p.15', 45),
+  C('lateral_sul', 'Fachada lateral sul', 'exterior', [-2.5, 4.2, 21.5], [14, 1.8, 14.5], 'ARQ p.12', 45),
+  C('vista_superior', 'Vista superior', 'exterior', [20, 52, 8.4], [20, 0, 9], 'ARQ p.16', 35),
   C('planta3d', 'Planta 3D', 'plan', [20, 34, 30], [20, 0, 9.4], 'ARQ p.2', 40),
 
   // ── Sala de TV ──────────────────────────────────────────────────────────
@@ -42,6 +44,7 @@ export const CAMERAS: CameraPreset[] = [
   C('kitchen_view_01', 'Vista leste', 'cozinha', [22.15, 1.5, 12.95], [26.7, 1.35, 13.9], 'INT p.19', 64),
   C('kitchen_view_02', 'Vista sul', 'cozinha', [24.0, 1.55, 11.35], [23.9, 1.3, 16.2], 'INT p.20', 64),
   C('kitchen_view_03', 'Cristaleira', 'cozinha', [24.2, 1.5, 15.9], [24.0, 1.6, 11.0], 'INT p.22', 62),
+  C('kitchen_view_05', 'Bancadas e coifa', 'cozinha', [22.3, 1.5, 11.75], [26.3, 1.25, 15.4], 'INT p.21', 60),
   C('kitchen_view_04', 'Ilha e gourmet', 'cozinha', [25.8, 1.5, 14.0], [21.7, 1.3, 13.8], 'INT p.23', 62),
 
   // ── Gourmet ─────────────────────────────────────────────────────────────
@@ -57,29 +60,40 @@ export const CAMERAS: CameraPreset[] = [
 
   // ── Banho externo / depósito / despensa ─────────────────────────────────
   C('extbath_view_01', 'Banho externo', 'banho_ext', [12.2, 1.55, 13.55], [12.8, 1.25, 16.2], 'INT p.30', 70),
-  C('deposit_view_01', 'Depósito', 'deposito', [6.55, 1.55, 17.4], [6.55, 1.3, 15.3], 'INT p.33', 62),
+  C('extbath_view_02', 'Box de seixos', 'banho_ext', [12.65, 1.55, 14.1], [12.6, 1.4, 16.2], 'INT p.31', 70),
+  C('extbath_view_03', 'Bancada e espelho', 'banho_ext', [12.25, 1.55, 15.5], [13.3, 1.2, 13.8], 'INT p.32', 72),
+  C('deposit_view_01', 'Depósito', 'deposito', [7.75, 1.5, 16.02], [5.4, 1.3, 15.45], 'INT p.33', 74),
   C('pantry_view_01', 'Despensa', 'despensa', [11.1, 1.55, 13.6], [9.3, 1.2, 16.0], 'ARQ p.2', 66),
 
   // ── Sala de jogos ───────────────────────────────────────────────────────
   C('game_view_01', 'Estante e mesa', 'jogos', [6.55, 1.5, 11.35], [6.55, 1.45, 15.15], 'INT p.35', 66),
   C('game_view_02', 'Vista longitudinal', 'jogos', [8.2, 1.5, 13.4], [4.82, 1.4, 13.1], 'INT p.36', 66),
+  C('game_view_04', 'Estante e nicho', 'jogos', [5.3, 1.5, 11.7], [7.4, 1.3, 15.0], 'INT p.37', 62),
+  C('game_view_05', 'Escrivaninha', 'jogos', [6.5, 1.4, 13.5], [7.6, 1.0, 15.1], 'INT p.38', 60),
   C('game_view_03', 'Parede dos violões', 'jogos', [7.7, 1.5, 14.2], [4.82, 1.5, 11.9], 'INT p.39', 62),
 
   // ── Banho social ────────────────────────────────────────────────────────
   C('socialbath_view_01', 'Bancada', 'bsocial', [30.05, 1.55, 4.1], [31.56, 1.4, 3.8], 'INT p.41', 78),
   C('socialbath_view_02', 'Box', 'bsocial', [30.75, 1.55, 5.2], [30.75, 1.5, 1.8], 'INT p.42', 70),
 
-  // ── Suíte master ────────────────────────────────────────────────────────
+  C('socialbath_view_03', 'Box — detalhe', 'bsocial', [30.6, 1.5, 3.3], [30.9, 1.4, 1.8], 'INT p.43', 66),
+
+  // ── Suíte master  // ── Suíte master ────────────────────────────────────────────────────────
   C('master_view_01', 'Vista geral', 'suite', [19.6, 1.5, 6.35], [19.6, 1.35, 1.8], 'INT p.57', 66),
   C('master_view_02', 'Cabeceira', 'suite', [18.55, 1.45, 2.3], [21.37, 1.15, 3.95], 'INT p.58', 64),
   C('master_view_03', 'TV e vista da piscina', 'suite', [21.1, 1.5, 4.4], [17.85, 1.4, 4.4], 'INT p.60', 64),
   C('master_view_04', 'Poltrona', 'suite', [19.4, 1.55, 2.0], [19.6, 1.25, 6.55], 'INT p.62', 64),
   C('closet_view_01', 'Corredor do closet', 'closet', [24.5, 1.55, 6.35], [24.6, 1.4, 1.8], 'INT p.45', 66),
-  C('closet_view_02', 'Nicho central', 'closet', [23.6, 1.5, 3.6], [26.06, 1.45, 3.6], 'INT p.46', 70),
+  C('closet_view_02', 'Nicho central', 'closet', [24.05, 1.45, 3.9], [26.06, 1.4, 3.9], 'INT p.46', 70),
   C('closet_view_03', 'Penteadeira', 'closet', [24.9, 1.5, 5.4], [22.8, 1.3, 4.7], 'INT p.47', 66),
+  C('closet_view_04', 'Penteadeira — frontal', 'closet', [24.9, 1.4, 4.6], [23.3, 1.25, 4.6], 'INT p.52', 60),
   C('masterbath_view_01', 'Box', 'suite_bath', [22.3, 1.55, 3.82], [22.3, 1.35, 1.8], 'INT p.55', 74),
 
-  // ── Quartos / hall / garagem ────────────────────────────────────────────
+  C('masterbath_view_02', 'Box — diagonal', 'suite_bath', [22.0, 1.55, 3.7], [22.6, 1.2, 1.9], 'INT p.56', 74),
+  C('master_view_05', 'Cabeceira — diagonal', 'suite', [18.6, 1.5, 5.4], [21.37, 1.3, 3.2], 'INT p.59', 60),
+  C('master_view_06', 'TV — diagonal', 'suite', [20.6, 1.5, 6.1], [17.85, 1.5, 4.0], 'INT p.61', 60),
+
+  // ── Quartos  // ── Quartos / hall / garagem ────────────────────────────────────────────
   C('q01_view_01', 'Quarto 01', 'q01', [34.7, 1.55, 5.55], [31.9, 1.0, 2.8], 'ARQ p.2', 66),
   C('q02_view_01', 'Quarto 02', 'q02', [29.5, 1.55, 5.05], [26.6, 1.0, 2.4], 'ARQ p.2', 66),
   C('hall_view_01', 'Hall de entrada', 'hall', [39.2, 1.6, 9.4], [33.3, 2.0, 9.4], 'ARQ p.5', 55),

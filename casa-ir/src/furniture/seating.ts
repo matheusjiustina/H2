@@ -86,9 +86,11 @@ export const ropeChair = (rope: SlotId, wood: SlotId): PrefabFn => (b) => {
   for (const [x, z, h] of [[-0.22, 0.2, 0.46], [0.22, 0.2, 0.46], [-0.22, -0.2, 0.82], [0.22, -0.2, 0.82]] as [number, number, number][]) {
     b.at(x, 0, z, 0, () => b.sbox(wood, 0, 0, 0, 0.035, h, 0.035), z < 0 ? 5 : -3)
   }
-  b.sbox(wood, 0, 0.42, 0, 0.48, 0.04, 0.44)
-  b.rbox(rope, 0, 0.465, 0.0, 0.44, 0.03, 0.4, 0.012)
-  band(b, rope, 0.33, 0.22, 110, 0.58, -0.24, 0.025)
+  b.sbox(wood, 0, 0.42, 0, 0.48, 0.03, 0.44)
+  b.rbox(rope, 0, 0.455, 0.0, 0.44, 0.025, 0.4, 0.012)
+  // woven horseshoe back wrapping into the arms (INT p.24–p.28)
+  band(b, rope, 0.25, 0.17, 220, 0.6, -0.25, 0.02)
+  torusArc(b, wood, 0.25, 0.012, 220, new THREE.Matrix4().compose(new THREE.Vector3(0, 0.775, 0), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, (-90 - 110) * D2R)), new THREE.Vector3(1, 1, 1)))
   b.sbox(wood, 0, 0.12, 0, 0.44, 0.025, 0.025)
 }
 
@@ -100,13 +102,14 @@ export const ropeStool = (rope: SlotId, wood: SlotId): PrefabFn => (b) => {
   b.sbox(wood, 0, 0.3, -0.19, 0.44, 0.03, 0.03)
   b.sbox(wood, 0, 0.72, 0, 0.46, 0.04, 0.42)
   b.rbox(rope, 0, 0.765, 0, 0.42, 0.03, 0.38, 0.012)
-  band(b, rope, 0.34, 0.16, 100, 0.86, -0.22, 0.025)
+  band(b, rope, 0.24, 0.15, 210, 0.88, -0.24, 0.02)
 }
 
 /** INT p.35: black shell chair on slim legs. */
 export const shellChair = (shell: SlotId): PrefabFn => (b) => {
-  b.rbox(shell, 0, 0.46, 0.02, 0.5, 0.05, 0.46, 0.022)
-  band(b, shell, 0.29, 0.3, 150, 0.48, -0.23, 0.03)
+  // upholstered seat + rounded shell wrapping into the arms (INT p.35–p.37)
+  b.rbox(shell, 0, 0.455, 0.02, 0.5, 0.08, 0.47, 0.04, 4)
+  band(b, shell, 0.255, 0.34, 210, 0.47, -0.255, 0.045)
   for (const [x, z] of [[-0.2, 0.18], [0.2, 0.18], [-0.2, -0.16], [0.2, -0.16]] as [number, number][]) {
     b.at(x, 0, z, 0, () => b.cyl('black_metal', 0, 0, 0, 0.011, 0.009, 0.45), z < 0 ? 8 : -6, x < 0 ? -4 : 4)
   }

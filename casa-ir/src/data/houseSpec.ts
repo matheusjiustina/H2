@@ -151,6 +151,8 @@ export interface Opening {
   curtain?: SlotId
   /** curtains drawn across the whole opening (e.g. behind the suite TV, INT p.60) */
   curtainClosed?: boolean
+  /** door leaf drawn closed (pivot default) or open (`false`) */
+  closed?: boolean
 }
 
 export interface WallDef {
@@ -174,7 +176,7 @@ export const WALLS: WallDef[] = [
   // ── Bloco íntimo — envoltória ───────────────────────────────────────────
   // North facade (white part, then taupe under the high block)
   W([17.7, 1.65, 29.7, 1.8], H.wall, [
-    win(18.2, 19.6, 0.95, 2.2), // suíte
+    win(18.2, 19.6, 0.95, 2.2, { curtain: 'master_curtain' }), // suíte — curtains (INT p.57)
     win(21.8, 22.8, 1.55, 2.2), // banho suíte
     win(27.0, 29.0, 0.95, 2.2), // quarto 02
   ]),
@@ -192,7 +194,7 @@ export const WALLS: WallDef[] = [
     win(22.8, 23.5, 0.55, 2.45, { curtain: 'master_curtain' }),
     win(24.58, 25.3, 0.55, 2.45, { curtain: 'master_curtain' }),
     slide(26.27, 27.1),
-  ]),
+  ], 'external_facade_primary'), // taupe towards the patio (ARQ p.6)
   // South wall shared with the double-height living room
   W([27.7, 6.55, 33.41, 6.7], H.salaTop, [door(28.0, 28.9, 'a', -1)], 'external_facade_primary'),
   W([33.41, 6.55, 35.35, 6.7], H.wall, [], 'external_facade_primary'),
@@ -227,8 +229,8 @@ export const WALLS: WallDef[] = [
   W([4.82, 15.15, 8.31, 15.3], H.wall), // jogos | depósito
   // Despensa + banho externo (stone recess — ARQ p.8/9)
   W([8.46, 13.21, 13.45, 13.37], H.wall, [
-    { a: 10.4, b: 11.55, sill: 0, top: H.doorTop, kind: 'louver', hinge: 'a', swing: 1 },
-    { a: 11.95, b: 12.75, sill: 0, top: H.doorTop, kind: 'louver', hinge: 'b', swing: -1 }, // opens outwards (ARQ p.2 / INT p.30),
+    { a: 10.4, b: 11.55, sill: 0, top: H.doorTop, kind: 'louver', hinge: 'a', swing: 1, closed: true }, // closed pair of louvered doors (ARQ p.8 / p.9)
+    { a: 11.95, b: 12.75, sill: 0, top: H.doorTop, kind: 'louver', hinge: 'b', swing: 1, closed: true }, // opens inwards (swing arc drawn inside the bath, ARQ p.2)
   ], 'external_stone'),
   W([11.7, 13.37, 11.86, 16.2], H.wall), // despensa | banho ext
   // Gourmet west wall (sliding door to the deck recess)

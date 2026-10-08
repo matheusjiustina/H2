@@ -1,7 +1,7 @@
 import { useStore } from '../app/store'
 import { camerasFor } from '../data/cameras'
 
-const EXTERIOR_MAIN = ['hero', 'fachada_frontal', 'fachada_posterior', 'patio_interno', 'piscina', 'vista_superior', 'lateral_norte', 'lateral_sul', 'aerea', 'fachada_frontal_02', 'fachada_posterior_02']
+const EXTERIOR_MAIN = ['hero', 'fachada_frontal', 'fachada_posterior', 'patio_interno', 'piscina', 'vista_superior', 'lateral_norte', 'lateral_sul', 'aerea', 'fachada_frontal_02', 'fachada_posterior_02', 'fachada_posterior_03', 'patio_piscina']
 
 /** Contextual camera presets (exterior façades or the current room's PDF views). */
 export function ViewChips() {

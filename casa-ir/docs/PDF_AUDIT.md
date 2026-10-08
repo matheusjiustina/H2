@@ -310,3 +310,96 @@ Nenhuma geometria validada na Fase 1 foi alterada, exceto as correções listada
 ### 10.1 Testes funcionais da Fase 2
 
 DIA / ENTARDECER / NOITE (transição contínua) · abertura de câmera (3 s) · APRESENTAÇÃO (12 vistas, interrompível) · cortes com fade entre ambientes · perspectiva de dois pontos · AMBIENTES agrupados (Exterior / Social / Serviço / Íntimo) · nomes clicáveis na Planta 3D · contorno ao passar o mouse em ACABAMENTOS · Projeto Original / Opções / Personalizar cor (paleta neutra) / Restaurar original · Ver detalhe / Voltar à vista · comparar segurando · CAPTURAR normal e ALTA QUALIDADE (3840×2160, sem interface) · QUALIDADE Auto / Equilibrado / Fotorealista · proteção adaptativa de desempenho (resolução primeiro, depois efeitos) · build de produção.
+
+---
+
+## 11. Auditoria de fidelidade — revisão página por página
+
+Método: as 17 páginas do ARQ e as 63 do INT foram abertas uma a uma (a planta ARQ p.2 também em 300 dpi). Para cada página com perspectiva, o modelo foi renderizado num enquadramento equivalente e comparado lado a lado (geometria, composição, materiais e iluminação). Em seguida as correções foram implementadas e as vistas renderizadas de novo. As colunas seguem o pedido: **correto · ausente · diferente · correção**.
+
+### 11.1 Arquitetônico (ARQ)
+
+| Pág. | Conteúdo | Correto no 3D | Ausente / diferente encontrado | Correção implementada |
+|---|---|---|---|---|
+| 1 | Capa | — | — | — |
+| 2 | Planta baixa | Paredes, ambientes, cotas, pérgola tracejada (x 8,2–18,0 · z 8,95–11,15), jardim central, garagem com 2 carros, faixas de pedrisco | Porta do banho externo tinha sido virada para fora na Fase 2, mas o arco de abertura da planta é **para dentro** | Abertura para dentro restaurada (planta prevalece) |
+| 3 | Mood board | Seixo branco, freijó, cimentício, off‑white, cinza fendi, grafite, vidro, areia, travertino | Seixo renderizava cinza‑azulado e graúdo | Textura do seixo clareada e aquecida, escala menor |
+| 4 | Fachada frontal (render) | Massas, marquise, laje alta com brise, forro de madeira com LED, pilar de pedra, pele de vidro, poltronas | **Porta pivotante aberta e grafite** (no render: fechada, ripada cinza, puxador longo); cinza fendi escuro e frio; poltronas cor de laranja; rua aparecia como gramado (z‑fighting) em ângulo baixo | Porta fechada, ripado cinza, puxador vertical integral; cinza fendi #958c80; fibra natural cinza‑bege; asfalto acima do plano do gramado; câmera reenquadrada |
+| 5 | Fachada frontal (frontal) | Idem p.4; proporção horizontal | Idem p.4 | Idem p.4 |
+| 6 | Fachada pátio interno | Corredor, pele de vidro dupla da sala, árvore, deck, pérgola | **Parede do bloco íntimo voltada ao pátio era clara** (no render: taupe); arbustos que não existem no jardim central; tábuas do deck com 40 cm; ripas da pérgola em madeira (no render: claras); câmera sob a pérgola | Parede sul do bloco íntimo em cinza fendi; jardim central só gramado + árvore; tábuas de 20 cm; ripas na cor da estrutura; câmera reposicionada |
+| 7 | Fachada posterior | Pórtico da suíte, volume alto, pérgola, praia, 2 palmeiras, mesa + ombrelone, espreguiçadeiras | Maciço tropical ralo | Maciço adensado (ver p.10/p.13) |
+| 8 | Fachada posterior (serviço) | Portas de correr da gourmet, recuo de pedra, poltrona suspensa, pérgola, caixa d'água | **Portas venezianas renderizadas abertas** (no render: par fechado); câmera atrás do ombrelone | Venezianas fechadas no plano da parede; câmera reposicionada |
+| 9 | Fachada posterior (recuo) | Idem p.8 | Sem vista equivalente | Nova vista “Recuo de pedra” |
+| 10 | Vista lago | Muros, painel de pedra com chuveiro, mesa, ombrelone, pedras, 3 palmeiras | Muros muito escuros; maciço de bananeiras ralo e baixo | Muros em cinza médio (#aaa6a0); maciço denso de 16 + 12 touceiras com 1,9–2,3 m |
+| 11 | 3D SketchUp frontal | Volumes, parede sul clara com janelas | — | — |
+| 12 | 3D SketchUp sudoeste | Bloco de jogos taupe, veneziana dupla do depósito, caixa d'água | Câmera atrás do muro (vista bloqueada); veneziana dupla aberta | Câmera elevada sobre o muro; veneziana dupla fechada |
+| 13 | 3D SketchUp aérea | Relação piscina × praia × deck × blocos | Maciço tropical ralo | Adensado |
+| 14 | 3D SketchUp pátio a partir da piscina | Pérgola, pele de vidro, painel do chuveiro, árvore | Sem vista equivalente | Nova vista “Pátio a partir da piscina” |
+| 15 | 3D SketchUp nordeste | Volume alto cego, bloco íntimo claro com porta‑janela e basculante | Vizinho bloqueava a fachada | Câmera reposicionada |
+| 16 | Vista superior | Coberturas, brise, caixa d'água, pérgolas, jardim central, praia, palmeiras | Orientação da imagem girada 180° em relação à câmera | Câmera “Vista superior” orientada como a prancha |
+| 17 | Encerramento | — | — | — |
+
+### 11.2 Interiores (INT)
+
+| Pág. | Ambiente | Correto no 3D | Ausente / diferente encontrado | Correção implementada |
+|---|---|---|---|---|
+| 1–3 | Capa, conceito, mood board | Paleta: terrazzo bege, nogueira, travertino, seixo, louça branca | — | — |
+| 4 | Planta sala de TV | Sofá em L, 2 poltronas, mesas laterais, rack, tapete | — | — |
+| 5–9 | Sala de TV | Pé‑direito duplo, linho + blocos de nogueira, painel grafite com travertino e LED, rack, sofá, cortinas | **Pendentes como discos achatados** (no render: gotas de vidro âmbar); faixa de forro **preta** (no render: cinza); planta cônica no lugar do ficus lyrata; porta pivotante aberta (p.9: fechada) | Gotas por torno (0,26 × 0,36 m) com lâmpada; faixa de forro cinza #8d8882; ficus com folhas largas; porta fechada |
+| 10–11 | Detalhes rack / poltrona | Rack nogueira + travertino com furos; poltrona com rolos e braço curvo | — | — |
+| 12–17 | Lavanderia | Bancadas, tanques, máquinas, superiores laca, nicho iluminado, painel de nogueira, torre, banco + cesto | **Bancada oeste com um módulo de gavetas saindo acima do granito** e granito sem base; granilite com pedras de 5–10 cm (no render: fino); **cubas pretas** (no render: inox) | Base reconstruída (portas + 1 fileira de gavetas sob o tampo, z 13,13–15,45); granilite em escala fina; cubas inox |
+| 18–23 | Cozinha | Ilha nogueira + granito, mesa de vidro + 6 cadeiras, L de bancadas, coifa em terrazzo, cristaleira, 5 pendentes globo sobre a ilha, forno sob o cooktop | Cadeiras cinza (no render: creme); piso acinzentado (no render: bege); vista p.21 sem câmera | Bouclé creme; porcelanato bege mais quente; nova vista “Bancadas e coifa” |
+| 24–28 | Área gourmet | Forro de madeira, ventiladores de palha, mesa cavalete, ilha orgânica, churrasqueira, adega, TV | **Cadeiras e banquetas quadradas** (no render: corda verde com encosto em ferradura e teca clara); **pendentes cônicos lisos** (no render: rattan trançado) | Encosto em ferradura de 220° com aro de madeira, teca natural; cone de rattan mel com cúpula interna iluminada |
+| 29–32 | Banho externo | Travertino, parede de seixos, bancada flutuante, espelho orgânico, box com painel retroiluminado, bacia | Vistas p.31/p.32 sem câmera; bacia quadrada | Novas vistas “Box de seixos” e “Bancada e espelho”; bacia arredondada |
+| 33 | Depósito | Estantes metálicas, prateleiras | Câmera ficava do lado de fora (porta fechada) | Câmera dentro do depósito |
+| 34–39 | Sala de jogos | Estante taupe com nichos iluminados, nicho da guitarra, mesa redonda preta, sofá bouclé, couro de vaca, violões + quadros, LED linear | **Piso escuro avermelhado** (no render: carvalho claro acinzentado); cadeiras em blocos (no render: concha estofada); vistas p.37/p.38 sem câmera | Carvalho #b9a488 com tábuas de 15 cm; cadeira concha arredondada; novas vistas |
+| 40–43 | Banho social | Ripado taupe, espelho retroiluminado, arandelas, gabinete taupe, cuba semiembutida, box | **Veios de mármore como linhas sinuosas** (no render: nuvens suaves); bacia quadrada; vista p.43 sem câmera | Mármore suave com veios largos e diagonais; bacia arredondada; nova vista |
+| 44–54 | Closet master | Corredor em U, portas laca com puxador quadrado dourado, nicho de nogueira, penteadeira, espelho redondo suspenso, LED retangular no forro | **Câmera “Nicho central” dentro do armário**; bouclé acinzentado; vista p.52 sem câmera | Câmera no corredor; bouclé com laçadas suaves (off‑white); nova vista “Penteadeira — frontal” |
+| 55–56 | Banho master | Porcelanato pedra cinza, revestimento cápsula, nicho iluminado, metais dourados, vidro com perfil dourado | **Cápsula também na parede da janela** (no render: só na parede do nicho); vista p.56 sem câmera | Parede da janela em pedra cinza; nova vista |
+| 57–62 | Suíte master | Cabeceira de tecido com moldura e LED, painel nogueira, criados ovais, abajures, TV em pórtico de latão com cortina fechada, rack, poltrona caramelo, tapete listrado | **Janela norte sem cortina** (p.57); **roupa de cama quase preta** (no render: taupe‑marrom); vistas p.59/p.61 sem câmera | Cortina na janela norte; roupa de cama taupe‑marrom; novas vistas |
+| 63 | Encerramento | — | — | — |
+
+### 11.3 Iluminação (todas as vistas internas)
+
+Os forros apareciam escuros porque não havia luz rebatida. Foi adicionado um preenchimento da cor do piso claro quando a câmera está em ambiente interno. Os ambientes de interiores do PDF mostram forros claros com sanca quente.
+
+### 11.4 Verificação visual após as correções
+
+Todas as vistas alteradas foram renderizadas de novo e comparadas com as páginas: ARQ p.5, 6, 8, 9, 12, 14; INT p.6, 9, 15, 19, 21, 22, 25, 28, 31, 32, 33, 35, 38, 41, 43, 46, 52, 55, 56, 57, 59, 61. Confirmado:
+- porta pivotante fechada e cinza;
+- parede do pátio em taupe e jardim central só com grama;
+- venezianas fechadas;
+- base da lavanderia sob o granito;
+- cadeiras creme na cozinha;
+- cadeiras de corda e cones de rattan na gourmet;
+- gotas âmbar na sala;
+- nicho do closet enquadrado;
+- cortina na janela norte da suíte;
+- câmera do depósito dentro do ambiente.
+
+### 11.5 Validação funcional
+
+Teste automatizado em navegador (`tools/walk2.mjs`):
+- **Passeio:** o andar com teclado em 4 direções no banho social e no banho externo para a 0,2–0,3 m de todas as paredes, do vidro do box e da bancada. Nenhuma parede é atravessada. **As aberturas de porta permitem passagem com a folha desenhada fechada** (porta pivotante, venezianas): é uma escolha consciente, que mantém a imagem do projeto e a navegação.
+- **Configurador:** trocar acabamento → aplicar cor da paleta → salvar Opção 01 → restaurar original (config vazia) → carregar Opção 01 (config recuperada) → restaurar. Sem erros de página.
+- **Câmeras:** todas as vistas novas e reenquadradas foram renderizadas sem a câmera dentro de objetos. Corrigidas as que estavam dentro do armário do closet, fora do depósito e atrás de tronco ou ombrelone.
+- **Superfícies sobrepostas:** corrigido o z‑fighting rua × gramado.
+
+### 11.6 Aproximações adotadas por falta de informação
+
+| Tema | Aproximação | Motivo |
+|---|---|---|
+| Sol | Um único sol (NE, 50°) para todas as vistas | Os renders do PDF usam posições de sol diferentes entre si (p.4 ilumina leste; p.6 ilumina a face sul; p.8 a face norte) |
+| Palmeira do jardim frontal | Mantida | Aparece na p.11, p.15 e p.16; os renders p.4/p.5 a omitem |
+| Muros nas vistas SketchUp (p.11–p.15) | Mantidos | O render p.10 mostra os muros; os SketchUp os omitem, então as vistas laterais ficam parcialmente encobertas |
+| Gotas da sala | 0,26 × 0,36 m, alturas 2,6–4,3 m | Sem cotas; proporção medida nas p.5–p.9 |
+| Cadeiras e banquetas de corda | Encosto em ferradura de 220°, assento 0,46 m | Sem ficha técnica; proporção pelas p.24–p.28 |
+| Tábua do deck | 20 cm | Não cotada; leitura das p.6–p.8 |
+| Tamanho das pedras do granilite da lavanderia | Escala fina (≈1–2 cm) | Leitura da p.13–p.15 |
+| Quartos 01 e 02 | Acabamentos neutros | Sem projeto de interiores (A‑07) |
+
+### 11.7 Pendências reais
+
+- Portas desenhadas fechadas não se abrem durante o Passeio (é possível atravessar a folha).
+- A cor do piso de porcelanato ainda tende ao cinza sob a luz do céu nas vistas da gourmet; o PDF mostra um bege mais quente.
+- Vistas laterais SketchUp (p.12) não podem ser reproduzidas sem remover o muro de divisa existente no render p.10.

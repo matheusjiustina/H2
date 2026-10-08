@@ -277,9 +277,9 @@ export function buildHouse(): HouseBuild {
         bx(FRAME, o.a, o.a + 0.02, 0, o.top, t0, t1)
         bx(FRAME, o.b - 0.02, o.b, 0, o.top, t0, t1)
         bx(FRAME, o.a, o.b, o.top - 0.02, o.top, t0, t1)
-        // pivot axis 0.3 m from edge `a`, opened 72° towards the interior
+        // pivot axis 0.3 m from edge `a`; shown closed as in ARQ p.4/p.5 and INT p.9
         const px = o.a + 0.3
-        const ang = side * 72 * (Math.PI / 180) * (axis === 'x' ? -1 : 1)
+        const ang = o.closed === false ? side * 72 * (Math.PI / 180) * (axis === 'x' ? -1 : 1) : 0
         const m = new THREE.Matrix4()
         const pivotWorld = axis === 'x' ? new THREE.Vector3(px, 0, tc) : new THREE.Vector3(tc, 0, px)
         m.makeTranslation(pivotWorld.x, 0, pivotWorld.z).multiply(new THREE.Matrix4().makeRotationY(ang))
@@ -287,12 +287,12 @@ export function buildHouse(): HouseBuild {
           // leaf in local axis-aligned frame (along local x if wall axis = x, along local z otherwise)
           if (axis === 'x') {
             arch.box('front_door', [-0.28, 0.01, -0.035], [lw - 0.28, h, 0.035])
-            arch.box('black_metal', [lw - 0.5, 0.5, 0.035], [lw - 0.46, 1.9, 0.07])
-            arch.box('black_metal', [lw - 0.5, 0.5, -0.07], [lw - 0.46, 1.9, -0.035])
+            arch.box('black_metal', [lw - 0.5, 0.35, 0.035], [lw - 0.47, 2.45, 0.06])
+            arch.box('black_metal', [lw - 0.5, 0.35, -0.06], [lw - 0.47, 2.45, -0.035])
           } else {
             arch.box('front_door', [-0.035, 0.01, -0.28], [0.035, h, lw - 0.28])
-            arch.box('black_metal', [0.035, 0.5, lw - 0.5], [0.07, 1.9, lw - 0.46])
-            arch.box('black_metal', [-0.07, 0.5, lw - 0.5], [-0.035, 1.9, lw - 0.46])
+            arch.box('black_metal', [0.035, 0.35, lw - 0.5], [0.06, 2.45, lw - 0.47])
+            arch.box('black_metal', [-0.06, 0.35, lw - 0.5], [-0.035, 2.45, lw - 0.47])
           }
         })
         break
@@ -306,6 +306,21 @@ export function buildHouse(): HouseBuild {
         bx(FRAME, o.a, o.a + 0.02, 0, o.top, t0, t1)
         bx(FRAME, o.b - 0.02, o.b, 0, o.top, t0, t1)
         bx(FRAME, o.a, o.b, o.top - 0.03, o.top, t0, t1)
+        if (o.kind === 'louver2' || o.closed) {
+          // closed leaves in the wall plane (ARQ p.8 / p.9 / p.12)
+          const tc = (t0 + t1) / 2
+          for (let k = 0; k < leaves; k++) {
+            const s0 = o.a + 0.02 + k * lw
+            const s1 = s0 + lw - (leaves === 2 && k === 0 ? 0.004 : 0)
+            bx('black_metal', s0 + 0.06, s1 - 0.06, 0.14, o.top - 0.16, tc - 0.004, tc + 0.004)
+            bx(FRAME, s0, s0 + 0.06, 0.01, o.top - 0.04, tc - 0.02, tc + 0.02)
+            bx(FRAME, s1 - 0.06, s1, 0.01, o.top - 0.04, tc - 0.02, tc + 0.02)
+            bx(FRAME, s0 + 0.06, s1 - 0.06, 0.01, 0.14, tc - 0.02, tc + 0.02)
+            bx(FRAME, s0 + 0.06, s1 - 0.06, o.top - 0.16, o.top - 0.04, tc - 0.02, tc + 0.02)
+            for (let y = 0.2; y < o.top - 0.2; y += 0.075) bx(FRAME, s0 + 0.06, s1 - 0.06, y, y + 0.045, tc - 0.016, tc + 0.016)
+          }
+          break
+        }
         for (let k = 0; k < leaves; k++) {
           const hingeA = leaves === 2 ? k === 0 : o.hinge !== 'b'
           const sH = hingeA ? o.a + 0.02 : o.b - 0.06

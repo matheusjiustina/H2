@@ -21,7 +21,8 @@ const F = HEIGHTS.floor
 export function MasterBathroom() {
   const parts = useParts((p: Parts) => {
     const t = p.of('masterbath_tile')
-    clad(t, 'masterbath_tile', 'n', Z0, X0 + 0.02, X1 - 0.02, F, 2.7, 0.03, [[21.8, 22.8, 1.55, 2.2]])
+    // window wall in grey stone porcelain; the 3D capsule tile only on the niche wall (INT p.55)
+    clad(p.of('masterbath_walls'), 'masterbath_stone', 'n', Z0, X0 + 0.02, X1 - 0.02, F, 2.7, 0.03, [[21.8, 22.8, 1.55, 2.2]])
     clad(t, 'masterbath_tile', 'w', X0, Z0 + 0.03, 2.8, F, 2.7, 0.03)
     // lit niche with shelves on the west wall (INT p.55)
     t.box('led', [X0 + 0.03, 0.4, 2.48], [X0 + 0.04, 2.3, 2.5])

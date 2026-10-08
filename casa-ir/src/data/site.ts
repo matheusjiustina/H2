@@ -46,9 +46,10 @@ export const TREES: [number, number, number][] = [
 /** Tropical planting beds (banana / alocasia / philodendron). [x, z, radius] */
 export const TROPICAL: [number, number, number][] = [
   // north boundary behind the pool
-  ...Array.from({ length: 11 }, (_, i) => [0.75 + i * 1.02, 0.55, 0.7] as [number, number, number]),
+  // dense band of bananas / heliconias / alocasias (ARQ p.10, p.13)
+  ...Array.from({ length: 16 }, (_, i) => [0.6 + i * 0.74, i % 2 ? 0.75 : 0.45, i % 3 === 0 ? 0.9 : 0.75] as [number, number, number]),
   // west boundary beside the pool
-  ...Array.from({ length: 8 }, (_, i) => [0.6, 1.4 + i * 1.0, 0.7] as [number, number, number]),
+  ...Array.from({ length: 12 }, (_, i) => [i % 2 ? 0.8 : 0.5, 1.3 + i * 0.72, i % 3 === 1 ? 0.9 : 0.75] as [number, number, number]),
   // outside the laundry glass door (INT p.13)
   [27.5, 17.05, 0.6], [28.4, 17.15, 0.55], [26.6, 17.1, 0.5],
   // front planter below the glass curtain wall (ARQ p.4)

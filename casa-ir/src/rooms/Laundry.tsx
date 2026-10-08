@@ -52,12 +52,13 @@ export function Laundry() {
     // bench + hooks z 15.45–16.18
     panel.box('laundry_panel', [X0, 0.45, 15.45], [X0 + 0.42, 0.49, 16.15])
     for (const z of [15.65, 15.95]) panel.box('brass', [X0 + 0.015, 1.65, z - 0.01], [X0 + 0.07, 1.67, z + 0.01])
-    // base: 4 drawers + doors, z 13.66–15.45
+    // base under the granite (INT p.15): doors below, one row of drawers on top, z 13.13–15.45
+    const hDoors = CT - 0.03 - F - 0.3
     upW.with(T(X0 + 0.6, F, 0, 90), () => {
       // yaw 90: local +x → world −z, so pass negated z
-      cabinetRow(upW, 'laundry_upper', -15.45, -13.66, 0, 0.45, 0.6, 4, { handle: 'steel', handleV: false, plinth: 'black_metal' })
+      cabinetRow(upW, 'laundry_upper', -15.45, -13.13, 0, hDoors, 0.6, 4, { handle: 'steel', handleV: false, plinth: 'black_metal' })
     })
-    upW.with(T(X0 + 0.6, 0.55 + F, 0, 90), () => cabinetRow(upW, 'laundry_upper', -15.45, -13.66, 0, 0.3, 0.6, 4, { handle: 'steel', drawers: 1, plinth: null }))
+    upW.with(T(X0 + 0.6, F + hDoors, 0, 90), () => cabinetRow(upW, 'laundry_upper', -15.45, -13.13, 0, 0.3, 0.6, 4, { handle: 'steel', drawers: 1, plinth: null }))
     p.of('laundry_counter').ebox('laundry_counter', [X0, CT - 0.03, 13.13], [X0 + 0.62, CT, 15.45])
     upW.with(T(X0 + 0.36, 1.65, 0, 90), () => cabinetRow(upW, 'laundry_upper', -15.4, -13.7, 0, 0.72, 0.36, 4, { handle: 'steel', plinth: null }))
     upW.box('led', [X0 + 0.32, 1.645, 13.75], [X0 + 0.34, 1.65, 15.35])
@@ -70,7 +71,7 @@ export function Laundry() {
   const spots = useMemo(() => [12.9, 14.3, 15.6].map((z) => ({ p: [28.1, 2.8, z] as [number, number, number] })), [])
   useMemo(() => {
     addBlocker('l_east', X1 - 0.62, 12.36, X1, 16.15)
-    addBlocker('l_west', X0, 12.38, X0 + 0.62, 15.45)
+    addBlocker('l_west', X0, 12.38, X0 + 0.62, 15.45) // tower + base run
   }, [])
 
   return (

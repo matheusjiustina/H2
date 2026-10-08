@@ -61,7 +61,7 @@ export function QualityManager() {
   const acc = useRef({ t: 0, frames: 0, bad: 0, good: 0, grace: 4 })
   useFrame((_, dt) => {
     const st = useStore.getState()
-    if (st.capturing || document.hidden || st.fading) return
+    if (!st.adaptive || st.capturing || document.hidden || st.fading) return
     const a = acc.current
     a.t += dt
     a.frames++

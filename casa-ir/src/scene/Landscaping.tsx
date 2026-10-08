@@ -19,7 +19,6 @@ export function Landscaping() {
   const shrubs = useMemo(
     () =>
       [
-        [22.3, 8.4], [24.9, 9.4], [22.4, 9.5], [25.0, 8.2], // central garden ground cover
         [0.7, 9.6], [0.8, 12.4], [0.7, 15.1], [0.8, 17.2], // west garden
       ].map(([x, z], i) => ({ p: [x, 0.08, z] as [number, number, number], r: i * 30, s: 0.8 + (i % 3) * 0.15 })),
     [],
@@ -37,8 +36,8 @@ export function Landscaping() {
     <group>
       <PrefabInstances id="palm" build={palm(9, 3)} items={palms} />
       <PrefabInstances id="tree" build={canopyTree(1, 5)} items={trees} />
-      <PrefabInstances id="tropA" build={tropicalClump(1.9, 1, 'leaf')} items={tropA} />
-      <PrefabInstances id="tropB" build={tropicalClump(1.6, 2, 'leaf_dark')} items={tropB} />
+      <PrefabInstances id="tropA" build={tropicalClump(2.3, 1, 'leaf')} items={tropA} />
+      <PrefabInstances id="tropB" build={tropicalClump(1.9, 2, 'leaf_dark')} items={tropB} />
       <PrefabInstances id="monstera" build={monstera(1)} items={front} />
       <PrefabInstances id="shrub" build={shrub(0.55, 1)} items={shrubs} />
       {/* pool furniture (ARQ p.2 plan positions; ARQ p.7/p.10 styles) */}

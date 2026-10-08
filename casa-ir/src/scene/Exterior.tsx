@@ -31,9 +31,9 @@ export function Exterior() {
     pergola.box('pergola_frame', [px1, y0, pz1], [px2, y1, pz1 + 0.15])
     pergola.box('pergola_frame', [px1, y0, pz1 + 0.15], [px1 + 0.15, y1, pz2])
     pergola.box('pergola_frame', [px2 - 0.15, y0, pz1 + 0.15], [px2, y1, pz2])
-    for (let x = px1 + 0.3; x < px2 - 0.2; x += 0.26) pergola.box('external_soffit', [x, y0 + 0.12, pz1 + 0.15], [x + 0.05, y0 + 0.3, pz2])
+    for (let x = px1 + 0.3; x < px2 - 0.2; x += 0.26) pergola.box('pergola_frame', [x, y0 + 0.12, pz1 + 0.15], [x + 0.05, y0 + 0.3, pz2]) // light slats (ARQ p.6/p.8/p.9)
     // ── Pergola over the stone recess (ARQ p.16 slats) ──
-    for (let x = 8.6; x < 13.4; x += 0.24) pergola.box('external_soffit', [x, H.wall + 0.05, 11.25], [x + 0.05, H.wall + 0.25, 13.21])
+    for (let x = 8.6; x < 13.4; x += 0.24) pergola.box('pergola_frame', [x, H.wall + 0.05, 11.25], [x + 0.05, H.wall + 0.25, 13.21])
     pergola.box('pergola_frame', [8.46, H.wall, 11.25], [8.6, H.slabTop, 13.21])
 
     // ── Brise slats under the high slab end over the garage (ARQ p.4/p.5/p.16) ──

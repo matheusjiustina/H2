@@ -215,14 +215,15 @@ const generators: Record<TextureKey, Gen> = {
     const tones: number[] = []
     for (let i = 0; i < 64; i++) tones.push(0.86 + r() * 0.22)
     return pixelFill(S, (u, v) => {
-      const board = Math.floor(v * 8)
-      const local = (v * 8) % 1
+      // 16 boards across a 3.2 m tile = 0.20 m boards (ARQ p.6 / p.7)
+      const board = Math.floor(v * 16)
+      const local = (v * 16) % 1
       const offset = ((board * 0.37) % 1)
-      const seg = Math.floor((u + offset) * 2)
-      const segLocal = ((u + offset) * 2) % 1
-      const gap = local < 0.05 || segLocal < 0.004 ? 0.35 : 1
+      const seg = Math.floor(u + offset)
+      const segLocal = (u + offset) % 1
+      const gap = local < 0.06 || segLocal < 0.003 ? 0.35 : 1
       const tone = tones[(board * 3 + seg) % 64]
-      const ring = Math.sin((v * 90 + n1(u * 0.3, v) * 6) * Math.PI)
+      const ring = Math.sin((v * 160 + n1(u * 0.3, v) * 6) * Math.PI)
       const val = (205 + ring * 10 + (n2(u * 0.4, v * 3) - 0.5) * 34) * tone * gap
       return grey(val)
     })
@@ -300,10 +301,10 @@ const generators: Record<TextureKey, Gen> = {
     const n4 = makeNoise(48, 84)
     return pixelFill(S, (u, v) => {
       const w = fbm([n1, n2, n3], u, v)
-      const main = Math.pow(1 - Math.abs(Math.sin((u + v * 2 + w * 2.6) * Math.PI)), 34)
-      const sec = Math.pow(1 - Math.abs(Math.sin((u * 3 - v + fbm([n2, n3, n4], u, v) * 3.4) * Math.PI)), 60)
+      const main = Math.pow(1 - Math.abs(Math.sin((u + v * 2 + w * 1.3) * Math.PI)), 26)
+      const sec = Math.pow(1 - Math.abs(Math.sin((u * 3 - v + fbm([n2, n3, n4], u, v) * 1.1) * Math.PI)), 40)
       const cloud = (fbm([n2, n3], u, v) - 0.5) * 16
-      const val = 236 + cloud - main * 46 * (0.55 + n2(u, v) * 0.7) - sec * 22 + (n4(u, v) - 0.5) * 4
+      const val = 236 + cloud - main * 34 * (0.55 + n2(u, v) * 0.7) - sec * 10 + (n4(u, v) - 0.5) * 4
       return [clamp(val + 1), clamp(val), clamp(val - 2)]
     })
   },
@@ -313,15 +314,16 @@ const generators: Record<TextureKey, Gen> = {
     const n3 = makeNoise(20, 93)
     return pixelFill(S, (u, v) => {
       const w = fbm([n1, n2, n3], u, v)
-      const vein = Math.pow(1 - Math.abs(Math.sin((u - v * 2 + w * 2.2) * Math.PI)), 20)
-      const cloud = (fbm([n1, n2], u, v) - 0.5) * 20
-      const val = 228 + cloud - vein * 22 + (n3(u, v) - 0.5) * 5
+      // soft diagonal clouding with broad, faint veins (INT p.41 / p.42)
+      const vein = Math.pow(1 - Math.abs(Math.sin((u - v * 2 + w * 0.9) * Math.PI)), 6)
+      const cloud = (fbm([n1, n2], u, v) - 0.5) * 26
+      const val = 228 + cloud - vein * 14 + (n3(u, v) - 0.5) * 4
       return [clamp(val + 3), clamp(val), clamp(val - 4)]
     })
   },
   pebble: (S) => {
     const { c, ctx } = canvas(S)
-    ctx.fillStyle = '#9c968c'
+    ctx.fillStyle = '#b9b2a6' // light joints (white pebble cladding, ARQ p.3 / p.4 / p.8)
     ctx.fillRect(0, 0, S, S)
     const r = rng(101)
     const cell = S / 14
@@ -332,11 +334,11 @@ const generators: Record<TextureKey, Gen> = {
         const rx = cell * (0.42 + r() * 0.16)
         const ry = cell * (0.32 + r() * 0.16)
         const a = r() * Math.PI
-        const l = 205 + r() * 40
+        const l = 222 + r() * 28
         const g = ctx.createRadialGradient(x - rx * 0.3, y - ry * 0.3, 1, x, y, rx)
-        g.addColorStop(0, `rgb(${l + 10},${l + 8},${l + 2})`)
-        g.addColorStop(0.7, `rgb(${l - 10},${l - 12},${l - 18})`)
-        g.addColorStop(1, `rgb(${l - 60},${l - 62},${l - 66})`)
+        g.addColorStop(0, `rgb(${l + 6},${l + 4},${l})`)
+        g.addColorStop(0.7, `rgb(${l - 8},${l - 10},${l - 15})`)
+        g.addColorStop(1, `rgb(${l - 38},${l - 41},${l - 47})`)
         ctx.fillStyle = g
         ctx.beginPath()
         ctx.ellipse(((x % S) + S) % S, ((y % S) + S) % S, rx, ry, a, 0, Math.PI * 2)
@@ -368,7 +370,7 @@ const generators: Record<TextureKey, Gen> = {
     const n2 = makeNoise(256, 132)
     return pixelFill(S, (u, v) => {
       const loops = n(u, v) * 0.6 + n2(u, v) * 0.4
-      return grey(150 + Math.pow(loops, 1.4) * 120)
+      return grey(196 + Math.pow(loops, 1.4) * 56) // soft loops: reads off-white, not speckled
     })
   },
   rope: (S) => {

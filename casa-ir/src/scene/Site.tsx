@@ -22,10 +22,10 @@ export function Site() {
     // sidewalk, curb and street (ARQ p.4/5)
     ground.box('pavers', [40, 0, -60], [42.5, 0.12, 80])
     ground.box('concrete_slab', [42.5, -0.05, -60], [42.66, 0.15, 80])
-    ground.box('asphalt', [42.66, -0.06, -60], [52.4, 0.0, 80])
+    ground.box('asphalt', [42.66, -0.06, -60], [52.4, 0.012, 80]) // above the lawn plane (no z-fighting)
     ground.box('concrete_slab', [52.4, -0.05, -60], [52.56, 0.15, 80])
     ground.box('pavers', [52.56, 0, -60], [55.2, 0.12, 80])
-    for (let z = -58; z < 78; z += 4.2) ground.box('paper', [47.45, 0.0, z], [47.6, 0.004, z + 2.2])
+    for (let z = -58; z < 78; z += 4.2) ground.box('paper', [47.45, 0.012, z], [47.6, 0.016, z + 2.2])
     // driveway ramp over the sidewalk
     ground.box('concrete_drive', [40, 0.0, 11.2], [42.5, 0.125, 17.8])
 
