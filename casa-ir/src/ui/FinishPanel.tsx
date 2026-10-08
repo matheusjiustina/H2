@@ -10,7 +10,10 @@ import { SELECTABLES, SELECTABLE_BY_ID, isOriginal, resolveChoice } from '../dat
 import { FINISHES, OPTIONS, SLOTS, type FinishId, type SlotId } from '../data/materials'
 import { ROOM_BY_ID } from '../data/houseSpec'
 import { swatchStyle } from './swatch'
-import { IconBack, IconClose, IconRestore, IconCheck } from './icons'
+import { IconBack, IconClose, IconRestore, IconCheck, IconFocus } from './icons'
+import { NEUTRAL_PALETTE } from '../data/palette'
+import { renderState } from '../scene/renderState'
+import { selectableBounds } from '../configurator/Selection'
 
 export function FinishPanel() {
   const selectedId = useStore((s) => s.selectedId)
@@ -101,18 +104,35 @@ function ObjectEditor({ id }: { id: string }) {
   const sel = SELECTABLE_BY_ID[id]
   const cfg = useStore((s) => activeConfig(s))
   const showOriginal = useStore((s) => s.showOriginal)
+  const focusActive = useStore((s) => s.focusActive)
   const resetSlots = useStore((s) => s.resetSlots)
   const allOriginal = sel.slots.every((sl) => isOriginal(cfg, sl))
+  const detail = () => {
+    const sc = renderState.scene
+    const b = sc ? selectableBounds(sc, id, useStore.getState().currentRoom) : null
+    if (b) useStore.setState({ focusRequest: { ...b, ts: performance.now() } })
+  }
   return (
     <>
+      <div className="row row--tight">
+        {!focusActive ? (
+          <button className="btn btn--ghost btn--sm" onClick={detail}>
+            <IconFocus /> Ver detalhe
+          </button>
+        ) : (
+          <button className="btn btn--ghost btn--sm" onClick={() => useStore.setState({ returnRequest: performance.now() })}>
+            <IconBack /> Voltar à vista
+          </button>
+        )}
+        <span className={`state${allOriginal ? '' : ' state--custom'}`}>{allOriginal ? 'Projeto original' : 'Personalizado'}</span>
+      </div>
       {showOriginal && <p className="note">Você está visualizando o <b>Projeto Original</b>. Alterações voltam a exibir a sua opção.</p>}
       {sel.slots.map((slot) => (
         <SlotEditor key={slot} slot={slot} />
       ))}
       <button className="btn btn--ghost btn--block" disabled={allOriginal} onClick={() => resetSlots(sel.slots)}>
-        <IconRestore /> Restaurar projeto deste item
+        <IconRestore /> Restaurar original
       </button>
-      <p className="status">{allOriginal ? 'Conforme o projeto original (PDF).' : 'Acabamento personalizado pelo cliente.'}</p>
     </>
   )
 }
@@ -124,43 +144,47 @@ function SlotEditor({ slot }: { slot: SlotId }) {
   const choice = resolveChoice(cfg, slot)
   const original = def.finish
   const options: FinishId[] = def.options ? (OPTIONS[def.options] as FinishId[]) : [original]
-  const list = options.includes(original) ? options : [original, ...options]
-  const choose = (f: FinishId) => setChoice(slot, f === original ? null : { finish: f })
-  const current = FINISHES[choice.finish]
+  const list = options.filter((f) => f !== original)
+  const choose = (f: FinishId) => setChoice(slot, f === original && !choice.color ? null : { finish: f, color: choice.color })
+  const tint = (hex: string | null) => setChoice(slot, choice.finish === original && !hex ? null : { finish: choice.finish, color: hex ?? undefined })
+  const isOrig = choice.finish === original && !choice.color
   return (
     <div className="slot">
-      <div className="slot__head">
-        <span className="slot__label">{def.label}</span>
-        <span className="slot__current">
-          {current.label}
-          {choice.color ? ' · cor personalizada' : ''}
+      <div className="slot__label">{def.label}</div>
+      <button className={`orig${isOrig ? ' is-active' : ''}`} onClick={() => setChoice(slot, null)} title="Voltar ao acabamento do projeto">
+        <span className="swatch swatch--sm" style={swatchStyle(original)} />
+        <span className="orig__text">
+          <span className="orig__eyebrow">Projeto original</span>
+          {FINISHES[original].label}
         </span>
-      </div>
-      <div className="swatches" role="radiogroup" aria-label={def.label}>
-        {list.map((f) => (
-          <button
-            key={f}
-            role="radio"
-            aria-checked={choice.finish === f && !choice.color}
-            className={`swatch${choice.finish === f && !choice.color ? ' is-active' : ''}`}
-            style={swatchStyle(f)}
-            title={FINISHES[f].label + (f === original ? ' (projeto)' : '')}
-            onClick={() => choose(f)}
-          >
-            {f === original && <span className="swatch__tag">projeto</span>}
-            {choice.finish === f && !choice.color && <IconCheck />}
-          </button>
-        ))}
-      </div>
+        {isOrig ? <IconCheck /> : <span className="orig__act">Restaurar</span>}
+      </button>
+      {list.length > 0 && (
+        <>
+          <div className="sub">Opções</div>
+          <div className="swatches" role="radiogroup" aria-label={def.label}>
+            {list.map((f) => (
+              <button key={f} role="radio" aria-checked={choice.finish === f} className={`swatch${choice.finish === f ? ' is-active' : ''}`} style={swatchStyle(f, choice.finish === f ? choice.color : undefined)} title={FINISHES[f].label} onClick={() => choose(f)}>
+                {choice.finish === f && <IconCheck />}
+                <span className="swatch__name">{FINISHES[f].label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       {def.custom && (
-        <label className="custom">
-          <span>Cor personalizada</span>
-          <input
-            type="color"
-            value={choice.color ?? FINISHES[choice.finish].swatch ?? FINISHES[choice.finish].color}
-            onChange={(e) => setChoice(slot, { finish: choice.finish, color: e.target.value })}
-          />
-        </label>
+        <>
+          <div className="sub">Personalizar cor</div>
+          <div className="palette" role="radiogroup" aria-label="Personalizar cor">
+            {NEUTRAL_PALETTE.map((c) => {
+              const active = c.hex ? choice.color === c.hex : !choice.color
+              return (
+                <button key={c.id} role="radio" aria-checked={active} className={`dot${active ? ' is-active' : ''}${c.hex ? '' : ' dot--orig'}`} style={c.hex ? { background: c.hex } : swatchStyle(choice.finish)} title={c.label} aria-label={c.label} onClick={() => tint(c.hex)} />
+              )
+            })}
+          </div>
+          <div className="palette__name">{NEUTRAL_PALETTE.find((c) => (c.hex ? choice.color === c.hex : !choice.color))?.label ?? 'Cor personalizada'}</div>
+        </>
       )}
     </div>
   )

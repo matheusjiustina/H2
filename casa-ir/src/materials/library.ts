@@ -82,7 +82,7 @@ function applyFinish(m: Mat, slot: SlotId, def: FinishDef, customColor?: string)
   // maps
   if (def.tex && def.tex !== 'water_normal') {
     const rep = 1 / (def.texScale ?? 1)
-    const off: [number, number] = [hash(slot), hash(slot + '#')]
+    const off: [number, number] = def.tex === 'foliage' ? [0, 0] : [hash(slot), hash(slot + '#')]
     m.map = prepMap(m.map, getTexture(def.tex), rep, off)
     const ns = def.bump ? def.bump * 0.8 : NORMAL_BY_FAMILY[def.family]
     if (ns && !NO_NORMAL.has(def.tex)) {

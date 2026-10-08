@@ -261,15 +261,21 @@ const generators: Record<TextureKey, Gen> = {
     }
     return c
   },
+  // vein-cut travertine: fine, slightly wavy horizontal strata + elongated pores
   travertine: (S) => {
     const n1 = makeNoise(3, 61)
     const n2 = makeNoise(12, 62)
-    const n3 = makeNoise(48, 63)
+    const n3 = makeNoise(64, 63)
+    const strata = makeNoise(40, 64)
     return pixelFill(S, (u, v) => {
-      const w = fbm([n1, n2], u, v) * 3
-      const band = Math.sin((v * 9 + w) * Math.PI * 2) * 0.5 + 0.5
-      const val = 214 + band * 18 + (n3(u, v) - 0.5) * 22
-      return [clamp(val + 6), clamp(val), clamp(val - 10)]
+      const w = fbm([n1, n2], u, v) * 0.06
+      const vv = v + w
+      const layer = strata(0, vv) * 0.85 + strata(u, vv) * 0.15 // ~40 thin layers per tile (tileable)
+      const band = Math.sin((vv * 23 + n1(u, v) * 0.8) * Math.PI * 2) * 0.5 + 0.5
+      const pn = n3(u, v * 4) // anisotropic sampling → pores elongated along the strata
+      const pore = pn < 0.16 ? (-26 * (0.16 - pn)) / 0.16 : 0
+      const val = 214 + (layer - 0.5) * 22 + band * 7 + (n3(u, v) - 0.5) * 8 + pore
+      return [clamp(val + 7), clamp(val + 1), clamp(val - 9)]
     })
   },
   travertine_pitted: (S) => {
@@ -286,28 +292,31 @@ const generators: Record<TextureKey, Gen> = {
     }
     return base
   },
+  // white marble: soft clouding + thin, branching, low-contrast veins
   marble: (S) => {
     const n1 = makeNoise(3, 81)
-    const n2 = makeNoise(9, 82)
-    const n3 = makeNoise(27, 83)
+    const n2 = makeNoise(7, 82)
+    const n3 = makeNoise(17, 83)
+    const n4 = makeNoise(48, 84)
     return pixelFill(S, (u, v) => {
-      const w = fbm([n1, n2, n3], u, v) * 5
-      const vein = Math.abs(Math.sin((u * 2 + v * 3 + w) * Math.PI))
-      const veinV = Math.pow(1 - vein, 14)
-      const val = 232 - veinV * 70 + (n3(u * 2, v * 2) - 0.5) * 10
-      return grey(val)
+      const w = fbm([n1, n2, n3], u, v)
+      const main = Math.pow(1 - Math.abs(Math.sin((u + v * 2 + w * 2.6) * Math.PI)), 34)
+      const sec = Math.pow(1 - Math.abs(Math.sin((u * 3 - v + fbm([n2, n3, n4], u, v) * 3.4) * Math.PI)), 60)
+      const cloud = (fbm([n2, n3], u, v) - 0.5) * 16
+      const val = 236 + cloud - main * 46 * (0.55 + n2(u, v) * 0.7) - sec * 22 + (n4(u, v) - 0.5) * 4
+      return [clamp(val + 1), clamp(val), clamp(val - 2)]
     })
   },
   marble_soft: (S) => {
     const n1 = makeNoise(3, 91)
-    const n2 = makeNoise(9, 92)
-    const n3 = makeNoise(27, 93)
+    const n2 = makeNoise(8, 92)
+    const n3 = makeNoise(20, 93)
     return pixelFill(S, (u, v) => {
-      const w = fbm([n1, n2, n3], u, v) * 4
-      const vein = Math.abs(Math.sin((u * 1.5 - v * 2 + w) * Math.PI))
-      const veinV = Math.pow(1 - vein, 8)
-      const val = 228 - veinV * 34 + (n2(u * 3, v * 3) - 0.5) * 12
-      return grey(val)
+      const w = fbm([n1, n2, n3], u, v)
+      const vein = Math.pow(1 - Math.abs(Math.sin((u - v * 2 + w * 2.2) * Math.PI)), 20)
+      const cloud = (fbm([n1, n2], u, v) - 0.5) * 20
+      const val = 228 + cloud - vein * 22 + (n3(u, v) - 0.5) * 5
+      return [clamp(val + 3), clamp(val), clamp(val - 4)]
     })
   },
   pebble: (S) => {
@@ -513,7 +522,7 @@ const generators: Record<TextureKey, Gen> = {
   },
   capsule_tile: (S) => {
     const { c, ctx } = canvas(S)
-    ctx.fillStyle = '#c9c1b6'
+    ctx.fillStyle = '#7f776d'
     ctx.fillRect(0, 0, S, S)
     const cols = 8
     const rows = 4
@@ -526,9 +535,9 @@ const generators: Record<TextureKey, Gen> = {
         const ww = w * 0.72
         const hh = h * 0.88
         const g = ctx.createLinearGradient(x, 0, x + ww, 0)
-        g.addColorStop(0, '#a9a196')
-        g.addColorStop(0.35, '#e1dbd2')
-        g.addColorStop(1, '#b3ab9f')
+        g.addColorStop(0, '#8e8579')
+        g.addColorStop(0.38, '#bfb6a9')
+        g.addColorStop(1, '#958c80')
         ctx.fillStyle = g
         ctx.beginPath()
         ctx.roundRect(x, y, ww, hh, ww / 2)

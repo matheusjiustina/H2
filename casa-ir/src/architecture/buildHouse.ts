@@ -335,10 +335,15 @@ export function buildHouse(): HouseBuild {
     const width = o.b - o.a
     const pw = Math.min(1.2, Math.max(0.45, width * 0.26))
     const slot = o.curtain!
-    const panels: [number, number][] = [
-      [o.a - 0.18, o.a - 0.18 + pw],
-      [o.b + 0.18 - pw, o.b + 0.18],
-    ]
+    const panels: [number, number][] = o.curtainClosed
+      ? [
+          [o.a - 0.18, (o.a + o.b) / 2],
+          [(o.a + o.b) / 2, o.b + 0.18],
+        ]
+      : [
+          [o.a - 0.18, o.a - 0.18 + pw],
+          [o.b + 0.18 - pw, o.b + 0.18],
+        ]
     for (const [s0, s1] of panels) {
       const g = curtainGeometry(s1 - s0, top - 0.02, 0.05)
       const m = new THREE.Matrix4()

@@ -224,7 +224,7 @@ export const FINISHES = {
   leaf_dark: F({ label: 'Folhagem Escura', family: 'plant', color: '#2f4b2b', tex: 'leaf', texScale: 1, roughness: 0.75 }),
   leaf_light: F({ label: 'Folhagem Clara', family: 'plant', color: '#6e8d42', tex: 'leaf', texScale: 1, roughness: 0.75 }),
   foliage: F({ label: 'Copa (folhas)', family: 'plant', color: '#ffffff', tex: 'foliage', texScale: 1, roughness: 0.8, swatch: '#5f7a45' }),
-  leaf_olive: F({ label: 'Copa Oliveira', family: 'plant', color: '#6e8058', tex: 'stone_rough', texScale: 0.45, roughness: 0.9, bump: 0.8 }),
+  leaf_olive: F({ label: 'Copa Oliveira', family: 'plant', color: '#56683f', tex: 'stone_rough', texScale: 0.45, roughness: 0.9, bump: 0.8 }),
   trunk: F({ label: 'Tronco', family: 'plant', color: '#7c6a57', tex: 'stone_rough', texScale: 0.6, roughness: 0.95 }),
   palm_trunk: F({ label: 'Estipe Palmeira', family: 'plant', color: '#a49a8c', tex: 'stone_rough', texScale: 0.5, roughness: 0.95 }),
 

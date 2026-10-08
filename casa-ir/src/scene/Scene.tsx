@@ -19,6 +19,7 @@ import { RoomTracker } from '../controls/RoomTracker'
 import { CaptureBridge } from '../utils/screenshot'
 import { RenderLoop } from './RenderLoop'
 import { PlanLabels } from './PlanLabels'
+import { MirrorProbes } from './MirrorProbes'
 
 export function Scene() {
   const nav = useStore((s) => s.nav)
@@ -59,6 +60,7 @@ export function Scene() {
       </Pickable>
       <SelectionHighlight />
       <PlanLabels />
+      <MirrorProbes />
       {nav === 'walk' ? <WalkControls /> : <CameraRig />}
       {nav !== 'walk' && <RoomTracker />}
       <Effects />

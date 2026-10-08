@@ -39,7 +39,7 @@ export const CAMERAS: CameraPreset[] = [
   C('tv_view_05', 'Porta pivotante', 'sala', [28.15, 1.4, 8.6], [33.3, 1.8, 9.2], 'INT p.9', 66),
 
   // ── Cozinha ─────────────────────────────────────────────────────────────
-  C('kitchen_view_01', 'Vista leste', 'cozinha', [21.95, 1.5, 13.6], [26.7, 1.6, 13.6], 'INT p.19', 64),
+  C('kitchen_view_01', 'Vista leste', 'cozinha', [22.15, 1.5, 12.95], [26.7, 1.35, 13.9], 'INT p.19', 64),
   C('kitchen_view_02', 'Vista sul', 'cozinha', [24.0, 1.55, 11.35], [23.9, 1.3, 16.2], 'INT p.20', 64),
   C('kitchen_view_03', 'Cristaleira', 'cozinha', [24.2, 1.5, 15.9], [24.0, 1.6, 11.0], 'INT p.22', 62),
   C('kitchen_view_04', 'Ilha e gourmet', 'cozinha', [25.8, 1.5, 14.0], [21.7, 1.3, 13.8], 'INT p.23', 62),
@@ -71,7 +71,7 @@ export const CAMERAS: CameraPreset[] = [
 
   // ── Suíte master ────────────────────────────────────────────────────────
   C('master_view_01', 'Vista geral', 'suite', [19.6, 1.5, 6.35], [19.6, 1.35, 1.8], 'INT p.57', 66),
-  C('master_view_02', 'Cabeceira', 'suite', [18.05, 1.4, 3.65], [21.37, 1.5, 3.65], 'INT p.58', 64),
+  C('master_view_02', 'Cabeceira', 'suite', [18.55, 1.45, 2.3], [21.37, 1.15, 3.95], 'INT p.58', 64),
   C('master_view_03', 'TV e vista da piscina', 'suite', [21.1, 1.5, 4.4], [17.85, 1.4, 4.4], 'INT p.60', 64),
   C('master_view_04', 'Poltrona', 'suite', [19.4, 1.55, 2.0], [19.6, 1.25, 6.55], 'INT p.62', 64),
   C('closet_view_01', 'Corredor do closet', 'closet', [24.5, 1.55, 6.35], [24.6, 1.4, 1.8], 'INT p.45', 66),

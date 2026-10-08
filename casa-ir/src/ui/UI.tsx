@@ -25,6 +25,7 @@ export function UI() {
   const intro = useStore((s) => s.intro)
   const presentation = useStore((s) => s.presentation)
   const fading = useStore((s) => s.fading)
+  const focusActive = useStore((s) => s.focusActive)
   const loaded = progress >= 1
   return (
     <>
@@ -44,6 +45,11 @@ export function UI() {
               {panel === 'opcoes' && <OptionsPanel />}
               <Toolbar />
               <WalkOverlay />
+              {focusActive && panel !== 'acabamentos' && (
+                <button className="btn focus-back" onClick={() => useStore.setState({ returnRequest: performance.now() })}>
+                  Voltar à vista
+                </button>
+              )}
             </>
           )}
           <PresentationCaption />

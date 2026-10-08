@@ -109,17 +109,30 @@ export const canopyTree = (scale = 1, s = 5): PrefabFn => (b) => {
     const yaw = (i / branches) * 360 + rnd() * 40
     b.at(0, h * 0.75, 0, yaw, () => b.cyl('trunk', 0, 0, 0, 0.03 * scale, 0.06 * scale, 1.1 * scale, 8), 35 + rnd() * 15)
   }
-  const blobs = 22
-  for (let i = 0; i < blobs; i++) {
-    const a = (i / blobs) * Math.PI * 2 * 3.1
-    const r = (0.35 + rnd() * 0.85) * scale
-    const x = Math.cos(a) * r
-    const z = Math.sin(a) * r
-    const y = h + (0.35 + rnd() * 1.2) * scale
-    const sz = (0.42 + rnd() * 0.3) * scale
-    b.geo('leaf_olive', rockGeometry(10 + (i % 5)), new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd(), rnd() * 6, 0)), new THREE.Vector3(sz, sz * 1.25, sz)), [2, 2])
+  // dense inner volume (keeps the crown from looking hollow)
+  const core = 7
+  for (let i = 0; i < core; i++) {
+    const a = (i / core) * Math.PI * 2
+    const r = (0.25 + rnd() * 0.45) * scale
+    const sz = (0.48 + rnd() * 0.2) * scale
+    b.geo('leaf_olive', rockGeometry(10 + (i % 5)), new THREE.Matrix4().compose(new THREE.Vector3(Math.cos(a) * r, h + (0.55 + rnd() * 0.7) * scale, Math.sin(a) * r), new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd(), rnd() * 6, 0)), new THREE.Vector3(sz, sz * 1.1, sz)), [2, 2])
   }
-  b.geo('leaf_olive', rockGeometry(17), new THREE.Matrix4().compose(new THREE.Vector3(0, h + 1.35 * scale, 0), new THREE.Quaternion(), new THREE.Vector3(1.1 * scale, 1.0 * scale, 1.1 * scale)), [2, 2])
+  // leaf cards on an irregular ellipsoidal shell (alpha-tested foliage)
+  const card = new THREE.PlaneGeometry(1, 1)
+  const cards = 96
+  const n = new THREE.Vector3()
+  const q = new THREE.Quaternion()
+  const up = new THREE.Vector3(0, 0, 1)
+  for (let i = 0; i < cards; i++) {
+    const t = rnd() * Math.PI * 2
+    const y = rnd() * 1.6 - 0.75
+    n.set(Math.cos(t) * Math.sqrt(1 - Math.min(0.95, y * y)), y, Math.sin(t) * Math.sqrt(1 - Math.min(0.95, y * y))).normalize()
+    const r = 0.62 + rnd() * 0.42
+    const pos = new THREE.Vector3(n.x * r * 1.35 * scale, h + 1.0 * scale + n.y * r * 0.95 * scale, n.z * r * 1.35 * scale)
+    q.setFromUnitVectors(up, n).multiply(new THREE.Quaternion().setFromAxisAngle(up, rnd() * Math.PI * 2))
+    const sz = (0.7 + rnd() * 0.4) * scale
+    b.geo('foliage', card, new THREE.Matrix4().compose(pos, q, new THREE.Vector3(sz, sz, sz)))
+  }
 }
 
 /** Banana / alocasia / strelitzia clump (ARQ p.10, INT p.13). */

@@ -101,7 +101,8 @@ export function Kitchen() {
     ],
     [],
   )
-  const pendants = useMemo(() => [22.8, 23.3, 23.8, 24.3, 24.8].map((x) => ({ p: [x, 2.8, 13.5] as [number, number, number] })), [])
+  // five amber globes in a line over the walnut island (INT p.18 / p.23)
+  const pendants = useMemo(() => [12.6, 13.05, 13.5, 13.95, 14.4].map((z) => ({ p: [24.735, 2.8, z] as [number, number, number] })), [])
   const spots = useMemo(() => {
     const s: { p: [number, number, number] }[] = []
     for (const x of [22.3, 25.9]) for (const z of [12.0, 13.6, 15.2]) s.push({ p: [x, 2.66, z] })

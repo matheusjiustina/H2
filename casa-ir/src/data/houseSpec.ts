@@ -103,7 +103,7 @@ export const ROOMS: RoomDef[] = [
   R({ id: 'gourmet', name: 'Área Gourmet', rects: [[13.61, 11.15, 21.55, 16.2]], floor: 'floor_social', wall: 'wall_gourmet', ceiling: 'gourmet_ceiling', ceilingH: 2.95, interior: true, menu: true, detailed: true,
     sources: ['ARQ p.2', 'ARQ p.7', 'ARQ p.14', 'INT p.18', 'INT p.24–28'], spawn: [20.6, 11.9, 120], lights: [[15.7, 2.5, 13.7, 1], [19.0, 2.5, 13.7, 1]] }),
   R({ id: 'cozinha', name: 'Cozinha', rects: [[21.71, 11.15, 26.7, 16.2]], floor: 'floor_social', wall: 'wall_kitchen', ceiling: 'ceiling', ceilingH: 2.8, cove: true, interior: true, menu: true, detailed: true,
-    sources: ['ARQ p.2', 'INT p.18', 'INT p.19–23'], spawn: [24.2, 11.6, 180], lights: [[24.2, 2.5, 13.6, 1.2]] }),
+    sources: ['ARQ p.2', 'INT p.18', 'INT p.19–23'], spawn: [24.2, 11.6, 180], lights: [[24.73, 2.25, 13.5, 0.9], [22.9, 2.5, 13.6, 0.55]] }),
   R({ id: 'circ_servico', name: 'Circulação de Serviço', rects: [[26.86, 11.15, 29.36, 12.19]], floor: 'floor_service', wall: 'wall_circulation', ceiling: 'ceiling', ceilingH: 2.8, interior: true,
     sources: ['ARQ p.2'], lights: [[28.1, 2.5, 11.7, 0.3]] }),
   R({ id: 'lavanderia', name: 'Lavanderia', rects: [[26.86, 12.34, 29.36, 16.2]], floor: 'floor_service', wall: 'wall_laundry', ceiling: 'ceiling', ceilingH: 2.8, interior: true, menu: true, detailed: true,
@@ -149,6 +149,8 @@ export interface Opening {
   hinge?: 'a' | 'b'
   swing?: 1 | -1
   curtain?: SlotId
+  /** curtains drawn across the whole opening (e.g. behind the suite TV, INT p.60) */
+  curtainClosed?: boolean
 }
 
 export interface WallDef {
@@ -183,7 +185,7 @@ export const WALLS: WallDef[] = [
   // West facade of the suite (glass towards pool deck — INT p.60, ARQ p.7)
   W([17.7, 1.65, 17.85, 6.7], H.wall, [
     slide(2.0, 3.0), // door to the pool deck (INT p.60)
-    { a: 3.1, b: 6.4, sill: 0, top: H.slideTop, kind: 'fixed', curtain: 'master_curtain' },
+    { a: 3.1, b: 6.4, sill: 0, top: H.slideTop, kind: 'fixed', curtain: 'master_curtain', curtainClosed: true }, // closed behind the TV (INT p.60)
   ]),
   // South facade (patio): closet windows, corridor glass door
   W([17.7, 6.55, 27.7, 6.7], H.wall, [
@@ -226,7 +228,7 @@ export const WALLS: WallDef[] = [
   // Despensa + banho externo (stone recess — ARQ p.8/9)
   W([8.46, 13.21, 13.45, 13.37], H.wall, [
     { a: 10.4, b: 11.55, sill: 0, top: H.doorTop, kind: 'louver', hinge: 'a', swing: 1 },
-    { a: 11.95, b: 12.75, sill: 0, top: H.doorTop, kind: 'louver', hinge: 'b', swing: 1 },
+    { a: 11.95, b: 12.75, sill: 0, top: H.doorTop, kind: 'louver', hinge: 'b', swing: -1 }, // opens outwards (ARQ p.2 / INT p.30),
   ], 'external_stone'),
   W([11.7, 13.37, 11.86, 16.2], H.wall), // despensa | banho ext
   // Gourmet west wall (sliding door to the deck recess)
