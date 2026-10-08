@@ -19,6 +19,7 @@ import * as THREE from 'three'
 import CameraControlsImpl from 'camera-controls'
 import { useStore } from '../app/store'
 import { CAMERA_BY_ID, type CameraPreset } from '../data/cameras'
+import { roomAt } from '../data/houseSpec'
 
 const ACTION = CameraControlsImpl.ACTION
 const SMALL_ROOMS = new Set(['bsocial', 'suite_bath', 'banho_ext', 'lavanderia', 'deposito', 'despensa'])
@@ -150,18 +151,30 @@ export function CameraRig() {
     if (!saved.current) saved.current = { pos, tgt, interior: interior.current, plan, fov: fovTarget.current }
     const center = new THREE.Vector3(...focus.center)
     const dir = center.clone().sub(pos)
-    dir.y = Math.min(dir.y, -0.25 * dir.length())
+    dir.y = Math.min(dir.y, -0.12 * dir.length())
     dir.normalize()
     const fov = Math.min(fovTarget.current, 50)
     const dist = THREE.MathUtils.clamp((focus.radius / Math.sin(THREE.MathUtils.degToRad(fov / 2))) * 0.85, 0.7, 9)
     const p2 = center.clone().addScaledVector(dir, -dist)
-    p2.y = Math.max(p2.y, 0.5)
+    // indoors: the detail view never leaves the room (camera kept 0.35 m off the walls)
+    const room = pos.y < 6 ? roomAt(pos.x, pos.z, pos.y) : null
+    let bounds: THREE.Box3 | undefined
+    if (room?.interior) {
+      const rect = room.rects.find(([x0, z0, x1, z1]) => pos.x >= x0 && pos.x <= x1 && pos.z >= z0 && pos.z <= z1) ?? room.rects[0]
+      const [x0, z0, x1, z1] = rect
+      bounds = new THREE.Box3(new THREE.Vector3(x0 + 0.35, 0.6, z0 + 0.35), new THREE.Vector3(x1 - 0.35, room.ceilingH - 0.3, z1 - 0.35))
+      bounds.clampPoint(p2, p2)
+    } else p2.y = Math.max(p2.y, 0.5)
     interior.current = false
     fovTarget.current = fov
     configure(c, false, false, isTouch)
     c.minDistance = 0.35
-    c.maxDistance = Math.max(dist * 2.5, 3)
-    c.setBoundary(undefined)
+    c.maxDistance = Math.max(p2.distanceTo(center) * 1.6, 2)
+    if (bounds) {
+      // orbiting around the object stays inside the room as well
+      c.setBoundary(bounds.clone().expandByScalar(0.3).union(new THREE.Box3().setFromCenterAndSize(center, new THREE.Vector3(0.1, 0.1, 0.1))))
+      c.boundaryEnclosesCamera = true
+    } else c.setBoundary(undefined)
     c.setLookAt(p2.x, p2.y, p2.z, center.x, center.y, center.z, true)
     useStore.setState({ focusActive: true })
   }, [focus, isTouch])

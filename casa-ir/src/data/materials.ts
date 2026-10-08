@@ -76,12 +76,12 @@ export const FINISHES = {
   wall_marble_geo: F({ label: 'Papel Geométrico Marmorizado', family: 'wallcovering', color: '#eeebe6', tex: 'wallpaper_geo', texScale: 1.2, roughness: 0.6 }),
 
   // ── Woods ──────────────────────────────────────────────────────────────
-  wood_walnut: F({ label: 'Nogueira', family: 'wood', color: '#6e4b33', tex: 'wood', texScale: 1.4, roughness: 0.5, clearcoat: 0.15 }),
+  wood_walnut: F({ label: 'Nogueira', family: 'wood', color: '#6e4b33', tex: 'wood_b', texScale: 1.4, roughness: 0.5, clearcoat: 0.15 }),
   wood_freijo: F({ label: 'Freijó', family: 'wood', color: '#a6774f', tex: 'wood', texScale: 1.4, roughness: 0.55 }),
   wood_oak: F({ label: 'Carvalho Natural', family: 'wood', color: '#9b7752', tex: 'wood', texScale: 1.4, roughness: 0.55 }),
   wood_oak_light: F({ label: 'Carvalho Claro', family: 'wood', color: '#c6a47e', tex: 'wood', texScale: 1.4, roughness: 0.55 }),
-  wood_cumaru: F({ label: 'Cumaru', family: 'wood', color: '#7b5a40', tex: 'wood', texScale: 1.4, roughness: 0.52 }),
-  wood_ebony: F({ label: 'Ebanizado', family: 'wood', color: '#3b2e25', tex: 'wood', texScale: 1.4, roughness: 0.45 }),
+  wood_cumaru: F({ label: 'Cumaru', family: 'wood', color: '#7b5a40', tex: 'wood_b', texScale: 1.4, roughness: 0.52 }),
+  wood_ebony: F({ label: 'Ebanizado', family: 'wood', color: '#3b2e25', tex: 'wood_b', texScale: 1.4, roughness: 0.45 }),
   wood_teak: F({ label: 'Teca', family: 'wood', color: '#9a6a3f', tex: 'wood_fine', texScale: 0.8, roughness: 0.6 }),
 
   slats_freijo: F({ label: 'Ripado Freijó', family: 'slats', color: '#a3744c', tex: 'wood_slats', texScale: 1.2, roughness: 0.6 }),
