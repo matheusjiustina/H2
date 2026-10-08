@@ -35,8 +35,9 @@ export function detectTier(gl: WebGLRenderingContext | WebGL2RenderingContext): 
 export function QualityManager() {
   const gl = useThree((s) => s.gl)
   const setDpr = useThree((s) => s.setDpr)
-  const quality = useStore((s) => s.quality)
   const tier = useStore(effectiveTier)
+  const dprScale = useStore((s) => s.dprScale)
+  const capturing = useStore((s) => s.capturing)
   const detected = useRef(false)
 
   useEffect(() => {
@@ -46,14 +47,21 @@ export function QualityManager() {
   }, [gl])
 
   useEffect(() => {
+    if (capturing) return // the capture sets its own resolution
     const [lo, hi] = DPR[tier]
-    setDpr(Math.max(lo, Math.min(hi, window.devicePixelRatio || 1)))
-  }, [tier, setDpr])
+    setDpr(Math.max(0.6, Math.max(lo, Math.min(hi, window.devicePixelRatio || 1)) * dprScale))
+  }, [tier, dprScale, capturing, setDpr])
 
-  // runtime FPS monitor (AUTO only)
-  const acc = useRef({ t: 0, frames: 0, bad: 0, grace: 4 })
+  /**
+   * Runtime safeguard (every mode): when the frame rate drops, first lower the
+   * render resolution, then (AUTO only) the effects tier. Geometry, finishes
+   * and lighting design are never simplified. Resolution recovers when there
+   * is headroom again.
+   */
+  const acc = useRef({ t: 0, frames: 0, bad: 0, good: 0, grace: 4 })
   useFrame((_, dt) => {
-    if (quality !== 'auto') return
+    const st = useStore.getState()
+    if (st.capturing || document.hidden || st.fading) return
     const a = acc.current
     a.t += dt
     a.frames++
@@ -65,14 +73,28 @@ export function QualityManager() {
       a.grace--
       return
     }
-    if (fps < 28) a.bad++
-    else a.bad = Math.max(0, a.bad - 1)
+    if (fps < 28) {
+      a.bad++
+      a.good = 0
+    } else if (fps > 52) {
+      a.good++
+      a.bad = Math.max(0, a.bad - 1)
+    } else {
+      a.bad = Math.max(0, a.bad - 1)
+      a.good = 0
+    }
     if (a.bad >= 3) {
       a.bad = 0
       a.grace = 3
-      const cur = useStore.getState().autoTier
-      if (cur === 'high') useStore.setState({ autoTier: 'medium' })
-      else if (cur === 'medium') useStore.setState({ autoTier: 'low' })
+      if (st.dprScale > 0.72) useStore.setState({ dprScale: Math.round((st.dprScale - 0.15) * 100) / 100 })
+      else if (st.quality === 'auto') {
+        if (st.autoTier === 'high') useStore.setState({ autoTier: 'medium', dprScale: 1 })
+        else if (st.autoTier === 'medium') useStore.setState({ autoTier: 'low', dprScale: 1 })
+      }
+    } else if (a.good >= 5 && st.dprScale < 1) {
+      a.good = 0
+      a.grace = 2
+      useStore.setState({ dprScale: Math.min(1, Math.round((st.dprScale + 0.15) * 100) / 100) })
     }
   })
   return null

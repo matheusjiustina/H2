@@ -30,7 +30,7 @@ interface Anchor {
   interior: boolean
 }
 
-const WARM = new THREE.Color('#ffc387')
+const WARM = new THREE.Color('#ffcf9e') // ~3000 K
 const WARM_EXT = new THREE.Color('#ffcf9c')
 const SUN_DAY = new THREE.Color('#fff1df')
 const SUN_SET = new THREE.Color('#ffae6b')

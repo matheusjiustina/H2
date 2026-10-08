@@ -252,3 +252,60 @@ Cada vista curada (`src/data/cameras.ts`, campo `source`) foi renderizada e comp
 | `q01_view_01` | ARQ p.2 | **Correção:** câmera estava dentro do armário — reposicionada. |
 
 Testes funcionais realizados: navegação por vistas, Planta 3D, Dia/Noite, seleção + troca de acabamento + restauração, comparação Projeto Original × Opção, layout mobile (390×844), passeio em primeira pessoa com colisão, build de produção.
+
+---
+
+## 9. Fase 2 — auditoria visual priorizada
+
+Antes do pipeline fotorrealista, cada vista curada foi renderizada lado a lado com a página do PDF. Divergências encontradas, por prioridade, e o que foi feito:
+
+| Prioridade | Divergência | Correção | Status |
+|---|---|---|---|
+| CRÍTICO | Espelhos refletiam o céu (pareciam janelas) — banho social, banho externo, closet | Sonda de reflexo (cube camera) por ambiente com espelho; renovada ao trocar horário/acabamento e ao entrar no ambiente (`src/scene/MirrorProbes.tsx`) | Corrigido |
+| MAIOR | Sol iluminava os fundos; fachada frontal (ARQ p.4/p.5) aparecia na sombra | Azimute/elevação do sol do DIA ajustados (`SUN` em `houseSpec.ts`) | Corrigido |
+| MAIOR | Água da piscina com cor saturada/opaca | Água física (IOR 1,33, atenuação por profundidade) no FOTOREALISTA; fundo com rampa 0,45→1,45 m e cáusticas | Corrigido |
+| MAIOR | Mármore e travertino com veios caricatos | Mármore com nuvens suaves e veios finos ramificados; travertino com estratos horizontais finos e poros alongados | Corrigido |
+| MAIOR | Revestimento 3D cápsula claro demais (no PDF é taupe/cinza) | Paleta da cápsula escurecida | Corrigido |
+| MAIOR | Copas das árvores em blocos facetados | Copa em cartões de folhas (alpha-test) com núcleo denso e vento sutil | Corrigido |
+| MAIOR | Pendentes da cozinha alinhados em X sobre a mesa (INT p.18/p.23 mostra linha sobre a ilha) | 5 globos alinhados em Z sobre a ilha (x 24,735; z 12,6→14,4); âncora de luz acompanha | Corrigido |
+| MAIOR | Cortinas da suíte abertas; INT p.60 mostra cortina fechada atrás da TV | `curtainClosed` no vidro fixo oeste da suíte | Corrigido |
+| MAIOR | Porta veneziana do banho externo abria para dentro, bloqueando a vista | Abertura para fora | Corrigido |
+| MAIOR | `master_view_02` encostada na TV/vidro; `kitchen_view_01` e `kitchen_view_04` com enquadramento ruim (04 dentro da torre) | Câmeras reposicionadas | Corrigido |
+| MAIOR | Interiores lavados (exposição alta) | Exposição interna por horário; lâmpadas suaves de dia, quentes à noite | Corrigido |
+| MENOR | Forno sob o cooktop (o projeto de interiores mostra o forno na torre) | — | Pendente |
+| MENOR | Detalhe do inserto da churrasqueira | — | Pendente |
+| MENOR | Areia da praia poderia ser mais quente | — | Pendente |
+| MENOR | Cuba do banho social semiembutida | — | Pendente |
+| MENOR | Carros da garagem genéricos | Mantidos como volumes neutros (não constam do projeto) | Aceito |
+| POLIMENTO | Chanfros em tampos e portas; variação de cor por instância na vegetação | — | Pendente |
+
+## 10. Verificação por ambiente (Fase 2)
+
+Legenda: ✔ verificado contra o PDF · ◐ verificado com a ressalva indicada · — não detalhado nos PDFs (somente planta ARQ p.2).
+
+| Ambiente | Referência | Geometria | Materiais | Iluminação | Mobiliário | Observação |
+|---|---|---|---|---|---|---|
+| Fachada frontal | ARQ p.4, p.5, p.11 | ✔ | ✔ | ✔ | ✔ | Sol na fachada; LEDs e embutidos acendem no entardecer |
+| Fachada posterior / piscina | ARQ p.7–p.10 | ✔ | ✔ | ✔ | ✔ | Água física no FOTOREALISTA |
+| Pátio interno | ARQ p.6 | ✔ | ✔ | ✔ | ✔ | Árvore com nova copa |
+| Hall de entrada | ARQ p.5 | ✔ | ✔ | ✔ | ✔ | |
+| Sala de TV | INT p.5–p.9 | ✔ | ✔ | ✔ | ✔ | |
+| Cozinha | INT p.18–p.23 | ✔ | ✔ | ✔ | ◐ | Forno sob o cooktop (pendente, MENOR) |
+| Área gourmet | INT p.24–p.28 | ✔ | ✔ | ✔ | ◐ | Inserto da churrasqueira simplificado |
+| Lavanderia | INT p.13–p.15 | ✔ | ✔ | ✔ | ✔ | |
+| Banho externo | INT p.30 | ✔ | ✔ | ✔ | ✔ | Porta abre para fora; espelho reflete o ambiente |
+| Depósito | INT p.33 | ✔ | ✔ | ✔ | ✔ | |
+| Despensa | ARQ p.2 | ✔ | — | ✔ | — | Não detalhada no projeto de interiores |
+| Sala de jogos | INT p.35–p.39 | ✔ | ✔ | ✔ | ✔ | |
+| Banho social | INT p.41–p.42 | ✔ | ✔ | ✔ | ◐ | Cuba semiembutida (pendente) |
+| Suíte master | INT p.57–p.62 | ✔ | ✔ | ✔ | ✔ | Cortina fechada atrás da TV |
+| Closet master | INT p.45–p.47 | ✔ | ✔ | ✔ | ✔ | Espelhos com reflexo do closet |
+| Banho master | INT p.55–p.56 | ✔ | ✔ | ✔ | ✔ | Cápsula taupe |
+| Quarto 01 / Quarto 02 | ARQ p.2 | ✔ | — | ✔ | — | Não detalhados no projeto de interiores (acabamentos neutros) |
+| Garagem | ARQ p.4, p.5 | ✔ | ✔ | ✔ | ✔ | |
+
+Nenhuma geometria validada na Fase 1 foi alterada, exceto as correções listadas acima (posição dos pendentes, cortina fechada, sentido de abertura da porta).
+
+### 10.1 Testes funcionais da Fase 2
+
+DIA / ENTARDECER / NOITE (transição contínua) · abertura de câmera (3 s) · APRESENTAÇÃO (12 vistas, interrompível) · cortes com fade entre ambientes · perspectiva de dois pontos · AMBIENTES agrupados (Exterior / Social / Serviço / Íntimo) · nomes clicáveis na Planta 3D · contorno ao passar o mouse em ACABAMENTOS · Projeto Original / Opções / Personalizar cor (paleta neutra) / Restaurar original · Ver detalhe / Voltar à vista · comparar segurando · CAPTURAR normal e ALTA QUALIDADE (3840×2160, sem interface) · QUALIDADE Auto / Equilibrado / Fotorealista · proteção adaptativa de desempenho (resolução primeiro, depois efeitos) · build de produção.

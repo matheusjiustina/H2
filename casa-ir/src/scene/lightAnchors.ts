@@ -17,6 +17,9 @@ export const EXTERIOR_LIGHTS: [number, number, number, number, number?][] = [
   [34.5, 3.0, 13.0, 0.7, 8],
   [36.6, 0.4, 6.1, 0.6, 7],
   [35.0, 5.6, 6.5, 0.6, 9],
+  // garden uplights on the central tree (ARQ p.6 / p.14)
+  [23.1, 0.35, 8.4, 0.55, 6],
+  [24.1, 0.35, 9.3, 0.45, 6],
   // pool underwater light
   [6.0, -0.5, 4.2, 0.9, 9],
   // suite frame / deck

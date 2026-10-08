@@ -28,7 +28,8 @@ function floorDepth(x: number, z: number) {
 
 export function Pool() {
   const tier = useStore(effectiveTier)
-  const high = tier === 'high'
+  const captureHQ = useStore((s) => s.captureHQ)
+  const high = tier === 'high' || captureHQ
   const { geos, water } = useMemo(() => {
     const b = new GeoBuilder()
     // basin (seen from inside), floor reshaped into a gentle slope

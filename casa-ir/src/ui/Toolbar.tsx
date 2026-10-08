@@ -129,7 +129,7 @@ export function Toolbar() {
                   aria-checked={quality === q}
                   className={quality === q ? 'is-active' : ''}
                   onClick={() => {
-                    set({ quality: q })
+                    set({ quality: q, dprScale: 1 })
                     setOpen(null)
                   }}
                 >
