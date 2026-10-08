@@ -71,7 +71,7 @@ export function TvRoom() {
       rk.box('tv_rack_wood', [a, ry0 + 0.035, Z1 - 0.44], [c, ry1 - 0.005, Z1 - 0.05])
       rk.box('brass', [(a + c) / 2 - 0.06, ry1 - 0.08, Z1 - 0.49], [(a + c) / 2 + 0.06, ry1 - 0.06, Z1 - 0.47])
     }
-    rk.box('tv_rack_top', [29.18, ry1, Z1 - 0.5], [33.22, ry1 + 0.035, Z1 - 0.02])
+    rk.ebox('tv_rack_top', [29.18, ry1, Z1 - 0.5], [33.22, ry1 + 0.035, Z1 - 0.02])
 
     // ── Graphite ceiling band with downlights along the TV wall & glazing (INT p.6/p.8) ──
     const cb = p.of('ceiling_band')

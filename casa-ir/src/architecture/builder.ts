@@ -97,6 +97,24 @@ export class GeoBuilder {
     if (f.nz) this.quad(f.nz, [[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]], [[-x1, y0], [-x0, y0], [-x0, y1], [-x1, y1]])
   }
 
+  /**
+   * Box with eased (chamfered) top edges — counter and table tops catch a
+   * thin line of light on their edges as real stone / timber does. The
+   * chamfer `c` is a few millimetres; UVs follow the same world-metre
+   * convention as `box`.
+   */
+  ebox(slot: SlotId, min: [number, number, number], max: [number, number, number], c = 0.004) {
+    const [x0, , z0] = min
+    const [x1, y1, z1] = max
+    const yc = y1 - c
+    this.box({ px: slot, nx: slot, ny: slot, pz: slot, nz: slot, py: null }, min, [x1, yc, z1])
+    this.quad(slot, [[x0 + c, y1, z1 - c], [x1 - c, y1, z1 - c], [x1 - c, y1, z0 + c], [x0 + c, y1, z0 + c]], [[x0, -z1], [x1, -z1], [x1, -z0], [x0, -z0]])
+    this.quad(slot, [[x1, yc, z1], [x1, yc, z0], [x1 - c, y1, z0], [x1 - c, y1, z1]], [[-z1, yc], [-z0, yc], [-z0, y1], [-z1, y1]])
+    this.quad(slot, [[x0, yc, z0], [x0, yc, z1], [x0 + c, y1, z1], [x0 + c, y1, z0]], [[z0, yc], [z1, yc], [z1, y1], [z0, y1]])
+    this.quad(slot, [[x0, yc, z1], [x1, yc, z1], [x1, y1, z1 - c], [x0, y1, z1 - c]], [[x0, yc], [x1, yc], [x1, y1], [x0, y1]])
+    this.quad(slot, [[x1, yc, z0], [x0, yc, z0], [x0, y1, z0 + c], [x1, y1, z0 + c]], [[-x1, yc], [-x0, yc], [-x0, y1], [-x1, y1]])
+  }
+
   /** Centered box helper: center (cx,cy,cz) and size (w,h,d). */
   cbox(mats: SlotId | FaceMats, cx: number, cy: number, cz: number, w: number, h: number, d: number) {
     this.box(mats, [cx - w / 2, cy - h / 2, cz - d / 2], [cx + w / 2, cy + h / 2, cz + d / 2])

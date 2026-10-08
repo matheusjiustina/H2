@@ -272,12 +272,13 @@ Antes do pipeline fotorrealista, cada vista curada foi renderizada lado a lado c
 | MAIOR | Porta veneziana do banho externo abria para dentro, bloqueando a vista | Abertura para fora | Corrigido |
 | MAIOR | `master_view_02` encostada na TV/vidro; `kitchen_view_01` e `kitchen_view_04` com enquadramento ruim (04 dentro da torre) | Câmeras reposicionadas | Corrigido |
 | MAIOR | Interiores lavados (exposição alta) | Exposição interna por horário; lâmpadas suaves de dia, quentes à noite | Corrigido |
-| MENOR | Forno sob o cooktop (o projeto de interiores mostra o forno na torre) | — | Pendente |
-| MENOR | Detalhe do inserto da churrasqueira | — | Pendente |
-| MENOR | Areia da praia poderia ser mais quente | — | Pendente |
-| MENOR | Cuba do banho social semiembutida | — | Pendente |
+| MENOR | Forno estava na torre; INT p.21 mostra o forno embutido sob o cooktop e a torre só com armários | Forno embutido (vidro preto, faixa e puxador inox) sob o cooktop; torre só armários | Corrigido |
+| MENOR | Churrasqueira: inserto ficava fora da coluna (laje preta) | Coluna de terrazzo aberta; moldura de granito, revestimento inox, gaveta de carvão e 2 níveis de espetos (INT p.25) | Corrigido |
+| MENOR | Areia da praia clara demais (ARQ p.7/p.10 é bege quente) | Textura da areia aquecida | Corrigido |
+| MENOR | Cuba do banho social era de apoio; INT p.41 mostra cuba semiembutida | Cuba semiembutida (borda cerâmica de 4 cm + bacia), bancada com recorte | Corrigido |
 | MENOR | Carros da garagem genéricos | Mantidos como volumes neutros (não constam do projeto) | Aceito |
-| POLIMENTO | Chanfros em tampos e portas; variação de cor por instância na vegetação | — | Pendente |
+| POLIMENTO | Arestas vivas nos tampos | Chanfro de 4 mm nas bancadas (cozinha, gourmet, lavanderia, closet) e no tampo do rack da sala | Corrigido |
+| POLIMENTO | Variação de cor por instância na vegetação | — | Pendente |
 
 ## 10. Verificação por ambiente (Fase 2)
 
@@ -290,21 +291,21 @@ Legenda: ✔ verificado contra o PDF · ◐ verificado com a ressalva indicada �
 | Pátio interno | ARQ p.6 | ✔ | ✔ | ✔ | ✔ | Árvore com nova copa |
 | Hall de entrada | ARQ p.5 | ✔ | ✔ | ✔ | ✔ | |
 | Sala de TV | INT p.5–p.9 | ✔ | ✔ | ✔ | ✔ | |
-| Cozinha | INT p.18–p.23 | ✔ | ✔ | ✔ | ◐ | Forno sob o cooktop (pendente, MENOR) |
-| Área gourmet | INT p.24–p.28 | ✔ | ✔ | ✔ | ◐ | Inserto da churrasqueira simplificado |
+| Cozinha | INT p.18–p.23 | ✔ | ✔ | ✔ | ✔ | Forno embutido sob o cooktop |
+| Área gourmet | INT p.24–p.28 | ✔ | ✔ | ✔ | ✔ | Churrasqueira com inserto inox e espetos |
 | Lavanderia | INT p.13–p.15 | ✔ | ✔ | ✔ | ✔ | |
 | Banho externo | INT p.30 | ✔ | ✔ | ✔ | ✔ | Porta abre para fora; espelho reflete o ambiente |
 | Depósito | INT p.33 | ✔ | ✔ | ✔ | ✔ | |
 | Despensa | ARQ p.2 | ✔ | — | ✔ | — | Não detalhada no projeto de interiores |
 | Sala de jogos | INT p.35–p.39 | ✔ | ✔ | ✔ | ✔ | |
-| Banho social | INT p.41–p.42 | ✔ | ✔ | ✔ | ◐ | Cuba semiembutida (pendente) |
+| Banho social | INT p.41–p.42 | ✔ | ✔ | ✔ | ✔ | Cuba semiembutida |
 | Suíte master | INT p.57–p.62 | ✔ | ✔ | ✔ | ✔ | Cortina fechada atrás da TV |
 | Closet master | INT p.45–p.47 | ✔ | ✔ | ✔ | ✔ | Espelhos com reflexo do closet |
 | Banho master | INT p.55–p.56 | ✔ | ✔ | ✔ | ✔ | Cápsula taupe |
 | Quarto 01 / Quarto 02 | ARQ p.2 | ✔ | — | ✔ | — | Não detalhados no projeto de interiores (acabamentos neutros) |
 | Garagem | ARQ p.4, p.5 | ✔ | ✔ | ✔ | ✔ | |
 
-Nenhuma geometria validada na Fase 1 foi alterada, exceto as correções listadas acima (posição dos pendentes, cortina fechada, sentido de abertura da porta).
+Nenhuma geometria validada na Fase 1 foi alterada, exceto as correções listadas acima (posição dos pendentes, cortina fechada, sentido de abertura da porta, forno, abertura da churrasqueira, recorte da bancada do banho social).
 
 ### 10.1 Testes funcionais da Fase 2
 

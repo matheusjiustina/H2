@@ -101,6 +101,42 @@ export const vesselSink = (w = 0.5, d = 0.36): PrefabFn => (b) => {
   b.rbox('chrome', 0, 0.141, 0, w - 0.06, 0.002, d - 0.06, 0.02)
 }
 
+/**
+ * Semi-recessed basin (INT p.41): a slim ceramic rim 4 cm above the counter
+ * with the bowl sunk into it. Origin at counter level; the counter needs a
+ * cut-out of (w − 0.06) × (d − 0.06).
+ */
+export const semiRecessedSink = (w = 0.48, d = 0.36): PrefabFn => (b) => {
+  const rim = 0.04
+  const shape = new THREE.Shape()
+  const r = 0.05
+  shape.moveTo(-w / 2 + r, -d / 2)
+  shape.lineTo(w / 2 - r, -d / 2)
+  shape.quadraticCurveTo(w / 2, -d / 2, w / 2, -d / 2 + r)
+  shape.lineTo(w / 2, d / 2 - r)
+  shape.quadraticCurveTo(w / 2, d / 2, w / 2 - r, d / 2)
+  shape.lineTo(-w / 2 + r, d / 2)
+  shape.quadraticCurveTo(-w / 2, d / 2, -w / 2, d / 2 - r)
+  shape.lineTo(-w / 2, -d / 2 + r)
+  shape.quadraticCurveTo(-w / 2, -d / 2, -w / 2 + r, -d / 2)
+  const hole = new THREE.Path()
+  hole.absellipse(0, 0, w / 2 - 0.03, d / 2 - 0.03, 0, Math.PI * 2, true, 0)
+  shape.holes.push(hole)
+  const ring = new THREE.ExtrudeGeometry(shape, { depth: rim, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 32 })
+  b.geo('ceramic', ring, new THREE.Matrix4().makeRotationX(-Math.PI / 2))
+  // bowl: lathe profile traced from the rim to the centre (normals face up/in)
+  const prof = [
+    [1, rim],
+    [0.96, rim - 0.035],
+    [0.82, rim - 0.085],
+    [0.55, rim - 0.115],
+    [0.001, rim - 0.13],
+  ].map(([x, y]) => new THREE.Vector2(x, y))
+  const bowl = new THREE.LatheGeometry(prof, 40)
+  b.geo('ceramic', bowl, new THREE.Matrix4().makeScale(w / 2 - 0.03, 1, d / 2 - 0.03))
+  b.cyl('chrome', 0, rim - 0.129, 0, 0.022, 0.022, 0.002, 16)
+}
+
 export const faucet = (metal: SlotId, tall = false): PrefabFn => (b) => {
   const h = tall ? 0.32 : 0.16
   b.cyl(metal, 0, 0, 0, 0.022, 0.022, h)
@@ -123,10 +159,14 @@ export const fridge = (): PrefabFn => (b) => {
   for (const x of [-0.04, 0.04]) b.box('steel', [x - 0.008, 0.9, 0.02], [x + 0.008, 1.6, 0.05])
 }
 
-export const ovenColumnInsert = (): PrefabFn => (b) => {
-  b.box('screen', [-0.29, 0, -0.02], [0.29, 0.58, 0.005])
-  b.box('steel', [-0.29, 0.5, 0.005], [0.29, 0.58, 0.012])
-  b.box('steel', [-0.22, 0.44, 0.012], [0.22, 0.455, 0.04])
+/** Built-in oven under the cooktop (INT p.21): black glass door, steel band and bar handle. */
+export const builtInOven = (w = 0.6, h = 0.6): PrefabFn => (b) => {
+  b.box('screen', [-w / 2, 0, -0.02], [w / 2, h, 0.004])
+  b.box('smoke_glass', [-w / 2 + 0.08, 0.1, 0.004], [w / 2 - 0.08, h - 0.2, 0.008])
+  b.box('steel', [-w / 2, h - 0.11, 0.004], [w / 2, h, 0.01])
+  b.box('black_metal', [-0.07, h - 0.085, 0.01], [0.07, h - 0.03, 0.012])
+  b.box('steel', [-w / 2 + 0.06, h - 0.17, 0.035], [w / 2 - 0.06, h - 0.155, 0.05])
+  for (const x of [-w / 2 + 0.08, w / 2 - 0.08]) b.box('steel', [x - 0.008, h - 0.17, 0.004], [x + 0.008, h - 0.155, 0.035])
 }
 
 export const washer = (front = true): PrefabFn => (b) => {
@@ -177,15 +217,34 @@ export const kitchenFaucet = (metal: SlotId): PrefabFn => (b) => {
   b.cyl(metal, 0, 0.26, 0.22, 0.02, 0.02, 0.16)
 }
 
-/** INT p.25/26: built-in charcoal grill with black granite frame. */
+/**
+ * INT p.25/26: built-in charcoal grill — black granite frame, stainless
+ * lining, charcoal tray and two racks of skewers with handles at the front.
+ * Origin: centre of the opening's bottom edge, front face at z = 0.
+ */
 export const churrasqueira = (): PrefabFn => (b) => {
-  b.box('stone_gourmet', [-0.5, 0, -0.02], [0.5, 0.7, 0.03])
-  b.box('screen', [-0.4, 0.08, -0.5], [0.4, 0.62, -0.02])
-  b.box('steel', [-0.4, 0.08, -0.5], [0.4, 0.1, -0.02])
-  for (let k = 0; k < 2; k++) {
-    const y = 0.25 + k * 0.2
-    b.box('steel', [-0.38, y, -0.3], [0.38, y + 0.012, -0.28])
-    for (let i = 0; i < 4; i++) b.cyl('steel', -0.27 + i * 0.18, y + 0.012, -0.29, 0.012, 0.012, 0.03)
+  // granite frame (ring around the 0.80 × 0.54 opening)
+  b.box('stone_gourmet', [-0.5, 0, -0.02], [0.5, 0.08, 0.04])
+  b.box('stone_gourmet', [-0.5, 0.62, -0.02], [0.5, 0.7, 0.04])
+  b.box('stone_gourmet', [-0.5, 0.08, -0.02], [-0.4, 0.62, 0.04])
+  b.box('stone_gourmet', [0.4, 0.08, -0.02], [0.5, 0.62, 0.04])
+  // stainless lining
+  b.box('steel', [-0.4, 0.08, -0.52], [0.4, 0.62, -0.5])
+  b.box('steel', [-0.4, 0.08, -0.5], [-0.39, 0.62, -0.02])
+  b.box('steel', [0.39, 0.08, -0.5], [0.4, 0.62, -0.02])
+  b.box('steel', [-0.4, 0.61, -0.5], [0.4, 0.62, -0.02])
+  b.box('steel', [-0.4, 0.08, -0.5], [0.4, 0.09, -0.02])
+  // charcoal tray
+  b.box('screen', [-0.36, 0.09, -0.46], [0.36, 0.13, -0.08])
+  // two racks of skewers
+  for (const y of [0.3, 0.47]) {
+    b.box('steel', [-0.39, y - 0.01, -0.46], [-0.37, y, -0.04])
+    b.box('steel', [0.37, y - 0.01, -0.46], [0.39, y, -0.04])
+    for (let i = 0; i < 5; i++) {
+      const x = -0.28 + i * 0.14
+      b.box('steel', [x - 0.004, y, -0.46], [x + 0.004, y + 0.008, 0.0])
+      b.box('steel', [x - 0.022, y - 0.012, 0.0], [x + 0.022, y + 0.02, 0.025])
+    }
   }
 }
 

@@ -86,7 +86,7 @@ export function MasterCloset() {
     v.box('closet_wood', [22.8, 0.5, 4.16], [23.75, 0.76, 4.8])
     for (let i = 0; i < 3; i++) v.box('rubber', [23.75, 0.55 + i * 0.07, 4.18], [23.752, 0.553 + i * 0.07, 4.78])
     v.box('closet_wood', [22.75, F, 4.16], [22.8, 0.76, 5.34])
-    v.box('closet_counter', [22.74, 0.76, 4.06], [23.84, 0.8, 5.42])
+    v.ebox('closet_counter', [22.74, 0.76, 4.06], [23.84, 0.8, 5.42])
     // ceiling-hung brass ring mirror with LED (INT p.52)
     const ring = new THREE.TorusGeometry(0.42, 0.025, 10, 48)
     v.geo('closet_handles', ring, new THREE.Matrix4().compose(new THREE.Vector3(23.3, 1.62, 4.6), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0)), new THREE.Vector3(1, 1.15, 1)))

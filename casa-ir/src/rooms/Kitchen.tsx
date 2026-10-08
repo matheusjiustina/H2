@@ -10,7 +10,7 @@ import { Parts, PartsMeshes, clad, ledShelf, useParts, T } from './kit'
 import { Prefab, PrefabInstances } from '../furniture/prefab'
 import { cabinetRow, glassTopTable } from '../furniture/tables'
 import { diningChair } from '../furniture/seating'
-import { cooktop, downlight, fridge, globePendant, kitchenFaucet, ovenColumnInsert, sinkBasin, splitAC } from '../furniture/fixtures'
+import { builtInOven, cooktop, downlight, fridge, globePendant, kitchenFaucet, sinkBasin, splitAC } from '../furniture/fixtures'
 import { pothos } from '../furniture/plants'
 import { vase } from '../furniture/decor'
 import { addBlocker } from '../controls/colliders'
@@ -39,7 +39,7 @@ export function Kitchen() {
     // dishwasher (INT p.21) x 25.0–25.6
     cab.box('steel', [25.0, F + 0.1, Z1 - 0.6], [25.6, CT - 0.03, Z1 - 0.58])
     cab.box('screen', [25.0, F + 0.1, Z1 - 0.6], [25.6, CT - 0.03, Z1 - 0.62])
-    top.box('counter_kitchen', [22.65, CT - 0.03, Z1 - 0.63], [26.7, CT, Z1])
+    top.ebox('counter_kitchen', [22.65, CT - 0.03, Z1 - 0.63], [26.7, CT, Z1])
     // uppers above the window (INT p.20) + walnut frieze
     cab.with(T(0, 1.95, Z1 - 0.36, 180), () => cabinetRow(cab, 'cabinet_kitchen', -26.1, -23.45, 0, 0.68, 0.36, 4, { plinth: null, handle: null }))
     wood.box('wood_kitchen', [X0, 2.63, Z1 - 0.03], [X1, 2.8, Z1])
@@ -61,8 +61,9 @@ export function Kitchen() {
       cabinetRow(cab, 'cabinet_kitchen', 15.1, 15.6, 0, CT - F - 0.03, 0.6, 1, { handle: 'steel', plinth: 'backsplash_kitchen' })
       cabinetRow(cab, 'cabinet_kitchen', 12.15, 13.55, 0, 2.53, 0.62, 3, { handle: 'steel', plinth: 'backsplash_kitchen' })
     })
-    // oven under the cooktop (INT p.21)
-    top.box('counter_kitchen', [X1 - 0.63, CT - 0.03, 13.55], [X1, CT, Z1 - 0.6])
+    // oven housing under the cooktop (INT p.21); the tall run is pantry only
+    cab.box('cabinet_kitchen', [X1 - 0.6, F, 14.3], [X1 - 0.02, CT - 0.03, 15.1])
+    top.ebox('counter_kitchen', [X1 - 0.63, CT - 0.03, 13.55], [X1, CT, Z1 - 0.6])
     // terrazzo backsplash + hood box (INT p.19)
     clad(bs, 'backsplash_kitchen', 'e', X1, 13.55, Z1, CT, 2.63, 0.015)
     bs.box('backsplash_kitchen', [X1 - 0.55, 1.95, 14.25], [X1 - 0.015, 2.63, 15.2])
@@ -77,7 +78,7 @@ export function Kitchen() {
     isl.box('backsplash_kitchen', [24.45, F, 12.44], [25.02, F + 0.1, 14.57])
     isl.box('wood_kitchen', [24.4, F + 0.1, 12.39], [25.07, CT - 0.03, 14.62])
     for (let i = 1; i < 3; i++) isl.box('rubber', [25.07, 0.3 + i * 0.2, 12.5], [25.075, 0.305 + i * 0.2, 14.5])
-    top.box('counter_kitchen', [24.37, CT - 0.03, 12.36], [25.1, CT, 14.65])
+    top.ebox('counter_kitchen', [24.37, CT - 0.03, 12.36], [25.1, CT, 14.65])
 
     // ── Cristaleira on the north wall (INT p.22) x 23.05–24.85 ──
     clad(wood, 'wood_kitchen', 'n', Z0, 23.05, 24.85, F, 2.8, 0.025)
@@ -124,7 +125,7 @@ export function Kitchen() {
       <PrefabInstances id="kChair" build={diningChair('chair_kitchen_fabric', 'walnut_fixed')} items={chairs} selectable="kitchen_chairs" />
       <Prefab id="kFridge" build={fridge()} position={[22.18, F, Z1 - 0.02]} rotation={180} />
       <Prefab id="kCooktop" build={cooktop(0.75)} position={[X1 - 0.3, CT, 14.72]} rotation={90} />
-      <Prefab id="kOven" build={ovenColumnInsert()} position={[X1 - 0.6, 1.0, 12.85]} rotation={-90} />
+      <Prefab id="kOven" build={builtInOven(0.6, 0.6)} position={[X1 - 0.6, CT - 0.74, 14.7]} rotation={-90} />
       <Prefab id="kSink" build={sinkBasin(0.7, 0.42)} position={[24.3, CT, Z1 - 0.3]} />
       <Prefab id="kFaucet" build={kitchenFaucet('steel')} position={[24.3, CT, Z1 - 0.08]} rotation={180} />
       <Prefab id="kPothos" build={pothos(0.55)} position={[23.05, 2.23, Z1 - 0.3]} />

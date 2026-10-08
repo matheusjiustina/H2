@@ -9,7 +9,7 @@ import { useMemo } from 'react'
 import { Parts, PartsMeshes, useParts, T } from './kit'
 import { Prefab, PrefabInstances } from '../furniture/prefab'
 import { cabinetRow } from '../furniture/tables'
-import { toilet, vesselSink, faucet, showerHead, sconce, downlight } from '../furniture/fixtures'
+import { toilet, semiRecessedSink, faucet, showerHead, sconce, downlight } from '../furniture/fixtures'
 import { towel } from '../furniture/decor'
 import { addBlocker } from '../controls/colliders'
 import { HEIGHTS } from '../data/houseSpec'
@@ -28,7 +28,11 @@ export function SocialBathroom() {
     // vanity: taupe drawers + beige quartz counter (INT p.41)
     const v = p.of('socialbath_vanity')
     v.with(T(X1 - 0.52, F + 0.18, 0, -90), () => cabinetRow(v, 'socialbath_vanity', 3.78, 5.28, 0, 0.62, 0.5, 4, { handle: 'brass', plinth: null, drawers: 1 }))
-    v.box('socialbath_counter', [X1 - 0.55, 0.9, 3.75], [X1, 0.94, 5.3])
+    // counter with the cut-out for the semi-recessed basin (x X1−0.45…X1−0.15, z 4.41…4.83)
+    v.box('socialbath_counter', [X1 - 0.55, 0.9, 3.75], [X1, 0.94, 4.41])
+    v.box('socialbath_counter', [X1 - 0.55, 0.9, 4.83], [X1, 0.94, 5.3])
+    v.box('socialbath_counter', [X1 - 0.55, 0.9, 4.41], [X1 - 0.45, 0.94, 4.83])
+    v.box('socialbath_counter', [X1 - 0.15, 0.9, 4.41], [X1, 0.94, 4.83])
     // low ledge behind the WC (INT p.41)
     v.box('socialbath_counter', [X1 - 0.22, F, 2.85], [X1, 0.94, 3.75])
     // LED-backlit mirror
@@ -61,7 +65,7 @@ export function SocialBathroom() {
       <PartsMeshes parts={parts} />
       <PartsMeshes parts={glassPanes} />
       <Prefab id="bsWC" build={toilet()} position={[X1 - 0.22, F, 3.3]} rotation={-90} />
-      <Prefab id="bsSink" build={vesselSink(0.48, 0.36)} position={[X1 - 0.3, 0.94, 4.62]} rotation={-90} />
+      <Prefab id="bsSink" build={semiRecessedSink(0.48, 0.36)} position={[X1 - 0.3, 0.94, 4.62]} rotation={-90} />
       <Prefab id="bsFaucet" build={faucet('chrome')} position={[X1 - 0.07, 0.94, 4.62]} rotation={-90} />
       <Prefab id="bsShower" build={showerHead('chrome')} position={[30.75, 2.25, Z0 + 0.02]} />
       <PrefabInstances id="bsSconce" build={sconce()} items={[{ p: [X1 - 0.05, 1.75, 3.86], r: -90 }, { p: [X1 - 0.05, 2.2, 3.86], r: -90 }]} cast={false} />

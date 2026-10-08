@@ -470,7 +470,7 @@ const generators: Record<TextureKey, Gen> = {
     return pixelFill(S, (u, v) => {
       const f = fbm([n1, n2], u, v)
       const g = (r() - 0.5) * 36
-      return [clamp(236 + f * 10 + g), clamp(226 + f * 10 + g), clamp(205 + f * 8 + g)]
+      return [clamp(228 + f * 12 + g), clamp(209 + f * 11 + g), clamp(174 + f * 9 + g * 0.9)] // warm beach sand (ARQ p.7 / p.10)
     })
   },
   gravel: (S) => {

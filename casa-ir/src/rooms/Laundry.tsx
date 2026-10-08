@@ -30,7 +30,7 @@ export function Laundry() {
     // ── East run (faces west) ──
     const base = p.of('laundry_base')
     base.with(T(X1 - 0.6, F, 0, -90), () => cabinetRow(base, 'laundry_base', 12.4, 14.9, 0, CT - F - 0.03, 0.6, 4, { handle: 'steel', plinth: 'black_metal' }))
-    p.of('laundry_counter').box('laundry_counter', [X1 - 0.62, CT - 0.03, 12.36], [X1, CT, 15.5])
+    p.of('laundry_counter').ebox('laundry_counter', [X1 - 0.62, CT - 0.03, 12.36], [X1, CT, 15.5])
     clad(p.of('laundry_backsplash'), 'laundry_backsplash', 'e', X1, 12.36, 15.5, CT, 1.55, 0.012)
     const upE = p.of('laundry_upper')
     upE.with(T(X1 - 0.36, 1.65, 0, -90), () => cabinetRow(upE, 'laundry_upper', 12.4, 14.5, 0, 0.72, 0.36, 4, { handle: 'steel', plinth: null }))
@@ -58,7 +58,7 @@ export function Laundry() {
       cabinetRow(upW, 'laundry_upper', -15.45, -13.66, 0, 0.45, 0.6, 4, { handle: 'steel', handleV: false, plinth: 'black_metal' })
     })
     upW.with(T(X0 + 0.6, 0.55 + F, 0, 90), () => cabinetRow(upW, 'laundry_upper', -15.45, -13.66, 0, 0.3, 0.6, 4, { handle: 'steel', drawers: 1, plinth: null }))
-    p.of('laundry_counter').box('laundry_counter', [X0, CT - 0.03, 13.13], [X0 + 0.62, CT, 15.45])
+    p.of('laundry_counter').ebox('laundry_counter', [X0, CT - 0.03, 13.13], [X0 + 0.62, CT, 15.45])
     upW.with(T(X0 + 0.36, 1.65, 0, 90), () => cabinetRow(upW, 'laundry_upper', -15.4, -13.7, 0, 0.72, 0.36, 4, { handle: 'steel', plinth: null }))
     upW.box('led', [X0 + 0.32, 1.645, 13.75], [X0 + 0.34, 1.65, 15.35])
     // tall tower z 12.38–13.13

@@ -51,7 +51,7 @@ export function Gourmet() {
 
     // ── South run: base cabinets x 16.50 → 20.55 (faces north) ──
     wood.with(T(0, F, Z1 - 0.6, 180), () => cabinetRow(wood, 'wood_gourmet', -20.55, -16.5, 0, CT - F - 0.03, 0.6, 7, { handle: null, plinth: 'terrazzo_gourmet' }))
-    top.box('stone_gourmet', [16.45, CT - 0.03, Z1 - 0.63], [20.58, CT, Z1])
+    top.ebox('stone_gourmet', [16.45, CT - 0.03, Z1 - 0.63], [20.58, CT, Z1])
     // terrazzo backsplash between counter and frieze
     clad(tz, 'terrazzo_gourmet', 's', Z1, 16.45, 20.58, CT, 2.6, 0.015, [[16.95, 18.3, 1.2, 1.8]])
     // floating LED shelves above the window (INT p.26)
@@ -69,7 +69,14 @@ export function Gourmet() {
     for (const y of [0.45, 0.9, 1.35, 1.8, 2.25]) ledShelf(up, 'cabinet_gourmet', 21.19, 21.5, y, Z1 - 0.38, Z1 - 0.03, 0.025)
 
     // ── Churrasqueira column x 15.40–16.45 (INT p.25/26) ──
-    tz.box('terrazzo_gourmet', [15.4, F, Z1 - 0.85], [16.45, CEIL, Z1])
+    // column built around the grill opening (x 15.52–16.32, y 1.03–1.57, 0.5 m deep)
+    const GY0 = 1.03
+    const GY1 = 1.57
+    tz.box('terrazzo_gourmet', [15.4, F, Z1 - 0.85], [15.52, CEIL, Z1])
+    tz.box('terrazzo_gourmet', [16.32, F, Z1 - 0.85], [16.45, CEIL, Z1])
+    tz.box('terrazzo_gourmet', [15.52, F, Z1 - 0.85], [16.32, GY0, Z1])
+    tz.box('terrazzo_gourmet', [15.52, GY1, Z1 - 0.85], [16.32, CEIL, Z1])
+    tz.box('terrazzo_gourmet', [15.52, GY0, Z1 - 0.33], [16.32, GY1, Z1])
     // (grill insert rendered as a prefab)
 
     // ── TV wall on the solid north bay (INT p.27 — A-13) ──
@@ -117,7 +124,7 @@ export function Gourmet() {
       <PrefabInstances id="gChair" build={ropeChair('gourmet_chairs', 'walnut_fixed')} items={chairs} selectable="gourmet_chairs" />
       <PrefabInstances id="gStool" build={ropeStool('gourmet_chairs', 'walnut_fixed')} items={stools} selectable="gourmet_chairs" />
       <Prefab id="gWine" build={wineCooler()} position={[20.85, F, Z1 - 0.02]} rotation={180} />
-      <Prefab id="gGrill" build={churrasqueira()} position={[15.92, 0.95, Z1 - 0.85]} />
+      <Prefab id="gGrill" build={churrasqueira()} position={[15.92, 0.95, Z1 - 0.85]} rotation={180} />
       <Prefab id="gCooktop" build={cooktop(0.6)} position={[19.9, CT, Z1 - 0.3]} />
       <Prefab id="gSink" build={sinkBasin(0.6, 0.42)} position={[17.65, CT, Z1 - 0.3]} />
       <Prefab id="gFaucet" build={kitchenFaucet('black_metal')} position={[17.65, CT, Z1 - 0.08]} rotation={180} />

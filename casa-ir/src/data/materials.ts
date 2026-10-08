@@ -207,7 +207,7 @@ export const FINISHES = {
 
   // ── Exterior grounds ───────────────────────────────────────────────────
   grass: F({ label: 'Grama Esmeralda', family: 'ground', color: '#c6ccb2', tex: 'grass', texScale: 2.2, roughness: 1, swatch: '#5d7a3e' }),
-  sand: F({ label: 'Areia', family: 'ground', color: '#ffffff', tex: 'sand', texScale: 2.4, roughness: 1, swatch: '#e6dcc6' }),
+  sand: F({ label: 'Areia', family: 'ground', color: '#ffffff', tex: 'sand', texScale: 2.4, roughness: 1, swatch: '#dcc8a4' }),
   gravel: F({ label: 'Brita Branca', family: 'ground', color: '#ffffff', tex: 'gravel', texScale: 1.4, roughness: 1, bump: 0.6 }),
   pavers: F({ label: 'Piso Intertravado', family: 'ground', color: '#b8b5ae', tex: 'pavers', texScale: 1.6, roughness: 0.95 }),
   asphalt: F({ label: 'Asfalto', family: 'ground', color: '#ffffff', tex: 'asphalt', texScale: 4, roughness: 0.95 }),
