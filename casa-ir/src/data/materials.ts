@@ -119,7 +119,7 @@ export const FINISHES = {
   stone_granite_black: F({ label: 'Granito Preto São Gabriel', family: 'stone', color: '#ffffff', tex: 'granite', texScale: 0.7, roughness: 0.16, clearcoat: 0.7, swatch: '#272625' }),
   stone_marble_white: F({ label: 'Mármore Branco', family: 'stone', color: '#efede9', tex: 'marble', texScale: 2.2, roughness: 0.22, clearcoat: 0.5 }),
   stone_marble_beige: F({ label: 'Marmorizado Bege', family: 'stone', color: '#e2d8ca', tex: 'marble_soft', texScale: 1.6, roughness: 0.28, clearcoat: 0.4 }),
-  stone_gray: F({ label: 'Pedra Cinza', family: 'stone', color: '#a8a39c', tex: 'marble', texScale: 2.4, roughness: 0.4 }),
+  stone_gray: F({ label: 'Pedra Cinza', family: 'stone', color: '#a8a39c', tex: 'marble_soft', texScale: 2.4, roughness: 0.4 }),
   stone_quartz_white: F({ label: 'Quartzo Branco', family: 'stone', color: '#ece7df', tex: 'concrete', texScale: 0.6, roughness: 0.25, clearcoat: 0.5 }),
   stone_quartz_beige: F({ label: 'Quartzo Bege', family: 'stone', color: '#ddd3c4', tex: 'concrete', texScale: 0.6, roughness: 0.25, clearcoat: 0.5 }),
   stone_pebble: F({ label: 'Seixo Branco', family: 'stone', color: '#f4eee4', tex: 'pebble', texScale: 0.7, roughness: 0.8, bump: 0.8, swatch: '#ddd8ce' }),
@@ -168,7 +168,7 @@ export const FINISHES = {
   rug_terracotta: F({ label: 'Tapete Terracota', family: 'rug', color: '#a8714f', tex: 'rug_knit', texScale: 1.0, roughness: 1, bump: 0.6 }),
 
   // ── Floors ─────────────────────────────────────────────────────────────
-  floor_porcelain_beige: F({ label: 'Porcelanato Bege 120×120', family: 'floor', color: '#e8d9c3', tex: 'porcelain_grid', texScale: 1.2, roughness: 0.22, clearcoat: 0.35 }),
+  floor_porcelain_beige: F({ label: 'Porcelanato Bege 120×120', family: 'floor', color: '#edd8ba', tex: 'porcelain_grid', texScale: 1.2, roughness: 0.22, clearcoat: 0.35 }),
   floor_porcelain_gray: F({ label: 'Porcelanato Cimentício Cinza', family: 'floor', color: '#c6c2bb', tex: 'porcelain_grid', texScale: 1.2, roughness: 0.4, clearcoat: 0.2 }),
   floor_porcelain_white: F({ label: 'Porcelanato Branco', family: 'floor', color: '#efece6', tex: 'porcelain_grid', texScale: 1.2, roughness: 0.18, clearcoat: 0.4 }),
   floor_travertine: F({ label: 'Travertino Levigado', family: 'floor', color: '#e6dac7', tex: 'travertine', texScale: 1.2, roughness: 0.35 }),
@@ -177,7 +177,7 @@ export const FINISHES = {
   floor_wood_walnut: F({ label: 'Vinílico Nogueira', family: 'floor', color: '#755640', tex: 'deck', texScale: 2.4, roughness: 0.5 }),
   floor_concrete: F({ label: 'Cimentício', family: 'floor', color: '#c9c5bd', tex: 'concrete', texScale: 3, roughness: 0.7 }),
   floor_marble_beige: F({ label: 'Porcelanato Marmorizado', family: 'floor', color: '#ddd3c5', tex: 'marble_soft', texScale: 1.2, roughness: 0.3, clearcoat: 0.3 }),
-  floor_stone_gray: F({ label: 'Porcelanato Pedra Cinza', family: 'floor', color: '#b1aca5', tex: 'marble', texScale: 1.2, roughness: 0.4 }),
+  floor_stone_gray: F({ label: 'Porcelanato Pedra Cinza', family: 'floor', color: '#b1aca5', tex: 'marble_soft', texScale: 1.2, roughness: 0.4 }),
 
   // ── Metals ─────────────────────────────────────────────────────────────
   metal_brass: F({ label: 'Latão Escovado', family: 'metal', color: '#c7a265', roughness: 0.32, metalness: 1 }),
