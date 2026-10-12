@@ -405,7 +405,7 @@ export class ExpansionUI {
   }
 
   // ================================================================ breaker panel
-  breaker({ onSolved }) {
+  breaker({ onSolved, note = null }) {
     const st = { A: true, B: false, C: false, MAIN: false };
     let solved = false;
     const LINES = [['A', 'Line A', 'insulation blackened'], ['B', 'Line B', 'station load'], ['C', 'Line C', 'mast and lamps'], ['MAIN', 'Main', 'incomer']];
@@ -416,9 +416,12 @@ export class ExpansionUI {
         <div class="xp-brk${k === 'A' ? ' scorched' : ''}${k === 'MAIN' ? ' main' : ''}" data-k="${k}">
           <div class="xp-brk-lamp"></div>
           <button type="button" class="xp-brk-lever" aria-label="${n}"><span></span></button>
+          <div class="xp-brk-state"></div>
           <div class="xp-brk-name">${n}</div><div class="xp-brk-sub">${s}</div>
         </div>`).join('')}</div>
       <div class="xp-dev-status">The board is dead.</div>
+      <div class="xp-dev-keys">Click a lever to switch it (or press 1–4). Up is on.</div>
+      ${note ? `<details class="xp-kp-note"><summary>${esc(note.title)}</summary><div>${para(note.text)}</div></details>` : '<div class="xp-dev-keys">Whoever left the station may have written down how the board should be set. Look inside.</div>'}
       <button type="button" class="close-hint" data-close>Close · Esc</button>`);
     this._closeBtn(el);
     const status = el.querySelector('.xp-dev-status');
@@ -426,6 +429,7 @@ export class ExpansionUI {
       el.querySelectorAll('.xp-brk').forEach((b) => {
         const k = b.dataset.k;
         b.classList.toggle('on', st[k]);
+        b.querySelector('.xp-brk-state').textContent = st[k] ? 'On' : 'Off';
         const live = st.MAIN && (k === 'MAIN' || st[k]);
         b.classList.toggle('live', solved ? k !== 'A' : live && k !== 'A');
       });

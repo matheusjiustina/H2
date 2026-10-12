@@ -243,7 +243,7 @@ export class Expansion {
       size: [0.8, 0.9, 0.5], label: () => (this.flag('station.power') ? null : 'Open the breaker panel'),
       onInteract: () => {
         if (this.flag('station.power')) return;
-        this.ui.breaker({ onSolved: () => { this.setFlag('station.power'); this._stationVisuals(); g.audio?.play('click', { volume: 0.8 }); g.toast('Power restored. The terminal hums awake.'); } });
+        this.ui.breaker({ note: this.flag('note.stationLog') ? NOTES.stationLog : null, onSolved: () => { this.setFlag('station.power'); this._stationVisuals(); g.audio?.play('click', { volume: 0.8 }); g.toast('Power restored. The terminal hums awake.'); } });
       },
     });
     this.addSpot('station.terminal', { size: [0.9, 0.7, 0.6], label: () => (this.flag('station.power') ? 'Use the terminal' : 'Terminal (no power)'), onInteract: () => this._stationTerminal() });

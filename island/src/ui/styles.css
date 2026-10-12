@@ -408,7 +408,9 @@ html, body {
 .xp-brk-lever span { position: absolute; left: 4px; right: 4px; height: 26px; bottom: 4px; background: linear-gradient(180deg, #d9d4c6, #a7a294); border-radius: 3px; transition: bottom 0.15s ease; }
 .xp-brk.on .xp-brk-lever span { bottom: 32px; }
 .xp-brk.main .xp-brk-lever span { background: linear-gradient(180deg, #c8462e, #8e2c1c); }
-.xp-brk-name { margin-top: 10px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink); }
+.xp-brk-state { margin-top: 6px; font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-faint); }
+.xp-brk.on .xp-brk-state { color: var(--accent); }
+.xp-brk-name { margin-top: 6px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink); }
 .xp-brk-sub { font-size: 10.5px; color: var(--ink-faint); margin-top: 2px; }
 .xp-breaker.spark { animation: xp-spark 0.5s ease; }
 @keyframes xp-spark { 0% { box-shadow: inset 0 0 80px rgba(255, 200, 120, 0.45); } 100% { box-shadow: none; } }
