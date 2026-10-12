@@ -27,9 +27,12 @@ export class CollisionWorld {
     }
   }
 
-  /** Oriented box. x,y,z centre; hx,hy,hz half extents; yaw rotation. */
-  addBox({ x, y, z, hx, hy, hz, yaw = 0, walkable = false, surface = 'wood', solid = true, tag = null }) {
-    const c = { type: 'box', x, y, z, hx, hy, hz, yaw, cos: Math.cos(yaw), sin: Math.sin(yaw), walkable, surface, solid, tag, id: this.colliders.length };
+  /**
+   * Oriented box. x,y,z centre; hx,hy,hz half extents; yaw rotation. tiltX / tiltZ slope the
+   * whole box (rise in metres per metre along its local x / z), e.g. a listing deck.
+   */
+  addBox({ x, y, z, hx, hy, hz, yaw = 0, tiltX = 0, tiltZ = 0, walkable = false, surface = 'wood', solid = true, tag = null }) {
+    const c = { type: 'box', x, y, z, hx, hy, hz, yaw, cos: Math.cos(yaw), sin: Math.sin(yaw), tx: tiltX, tz: tiltZ, walkable, surface, solid, tag, id: this.colliders.length };
     this.colliders.push(c);
     const r = Math.hypot(hx, hz);
     this._insert(c, x - r, z - r, x + r, z + r);
@@ -93,7 +96,7 @@ export class CollisionWorld {
       if (c.type === 'box' && c.walkable) {
         const [lx, lz] = this._boxLocal(c, x, z);
         if (Math.abs(lx) <= c.hx + radius * 0.4 && Math.abs(lz) <= c.hz + radius * 0.4) {
-          const top = c.y + c.hy;
+          const top = c.y + c.hy + lx * c.tx + lz * c.tz;
           if (top <= maxY && top > y) { y = top; surface = c.surface; collider = c; }
         }
       } else if (c.type === 'ell') {
@@ -115,7 +118,7 @@ export class CollisionWorld {
       if (c.type !== 'box' || !c.solid) continue;
       const [lx, lz] = this._boxLocal(c, x, z);
       if (Math.abs(lx) <= c.hx + radius && Math.abs(lz) <= c.hz + radius) {
-        const bottom = c.y - c.hy;
+        const bottom = c.y - c.hy + lx * c.tx + lz * c.tz;
         if (bottom >= y && bottom < ceil) ceil = bottom;
       }
     }
@@ -135,11 +138,12 @@ export class CollisionWorld {
       for (const c of this.query(p.x, p.z, r + 1.5)) {
         if (!c.solid) continue;
         if (c.type === 'box') {
-          const y0 = c.y - c.hy, y1 = c.y + c.hy;
-          if (y1 <= lo || y0 >= hi) continue;
           const [lx, lz] = this._boxLocal(c, p.x, p.z);
           const cx = Math.max(-c.hx, Math.min(c.hx, lx));
           const cz = Math.max(-c.hz, Math.min(c.hz, lz));
+          const off = cx * c.tx + cz * c.tz;
+          const y0 = c.y - c.hy + off, y1 = c.y + c.hy + off;
+          if (y1 <= lo || y0 >= hi) continue;
           let ox = lx - cx, oz = lz - cz;
           let d = Math.hypot(ox, oz);
           if (d >= r) continue;
@@ -195,7 +199,7 @@ export class CollisionWorld {
       if (!c.solid) continue;
       if (c.type === 'box') {
         const [lx, lz] = this._boxLocal(c, x, z);
-        if (Math.abs(lx) < c.hx + pad && Math.abs(lz) < c.hz + pad && Math.abs(y - c.y) < c.hy + pad) return c;
+        if (Math.abs(lx) < c.hx + pad && Math.abs(lz) < c.hz + pad && Math.abs(y - c.y - lx * c.tx - lz * c.tz) < c.hy + pad) return c;
       } else if (c.type === 'cyl') {
         if (Math.hypot(x - c.x, z - c.z) < c.r + pad && y > c.y0 && y < c.y1) return c;
       } else if (c.type === 'ell') {

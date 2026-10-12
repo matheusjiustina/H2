@@ -114,7 +114,8 @@ export class PlayerController {
 
     // --- water state
     this.waterSurface = this.ocean.heightAt(p.x, p.z);
-    const groundH = this.terrain.heightAt(p.x, p.z);
+    // decks, docks and pontoons count as the bottom too (standing on a dock is not swimming)
+    const groundH = this.collision.ground(p.x, p.z, p.y + 0.6).y;
     this.waterDepth = this.waterSurface - groundH;
     const feetDepth = this.waterSurface - p.y;
 
@@ -273,9 +274,23 @@ export class PlayerController {
     p.x += v.x * dt; p.y += v.y * dt; p.z += v.z * dt;
     if (p.y > surfaceFeet + 0.05) p.y = surfaceFeet + 0.05;
     this.collision.resolve(p, RADIUS, HEIGHT, 0.2);
-    const g = this.terrain.heightAt(p.x, p.z);
+    const g = this.collision.ground(p.x, p.z, p.y + 0.35).y;
     if (p.y < g) { p.y = g; if (v.y < 0) v.y = 0; }
     this.onGround = false;
+    // climb out onto a low dock, pontoon, deck or rock ledge when swimming against it
+    if (!submerged && wish.len > 0.3) {
+      const ax = p.x + wish.x * 0.6, az = p.z + wish.z * 0.6;
+      const ledge = this.collision.ground(ax, az, this.waterSurface + 0.95, 0.15);
+      if (ledge.collider && ledge.y > this.waterSurface - 0.7) {
+        p.set(ax, ledge.y, az);
+        v.set(0, 0, 0);
+        this.mode = 'walk';
+        this.onGround = true;
+        this.landVel = 0.06;
+        if (this.onSplash) this.onSplash(p.x, p.z, 0.05);
+        return;
+      }
+    }
     if (Math.hypot(v.x, v.z) > 0.4 && !submerged) {
       this.wadeTimer -= dt;
       if (this.wadeTimer <= 0 && this.onSplash) {

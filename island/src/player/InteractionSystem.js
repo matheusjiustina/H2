@@ -69,6 +69,8 @@ export class InteractionSystem {
       // cheap reject using the object position
       it.object.getWorldPosition(this._hit);
       if (this._hit.distanceToSquared(cp) > (it.interactionDistance + 3) ** 2) continue;
+      // nothing to do here right now (a label function returning null)
+      if (!it.label(game)) continue;
       const box = it.worldBox();
       const hit = this.ray.intersectBox(box, this._hit);
       if (!hit) continue;

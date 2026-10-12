@@ -5,6 +5,7 @@ import { rng, Noise, smoothstep, clamp, lerp } from '../utils/MathUtils.js';
 import { createLeafTextures } from './LeafTextures.js';
 import { buildPalm, buildTree, buildBanana, buildFern, buildBigLeaf, buildBush } from './PlantGeometry.js';
 import { CAMP, PIER, WATERFALL, ISLET, VIEWPOINT } from '../world/Layout.js';
+import { EXCLUSIONS } from '../world/Archipelago.js';
 
 const CHUNK = 32;
 const PALM_HEIGHTS = [7.5, 9.2, 11, 12.8, 8.4];
@@ -129,6 +130,8 @@ export class VegetationManager {
     if (Math.hypot(x + 3.2, z + 2.8) < 3 + pad) return true; // fire pit
     if (Math.hypot(x - WATERFALL.x, z - (WATERFALL.z + 3)) < WATERFALL.poolRadius + 1.5 + pad) return true;
     if (Math.hypot(x - VIEWPOINT.x, z - VIEWPOINT.z) < 7 + pad) return true;
+    // sites on the archipelago and the ridge station
+    for (const [ex, ez, er] of EXCLUSIONS) if (Math.abs(x - ex) < er + pad && Math.hypot(x - ex, z - ez) < er + pad) return true;
     return false;
   }
 

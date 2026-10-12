@@ -1,10 +1,13 @@
 import { damp, clamp, rng } from '../utils/MathUtils.js';
 
+// Auto weather cycles through the four fair states; the storm is only set by hand (dev panel).
+// Wind stays light in all of them so flying, landing and boat trips are always possible.
 export const WEATHER_STATES = {
-  CLEAR: { label: 'Clear', cloud: 0.3, rain: 0, wind: 0.32, gust: 0.45, fog: 1.0, sunDim: 1.0, waves: 1.0, overcast: 0.0 },
-  CLOUDY: { label: 'Cloudy', cloud: 0.68, rain: 0, wind: 0.5, gust: 0.6, fog: 1.5, sunDim: 0.75, waves: 1.15, overcast: 0.35 },
-  LIGHT_RAIN: { label: 'Light rain', cloud: 0.88, rain: 0.38, wind: 0.55, gust: 0.65, fog: 2.6, sunDim: 0.32, waves: 1.25, overcast: 0.75 },
-  STORM: { label: 'Tropical storm', cloud: 1.0, rain: 1.0, wind: 1.0, gust: 1.0, fog: 4.6, sunDim: 0.1, waves: 1.75, overcast: 1.0 },
+  CLEAR: { label: 'Clear', cloud: 0.3, rain: 0, wind: 0.32, gust: 0.45, fog: 1.0, fogLow: 0, sunDim: 1.0, waves: 1.0, overcast: 0.0, stay: [240, 460] },
+  FOG: { label: 'Light fog', cloud: 0.42, rain: 0, wind: 0.14, gust: 0.2, fog: 7.5, fogLow: 1, sunDim: 0.72, waves: 0.75, overcast: 0.22, stay: [140, 240] },
+  CLOUDY: { label: 'Overcast', cloud: 0.72, rain: 0, wind: 0.48, gust: 0.55, fog: 1.6, fogLow: 0, sunDim: 0.68, waves: 1.12, overcast: 0.45, stay: [200, 380] },
+  LIGHT_RAIN: { label: 'Passing rain', cloud: 0.86, rain: 0.34, wind: 0.52, gust: 0.6, fog: 2.4, fogLow: 0.2, sunDim: 0.36, waves: 1.2, overcast: 0.72, stay: [70, 140] },
+  STORM: { label: 'Tropical storm', cloud: 1.0, rain: 1.0, wind: 1.0, gust: 1.0, fog: 4.6, fogLow: 0, sunDim: 0.1, waves: 1.75, overcast: 1.0, stay: [120, 200] },
 };
 
 const KEYS = Object.keys(WEATHER_STATES);
@@ -18,7 +21,7 @@ export class Weather {
     this.state = 'CLEAR';
     this.target = WEATHER_STATES.CLEAR;
     const t = this.target;
-    this.p = { cloud: t.cloud, rain: t.rain, wind: t.wind, gust: t.gust, fog: t.fog, sunDim: t.sunDim, waves: t.waves, overcast: t.overcast };
+    this.p = { cloud: t.cloud, rain: t.rain, wind: t.wind, gust: t.gust, fog: t.fog, fogLow: t.fogLow, sunDim: t.sunDim, waves: t.waves, overcast: t.overcast };
     this.wetness = 0;
     this.lightning = 0;
     this.transitionRate = 0.035; // ~30 s for a full transition
@@ -38,10 +41,11 @@ export class Weather {
     this.state = state;
     this.target = WEATHER_STATES[state];
     this.timer = 0;
-    this.nextChange = 200 + this.r() * 260;
+    const [a, b] = this.target.stay;
+    this.nextChange = a + this.r() * (b - a);
     if (instant) {
       const t = this.target;
-      Object.assign(this.p, { cloud: t.cloud, rain: t.rain, wind: t.wind, gust: t.gust, fog: t.fog, sunDim: t.sunDim, waves: t.waves, overcast: t.overcast });
+      Object.assign(this.p, { cloud: t.cloud, rain: t.rain, wind: t.wind, gust: t.gust, fog: t.fog, fogLow: t.fogLow, sunDim: t.sunDim, waves: t.waves, overcast: t.overcast });
       this.wetness = t.rain > 0 ? 0.8 : this.wetness;
     }
   }
@@ -49,11 +53,13 @@ export class Weather {
   _pickNext() {
     const r = this.r();
     const cur = this.state;
-    // mostly fair weather, storms are rare events
-    if (cur === 'CLEAR') return r < 0.55 ? 'CLOUDY' : r < 0.7 ? 'LIGHT_RAIN' : 'CLEAR';
-    if (cur === 'CLOUDY') return r < 0.45 ? 'CLEAR' : r < 0.8 ? 'LIGHT_RAIN' : 'STORM';
-    if (cur === 'LIGHT_RAIN') return r < 0.4 ? 'CLOUDY' : r < 0.7 ? 'CLEAR' : 'STORM';
-    return r < 0.6 ? 'LIGHT_RAIN' : 'CLOUDY';
+    // fair weather most of the time: overcast spells, the odd passing shower, morning fog
+    // banks. Storms never come on their own.
+    if (cur === 'CLEAR') return r < 0.38 ? 'CLOUDY' : r < 0.52 ? 'LIGHT_RAIN' : r < 0.64 ? 'FOG' : 'CLEAR';
+    if (cur === 'FOG') return r < 0.65 ? 'CLEAR' : 'CLOUDY';
+    if (cur === 'CLOUDY') return r < 0.45 ? 'CLEAR' : r < 0.8 ? 'LIGHT_RAIN' : r < 0.9 ? 'FOG' : 'CLOUDY';
+    if (cur === 'LIGHT_RAIN') return r < 0.55 ? 'CLOUDY' : 'CLEAR';
+    return 'LIGHT_RAIN';
   }
 
   update(dt) {
@@ -61,7 +67,7 @@ export class Weather {
     if (this.auto && this.timer > this.nextChange) this.set(this._pickNext());
     const k = this.transitionRate;
     const t = this.target;
-    for (const key of Object.keys(this.p)) this.p[key] = damp(this.p[key], t[key], k * (key === 'rain' ? 1.3 : 1), dt);
+    for (const key of Object.keys(this.p)) this.p[key] = damp(this.p[key], t[key], k * (key === 'rain' ? 1.3 : key === 'fog' || key === 'fogLow' ? 0.7 : 1), dt);
     // rain only once clouds have built up
     const rain = this.p.rain * clamp((this.p.cloud - 0.55) / 0.3, 0, 1);
     this.rain = rain;

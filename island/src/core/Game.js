@@ -40,6 +40,9 @@ import { Pebbles } from '../environment/Pebbles.js';
 import { Wildlife } from '../environment/Wildlife.js';
 import { Collectibles } from '../environment/Collectibles.js';
 import { Boat } from '../vehicles/Boat.js';
+import { Sites } from '../world/Sites.js';
+import { Shipwreck } from '../world/Shipwreck.js';
+import { Expansion } from '../systems/Expansion.js';
 import { AudioManager } from '../audio/AudioManager.js';
 import { UI } from '../ui/UI.js';
 
@@ -149,6 +152,9 @@ export class Game {
     this.seaplane = new Seaplane({ scene: this.scene, materials: this.materials, ocean: this.ocean, terrainData: this.terrainData, collision: this.collision, particles: this.particles, ripples: this.ripples, interaction: this.interaction, distant: this.distant, game: this });
     this.wildlife = new Wildlife({ scene: this.scene, terrainData: this.terrainData, ocean: this.ocean });
     this.collectibles = new Collectibles({ scene: this.scene, materials: this.materials, terrainData: this.terrainData, interaction: this.interaction, game: this });
+    // the archipelago: sites on the islands, the ridge station and the wreck
+    this.sites = new Sites({ scene: this.scene, terrainData: this.terrainData, materials: this.materials, collision: this.collision, rocksMaterial: this.rocks.material, ocean: this.ocean });
+    this.wreck = new Shipwreck({ scene: this.scene, collision: this.collision, materials: this.materials, terrainData: this.terrainData });
     this.weather.onThunder = (d, i) => this.audio.thunder(d, i);
     await this._yield();
 
@@ -162,12 +168,14 @@ export class Game {
 
     this.ui = new UI(this, this.uiRoot);
     if ('ontouchstart' in window || navigator.maxTouchPoints > 0) this.touch = new TouchControls(this, this.uiRoot);
+    // missions, treasure, relics and the Signal Lost story across the archipelago (saved progress)
+    this.expansion = new Expansion(this);
     this.input.onLockChange = (locked) => {
       if (!locked && this.state === 'playing' && !this.ui.open) this.pause();
     };
     // if the browser refused the lock (e.g. resumed too soon after Esc), a click on the view recaptures it
     this.canvas.addEventListener('mousedown', () => { if (this.state === 'playing' && !this.input.locked) this.input.lock(); });
-    this.systems.push(this.terrain, this.vegetation, this.grass, this.camp, this.rocks, this.waterfall, this.props);
+    this.systems.push(this.terrain, this.vegetation, this.grass, this.camp, this.rocks, this.waterfall, this.props, this.sites, this.wreck);
 
     this.applySettings();
     this.settings.onChange(() => this.applySettings());
@@ -304,7 +312,7 @@ export class Game {
     this.ui.hud.classList.toggle('show', !open);
   }
 
-  toast(text) { this.ui?.toast(text); }
+  toast(text, dur) { this.ui?.toast(text, dur); }
 
   // ------------------------------------------------------------------ actions
   pickUp(id) {
@@ -387,12 +395,16 @@ export class Game {
       if (this.state === 'paused') { if (this.ui.pauseMain.style.display === 'none') this.ui.showPanel('main'); else this.resume(); return; }
     }
     if (this.state === 'menu') {
-      if (inp.wasPressed('inventory') && this.ui.open === 'inv') this.ui.closeAll();
+      if (inp.wasPressed('journal') && this.ui.open) this.expansion?.ui.openJournal();
+      else if (inp.wasPressed('inventory') && this.ui.open === 'inv') this.ui.closeAll();
       else if (inp.wasPressed('notebook') && this.ui.open === 'note') this.ui.closeAll();
       else if (inp.wasPressed('map') && this.ui.open === 'map') this.ui.closeAll();
       return;
     }
     if (this.state !== 'playing') return;
+    if (inp.wasPressed('journal')) { this.expansion?.ui.openJournal(); return; }
+    // away from the home island (or afloat) M shows the chart of the outer islands
+    if (inp.wasPressed('map') && (this.player.mode === 'boat' || this.player.mode === 'plane' || !this._nearHome())) { this.expansion?.ui.openChart(); return; }
     if (this.player.mode === 'plane') return; // the seaplane reads its own keys
     if (inp.wasPressed('timeBack')) this.setTime(this.timeOfDay.hour - 1);
     if (inp.wasPressed('timeFwd')) this.setTime(this.timeOfDay.hour + 1);
@@ -408,6 +420,12 @@ export class Game {
     // number keys equip items quickly
     const order = ['lantern', 'flashlight', 'compass', 'camera', 'binoculars', 'mug', 'pebble'];
     for (let i = 0; i < 7; i++) if (inp.pressed.has(`Digit${i + 1}`) && this.inventory.has(order[i])) this.inventory.equip(order[i]);
+  }
+
+  _nearHome() {
+    const { x0, x1, z0, z1 } = this.camp.mapBounds;
+    const p = this.player.pos;
+    return p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1;
   }
 
   _frame(now) {
@@ -476,6 +494,7 @@ export class Game {
     this.pebbles.update(simDt, this);
     this.wildlife.update(simDt, this);
     this.collectibles.update(simDt, this);
+    this.expansion?.update(simDt, dt);
     this.tools.update(dt);
     this.rig.update(dt, this);
     this.particles.update(simDt);

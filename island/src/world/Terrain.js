@@ -2,7 +2,10 @@ import * as THREE from 'three';
 import { patchMaterial } from '../core/MaterialPatch.js';
 import { LAYER } from '../core/Shared.js';
 
-const CHUNKS = 8;
+// chunk edge length in metres (the chunk count follows the terrain size)
+const CHUNK_SIZE = 128;
+// chunks lying entirely deeper than this are not built: the water hides them anyway
+const DEEP = -24;
 
 // Terrain splat shading: 7 procedural layers in texture arrays, height-blended,
 // rock triplanar on cliffs, wet sand band with wave wash, puddles in rain.
@@ -162,6 +165,7 @@ export class Terrain {
     this.material = mat;
 
     const { res, size } = data;
+    const CHUNKS = Math.round(size / CHUNK_SIZE);
     const per = (res - 1) / CHUNKS;
     const W = per + 1;
     const chunkSize = size / CHUNKS;
@@ -213,6 +217,9 @@ export class Terrain {
       for (let cx = 0; cx < CHUNKS; cx++) {
         const x0 = -size / 2 + cx * chunkSize;
         const z0 = -size / 2 + cz * chunkSize;
+        let top = -Infinity;
+        for (let j = cz * per; j <= (cz + 1) * per; j++) for (let i = cx * per; i <= (cx + 1) * per; i++) top = Math.max(top, data.heights[j * res + i]);
+        if (top < DEEP) continue;
         const nv = W * W + skirtList.length;
         const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2);
         const H = (a, b) => data.heights[Math.min(res - 1, Math.max(0, b)) * res + Math.min(res - 1, Math.max(0, a))];

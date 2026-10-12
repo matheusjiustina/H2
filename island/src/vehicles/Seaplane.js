@@ -97,6 +97,8 @@ export class Seaplane {
     this.fm.reset(new THREE.Vector3(MOOR.x, water + 1.9, MOOR.z), MOOR.heading);
     this.assist.reset();
     this.moored = !this.occupied;
+    this.anchor = { anchor: new THREE.Vector3(MOOR.x, 0, MOOR.z), heading: MOOR.heading };
+    this.atPierAnchor = true;
     this.damage = 0;
     this.broken = false;
     this._sync();
@@ -180,11 +182,15 @@ export class Seaplane {
       game.audio?.play('splash', { volume: 0.7 });
     }
     if (game.player.mode === 'plane') game.player.mode = 'walk';
-    // tie up again when left by the pier
-    if (Math.hypot(fm.pos.x - MOOR.x, fm.pos.z - MOOR.z) < 8 && fm.out.airspeed < 2) {
-      this.moored = true;
+    // shut down and make fast where she was left: tied to the pier by the old mooring, or
+    // anchored wherever else she sits on the water, so she never drifts off
+    if (fm.out.onWater || fm.out.onGround) {
       fm.engine = 'off';
       fm.throttle = 0;
+      const atPier = Math.hypot(fm.pos.x - MOOR.x, fm.pos.z - MOOR.z) < 8;
+      this.anchor = atPier ? { anchor: new THREE.Vector3(MOOR.x, 0, MOOR.z), heading: MOOR.heading } : { anchor: new THREE.Vector3(fm.pos.x, 0, fm.pos.z), heading: Math.atan2(fwd.x, fwd.z) };
+      this.atPierAnchor = atPier;
+      this.moored = true;
     }
   }
 
@@ -207,7 +213,7 @@ export class Seaplane {
     const w = U.uWind.value;
     const gust = (Math.sin(game.time * 0.7) * 0.5 + Math.sin(game.time * 1.9 + 1.3) * 0.3) * game.weather.p.gust;
     this.env.wind.set(w.x, 0, w.y).multiplyScalar(w.z * (6 + gust * 3));
-    this.env.mooring = this.moored && !this.occupied ? { anchor: new THREE.Vector3(MOOR.x, 0, MOOR.z), heading: MOOR.heading } : null;
+    this.env.mooring = this.moored && !this.occupied ? this.anchor : null;
     const prop = this._v2.set(0, 0.12, 3.5).applyQuaternion(fm.quat).add(fm.pos);
     this.env.engineSubmerged = prop.y < this.ocean.heightAt(prop.x, prop.z) - 0.2;
 
@@ -645,7 +651,7 @@ export class Seaplane {
     this._ropeTimer -= dt;
     if (this._ropeTimer > 0) return;
     this._ropeTimer = 0.1;
-    if (this.moored && !this.occupied && !this.broken) {
+    if (this.moored && this.atPierAnchor && !this.occupied && !this.broken) {
       const cleat = this._v.set(-1.55, -1.48, 3.6).applyQuaternion(this.fm.quat).add(this.fm.pos);
       const post = this._v2.set(PIER.x - PIER.width / 2 + 0.08, 0, MOOR.z - 4);
       post.y = this.collision.ground(post.x, post.z, 10).y + 0.25;

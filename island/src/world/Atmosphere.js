@@ -95,7 +95,9 @@ export class Atmosphere {
     fogColor.multiplyScalar(0.95);
     U.uFogSunColor.value.copy(fogColor).lerp(_c.copy(t.glow).multiplyScalar(1.1), 0.55 * (1 - o));
     U.uFogDensity.value = 0.00028 * t.fogMul * w.fog;
-    U.uFogHeightFalloff.value = lerp(0.012, 0.006, o);
+    // fog banks hug the water: a steeper height falloff keeps them low, so from a few
+    // tens of metres up (or on approach in the seaplane) the islands stay in view
+    U.uFogHeightFalloff.value = lerp(lerp(0.012, 0.006, o), 0.042, w.fogLow || 0);
 
     // clouds
     U.uCloudCover.value = w.cloud;

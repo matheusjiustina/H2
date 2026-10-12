@@ -1,12 +1,14 @@
+import { ARCHIPELAGO_POIS } from './Archipelago.js';
+
 // Hand-authored layout of the island region. All coordinates are metres.
 // +X = east, -Z = "north" (towards the lagoon / reef), sea level = 0.
 // The camp sits on the northern beach at the origin looking north across the lagoon.
 
 export const WORLD = {
-  size: 1024, // terrain extent (square, centred on origin)
-  res: 513, // heightfield samples per side (2 m spacing)
+  size: 2048, // terrain extent (square, centred on origin): the main island and the archipelago
+  res: 1025, // heightfield samples per side (2 m spacing)
   seaLevel: 0,
-  playRadius: 560, // soft boundary for player / boat
+  playRadius: 975, // soft boundary for player / boat
 };
 
 // Main island coastline (closed loop, clockwise seen from above). Smoothed with Catmull-Rom.
@@ -76,6 +78,7 @@ export const POIS = [
   { id: 'westpoint', name: 'Driftwood Point', x: -296, z: -48, radius: 26 },
   { id: 'overlook', name: 'Ridge Overlook', x: 52, z: 154, radius: 14 },
   { id: 'wreck', name: 'Beached Wreck', x: -168, z: -26, radius: 14 },
+  ...ARCHIPELAGO_POIS,
 ];
 
 export const SPAWN = { x: 0.6, z: 5.6, yaw: 0.12, pitch: -0.04 };

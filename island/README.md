@@ -55,8 +55,9 @@ start on Low) and remembers any change you make in Settings.
 | Q | Stow the held item |
 | 1–7 | Equip an inventory item |
 | Tab / I | Inventory and photos |
-| M | Survey chart |
+| M | Survey chart (away from the home island, or afloat: the chart of the outer islands) |
 | N | Field notebook |
+| J | Journal: missions, Relic Archive, clues and the archipelago chart |
 | Esc / P | Pause, settings and controls |
 | F2 / ` | Debug panel (time of day, weather, speed, stats) |
 | [ / ] | Move the clock back or forward one hour |
@@ -152,12 +153,61 @@ show up only when they do something. The top corner has your bag and pause.
   and clumped grass. Each type has its own wind behaviour in the shader. Plants are
   instanced per 32 m chunk with CPU culling and three LODs.
 - **Time and weather:** the day runs early morning → noon → golden hour → sunset → night
-  → pre-dawn. Weather moves gradually between Clear, Cloudy, Light rain and Tropical
-  storm. Weather changes wetness, puddles, rain ripples on the water, wind, waves,
-  lightning and the audio mix.
+  → pre-dawn. Weather drifts on its own between Clear, Light fog (a low bank over the
+  water that thins with height), Overcast and Passing rain (short showers). Wind stays
+  light in all of them, so sailing, flying and landing always work, and no mission
+  depends on the weather. A Tropical storm exists only in the developer panel. Weather
+  changes wetness, puddles, rain ripples on the water, wind, waves, fog and the audio mix.
 - **Life:** birds, seabirds, fish, rays, butterflies, fireflies and crabs.
 - **Exploration:** 12 rare shells to find. Reaching points of interest adds notes to the
   notebook.
+
+## The outer islands
+
+The world is 2 km across. Beyond the reef lie four explorable islands, two offshore
+shoals and a wreck, reached by skiff or seaplane:
+
+- **The Forgotten Outpost** (north-west): dock, communications hut with a radio console,
+  a dead antenna mast, crates, a damaged solar array and storage under the hut floor.
+- **Smuggler's Cove** (north-east): a secluded beach and loading dock, a cargo shelter
+  with a radio and cipher wheel, shipping containers, and a narrow trail to a hidden
+  store.
+- **Relic Island** (west): ruins and a stone ring, rock outcrops, a small cave, a
+  half-buried container and an observation tower on the summit.
+- **Airstrip Island** (south): sheltered landing water, a floating dock, fuel store,
+  research shelter, a radio beacon on the point and an abandoned camp.
+- **The Lost Vessel**: a rusted coastal freighter aground on a shoal west of the cove,
+  half under water. Board her from the skiff at the gap in the port rail aft. The deck
+  and the wheelhouse are walkable.
+- **Needle Rock** and the **Lost Sandbar**: two small offshore places with caches.
+
+**Signal Lost** is the main story. A radio station on the ridge above the falls receives
+five transmissions; each one opens the next step: restore the station's power (a breaker
+panel), tune the receiver, follow the clues to the outpost, bring its antenna back online,
+recover three signal fragments, chain them back together at the station, wake the old
+node on Relic Island, link the nodes in the right order and open the vault under the
+observation tower.
+
+**Missions** come from the story, from the **harbour ledger** on the pier (skiff jobs and
+seaplane charters) and from clues you find. Cargo runs show the cargo in the skiff or the
+seaplane; it does not change how they handle. Load it next to the vehicle, arrive and stop
+at the destination, step out and unload it. Missions can be tracked, restarted from the
+ledger or the journal, and fail only if the cargo is lost (a seaplane crash), in which
+case the cargo goes back to the pier. The ledger can also bring the skiff and the
+seaplane back to their moorings from anywhere.
+
+**Treasure** comes in four kinds of container: supply caches, rugged hard cases,
+encrypted strongboxes with keypads and heavy vaults. There are 17, each opened once.
+Chart fragments mark caches on the archipelago chart.
+
+**Relics** are fictional in-game collectibles kept in the **Relic Archive** (J). There are
+ten, from Common to Legendary, each with an id, rarity, description, location and lore.
+Relics and credits have no real-world value. Nothing is minted, traded or withdrawn.
+
+**Progress** (missions, containers, relics, credits, clues, world changes such as opened
+hatches and powered antennas) is saved in the browser (`localStorage`, key
+`tidemark.progress.v1`) and restored on load. *Journal → Clues → Reset expedition
+progress* clears it.
 
 ## Architecture
 
@@ -166,7 +216,9 @@ src/
   core/        Game loop & system wiring, Renderer (frame graph), Input, Settings,
                Shared uniforms + GLSL libraries, MaterialPatch (world shading injected
                into MeshStandardMaterial: wind, wetness, caustics, canopy, cloud shadows, fog)
-  world/       Layout (art-directed map), TerrainData (heights, distance fields, splats),
+  world/       Layout (art-directed map), Archipelago (outer islands and shoals),
+               TerrainData (heights, distance fields, splats), Sites + SiteKit (buildings
+               and props on the islands), Shipwreck,
                Terrain (chunked LOD), Textures (GPU-baked procedural materials), Sky,
                CloudBillboards, TimeOfDay, Weather, Atmosphere (sun, IBL, fog, grading),
                Ocean, Rocks, Waterfall, DistantScenery
@@ -178,7 +230,10 @@ src/
   effects/     Post-processing passes, particles, rain, ripple simulation, footprints
   audio/       AudioManager (layered ambience, HRTF 3D sounds, underwater filter),
                ProceduralSounds (all default sounds are synthesized)
-  ui/          HUD, menus, inventory, notebook, chart, debug panel
+  systems/     Content (relics, containers, clues, missions as data), Progress (save),
+               Expansion (containers, site interactions, cargo, mission engine)
+  ui/          HUD, menus, inventory, notebook, chart, debug panel; ExpansionUI (mission
+               tracker and waypoint, reveal card, puzzles, harbour ledger, journal)
 ```
 
 Each frame is one central loop (`Game.update` and then `Game.render`). The renderer

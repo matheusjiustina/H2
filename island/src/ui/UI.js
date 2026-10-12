@@ -61,7 +61,7 @@ export class UI {
         <div class="title-name">TIDEMARK</div>
         <div class="title-sub">a lagoon field journal</div>
         <button class="title-start">Begin</button>
-        <div class="title-keys">WASD move · Mouse look · Shift sprint · Space jump · E interact · F use · R put down · Q stow · Tab inventory · M map · N notebook · Esc pause</div>
+        <div class="title-keys">WASD move · Mouse look · Shift sprint · Space jump · E interact · F use · R put down · Q stow · Tab inventory · M map · N notebook · J journal · Esc pause</div>
         <div class="title-keys touch-only">Left thumb moves, push to the rim to run · Right thumb looks around · E interacts, F uses what you hold</div>
       </div>`);
     this.title.querySelector('.title-start').addEventListener('click', (e) => { e.stopPropagation(); this.game.start(); });
@@ -74,6 +74,7 @@ export class UI {
       <div class="menu-title">Paused</div>
       <button data-a="continue">Continue</button>
       <button data-a="leavePlane" hidden>Get out of the seaplane</button>
+      <button data-a="journal">Journal</button>
       <button data-a="settings">Settings</button>
       <button data-a="controls">Controls</button>
       <button data-a="restart">Restart</button>`);
@@ -81,6 +82,7 @@ export class UI {
       const a = e.target.dataset.a;
       if (a === 'continue') this.game.resume();
       if (a === 'leavePlane' && this.game.seaplane.canExit()) { this.game.resume(); this.game.seaplane.exit(this.game); }
+      if (a === 'journal') this.game.expansion?.ui.openJournal();
       if (a === 'settings') this.showPanel('settings');
       if (a === 'controls') this.showPanel('controls');
       if (a === 'restart') this.game.restart();
@@ -95,7 +97,8 @@ export class UI {
         <div><b>F / Left click</b><span>Use held item · contextual action</span></div><div><b>Right mouse</b><span>Aim camera / binoculars</span></div>
         <div><b>R</b><span>Put down held item</span></div><div><b>Q</b><span>Stow held item</span></div>
         <div><b>Tab / I</b><span>Inventory</span></div><div><b>M</b><span>Map</span></div>
-        <div><b>N</b><span>Field notebook</span></div><div><b>Esc</b><span>Pause</span></div>
+        <div><b>N</b><span>Field notebook</span></div><div><b>J</b><span>Journal · missions · relics</span></div>
+        <div><b>M away from camp</b><span>Chart of the outer islands</span></div><div><b>Esc</b><span>Pause</span></div>
         <div><b>In the boat</b><span>W/S throttle · A/D steer · E leave</span></div><div><b>F2</b><span>Developer panel</span></div>
       </div>
       <div class="menu-sub">Flying the seaplane</div>
@@ -374,19 +377,23 @@ export class UI {
     const photos = g.inventory.photos.slice().reverse().map((p) => `<figure><img src="${p.url}"><figcaption>${p.caption}</figcaption></figure>`).join('');
     const shells = g.inventory.count('shell');
     const found = [...this.discovered].length;
+    const xp = g.expansion?.P.data;
+    const xpLine = xp ? ` · ${Math.round(xp.credits).toLocaleString('en-US')} credits · ${Object.keys(xp.relics).length} relics` : '';
     this.inv.innerHTML = `
       <div class="panel">
-        <div class="panel-head"><span>Inventory</span><span class="dim">${shells}/12 shells · ${found}/${POIS.length} places</span></div>
+        <div class="panel-head"><span>Inventory</span><span class="dim">${shells}/12 shells · ${found}/${POIS.length} places${xpLine}</span></div>
         <div class="inv-grid">${items}</div>
         ${photos ? `<div class="panel-head small">Photographs</div><div class="photos">${photos}</div>` : ''}
+        ${xp ? '<button type="button" class="xp-btn inv-journal" data-journal>Journal &amp; Relic Archive · J</button>' : ''}
         <button type="button" class="close-hint" data-close>Close · Tab</button>
       </div>`;
+    this.inv.querySelector('[data-journal]')?.addEventListener('click', () => g.expansion.ui.openJournal());
     this.inv.querySelectorAll('.inv-item').forEach((el) => el.addEventListener('click', () => {
       const id = el.dataset.id;
       if (ITEMS[id]?.hold) {
         if (g.inventory.equipped === id) g.inventory.unequip(); else g.inventory.equip(id);
         this.openInventory();
-      } else if (id === 'map') { this.closeAll(); this.openMap(); } else if (id === 'notebook') { this.closeAll(); this.openNotebook(); }
+      } else if (id === 'map') { this.closeAll(); this.openMap(); } else if (id === 'notebook') { this.closeAll(); this.openNotebook(); } else if (g.expansion && ['navLog', 'accessCode', 'expeditionNotes', 'signalFragment', 'mapFragment'].includes(id)) g.expansion.ui.openJournal(id === 'mapFragment' ? 'chart' : 'clues');
     }));
     this._open('inv');
   }
@@ -414,8 +421,10 @@ export class UI {
       <div class="map-wrap">
         <img src="${camp.mapCanvas.toDataURL('image/jpeg', 0.9)}">
         <div class="you" style="left:${px}%;top:${pz}%;transform:translate(-50%,-50%) rotate(${yawDeg}deg)"></div>
+        ${g.expansion ? '<button type="button" class="xp-btn map-outer" data-outer>Chart of the outer islands</button>' : ''}
         <button type="button" class="close-hint" data-close>Close · M</button>
       </div>`;
+    this.map.querySelector('[data-outer]')?.addEventListener('click', () => g.expansion.ui.openChart());
     this._open('map');
   }
 
@@ -430,7 +439,8 @@ export class UI {
 
   closeAll(notify = true) {
     for (const el of [this.inv, this.note, this.map]) el.classList.remove('show');
-    const was = this.open;
+    const xpWas = this.game.expansion?.ui.closeAll(false) || false;
+    const was = this.open || xpWas;
     this.open = null;
     if (notify && was) this.game.setMenuOpen(false);
   }

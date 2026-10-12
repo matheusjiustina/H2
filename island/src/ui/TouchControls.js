@@ -28,6 +28,7 @@ export class TouchControls {
       <div class="touch-move"><div class="touch-stick"><div class="touch-knob"></div></div></div>
       <div class="touch-buttons">${BUTTONS.map((b) => `<button type="button" class="touch-btn" data-id="${b.id}"${b.plane ? " hidden" : ""}>${b.label}</button>`).join('')}</div>
       <div class="touch-top">
+        <button type="button" class="touch-btn small" data-act="journal">Log</button>
         <button type="button" class="touch-btn small" data-act="inventory">Bag</button>
         <button type="button" class="touch-btn small" data-act="pause">II</button>
       </div>`;
@@ -116,6 +117,9 @@ export class TouchControls {
       btn.addEventListener('touchcancel', up);
     }
     this.el.querySelector('[data-act=pause]').addEventListener('click', () => this.game.pause());
+    this.el.querySelector('[data-act=journal]').addEventListener('click', () => {
+      if (this.game.state === 'playing') this.game.expansion?.ui.openJournal();
+    });
     this.el.querySelector('[data-act=inventory]').addEventListener('click', () => {
       if (this.game.state === 'playing') this.input.pressCode('Tab');
       setTimeout(() => this.input.releaseCode('Tab'), 50);

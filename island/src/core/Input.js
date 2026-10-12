@@ -15,6 +15,7 @@ const BINDINGS = {
   inventory: ['Tab', 'KeyI'],
   map: ['KeyM'],
   notebook: ['KeyN'],
+  journal: ['KeyJ'],
   debug: ['F2', 'Backquote'],
   hideHud: ['F1'],
   timeBack: ['BracketLeft'],

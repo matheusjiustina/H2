@@ -110,6 +110,9 @@ export class Boat {
     this.moored = true;
     this.mooringPoint = camp.mooring.clone();
     this.mooringAnchor = this.pos.clone();
+    this.homeAnchor = this.pos.clone();
+    this.anchorHeading = Math.PI;
+    this.atHomePier = true;
     this.occupied = false;
     this.prompt = '';
     this.lookYaw = 0;
@@ -275,8 +278,24 @@ export class Boat {
       game.particles.splash(c.x, this.ocean.heightAt(c.x, c.z), c.z, 1);
       game.audio?.play('splash');
     }
-    // moor automatically if left next to the pier
-    if (this.pos.distanceTo(this.mooringAnchor) < 6) { this.moored = true; }
+    // made fast where she was left: tied up at the camp pier, or anchored anywhere else so
+    // she is still there when you come back
+    this.atHomePier = this.pos.distanceTo(this.homeAnchor) < 6;
+    if (this.atHomePier) { this.mooringAnchor.copy(this.homeAnchor); this.anchorHeading = Math.PI; } else { this.mooringAnchor.copy(this.pos); this.anchorHeading = this.heading; }
+    this.moored = true;
+  }
+
+  /** Bring the skiff back to her mooring at the camp pier (keeps whatever cargo she carries). */
+  recall() {
+    if (this.occupied) return;
+    this.pos.copy(this.homeAnchor);
+    this.vel.set(0, 0);
+    this.angVel = 0;
+    this.heading = Math.PI;
+    this.mooringAnchor.copy(this.homeAnchor);
+    this.anchorHeading = Math.PI;
+    this.atHomePier = true;
+    this.moored = true;
   }
 
   // ------------------------------------------------------------------ simulation
@@ -335,7 +354,7 @@ export class Boat {
     this._ropeTimer -= dt;
     if (this._ropeTimer <= 0) {
       this._ropeTimer = 0.1;
-      if (this.moored && !this.occupied) {
+      if (this.moored && this.atHomePier && !this.occupied) {
         const bow = new THREE.Vector3(0, sheerY(1) - 0.05, HALF - 0.1).applyEuler(this.group.rotation).add(this.group.position);
         const g = ropeGeometry(this.mooringPoint, bow, 0.35, 0.014, 10);
         this.ropeMesh.geometry.dispose();
@@ -357,7 +376,8 @@ export class Boat {
     const right = new THREE.Vector2(c, -s);
     // velocity in boat space
     let vf = this.vel.dot(fwd), vr = this.vel.dot(right);
-    const thrust = this.occupied ? this.throttle * (this.throttle > 0 ? 3.4 : 1.6) : 0;
+    // ~12 kt flat out: enough to cross to the outer islands in a couple of minutes
+    const thrust = this.occupied ? this.throttle * (this.throttle > 0 ? 5.6 : 1.8) : 0;
     vf += (thrust - vf * Math.abs(vf) * 0.09 - vf * 0.25) * dt;
     vr -= vr * 3.2 * dt;
     // steering: outboard steering works with thrust and speed
@@ -370,7 +390,7 @@ export class Boat {
       const dx = this.mooringAnchor.x - this.pos.x, dz = this.mooringAnchor.z - this.pos.z;
       vf += (dx * fwd.x + dz * fwd.y) * 0.8 * dt;
       vr += (dx * right.x + dz * right.y) * 0.8 * dt;
-      this.angVel += wrapAngle(Math.PI - this.heading) * 0.4 * dt + Math.sin(U.uTime.value * 0.3) * 0.004;
+      this.angVel += wrapAngle(this.anchorHeading - this.heading) * 0.4 * dt + Math.sin(U.uTime.value * 0.3) * 0.004;
     }
 
     this.vel.set(fwd.x * vf + right.x * vr, fwd.y * vf + right.y * vr);

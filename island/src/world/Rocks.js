@@ -4,6 +4,7 @@ import { patchMaterial } from '../core/MaterialPatch.js';
 import { LAYER } from '../core/Shared.js';
 import { Noise, rng, smoothstep, clamp } from '../utils/MathUtils.js';
 import { VIEWPOINT, WATERFALL, ISLET, CAMP, PIER } from './Layout.js';
+import { ISLANDS, EXCLUSIONS, SITE_ROCKS } from './Archipelago.js';
 
 /** Build a displaced boulder geometry with baked crevice AO in vertex colours. */
 function rockGeometry(seed, { flat = 0.75, sharp = 0.5, elong = 1 } = {}, detail = 3) {
@@ -125,7 +126,8 @@ export class Rocks {
         this.collision.addEllipsoid({ x, y: y + sy * 0.1, z, rx: size * 0.92, ry: sy * 0.72, rz: size * 0.92, surface: 'rock' });
       }
     };
-    const avoid = (x, z, pad = 4) => Math.hypot(x - CAMP.x, z - CAMP.z) < 16 + pad || (Math.abs(x - PIER.x) < 5 && z < PIER.zStart + 4 && z > PIER.zEnd - 6);
+    const avoid = (x, z, pad = 4) => Math.hypot(x - CAMP.x, z - CAMP.z) < 16 + pad || (Math.abs(x - PIER.x) < 5 && z < PIER.zStart + 4 && z > PIER.zEnd - 6)
+      || EXCLUSIONS.some(([ex, ez, er]) => Math.hypot(x - ex, z - ez) < er + Math.max(0, pad - 2));
 
     // coastal boulders where the shore is rocky
     for (const [x, z] of td.coastPoly) {
@@ -201,6 +203,35 @@ export class Rocks {
       const x = W.x + Math.cos(a) * (W.poolRadius - 1), z = W.z + 3 + Math.sin(a) * (W.poolRadius - 1) * 0.8;
       add(x, z, 0.6 + r() * 1.3, { sink: 0.3 });
     }
+
+    // the archipelago: rocky windward shores, boulders in the bush, and the formations the
+    // sites ask for (stacks, the cave mouth, the needle)
+    for (const o of ISLANDS) {
+      const reach = Math.max(o.rx, o.rz) * 1.15;
+      const nShore = Math.round(reach * 1.6);
+      for (let i = 0; i < nShore; i++) {
+        const x = o.x + (r() * 2 - 1) * reach, z = o.z + (r() * 2 - 1) * reach;
+        const dc = td.coastAt(x, z);
+        if (dc < -4 || dc > 7 || avoid(x, z, 2)) continue;
+        const h = td.heightAt(x, z);
+        if (h < -3) continue;
+        const len = Math.hypot(x - o.x, z - o.z) || 1;
+        const c = Math.cos(o.rot), sn = Math.sin(o.rot);
+        const lx = ((x - o.x) * c - (z - o.z) * sn) / len, lz = ((x - o.x) * sn + (z - o.z) * c) / len;
+        const windward = o.cliffDir ? Math.max(0, lx * o.cliffDir[0] + lz * o.cliffDir[1]) : 0;
+        if (r() > 0.12 + windward * o.cliffs * 0.9) continue;
+        add(x, z, 0.7 + r() * (1.2 + windward * 2.8), { sink: 0.35, tilt: 0.4 });
+      }
+      for (let i = 0; i < Math.round(reach * 0.8); i++) {
+        const x = o.x + (r() * 2 - 1) * reach, z = o.z + (r() * 2 - 1) * reach;
+        const dc = td.coastAt(x, z);
+        if (dc < 14 || td.pathAt(x, z) < 3 || avoid(x, z)) continue;
+        const sl = td.slopeAt(x, z);
+        if (r() > 0.18 + sl * 1.4) continue;
+        add(x, z, 0.5 + r() * (1.6 + sl * 6), { sink: 0.4, tilt: 0.5 });
+      }
+    }
+    for (const [x, z, size, o] of SITE_ROCKS) add(x, z, size, { sink: 0.3, ...o });
 
     // instance data + two LOD instanced meshes per variant, filled per frame by culling
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), p = new THREE.Vector3();

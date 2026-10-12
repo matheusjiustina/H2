@@ -5,6 +5,7 @@ import {
 import {
   WORLD, COASTLINE, REEF, REEF_CHANNEL, ISLET, CAMP, PATHS, MOUNTAINS, WATERFALL, VIEWPOINT, PIER,
 } from './Layout.js';
+import { archipelagoSample, ISLAND_PATHS, PADS } from './Archipelago.js';
 
 const INF = 1e20;
 
@@ -165,8 +166,8 @@ export class TerrainData {
     const lagoonPoly = this.reefLine.concat([[0, 200]]);
     const lagoonIn = rasterPolygon(lagoonPoly, w, h, toGrid);
 
-    // 3. Paths.
-    this.pathLines = PATHS.map((p) => ({ width: p.width, pts: catmullRom(p.points, 8, false) }));
+    // 3. Paths (main island trails and the ones on the archipelago).
+    this.pathLines = PATHS.concat(ISLAND_PATHS).map((p) => ({ width: p.width, pts: catmullRom(p.points, 8, false) }));
     const gPath = new Float64Array(w * h).fill(INF);
     for (const p of this.pathLines) rasterPolyline(p.pts, w, h, toGrid, gPath);
     edt2d(gPath, w, h);
@@ -174,17 +175,33 @@ export class TerrainData {
     progress(0.3);
     await yieldFrame();
 
-    // 4. Heights.
+    // 4. Heights: the main island, then the archipelago folded in with max().
+    const satCoast = new Float32Array(w * h);
+    const sat = { h: 0, dc: 0, calm: 0 };
+    const edge0 = this.half - 50, edge1 = this.half - 8;
     for (let j = 0; j < h; j++) {
       const z = -this.half + j * this.cell;
       for (let i = 0; i < w; i++) {
         const x = -this.half + i * this.cell;
         const k = j * w + i;
-        this.heights[k] = this._height(x, z, this.coast[k], this.reefDist[k], lagoonIn[k]);
-        this.lagoon[k] = lagoonIn[k] ? smoothstep(0, 45, this.reefDist[k]) : 0;
+        let hgt = this._height(x, z, this.coast[k], this.reefDist[k], lagoonIn[k]);
+        let lag = lagoonIn[k] ? smoothstep(0, 45, this.reefDist[k]) : 0;
+        archipelagoSample(x, z, sat);
+        if (sat.h > hgt) hgt = sat.h;
+        if (sat.calm > lag) lag = sat.calm;
+        satCoast[k] = sat.dc;
+        // world edge falls to the deep ocean
+        const e = Math.max(Math.abs(x), Math.abs(z));
+        if (e > edge0) hgt = lerp(hgt, -38, smoothstep(edge0, edge1, e));
+        this.heights[k] = hgt;
+        this.lagoon[k] = lag;
       }
       if (j % 128 === 0) { progress(0.3 + 0.3 * (j / h)); await yieldFrame(); }
     }
+    // the archipelago's coasts join the main coastline field (beaches, splats, vegetation)
+    for (let k = 0; k < w * h; k++) if (satCoast[k] > this.coast[k]) this.coast[k] = satCoast[k];
+    // level build pads for the sites on the islands and the ridge station
+    for (const pad of PADS) this._levelPad(pad);
 
     // 5. Path flattening against a smoothed copy of the heights.
     const smooth = blur(Float32Array.from(this.heights), w, h, 3, 2);
@@ -364,10 +381,27 @@ export class TerrainData {
       hgt -= 0.15 * (1 - smoothstep(2, 6, Math.abs(x - PIER.x)));
     }
 
-    // World edge falls to the deep ocean.
+    // The main island's own surroundings fall to the deep ocean well before the archipelago.
     const e = Math.max(Math.abs(x), Math.abs(z));
     if (e > 460) hgt = lerp(hgt, -38, smoothstep(460, 505, e));
     return hgt;
+  }
+
+  /** Blend the ground inside a pad to one level (the height at its centre, or pad.y). */
+  _levelPad(pad) {
+    const { res, cell, half, heights } = this;
+    const target = pad.y ?? this.heightAt(pad.x, pad.z);
+    pad.level = target;
+    const R = pad.r + 6;
+    const i0 = Math.max(0, Math.floor((pad.x - R + half) / cell)), i1 = Math.min(res - 1, Math.ceil((pad.x + R + half) / cell));
+    const j0 = Math.max(0, Math.floor((pad.z - R + half) / cell)), j1 = Math.min(res - 1, Math.ceil((pad.z + R + half) / cell));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const x = -half + i * cell, z = -half + j * cell;
+        const m = 1 - smoothstep(pad.r, pad.r + 6, Math.hypot(x - pad.x, z - pad.z));
+        if (m > 0) heights[j * res + i] = lerp(heights[j * res + i], target, m);
+      }
+    }
   }
 
   _computeSlopes() {
