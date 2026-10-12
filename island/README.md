@@ -144,9 +144,13 @@ show up only when they do something. The top corner has your bag and pause.
 - **Pebbles:** pick them up from piles on the beach and throw them. They splash, make
   ripples and sink, and a low, fast throw skips them. Thrown pebbles can be picked up
   again.
-- **Seaplane:** a high-wing radial floatplane with a realistic six-degree-of-freedom flight
+- **Seaplane:** a high-wing floatplane with a realistic six-degree-of-freedom flight
   model, full cockpit with working instruments, chase and orbit cameras, damage and
-  break-up. See *Flying the seaplane*.
+  break-up. See *Flying the seaplane*. The model is lofted procedurally: a tapered cowling
+  with twin intakes and a polished spinner, cambered wings and tail surfaces with moving
+  controls, stepped floats on streamlined struts and a furnished cabin. Panel seams,
+  rivets, doors, vents, the livery and the window openings are baked at load into
+  textures, and the cabin and small fittings switch off with distance.
 - **Boat:** buoyancy sampled at the hull points gives pitch and roll. It has a wake
   ribbon, spray, grounding in shallow water, a throttle and steering.
 - **Vegetation:** palms, broadleaf trees, banana plants, ferns, big-leaf plants, bushes

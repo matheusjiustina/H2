@@ -31,7 +31,9 @@ export class Seaplane {
     this.game = game;
     this.M = materials;
 
+    const t0 = performance.now();
     this.model = buildSeaplane(materials);
+    this.buildMs = performance.now() - t0;
     scene.add(this.model.root);
     this.fm = new FlightModel();
     this.assist = new FlightAssist();
@@ -522,12 +524,20 @@ export class Seaplane {
       wr.rotation.y = fm.rudder * 0.5;
       wr.rotation.x = damp(wr.rotation.x, fm.waterRudders ? 0 : -1.4, 4, dt);
     }
-    // propeller: blades below ~900 rpm, then a blurred disc
+    // propeller: blades below ~900 rpm, fading into a blurred disc as it spins up
     m.blades.rotation.z += (fm.rpm / 60) * Math.PI * 2 * dt;
     const blur = smoothstep(380, 900, fm.rpm);
-    m.disc.material.opacity = blur * 0.9;
+    m.disc.material.opacity = blur * 0.85;
     m.disc.rotation.z += dt * 2.3;
-    m.blades.visible = blur < 0.98;
+    const solid = 1 - smoothstep(0.3, 0.92, blur);
+    if (m.bladeMat) { m.bladeMat.opacity = solid; m.bladeMat.depthWrite = solid > 0.98; }
+    m.blades.visible = solid > 0.02;
+    // a little engine vibration through the nose (visual only)
+    if (m.propBase) {
+      const vib = fm.engine !== 'off' && fm.rpm > 100 ? 0.0008 + 0.0008 * smoothstep(1500, 2300, fm.rpm) + this.damage * 0.00002 : 0;
+      m.prop.position.set(m.propBase.x + (Math.random() - 0.5) * vib, m.propBase.y + (Math.random() - 0.5) * vib, m.propBase.z);
+    }
+    m.updateLOD?.(game.camera.position.distanceTo(fm.pos));
     for (const y of m.yokes) {
       y.position.z = y.userData.z0 - fm.elevator * 0.07;
       y.userData.wheel.rotation.z = fm.aileron * 1.0;
@@ -570,6 +580,15 @@ export class Seaplane {
           const side = this._v.set(s, 0, 0).applyQuaternion(fm.quat);
           this.particles.spray(bow.x, wy + 0.05, bow.z, side.x * 2 + fm.vel.x * 0.3, 1 + v * 0.06, side.z * 2 + fm.vel.z * 0.3, 2 + Math.floor(v / 8));
         }
+      }
+    }
+    // a moored or drifting float stirs the surface gently
+    if (out.onWater && v <= 1.5) {
+      this._idleRipple = (this._idleRipple || 0) - 0.05;
+      if (this._idleRipple <= 0) {
+        this._idleRipple = 0.45 + Math.random() * 0.8;
+        const p = this._v2.set((Math.random() < 0.5 ? 1 : -1) * 1.55, -1.9, -3 + Math.random() * 6.6).applyQuaternion(fm.quat).add(fm.pos);
+        this.ripples.addDrop(p.x, p.z, 0.45 + Math.random() * 0.3, 0.01 + Math.random() * 0.012);
       }
     }
     // prop wash on the water close to the surface

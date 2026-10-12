@@ -486,7 +486,7 @@ export class Expansion {
       const aboard = buildCargoCase(g.materials, kind);
       aboard.visible = false;
       const c = { id: cd.id, def: cd, mission: mid, pickup, aboard };
-      if (cd.vehicle === 'boat') { aboard.position.set(0, 0.28, 0.35); g.boat.hull.add(aboard); } else { aboard.position.set(0, 0.62, -0.95); g.seaplane.model.root.add(aboard); }
+      if (cd.vehicle === 'boat') { aboard.position.set(0, 0.28, 0.35); g.boat.hull.add(aboard); } else { aboard.position.set(0, -0.445, -1.0); g.seaplane.model.root.add(aboard); }
       // load from the pier (or the washed-up crate at the cove)
       const loadObj = pickup || this.A['cove.missing'].mesh;
       c.loadIt = g.interaction.add({
