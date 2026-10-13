@@ -1,0 +1,27 @@
+{
+  "name": "crypto-world",
+  "private": true,
+  "version": "1.0.0",
+  "description": "CRYPTO WORLD — THE LIVING CHAIN. A tiny spherical planet exploration game built with Three.js.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "playtest": "node scripts/playtest.mjs"
+  },
+  "dependencies": {
+    "@fontsource/fredoka": "5.3.0",
+    "@fontsource/nunito": "5.3.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "playwright": "^1.56.1",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
+  }
+}
