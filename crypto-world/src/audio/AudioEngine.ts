@@ -487,6 +487,27 @@ export class AudioEngine {
     this.tone(base, t, 0.07, 0.07, 'triangle', base * (0.9 + Math.random() * 0.25), 0.05);
   }
 
+  /** Small animal voices, synthesised to sit with the toy-like art. */
+  critter(kind: 'bark' | 'meow' | 'gull'): void {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const t = this.ctx.currentTime + 0.01;
+    switch (kind) {
+      case 'bark':
+        for (const k of [0, 0.17]) {
+          this.tone(430, t + k, 0.11, 0.08, 'sawtooth', 250, 0.15);
+          this.noiseHit(t + k, 0.07, 'bandpass', 900, 1.4, 0.1);
+        }
+        break;
+      case 'meow':
+        this.tone(600, t, 0.24, 0.045, 'triangle', 900, 0.2);
+        this.tone(900, t + 0.22, 0.34, 0.04, 'triangle', 520, 0.25);
+        break;
+      case 'gull':
+        for (const k of [0, 0.24, 0.44]) this.tone(1500, t + k, 0.18, 0.018, 'triangle', 1000, 0.5);
+        break;
+    }
+  }
+
   ui(kind: 'select' | 'confirm' | 'open' | 'close' | 'tick'): void {
     if (!this.ctx || this.ctx.state !== 'running') return;
     const t = this.ctx.currentTime;

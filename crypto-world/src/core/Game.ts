@@ -22,6 +22,7 @@ import { npcById } from '../data/npcs';
 import { GameState, GameEvent } from '../gameplay/GameState';
 import { DialogueRunner, pickConversation } from '../gameplay/Dialogue';
 import { Interactable, WorldProps } from '../gameplay/WorldProps';
+import { Life } from '../world/Life';
 import { SaveSystem, Settings, Cosmetics, DEFAULT_COSMETICS } from '../gameplay/SaveSystem';
 import { MISSIONS, ITEMS } from '../data/missions';
 import { CONVERSATIONS, OBJECT_SPEAKERS } from '../data/dialogue';
@@ -84,6 +85,7 @@ export class Game {
   lighting!: Lighting;
   npcs!: NpcManager;
   props!: WorldProps;
+  private life!: Life;
   player!: PlayerController;
   cam!: CameraController;
   avatar!: Avatar;
@@ -199,6 +201,10 @@ export class Game {
     this.npcs = new NpcManager(this.world, this.content, this.scene, this.culler);
     this.props = new WorldProps(this.world, this.content, this.scene, this.culler, (id) => this.state.hasCollected(id));
     this.npcs.setReserved(this.props.interactables.filter((i) => i.kind !== 'sit').map((i) => i.pos));
+    this.life = new Life(this.world, this.scene, this.culler);
+    this.life.onSound = (k) => this.audio.critter(k);
+    this.life.setViewportHeight(this.renderer.domElement.height);
+    this.props.interactables.push(...this.life.interactables);
     this.rebuildAvatar();
     this.targetMarker = new Sprite(this.npcs.markerMaterial('target'));
     this.targetMarker.scale.set(0.5, 0.5, 1);
@@ -549,6 +555,8 @@ export class Game {
     this.content.update(dt, this.lighting.night);
     this.npcs.update(dt, hours, this.player.visualPosition(), this.camera.position, this.mode !== 'play');
     this.props.update(dt, this.lighting.night);
+    this.life.setViewportHeight(this.renderer.domElement.height);
+    this.life.update(dt, this.elapsed, this.lighting.night, this.player.visualPosition(), this.camera.position, this.effectiveQuality());
     this.culler.update(this.camera.position);
     this.updateMarkers();
 
@@ -686,6 +694,15 @@ export class Game {
       case 'dial':
         this.turnDial(it.data?.dial ?? 0);
         return;
+      case 'pet': {
+        this.avatar.anim.play('receive');
+        const name = this.life.pet(it.id);
+        if (name && !this.state.data.flags[`pet.${it.id}`]) {
+          this.state.data.flags[`pet.${it.id}`] = true;
+          this.ui.toast('New friend', name, it.id === 'critter.dog' ? 'Genesis Hills’ goodest boy. Holds sticks forever.' : 'Chain City’s café cat. Keeps an immutable record of every nap.');
+        }
+        return;
+      }
       case 'fragment':
         this.avatar.anim.play('receive');
         this.state.collect(it.id);

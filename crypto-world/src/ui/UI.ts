@@ -210,13 +210,28 @@ export class UI {
     this.prompt.classList.add('show');
   }
 
+  private toastQueue: [string, string, string, boolean, number][] = [];
+
+  /** Shows a notification card; at most two are on screen, the rest wait their turn. */
   toast(kicker: string, title: string, body = '', big = false, ms = 3800): void {
+    if (this.toasts.children.length >= 2) {
+      this.toastQueue.push([kicker, title, body, big, ms]);
+      // Keep the backlog short: older routine notices give way to newer ones.
+      while (this.toastQueue.length > 4) {
+        const i = this.toastQueue.findIndex((q) => !q[3]);
+        this.toastQueue.splice(i < 0 ? 0 : i, 1);
+      }
+      return;
+    }
     const t = el('div', `toast${big ? ' big' : ''}`, `<small>${esc(kicker)}</small><b>${esc(title)}</b>${body ? `<p>${esc(body)}</p>` : ''}`);
     this.toasts.appendChild(t);
-    while (this.toasts.children.length > 3) this.toasts.firstElementChild!.remove();
     setTimeout(() => {
       t.classList.add('out');
-      setTimeout(() => t.remove(), 450);
+      setTimeout(() => {
+        t.remove();
+        const next = this.toastQueue.shift();
+        if (next) this.toast(...next);
+      }, 450);
     }, ms);
   }
 
