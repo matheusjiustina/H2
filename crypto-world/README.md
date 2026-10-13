@@ -81,7 +81,7 @@ Chromium:
   HUD with a mission tracker, direction arrow and distance, and an interaction prompt. Dialogue has a
   typewriter effect, names and titles, choices and skip. The journal covers missions, residents,
   discoveries and the bag. Notices queue so at most two are on screen.
-- **Audio**: a generative WebAudio soundtrack (day and night chord sets), ambient layers mixed by region
+- **Audio**: a quiet generative ambient score with no beat or melody (a low drone on a slowly wandering root, long overlapping chord swells, rare distant bell tones; separate day and night harmony), ambient layers mixed by region
   (wind, ocean, city, machines, birds, crickets), surface-dependent footsteps, voices, UI sounds, chimes
   and critter calls. Master, music, ambience and effects each have their own volume.
 - **Saving**: versioned local saves (v2, with migration from v1). Saves are validated and sanitised;

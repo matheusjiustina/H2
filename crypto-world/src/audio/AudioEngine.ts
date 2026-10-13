@@ -11,21 +11,13 @@ export interface AmbienceMix {
 
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
-// Chord progressions (MIDI notes). Day: warm major colours; night: softer, open voicings.
-const DAY_CHORDS = [
-  [50, 57, 62, 66, 69], // Dmaj9-ish
-  [47, 54, 59, 62, 66], // Bm7
-  [43, 50, 55, 59, 62], // Gmaj7
-  [45, 52, 57, 61, 64], // A6
-];
-const NIGHT_CHORDS = [
-  [45, 52, 57, 60, 64], // Am9
-  [41, 48, 53, 57, 60], // Fmaj7
-  [43, 50, 55, 58, 62], // Gm
-  [40, 47, 52, 55, 59], // Em7
-];
-const DAY_SCALE = [62, 64, 66, 69, 71, 74, 76, 78, 81];
-const NIGHT_SCALE = [57, 60, 62, 64, 67, 69, 72, 74];
+// Ambient harmony. The music has no beat and no melody: a low drone on a slowly wandering root,
+// long overlapping "clouds" of open voicings, and the odd distant bell tone. Roots move every
+// ~40 s; everything fades in and out over many seconds.
+const DAY_ROOTS = [50, 43, 47, 45]; // D, G, B, A
+const NIGHT_ROOTS = [45, 41, 40, 43]; // A, F, E, G
+const DAY_COLOURS = [0, 7, 12, 14, 16, 19, 23, 26]; // root, 5th, octave, 9th, 3rd, 5th, maj7, 9th
+const NIGHT_COLOURS = [0, 7, 10, 12, 14, 15, 19, 22]; // minor colours: b7, 9th, b3
 
 /**
  * Procedural sound: every note and noise is synthesised at runtime, so the soundtrack is original
@@ -39,20 +31,22 @@ export class AudioEngine {
   private sfx!: GainNode;
   private reverb!: ConvolverNode;
   private reverbSend!: GainNode;
-  private delay!: DelayNode;
   private noiseBuf!: AudioBuffer;
   private brownBuf!: AudioBuffer;
   private layers: Record<'wind' | 'ocean' | 'city' | 'machines', GainNode> = {} as any;
-  private nextChordAt = 0;
-  private chordIndex = 0;
-  private nextNoteAt = 0;
+  private nextSectionAt = 0;
+  private sectionIndex = 0;
+  private root = 50;
+  private nextSwellAt = 0;
+  private nextBellAt = 0;
+  private drone: { oscs: OscillatorNode[]; gain: GainNode } | null = null;
   private scheduler = 0;
   private night = 0;
   private birdsLevel = 0;
   private cricketLevel = 0;
   private nextBirdAt = 0;
   private nextCricketAt = 0;
-  private volumes = { master: 0.8, music: 0.55, ambience: 0.7, sfx: 0.8 };
+  private volumes = { master: 0.8, music: 0.35, ambience: 0.7, sfx: 0.8 };
   private intensity = 0; // music swells during big moments
   started = false;
 
@@ -79,30 +73,19 @@ export class AudioEngine {
     this.amb.connect(comp);
     this.sfx.connect(comp);
     this.reverb = ctx.createConvolver();
-    this.reverb.buffer = this.makeImpulse(3.2, 2.6);
+    this.reverb.buffer = this.makeImpulse(4.6, 2.2);
     this.reverbSend = ctx.createGain();
     this.reverbSend.gain.value = 0.9;
     this.reverbSend.connect(this.reverb);
     this.reverb.connect(comp);
-    this.delay = ctx.createDelay(1.5);
-    this.delay.delayTime.value = 0.42;
-    const fb = ctx.createGain();
-    fb.gain.value = 0.32;
-    const dl = ctx.createBiquadFilter();
-    dl.type = 'lowpass';
-    dl.frequency.value = 2400;
-    this.delay.connect(dl);
-    dl.connect(fb);
-    fb.connect(this.delay);
-    dl.connect(this.reverbSend);
-    dl.connect(this.music);
     this.noiseBuf = this.makeNoise(false);
     this.brownBuf = this.makeNoise(true);
     this.buildAmbience();
     this.applyVolumes();
     this.started = true;
-    this.nextChordAt = ctx.currentTime + 0.5;
-    this.nextNoteAt = ctx.currentTime + 2;
+    this.nextSectionAt = ctx.currentTime + 0.5;
+    this.nextSwellAt = ctx.currentTime + 1.5;
+    this.nextBellAt = ctx.currentTime + 9;
     this.scheduler = window.setInterval(() => this.schedule(), 120);
   }
 
@@ -120,7 +103,7 @@ export class AudioEngine {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.master.gain.setTargetAtTime(this.volumes.master, t, 0.1);
-    this.music.gain.setTargetAtTime(this.volumes.music * 0.5, t, 0.1);
+    this.music.gain.setTargetAtTime(this.volumes.music * 0.3, t, 0.1);
     this.amb.gain.setTargetAtTime(this.volumes.ambience * 0.6, t, 0.1);
     this.sfx.gain.setTargetAtTime(this.volumes.sfx * 0.7, t, 0.1);
   }
@@ -277,25 +260,27 @@ export class AudioEngine {
   private schedule(): void {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
-    const ahead = ctx.currentTime + 0.4;
+    const now = ctx.currentTime;
+    const ahead = now + 0.4;
+    // After a suspend (hidden tab) don't try to catch up on missed events all at once.
+    if (this.nextSectionAt < now - 1) this.nextSectionAt = now + 0.1;
+    if (this.nextSwellAt < now - 1) this.nextSwellAt = now + 0.1;
+    if (this.nextBellAt < now - 1) this.nextBellAt = now + 2;
     const night = this.night > 0.5;
-    const chords = night ? NIGHT_CHORDS : DAY_CHORDS;
-    while (this.nextChordAt < ahead) {
-      const chord = chords[this.chordIndex % chords.length];
-      this.pad(chord, this.nextChordAt, 9.6);
-      this.bass(chord[0] - 12, this.nextChordAt, 9.6);
-      this.chordIndex++;
-      this.nextChordAt += 9.6;
+    if (this.nextSectionAt < ahead) {
+      const roots = night ? NIGHT_ROOTS : DAY_ROOTS;
+      this.root = roots[this.sectionIndex % roots.length];
+      this.sectionIndex++;
+      this.setDrone(this.root, this.nextSectionAt);
+      this.nextSectionAt += 36 + Math.random() * 10;
     }
-    while (this.nextNoteAt < ahead) {
-      const scale = night ? NIGHT_SCALE : DAY_SCALE;
-      const density = night ? 0.35 : 0.55 + this.intensity * 0.3;
-      if (Math.random() < density) {
-        const n = scale[Math.floor(Math.random() * scale.length)];
-        this.pluck(midi(n), this.nextNoteAt, 0.06 + Math.random() * 0.04);
-        if (Math.random() < 0.25) this.pluck(midi(n + (Math.random() < 0.5 ? 7 : 12)), this.nextNoteAt + 0.3, 0.035);
-      }
-      this.nextNoteAt += [0.6, 0.6, 1.2, 0.9, 1.8][Math.floor(Math.random() * 5)];
+    if (this.nextSwellAt < ahead) {
+      this.swell(this.nextSwellAt, night);
+      this.nextSwellAt += 13 + Math.random() * 7;
+    }
+    if (this.nextBellAt < ahead) {
+      if (Math.random() < 0.55 + this.intensity * 0.3) this.bell(this.nextBellAt, night);
+      this.nextBellAt += 9 + Math.random() * 12;
     }
     // Ambient critters.
     if (ctx.currentTime > this.nextBirdAt) {
@@ -308,69 +293,111 @@ export class AudioEngine {
     }
   }
 
-  private pad(chord: number[], t: number, dur: number): void {
+  /** Low drone on the current root: crossfades to the new root over ~10 s. */
+  private setDrone(root: number, t: number): void {
     const ctx = this.ctx!;
+    if (this.drone) {
+      const old = this.drone;
+      old.gain.gain.cancelScheduledValues(t);
+      old.gain.gain.setValueAtTime(old.gain.gain.value, t);
+      old.gain.gain.linearRampToValueAtTime(0, t + 10);
+      for (const o of old.oscs) o.stop(t + 10.5);
+    }
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.045, t + 2.5);
-    g.gain.setValueAtTime(0.045, t + dur - 2);
-    g.gain.linearRampToValueAtTime(0, t + dur + 1.5);
+    g.gain.linearRampToValueAtTime(0.036, t + 10);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = this.night > 0.5 ? 900 : 1500;
+    lp.frequency.value = 420;
     g.connect(lp);
     lp.connect(this.music);
     lp.connect(this.reverbSend);
-    for (const n of chord.slice(1)) {
-      for (const det of [-6, 6]) {
+    const oscs: OscillatorNode[] = [];
+    for (const [n, type, det, lvl] of [[root - 12, 'sine', 0, 1], [root, 'triangle', -4, 0.45], [root + 7, 'sine', 3, 0.3]] as [number, OscillatorType, number, number][]) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = midi(n);
+      o.detune.value = det;
+      const og = ctx.createGain();
+      og.gain.value = lvl;
+      o.connect(og).connect(g);
+      o.start(t);
+      oscs.push(o);
+    }
+    this.drone = { oscs, gain: g };
+  }
+
+  /** A slow cloud of three open-voiced notes that blooms and dissolves over ~25 s. */
+  private swell(t: number, night: boolean): void {
+    const ctx = this.ctx!;
+    const colours = night ? NIGHT_COLOURS : DAY_COLOURS;
+    const picks = new Set<number>();
+    while (picks.size < 3) picks.add(colours[1 + Math.floor(Math.random() * (colours.length - 1))]);
+    const dur = 22 + Math.random() * 8;
+    const g = ctx.createGain();
+    const peak = 0.03 * (1 + this.intensity * 0.4);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t + dur * 0.38);
+    g.gain.linearRampToValueAtTime(peak * 0.8, t + dur * 0.62);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    const lo = night ? 320 : 420;
+    const hi = (night ? 900 : 1300) * (1 + this.intensity * 0.5);
+    lp.frequency.setValueAtTime(lo, t);
+    lp.frequency.linearRampToValueAtTime(hi, t + dur * 0.45);
+    lp.frequency.linearRampToValueAtTime(lo, t + dur);
+    lp.Q.value = 0.4;
+    g.connect(lp);
+    lp.connect(this.music);
+    const send = ctx.createGain();
+    send.gain.value = 1.2;
+    lp.connect(send).connect(this.reverbSend);
+    for (const c of picks) {
+      for (const det of [-7, 5]) {
         const o = ctx.createOscillator();
-        o.type = 'triangle';
-        o.frequency.value = midi(n);
+        o.type = det < 0 ? 'triangle' : 'sine';
+        o.frequency.value = midi(this.root + 12 + c);
         o.detune.value = det;
+        // A very slow vibrato keeps long notes from sounding static.
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 0.07 + Math.random() * 0.08;
+        const lg = ctx.createGain();
+        lg.gain.value = 4;
+        lfo.connect(lg).connect(o.detune);
         o.connect(g);
         o.start(t);
-        o.stop(t + dur + 2);
+        lfo.start(t);
+        o.stop(t + dur + 0.2);
+        lfo.stop(t + dur + 0.2);
       }
     }
   }
 
-  private bass(n: number, t: number, dur: number): void {
+  /** A distant glassy tone, soft attack and a long tail in the reverb. */
+  private bell(t: number, night: boolean): void {
     const ctx = this.ctx!;
-    const o = ctx.createOscillator();
-    o.type = 'sine';
-    o.frequency.value = midi(n);
+    const colours = night ? NIGHT_COLOURS : DAY_COLOURS;
+    const n = this.root + 24 + colours[2 + Math.floor(Math.random() * (colours.length - 2))];
+    const f = midi(n);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.07, t + 1.2);
-    g.gain.linearRampToValueAtTime(0, t + dur);
-    o.connect(g).connect(this.music);
-    o.start(t);
-    o.stop(t + dur + 0.1);
-  }
-
-  private pluck(freq: number, t: number, vol: number): void {
-    const ctx = this.ctx!;
-    const o = ctx.createOscillator();
-    o.type = 'sine';
-    o.frequency.value = freq;
-    const o2 = ctx.createOscillator();
-    o2.type = 'triangle';
-    o2.frequency.value = freq * 2;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0005, t + 1.8);
-    const g2 = ctx.createGain();
-    g2.gain.value = 0.25;
-    o.connect(g);
-    o2.connect(g2).connect(g);
+    g.gain.linearRampToValueAtTime(0.018, t + 1.6);
+    g.gain.exponentialRampToValueAtTime(0.0004, t + 8);
+    for (const [mul, lvl] of [[1, 1], [2.01, 0.18], [3.0, 0.06]]) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * mul;
+      const og = ctx.createGain();
+      og.gain.value = lvl;
+      o.connect(og).connect(g);
+      o.start(t);
+      o.stop(t + 8.2);
+    }
     g.connect(this.music);
-    g.connect(this.delay);
-    g.connect(this.reverbSend);
-    o.start(t);
-    o2.start(t);
-    o.stop(t + 2);
-    o2.stop(t + 2);
+    const send = ctx.createGain();
+    send.gain.value = 2.2;
+    g.connect(send).connect(this.reverbSend);
   }
 
   private bird(): void {

@@ -53,7 +53,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   master: 0.8,
-  music: 0.55,
+  music: 0.35,
   ambience: 0.7,
   sfx: 0.8,
   quality: 'auto',
