@@ -162,6 +162,15 @@ export class Game {
     for (let i = 0; i < n; i++) this.tick(dt);
   }
 
+  /** Debug: teleport to region-local coordinates. */
+  teleportTo(region: string, x: number, y: number, headingDeg = 0): void {
+    const f = this.world.layout.get(region as any).frame;
+    const b = f.basis(x, y, headingDeg);
+    this.player.teleport(b.pos, b.forward);
+    this.cam.reset({ dir: this.player.dir, feetPos: this.player.visualPosition(), velocity: this.player.velocity, facing: this.player.facing, frameQuat: this.player.frameQuat, speed: 0, running: false });
+    this.lighting.resetFrame(this.player.dir);
+  }
+
   /** Debug helpers for automated play-testing. */
   debugState() {
     const p = this.player;

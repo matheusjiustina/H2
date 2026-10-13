@@ -232,7 +232,7 @@ defineKit('lookout', (c) => {
   c.collider({ type: 'circle', x: 2.0, z: 0.7, r: 0.3, h: 1.5 });
   c.interact({ id: c.params.iid ?? c.id, kind: 'view', label: 'Look through the viewer', x: 2.0, y: 1.2, z: 0.1, heading: 0, radius: 1.4, data: { doc: c.params.doc ?? 'lookout.halving' } });
   c.interact({ id: `${c.id}.bench`, kind: 'sit', label: 'Sit and enjoy the view', x: 0, y: 0.45, z: -0.05, heading: 0, radius: 1.4 });
-  if (c.params.sign) c.sign(-2.4, 1.3, 1.45, 1.6, 0.42, 0, { text: c.params.sign, bg: P.woodLight, fg: P.ink, style: 'banner' }, { double: true, depth: 0.05 });
+  if (c.params.sign) c.sign(-2.4, 1.3, 1.4, 1.6, 0.42, 0, { text: c.params.sign, bg: P.woodLight, fg: P.ink, style: 'banner' }, { double: true, depth: 0.06 });
 });
 
 defineKit('gate.arch', (c) => {
@@ -245,7 +245,7 @@ defineKit('gate.arch', (c) => {
   }
   g.box(w + 0.8, 0.3, 0.3, [0, 3.5, 0], P.woodDark);
   g.box(w + 0.4, 0.75, 0.12, [0, 3.0, 0], P.woodLight);
-  c.sign(0, 3.0, 0.07, w, 0.62, 0, { text: c.params.text ?? 'WELCOME', sub: c.params.sub, bg: c.params.bg ?? P.woodLight, fg: c.params.fg ?? P.ink, style: 'banner' }, { double: true, depth: 0.0 });
+  c.sign(0, 3.0, 0, w, 0.62, 0, { text: c.params.text ?? 'WELCOME', sub: c.params.sub, bg: c.params.bg ?? P.woodLight, fg: c.params.fg ?? P.ink, style: 'banner' }, { double: true, depth: 0.065 });
   for (let i = 0; i < 6; i++) g.sphere(0.12, [-w / 2 + i * (w / 5), 3.72, 0], c.rng.pick(['#f29db0', '#f6d55c', '#ffffff']), { ws: 6, hs: 4, wind: 0.2 });
 });
 

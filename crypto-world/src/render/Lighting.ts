@@ -87,8 +87,8 @@ export class Lighting {
       const sc = s.shadow.camera;
       sc.left = -28; sc.right = 28; sc.top = 28; sc.bottom = -28; sc.near = 1; sc.far = 140;
       sc.updateProjectionMatrix();
-      s.shadow.bias = -0.0005;
-      s.shadow.normalBias = 0.04;
+      s.shadow.bias = -0.0009;
+      s.shadow.normalBias = 0.07;
     }
   }
 
