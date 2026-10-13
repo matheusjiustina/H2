@@ -83,6 +83,19 @@ export class TouchControls {
     this.input.analogY = (-dy * k) / max;
   }
 
+  /** Hides the stick and buttons (keeping state clean) while a conversation or panel is open. */
+  setBusy(busy: boolean): void {
+    if (busy === this.root.classList.contains('busy')) return;
+    this.root.classList.toggle('busy', busy);
+    if (busy) {
+      this.joyId = null;
+      this.lookId = null;
+      this.input.analogX = 0;
+      this.input.analogY = 0;
+      this.knob.style.transform = '';
+    }
+  }
+
   setVisible(on: boolean): void {
     this.enabled = on;
     this.root.classList.toggle('hidden', !on);

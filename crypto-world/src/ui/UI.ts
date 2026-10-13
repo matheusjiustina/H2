@@ -106,7 +106,7 @@ export class UI {
       </div>
       <div class="title-menu"></div>
       <div class="loading"></div>
-      <div class="title-foot">A tiny planet of blockchain culture · WASD to move · Shift to run · E to interact · drag to look<br/>All markets, prices and transactions in this world are simulated.</div>`;
+      <div class="title-foot"><span class="controls-hint">A tiny planet of blockchain culture · WASD to move · Shift to run · E to interact · drag to look<br/></span>All markets, prices and transactions in this world are simulated.</div>`;
     t.querySelector('.loading')!.appendChild(this.loadingBar);
     this.root.appendChild(t);
   }
@@ -265,6 +265,16 @@ export class UI {
     this.root.appendChild(this.dlg);
   }
 
+  private touchModeOn = false;
+  /** Touch layouts: dialogue sits lower (controls hide) and hints say "tap". */
+  get touchMode(): boolean {
+    return this.touchModeOn;
+  }
+  set touchMode(on: boolean) {
+    this.touchModeOn = on;
+    this.dlg.classList.toggle('touchmode', on);
+  }
+
   get dialogueOpen(): boolean {
     return this.dlg.classList.contains('show');
   }
@@ -288,7 +298,7 @@ export class UI {
     this.dlgFoot.innerHTML = '';
     const skip = el('button', '', 'Skip ⏭');
     skip.onclick = () => this.onDialogueSkip();
-    const next = el('span', 'next', v.choices.length ? 'Choose a reply' : 'E / Space ▸');
+    const next = el('span', 'next', v.choices.length ? 'Choose a reply' : this.touchMode ? 'Tap ▸' : 'E / Space ▸');
     this.dlgFoot.append(skip, next);
   }
 

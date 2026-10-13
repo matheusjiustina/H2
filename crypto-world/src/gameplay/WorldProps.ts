@@ -82,7 +82,8 @@ export class WorldProps {
   private dials: { obj: Object3D; value: number; target: number; angle: number }[] = [];
   private time = 0;
   private glowMat: SpriteMaterial;
-  private orbOff = new MeshBasicMaterial({ color: '#5b6672', toneMapped: false });
+  // Dormant beacons read as pale glass bulbs (a flat dark disc looked like a hole in the sky).
+  private orbOff = new MeshBasicMaterial({ color: '#dfe7f1', transparent: true, opacity: 0.8, toneMapped: false });
   private orbOn = new MeshBasicMaterial({ color: '#ffd27f', toneMapped: false });
   pulse: { t: number; sprites: Sprite[]; ring: Vector3[] } | null = null;
 

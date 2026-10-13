@@ -431,6 +431,7 @@ export class Game {
     this.cam.update(0.016, this.followTarget(0), null);
     this.cam.setSpecial(null, 0.75);
     this.touch.setVisible(TouchControls.isTouchDevice());
+    this.ui.touchMode = TouchControls.isTouchDevice();
     if (first) {
       setTimeout(() => {
         this.ui.toast('Chain City', 'Welcome, Messenger', 'The morning shuttle drops you off beside Consensus Square.', true, 5200);
@@ -556,6 +557,7 @@ export class Game {
     this.npcs.update(dt, hours, this.player.visualPosition(), this.camera.position, this.mode !== 'play');
     this.props.update(dt, this.lighting.night);
     this.life.setViewportHeight(this.renderer.domElement.height);
+    if (this.touch.enabled) this.touch.setBusy(this.mode !== 'play' || this.ui.modalKind !== 'none');
     this.life.update(dt, this.elapsed, this.lighting.night, this.player.visualPosition(), this.camera.position, this.effectiveQuality());
     this.culler.update(this.camera.position);
     this.updateMarkers();

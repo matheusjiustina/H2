@@ -250,6 +250,36 @@ html, body {
   .prompt { bottom: 190px; }
   .card { padding: 22px 18px 18px; }
 }
+/* Touch overlay steps aside during conversations, panels and cinematics. */
+.touch.busy .joy, .touch.busy .touch-btns { opacity: 0; pointer-events: none; }
+.touch .joy, .touch .touch-btns { transition: opacity 0.25s; }
+@media (max-width: 640px) {
+  .dialogue.touchmode { bottom: max(14px, env(safe-area-inset-bottom)); }
+}
+/* Short screens (phones in landscape). */
+@media (max-height: 520px) {
+  .title-logo { transform: none; }
+  .title-logo h1 { font-size: clamp(30px, 11vh, 56px); }
+  .title-logo h2 { font-size: 13px; margin-top: 8px; }
+  .title-logo .chain { margin-top: 10px; }
+  .title-logo .chain i { width: 10px; height: 10px; }
+  .title-menu { margin-top: 3vh; gap: 8px; min-width: 200px; }
+  .title-menu .btn { padding: 9px 26px; font-size: 16px; }
+  .title-foot { font-size: 11px; bottom: 8px; }
+  .title-foot .controls-hint { display: none; }
+  .tracker { padding: 7px 10px; }
+  .dialogue { padding: 16px 18px 12px; bottom: max(10px, env(safe-area-inset-bottom)); }
+  .dialogue .text { font-size: 15px; min-height: 0; }
+  .dialogue .choices { gap: 5px; margin-top: 8px; }
+  .clock { top: calc(max(12px, env(safe-area-inset-top)) + 46px); }
+  .joy { width: 112px; height: 112px; left: max(18px, env(safe-area-inset-left)); bottom: 18px; }
+  .joy i { width: 50px; height: 50px; margin: -25px; }
+  .touch-btns { flex-direction: row; align-items: flex-end; right: max(16px, env(safe-area-inset-right)); bottom: 18px; }
+  .tbtn { width: 56px; height: 56px; font-size: 12px; }
+  .tbtn.act { width: 70px; height: 70px; }
+  .prompt { bottom: 22px; }
+  .card { max-height: calc(100vh - 24px); overflow-y: auto; }
+}
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
