@@ -1,10 +1,7 @@
 import {
-  CapsuleGeometry,
   Mesh,
-  MeshToonMaterial,
   PCFShadowMap,
   PerspectiveCamera,
-  Quaternion,
   Scene,
   SRGBColorSpace,
   Vector3,
@@ -23,7 +20,7 @@ import { World } from '../world/World';
 import { PlayerController } from '../player/PlayerController';
 import { CameraController } from '../player/CameraController';
 import { worldUniforms } from '../render/materials';
-import { orientQuat } from '../world/RegionFrame';
+import { Avatar, PLAYER_LOOK } from '../characters/Avatar';
 import { PLANET_RADIUS } from '../world/constants';
 import { buildRoadMeshes } from '../world/terrain/RoadMesh';
 
@@ -39,8 +36,9 @@ export class Game {
   readonly content: WorldContent;
   readonly water: Water;
   readonly lighting: Lighting;
-  private playerMesh: Mesh;
+  readonly avatar: Avatar;
   private last = performance.now();
+  private lastFeet = new Vector3();
   private elapsed = 0;
 
   constructor(private container: HTMLElement) {
@@ -86,9 +84,8 @@ export class Game {
     this.lighting.resetFrame(this.player.dir);
     this.cam = new CameraController(this.camera, this.world.collision, (d) => this.world.groundHeight(d));
 
-    this.playerMesh = new Mesh(new CapsuleGeometry(0.35, 0.85, 6, 12), new MeshToonMaterial({ color: '#e8644a' }));
-    this.playerMesh.castShadow = true;
-    this.scene.add(this.playerMesh);
+    this.avatar = new Avatar(PLAYER_LOOK);
+    this.scene.add(this.avatar.group);
 
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -143,9 +140,14 @@ export class Game {
       running: run,
     }, this.input);
 
-    const q = orientQuat(this.player.dir, this.player.facing, new Quaternion());
-    this.playerMesh.quaternion.copy(q);
-    this.playerMesh.position.copy(feet).addScaledVector(this.player.dir, 0.78);
+    const moved = this.lastFeet.distanceTo(feet);
+    this.lastFeet.copy(feet);
+    this.avatar.place(feet, this.player.dir, this.player.facing, dt);
+    const a = this.avatar.anim;
+    a.speed = this.player.speed;
+    a.grounded = this.player.grounded;
+    a.turnRate = this.player.turnRate;
+    a.update(dt, this.player.grounded ? Math.min(moved, 1) : 0);
     worldUniforms.uPlayerPos.value.copy(feet);
 
     this.lighting.update(dt, this.player.dir, this.player.frameQuat, feet, this.camera.position);
