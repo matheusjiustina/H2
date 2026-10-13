@@ -53,9 +53,14 @@ export const SHOALS = [
   { id: 'needleSpit', x: 395, z: -772, rx: 30, rz: 16, rot: 0.1, floor: -0.35, calm: 0.85 },
 ];
 
+// The helipad on the home island: a beach berm west of the camp, approach over the lagoon.
+// heading: the parked helicopter's nose (π = towards -z, the lagoon).
+export const HELIPAD = { x: -40, z: 9, r: 11, heading: Math.PI, half: 7 };
+
 // Level build pads (world space): the ground is blended to the height at the centre.
 // `y` overrides the target height when given.
 export const PADS = [
+  { id: 'helipad', x: HELIPAD.x, z: HELIPAD.z, r: HELIPAD.r },
   { id: 'station', x: 66, z: 172, r: 12 },
   { id: 'outpostHut', x: -596, z: -552, r: 9 },
   { id: 'outpostMast', x: -612, z: -575, r: 6 },
@@ -91,6 +96,7 @@ export const ISLAND_PATHS = [
 
 // Points the vegetation and rocks keep clear of: [x, z, radius]
 export const EXCLUSIONS = [
+  [HELIPAD.x, HELIPAD.z, 16],
   [66, 172, 13], [60, 163, 3],
   [-596, -552, 10], [-612, -575, 7], [-578, -541, 8], [-560, -536, 10],
   [652, -392, 13], [668, -372, 11], [636, -414, 9], [728, -400, 5],

@@ -31,6 +31,8 @@ import { SPAWN } from '../world/Layout.js';
 import { smoothstep, damp } from '../utils/MathUtils.js';
 import { TouchControls } from '../ui/TouchControls.js';
 import { Seaplane } from '../vehicles/Seaplane.js';
+import { Helicopter } from '../vehicles/Helicopter.js';
+import { Helipad } from '../world/Helipad.js';
 import { VegetationManager } from '../vegetation/VegetationManager.js';
 import { GrassSystem } from '../vegetation/GrassSystem.js';
 import { createPropMaterials } from '../environment/PropMaterials.js';
@@ -150,6 +152,9 @@ export class Game {
     this.pebbles = new Pebbles({ scene: this.scene, materials: this.materials, terrainData: this.terrainData, ocean: this.ocean, collision: this.collision, particles: this.particles, ripples: this.ripples, interaction: this.interaction, audio: this.audio });
     this.boat = new Boat({ scene: this.scene, materials: this.materials, textures: this.textures, ocean: this.ocean, terrainData: this.terrainData, collision: this.collision, particles: this.particles, ripples: this.ripples, interaction: this.interaction, camp: this.camp });
     this.seaplane = new Seaplane({ scene: this.scene, materials: this.materials, ocean: this.ocean, terrainData: this.terrainData, collision: this.collision, particles: this.particles, ripples: this.ripples, interaction: this.interaction, distant: this.distant, game: this });
+    // the helipad west of the camp and the helicopter parked on it
+    this.helipad = new Helipad({ scene: this.scene, terrainData: this.terrainData, materials: this.materials, collision: this.collision });
+    this.heli = new Helicopter({ scene: this.scene, ocean: this.ocean, terrainData: this.terrainData, collision: this.collision, particles: this.particles, ripples: this.ripples, interaction: this.interaction, distant: this.distant, game: this, helipad: this.helipad });
     this.wildlife = new Wildlife({ scene: this.scene, terrainData: this.terrainData, ocean: this.ocean });
     this.collectibles = new Collectibles({ scene: this.scene, materials: this.materials, terrainData: this.terrainData, interaction: this.interaction, game: this });
     // the archipelago: sites on the islands, the ridge station and the wreck
@@ -175,7 +180,7 @@ export class Game {
     };
     // if the browser refused the lock (e.g. resumed too soon after Esc), a click on the view recaptures it
     this.canvas.addEventListener('mousedown', () => { if (this.state === 'playing' && !this.input.locked) this.input.lock(); });
-    this.systems.push(this.terrain, this.vegetation, this.grass, this.camp, this.rocks, this.waterfall, this.props, this.sites, this.wreck);
+    this.systems.push(this.terrain, this.vegetation, this.grass, this.camp, this.rocks, this.waterfall, this.props, this.sites, this.wreck, this.helipad);
 
     this.applySettings();
     this.settings.onChange(() => this.applySettings());
@@ -294,6 +299,8 @@ export class Game {
     if (this.boat.occupied) this.boat.exit(this);
     if (this.seaplane.occupied) this.seaplane.exit(this, true);
     this.seaplane.atPier();
+    if (this.heli.occupied) this.heli.exit(this, true);
+    this.heli.atPad();
     this.player.spawn(SPAWN.x, SPAWN.z, SPAWN.yaw, SPAWN.pitch);
     this.setTime(9.7);
     this.weather.set('CLEAR', true);
@@ -404,8 +411,9 @@ export class Game {
     if (this.state !== 'playing') return;
     if (inp.wasPressed('journal')) { this.expansion?.ui.openJournal(); return; }
     // away from the home island (or afloat) M shows the chart of the outer islands
-    if (inp.wasPressed('map') && (this.player.mode === 'boat' || this.player.mode === 'plane' || !this._nearHome())) { this.expansion?.ui.openChart(); return; }
-    if (this.player.mode === 'plane') return; // the seaplane reads its own keys
+    const flying = this.player.mode === 'plane' || this.player.mode === 'heli';
+    if (inp.wasPressed('map') && (this.player.mode === 'boat' || flying || !this._nearHome())) { this.expansion?.ui.openChart(); return; }
+    if (flying) return; // the seaplane and the helicopter read their own keys
     if (inp.wasPressed('timeBack')) this.setTime(this.timeOfDay.hour - 1);
     if (inp.wasPressed('timeFwd')) this.setTime(this.timeOfDay.hour + 1);
     if (this.player.mode === 'boat') return; // the boat handles its own input
@@ -451,7 +459,7 @@ export class Game {
     this.timeOfDay.update(simDt);
     this.weather.update(simDt);
 
-    if (playing && this.player.mode !== 'boat' && this.player.mode !== 'plane') {
+    if (playing && this.player.mode !== 'boat' && this.player.mode !== 'plane' && this.player.mode !== 'heli') {
       this.player.look(dt, this.input.locked || this.autostart);
       this.player.update(dt);
     } else if (this.state === 'title') {
@@ -462,6 +470,7 @@ export class Game {
     }
     this.boat.update(simDt, this);
     this.seaplane.update(simDt, this);
+    this.heli.update(simDt, this);
     U.uPlayerPos.value.copy(this.player.pos);
     this.camera.updateMatrixWorld();
 
@@ -545,6 +554,7 @@ export class Game {
   teleport(x, z, yaw = this.player.yaw, pitch = 0) {
     if (this.boat.occupied) this.boat.exit(this);
     if (this.seaplane.occupied) this.seaplane.exit(this, true);
+    if (this.heli.occupied) this.heli.exit(this, true);
     this.player.spawn(x, z, yaw, pitch);
   }
 }

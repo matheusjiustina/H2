@@ -3,6 +3,7 @@ import { patchMaterial } from '../core/MaterialPatch.js';
 import { LAYER } from '../core/Shared.js';
 import { rng, hash2, smoothstep, clamp, Noise } from '../utils/MathUtils.js';
 import { CAMP, PIER } from '../world/Layout.js';
+import { HELIPAD } from '../world/Archipelago.js';
 
 const CELL = 6;
 const MAX_INSTANCES = 42000;
@@ -142,6 +143,8 @@ vec3 objectNormal = vec3(_gc * normal.x`);
     const e = this.deckExclusion;
     if (Math.abs(x - e.x) < e.hw && Math.abs(z - e.z) < e.hd) return 0;
     if (Math.abs(x - PIER.x) < 1.6 && z < PIER.zStart + 1.5 && z > PIER.zStart - 6) return 0;
+    // the helipad slab and its gravel apron
+    if (Math.abs(x - HELIPAD.x) < HELIPAD.half + 2.4 && Math.abs(z - HELIPAD.z) < HELIPAD.half + 2.4) return 0;
     return Math.max(d, dune) * (1 - smoothstep(0.32, 0.45, sl));
   }
 

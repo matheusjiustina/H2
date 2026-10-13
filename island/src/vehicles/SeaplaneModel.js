@@ -16,22 +16,22 @@ import { lerp, smoothstep, clamp } from '../utils/MathUtils.js';
 // Livery: aviation white, dark teal belly, a restrained orange cheat line, orange
 // wing and tail tips, natural aluminium struts. Registration PT-ILH.
 
-const TAU = Math.PI * 2;
-const C = (hex) => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
-const RGB8 = (hex) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
-const HEX = { white: 0xf2f0ea, grey: 0xe0ded7, teal: 0x14505c, orange: 0xdc5f28, seal: 0x272b2d, bottom: 0x283033, nonskid: 0x3a3e40 };
-const WHITE = C(HEX.white), TEAL = C(HEX.teal), ORANGE = C(HEX.orange), DARK = C(0x1e2224), ALU = C(0xd2d4d2), RUBBER = C(0x111213), STEEL = C(0x54595c);
-const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
-const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+export const TAU = Math.PI * 2;
+export const C = (hex) => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
+export const RGB8 = (hex) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
+export const HEX = { white: 0xf2f0ea, grey: 0xe0ded7, teal: 0x14505c, orange: 0xdc5f28, seal: 0x272b2d, bottom: 0x283033, nonskid: 0x3a3e40 };
+export const WHITE = C(HEX.white), TEAL = C(HEX.teal), ORANGE = C(HEX.orange), DARK = C(0x1e2224), ALU = C(0xd2d4d2), RUBBER = C(0x111213), STEEL = C(0x54595c);
+export const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+export const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 
-function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
-function canvasTexture(c, srgb, aniso = 8) {
+export function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+export function canvasTexture(c, srgb, aniso = 8) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.anisotropy = aniso;
   return t;
 }
-function imageTexture(img, srgb, aniso, scale = 1) {
+export function imageTexture(img, srgb, aniso, scale = 1) {
   const c = makeCanvas(img.width, img.height);
   c.getContext('2d').putImageData(img, 0, 0);
   if (scale === 1) return canvasTexture(c, srgb, aniso);
@@ -44,7 +44,7 @@ function imageTexture(img, srgb, aniso, scale = 1) {
 }
 
 /** Tangent-space normal map from a height field (0..1). */
-function normalImage(hgt, W, H, k) {
+export function normalImage(hgt, W, H, k) {
   const img = new ImageData(W, H), d = img.data;
   for (let y = 0; y < H; y++) {
     const yu = y > 0 ? y - 1 : y, yd = y < H - 1 ? y + 1 : y;
@@ -61,7 +61,7 @@ function normalImage(hgt, W, H, k) {
 }
 
 /** Signed distance to a polygon (negative inside). */
-function sdPoly(px, py, P) {
+export function sdPoly(px, py, P) {
   let d = Infinity, s = 1;
   for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
     const ex = P[j][0] - P[i][0], ey = P[j][1] - P[i][1], wx = px - P[i][0], wy = py - P[i][1];
@@ -73,9 +73,9 @@ function sdPoly(px, py, P) {
   }
   return s * Math.sqrt(d);
 }
-const sdRound = (px, py, shape) => sdPoly(px, py, shape.core) - shape.r;
+export const sdRound = (px, py, shape) => sdPoly(px, py, shape.core) - shape.r;
 
-function colorize(g, rgb) {
+export function colorize(g, rgb) {
   const n = g.attributes.position.count;
   const c = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { c[i * 3] = rgb[0]; c[i * 3 + 1] = rgb[1]; c[i * 3 + 2] = rgb[2]; }
@@ -83,10 +83,10 @@ function colorize(g, rgb) {
   if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
   return g;
 }
-const toNI = (g) => (g.index ? g.toNonIndexed() : g);
-const part = (g, rgb) => { const n = toNI(g); for (const k of Object.keys(n.attributes)) if (!['position', 'normal', 'uv'].includes(k)) n.deleteAttribute(k); return colorize(n, rgb); };
+export const toNI = (g) => (g.index ? g.toNonIndexed() : g);
+export const part = (g, rgb) => { const n = toNI(g); for (const k of Object.keys(n.attributes)) if (!['position', 'normal', 'uv'].includes(k)) n.deleteAttribute(k); return colorize(n, rgb); };
 
-function orient(g, expect, sample) {
+export function orient(g, expect, sample) {
   const n = g.attributes.normal;
   if (n.getX(sample) * expect.x + n.getY(sample) * expect.y + n.getZ(sample) * expect.z < 0) {
     const idx = g.index.array;
@@ -97,14 +97,14 @@ function orient(g, expect, sample) {
   return g;
 }
 
-function cyl(a, b, r, rgb, seg = 10, r2 = r) {
+export function cyl(a, b, r, rgb, seg = 10, r2 = r) {
   const A = V3(...a), B = V3(...b);
   const g = new THREE.CylinderGeometry(r2, r, A.distanceTo(B), seg, 1);
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), B.clone().sub(A).normalize()));
   g.translate((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2);
   return part(g, rgb);
 }
-function box(w, h, d, x, y, z, rgb, { rx = 0, ry = 0, rz = 0, round = 0 } = {}) {
+export function box(w, h, d, x, y, z, rgb, { rx = 0, ry = 0, rz = 0, round = 0 } = {}) {
   const g = round > 0 ? new RoundedBoxGeometry(w, h, d, 2, round) : new THREE.BoxGeometry(w, h, d);
   if (rx) g.rotateX(rx); if (ry) g.rotateY(ry); if (rz) g.rotateZ(rz);
   g.translate(x, y, z);
@@ -405,9 +405,9 @@ function fuselageTextures() {
 }
 
 // ==================================================================== lifting surfaces
-function airfoilT(f, t) { f = clamp(f, 0, 1); return 5 * t * (0.2969 * Math.sqrt(f) - 0.126 * f - 0.3516 * f * f + 0.2843 * f ** 3 - 0.1036 * f ** 4); }
-function camberY(f, m, p) { if (!m) return 0; return f < p ? (m / (p * p)) * (2 * p * f - f * f) : (m / ((1 - p) * (1 - p))) * (1 - 2 * p + 2 * p * f - f * f); }
-function surfacePoint(F, f, side, t, m, p, out = V3()) {
+export function airfoilT(f, t) { f = clamp(f, 0, 1); return 5 * t * (0.2969 * Math.sqrt(f) - 0.126 * f - 0.3516 * f * f + 0.2843 * f ** 3 - 0.1036 * f ** 4); }
+export function camberY(f, m, p) { if (!m) return 0; return f < p ? (m / (p * p)) * (2 * p * f - f * f) : (m / ((1 - p) * (1 - p))) * (1 - 2 * p + 2 * p * f - f * f); }
+export function surfacePoint(F, f, side, t, m, p, out = V3()) {
   const h = (camberY(f, m, p) + side * airfoilT(f, t) * (F.thick ?? 1)) * F.chord;
   return out.copy(F.le).addScaledVector(F.back, f * F.chord).addScaledVector(F.up, h);
 }
@@ -417,7 +417,7 @@ function surfacePoint(F, f, side, t, m, p, out = V3()) {
  * thick, span }; the surface covers chord fractions c0..c1 (cut faces are closed), and
  * v = 0.5 ∓ f / 2 on the upper / lower side so textures line up across control surfaces.
  */
-function liftSurface({ spans, frame, c0 = 0, c1 = 1, n = 18, t = 0.12, m = 0, p = 0.4, uvOf, capStart = true, capEnd = true }) {
+export function liftSurface({ spans, frame, c0 = 0, c1 = 1, n = 18, t = 0.12, m = 0, p = 0.4, uvOf, capStart = true, capEnd = true }) {
   const fr = [];
   for (let k = 0; k <= n; k++) fr.push(c0 + (c1 - c0) * (1 - Math.cos((k / n) * Math.PI)) / 2);
   const F = spans.map(frame);
@@ -466,7 +466,7 @@ function liftSurface({ spans, frame, c0 = 0, c1 = 1, n = 18, t = 0.12, m = 0, p 
   return mergeGeometries(geos);
 }
 
-const linspace = (a, b, n) => { const out = []; for (let i = 0; i <= n; i++) out.push(a + (b - a) * (i / n)); return out; };
+export const linspace = (a, b, n) => { const out = []; for (let i = 0; i <= n; i++) out.push(a + (b - a) * (i / n)); return out; };
 
 // wing: constant chord with a rounded, slightly drooped tip, 1.6° dihedral, 2412 section
 const WING = { span: 7.0, root: 1.28, le: 1.95, chord: 1.66, dihedral: Math.tan((1.6 * Math.PI) / 180), inc: 0.03, hinge: 0.745, t: 0.12, m: 0.02, p: 0.4 };
@@ -694,7 +694,7 @@ function floatTextures() {
 }
 
 /** Streamlined (teardrop) strut from A to B, chord along the flight direction. */
-function aeroStrut(a, b, chord, thick, rgb) {
+export function aeroStrut(a, b, chord, thick, rgb) {
   const A = V3(...a), B = V3(...b);
   const dir = B.clone().sub(A).normalize();
   const fwd = V3(0, 0, 1);
@@ -852,7 +852,7 @@ function registrationGeometry(side) {
 }
 
 // ==================================================================== materials
-function skinMaterial({ map = null, normalMap = null, alphaTest = 0, roughness = 0.3, normalScale = 0.55, clearcoat = 0.5 }) {
+export function skinMaterial({ map = null, normalMap = null, alphaTest = 0, roughness = 0.3, normalScale = 0.55, clearcoat = 0.5 }) {
   const m = new THREE.MeshPhysicalMaterial({
     color: 0xffffff, map, normalMap, normalScale: new THREE.Vector2(normalScale, normalScale), alphaTest,
     roughness, metalness: 0.05, clearcoat, clearcoatRoughness: 0.22, envMapIntensity: 1.0,
@@ -860,7 +860,7 @@ function skinMaterial({ map = null, normalMap = null, alphaTest = 0, roughness =
   patchMaterial(m, { wet: 0.45, key: 'planeSkin' });
   return m;
 }
-function plainMaterial({ roughness = 0.4, metalness = 0.05, key, ...rest }) {
+export function plainMaterial({ roughness = 0.4, metalness = 0.05, key, ...rest }) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness, metalness, vertexColors: true, ...rest });
   patchMaterial(m, { wet: 0.4, key });
   return m;

@@ -49,6 +49,7 @@ export const U = {
   uUnderwater: { value: 0 },
   uUnderwaterColor: { value: new THREE.Color(0.02, 0.2, 0.24) },
   uPlayerPos: { value: new THREE.Vector3() },
+  uDownwash: { value: new THREE.Vector4(0, -1000, 0, 0) }, // helicopter rotor wash: ground point under the hub, strength
   uShelter: { value: new THREE.Vector4(-3.6, 1.0, 3.6, 7.8) }, // xmin, zmin, xmax, zmax (roof footprint)
   uShelterY: { value: new THREE.Vector2(2.3, 4.6) }, // floor .. roof height
   uExposure: { value: 1 },
@@ -92,6 +93,7 @@ uniform vec3 uCloudDark;
 uniform float uUnderwater;
 uniform vec3 uUnderwaterColor;
 uniform vec3 uPlayerPos;
+uniform vec4 uDownwash;
 uniform vec4 uShelter;
 uniform vec2 uShelterY;
 `;
@@ -224,6 +226,15 @@ vec3 windOffset(vec3 root, vec3 wp, vec3 wn, vec4 w, float freq, float amp, floa
   off += wn * fl * w.y * fAmp * (0.25 + s * 1.2);
   // branch level sway
   off.y += sin(uTime * freq * 1.9 + ph * 4.0) * w.w * amp * 0.12 * (0.3 + s);
+  // helicopter rotor wash: pushed out from under the disc, leaves thrashing
+  if (uDownwash.w > 0.01) {
+    vec2 dd = root.xz - uDownwash.xz;
+    float dl = length(dd);
+    float dw = uDownwash.w * (1.0 - smoothstep(3.0, 18.0, dl)) * (1.0 - smoothstep(10.0, 22.0, root.y - uDownwash.y));
+    float beat = 0.75 + 0.25 * sin(uTime * 19.0 + ph * 5.0);
+    off.xz += dd / max(dl, 0.5) * dw * w.x * amp * 1.6 * beat;
+    off += wn * sin(uTime * 23.0 + ph * 7.0) * dw * w.y * fAmp * 2.5;
+  }
   return off;
 }
 #endif

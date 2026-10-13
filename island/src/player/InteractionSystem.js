@@ -58,7 +58,7 @@ export class InteractionSystem {
 
   update(dt, game) {
     this.focus = null;
-    if (game.state !== 'playing' || this.blocked || game.player.mode === 'locked') return;
+    if (game.state !== 'playing' || this.blocked || game.player.mode === 'locked' || game.player.mode === 'heli') return;
     const cam = game.camera;
     cam.getWorldDirection(this._dir);
     this.ray.set(cam.position, this._dir);

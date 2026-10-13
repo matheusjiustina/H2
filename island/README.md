@@ -48,7 +48,7 @@ start on Low) and remembers any change you make in Settings.
 | Shift | Sprint |
 | Space | Jump / swim up |
 | C / Ctrl | Dive while swimming |
-| E | Interact (open, take, inspect, board) |
+| E | Interact (open, take, inspect, board the skiff, the seaplane or the helicopter) |
 | F / left click | Contextual action or use held item (light the lantern, throw a pebble, take a photo) |
 | Right mouse | Aim the camera or binoculars |
 | R | Put the held item down |
@@ -122,12 +122,73 @@ and slowly sink, and you end up in the water. The plane is recovered and moored 
 pier again a little later. The developer panel (F2) can also put the seaplane at the
 pier, put it in the air at 300 m, or repair it.
 
+### Flying the helicopter
+
+The helicopter PT-TDM (a light single-turbine machine in the H125 mould: three-blade
+main rotor, tail rotor on the left of the fin, skids) is parked on the **helipad** on the
+beach west of the camp, engine off. Walk up to it and press E: you board, the camera
+eases out to the chase view and the turbine starts. The rotor takes about eight seconds
+to reach 100 %; the collective stays down until it does.
+
+| Input | Action |
+| --- | --- |
+| Space / Left Shift (or mouse wheel) | Collective up / down |
+| W / S / A / D (or arrows) | Cyclic: tilt the rotor forward, back, left, right |
+| Q / R (or Z / X) | Pedals: yaw left / right |
+| T | Start or shut down the engine (press twice in flight) |
+| Hold right mouse | Fly the cyclic with the mouse |
+| L | Navigation lights (the red anti-collision beacons flash whenever the rotor turns) |
+| V | Chase or cockpit camera (the mouse swings the chase camera round; it drifts back behind the tail) |
+| O | Orbit camera (wheel zooms) |
+| E | Get out once landed with the lever down. The engine shuts down and the rotor runs down by itself |
+
+To fly: wait for NR 100 %, raise the collective (hold Space) until she gets light on the
+skids and lifts into a hover, then ease the lever back to hold it. Tilt the cyclic
+forward and she gathers speed; through about 15 kt translational lift makes her climb a
+little. To land, slow down with back cyclic, come down gently over the spot and lower the
+lever once the skids are on the ground. Land on firm, fairly level ground: on a slope she
+slides, and a steep slope or a rotor strike ends the flight.
+
+The rotorcraft model (`HeliFlight.js`) is not the seaplane's. Blade-element thrust is
+balanced against momentum-theory inflow at 120 Hz, so climb and descent damping,
+translational lift, ground effect and autorotation all come from the same equations, and
+settling straight down too fast gets her into the vortex ring. The cyclic tilts the
+tip-path plane, which also flaps back with airspeed and lags the shaft. Rotor speed is a
+state: the governed turbine drives it against the rotor's own torque, the fuselage takes
+the reaction (she swings nose-left when you pull power) and the tail rotor cancels it. The
+skids are spring-damper contacts with stick-and-slip friction on the terrain, the helipad
+and the decks. It cruises at about 110 kt, climbs at about 1,600 ft/min and hovers at
+about 70 % torque.
+
+**Flight assist** (Settings → Input) applies here too:
+
+- **Normal** (default): the cyclic keys ask for a rotor attitude and level it when you
+  let go, so she slows down on her own momentum; the pedals ask for a yaw rate with the
+  torque trimmed out and hold the heading in the hover; turns are coordinated at speed. The
+  lever is yours: it stays where you leave it, it doesn't sag when you tilt the cyclic, and
+  it settles into a soft detent at the hover when you let go near level flight. A power
+  limiter stops you over-torquing, and close to the ground at low speed she won't sink
+  faster than is safe.
+- **High**: also holds the hover in place, and Space / Shift ask for a climb or a descent
+  rate (let go and she holds the height, and touches down gently).
+- **Off**: the cyclic and pedals go straight to the rotor with only a little rate damping
+  and the torque trim: hard work on a keyboard, like the real thing.
+
+The rotor wash blows dust off the sand and the helipad, flattens the grass and shakes
+the palms, and rings the water with ripples and spray. Hard landings and tail strikes
+cost damage; rolling over, a rotor or tail-rotor strike, or ditching in the water ends the
+flight: the blades break, you get clear, and the helicopter is recovered to the helipad a
+little later. The harbour ledger can also bring it back to the helipad from anywhere,
+and the developer panel (F2) can put it on the helipad, in a 40 m hover or repair it.
+
 If the browser won't capture the mouse (some embedded pages refuse it), drag on the view
 to look around instead.
 
 **Touch screens** get on-screen controls. Your left thumb moves you (push to the rim of
 the stick to run) and your right thumb looks around. The buttons for jump, E, F and dive
-show up only when they do something. The top corner has your bag and pause.
+show up only when they do something. The top corner has your bag and pause. In the
+helicopter the stick is the cyclic and buttons work the collective, the pedals, the
+engine, the camera and getting out.
 
 ## What's in the island
 
@@ -151,6 +212,17 @@ show up only when they do something. The top corner has your bag and pause.
   controls, stepped floats on streamlined struts and a furnished cabin. Panel seams,
   rivets, doors, vents, the livery and the window openings are baked at load into
   textures, and the cabin and small fittings switch off with distance.
+- **Helicopter and helipad:** a light single-turbine helicopter with its own rotorcraft
+  flight model, cockpit (pilot in the right seat: cyclic, collective and pedals move with
+  the controls, a VEMD-style engine display and flight instruments), chase, cockpit and
+  orbit cameras, rotor blur and rotor shadow, rotor wash, damage and recovery. See
+  *Flying the helicopter*. The airframe is lofted procedurally like the seaplane's, in the
+  same livery, with the windows, doors, seams, rivets and weathering baked into
+  textures, a Starflex-style hub with three twisted, profiled blades and a cabin that
+  switches off with distance. The helipad is a weathered concrete slab with an H,
+  touchdown circle and perimeter line, flush green perimeter lights that come on at
+  dusk, a windsock that follows the wind and the rotor wash, a fuel store and a small
+  maintenance corner.
 - **Boat:** buoyancy sampled at the hull points gives pitch and roll. It has a wake
   ribbon, spray, grounding in shallow water, a throttle and steering.
 - **Vegetation:** palms, broadleaf trees, banana plants, ferns, big-leaf plants, bushes
@@ -198,7 +270,9 @@ seaplane; it does not change how they handle. Load it next to the vehicle, arriv
 at the destination, step out and unload it. Missions can be tracked, restarted from the
 ledger or the journal, and fail only if the cargo is lost (a seaplane crash), in which
 case the cargo goes back to the pier. The ledger can also bring the skiff and the
-seaplane back to their moorings from anywhere.
+seaplane back to their moorings, and the helicopter back to the helipad, from anywhere.
+The helicopter can reach every mission area and land near it; it doesn't change any
+mission.
 
 **Treasure** comes in four kinds of container: supply caches, rugged hard cases,
 encrypted strongboxes with keypads and heavy vaults. There are 17, each opened once.
@@ -225,12 +299,14 @@ src/
                and props on the islands), Shipwreck,
                Terrain (chunked LOD), Textures (GPU-baked procedural materials), Sky,
                CloudBillboards, TimeOfDay, Weather, Atmosphere (sun, IBL, fog, grading),
-               Ocean, Rocks, Waterfall, DistantScenery
+               Ocean, Rocks, Waterfall, DistantScenery, Helipad
   vegetation/  Procedural plant geometry, canvas leaf textures, chunked instancing, grass
   player/      PlayerController (fixed 120 Hz step), Collision, InteractionSystem,
                Inventory, Tools (held items), FirstPersonRig (skinned hands)
   environment/ Camp, props, prop materials, pebbles, wildlife, collectibles
-  vehicles/    Boat, Seaplane (FlightModel = 6-DOF physics, SeaplaneModel = procedural airframe + cockpit)
+  vehicles/    Boat, Seaplane (FlightModel = 6-DOF physics, SeaplaneModel = procedural airframe + cockpit),
+               Helicopter (HeliFlight = rotorcraft physics + assist, HeliModel = procedural airframe,
+               rotors + cockpit)
   effects/     Post-processing passes, particles, rain, ripple simulation, footprints
   audio/       AudioManager (layered ambience, HRTF 3D sounds, underwater filter),
                ProceduralSounds (all default sounds are synthesized)

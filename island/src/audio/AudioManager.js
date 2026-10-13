@@ -166,6 +166,19 @@ export class AudioManager {
     this.planeRoar = this._loop('wind', this.planePanner, { gain: 0, filter: { type: 'bandpass', freq: 420, q: 0.7 } });
     this.planeAir = this._loop('wind', this.sfx, { gain: 0, filter: { type: 'bandpass', freq: 900, q: 0.6 } });
     this.planeHorn = this._loop('stallHorn', this.sfx, { gain: 0 });
+    // helicopter: turbine, main rotor, tail rotor and blade slap at the aircraft; airflow in the cabin
+    this.heliBus = ctx.createGain(); this.heliBus.gain.value = 1; this.heliBus.connect(this.sfx);
+    this.heliTone = ctx.createBiquadFilter(); this.heliTone.type = 'lowpass'; this.heliTone.frequency.value = 6000; this.heliTone.Q.value = 0.5;
+    this.heliBody = ctx.createBiquadFilter(); this.heliBody.type = 'lowshelf'; this.heliBody.frequency.value = 140; this.heliBody.gain.value = 0;
+    this.heliTone.connect(this.heliBody).connect(this.heliBus);
+    this.heliPanner = this._panner(null, 8, 1.0);
+    this.heliPanner.maxDistance = 3000;
+    this.heliPanner.connect(this.heliTone);
+    this.heliTurbine = this._loop('turbine', this.heliPanner, { gain: 0 });
+    this.heliRotor = this._loop('rotor', this.heliPanner, { gain: 0 });
+    this.heliTail = this._loop('tailRotor', this.heliPanner, { gain: 0 });
+    this.heliSlap = this._loop('bladeSlap', this.heliPanner, { gain: 0 });
+    this.heliAir = this._loop('wind', this.sfx, { gain: 0, filter: { type: 'bandpass', freq: 800, q: 0.6 } });
     if (this._pendingFire) this.setFire(...this._pendingFire);
     if (this._pendingRadio) this.setRadio(...this._pendingRadio);
   }
@@ -254,11 +267,47 @@ export class AudioManager {
     this.planeBody.gain.setTargetAtTime(inside ? 7 : 1, t, 0.1);
     // the aircraft you are in is the loudest thing around, and the island fades behind it
     this.planeBus.gain.setTargetAtTime(occupied ? (inside ? 2.3 : 1.8) : 1.3, t, 0.25);
-    this.ambDuck.gain.setTargetAtTime(occupied ? 1 - 0.65 * run * (inside ? 1 : 0.6) : 1, t, 0.5);
+    this._duckPlane = occupied ? 1 - 0.65 * run * (inside ? 1 : 0.6) : 1;
+    this._applyDuck(t);
     const air = Math.min(1, airspeed / 70);
     this.planeAir.gain.gain.setTargetAtTime(air * air * (inside ? 0.7 : 0.9) * (occupied ? 1.4 : 1), t, 0.2);
     this.planeAir.src.playbackRate.setTargetAtTime(0.7 + air * 0.9, t, 0.2);
     this.planeHorn.gain.gain.setTargetAtTime(stall > 0.5 ? 0.35 : 0, t, 0.04);
+  }
+
+  /** The ambience ducks under whichever aircraft you are flying. */
+  _applyDuck(t) {
+    this.ambDuck.gain.setTargetAtTime(Math.min(this._duckPlane ?? 1, this._duckHeli ?? 1), t, 0.5);
+  }
+
+  /**
+   * Helicopter audio. n1 (turbine spool 0..1) drives the whine, nr (rotor speed / 100 %)
+   * the rotor and tail rotor, power the load in the blades; slap 0..1 the blade slap.
+   */
+  setHeli({ n1 = 0, nr = 0, power = 0, slap = 0, inside = false, occupied = false, position, starting = false, airspeed = 0 }) {
+    if (!this.heliRotor) return;
+    const t = this.ctx.currentTime;
+    if (position) { this.heliPanner.positionX.value = position.x; this.heliPanner.positionY.value = position.y; this.heliPanner.positionZ.value = position.z; }
+    const spin = smoothstep(0.04, 0.35, nr);
+    // turbine: rises in pitch as the gas generator winds up, a little more voice under load
+    this.heliTurbine.gain.gain.setTargetAtTime(smoothstep(0.0, 0.12, n1) * (0.22 + 0.3 * n1 + 0.15 * power) * (inside ? 1.15 : 0.8), t, starting ? 0.25 : 0.12);
+    this.heliTurbine.src.playbackRate.setTargetAtTime(0.3 + 0.7 * n1, t, 0.15);
+    // main rotor: the whop slows with the rotor and deepens with the load
+    this.heliRotor.gain.gain.setTargetAtTime(spin * (0.35 + 0.55 * power) * (inside ? 0.75 : 1.1), t, 0.1);
+    this.heliRotor.src.playbackRate.setTargetAtTime(Math.max(0.1, nr), t, 0.08);
+    this.heliTail.gain.gain.setTargetAtTime(smoothstep(0.1, 0.6, nr) * (0.12 + 0.12 * power) * (inside ? 0.4 : 0.9), t, 0.12);
+    this.heliTail.src.playbackRate.setTargetAtTime(Math.max(0.1, nr), t, 0.08);
+    this.heliSlap.gain.gain.setTargetAtTime(slap * (inside ? 0.35 : 0.9), t, 0.15);
+    this.heliSlap.src.playbackRate.setTargetAtTime(Math.max(0.1, nr), t, 0.08);
+    // cabin: the airframe filters the top end and booms in the low end
+    this.heliTone.frequency.setTargetAtTime(inside ? 2200 : 6500, t, 0.1);
+    this.heliBody.gain.setTargetAtTime(inside ? 6 : 1, t, 0.1);
+    this.heliBus.gain.setTargetAtTime(occupied ? (inside ? 2.0 : 1.7) : 1.3, t, 0.25);
+    const air = Math.min(1, airspeed / 65);
+    this.heliAir.gain.gain.setTargetAtTime(occupied ? air * air * (inside ? 0.6 : 0.8) : 0, t, 0.2);
+    this.heliAir.src.playbackRate.setTargetAtTime(0.7 + air * 0.9, t, 0.2);
+    this._duckHeli = occupied ? 1 - 0.6 * spin * (inside ? 1 : 0.65) : 1;
+    this._applyDuck(t);
   }
 
   setEngine(level, position) {

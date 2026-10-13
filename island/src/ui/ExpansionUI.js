@@ -266,7 +266,7 @@ export class ExpansionUI {
 
   _myPos() {
     const g = this.g;
-    return g.player.mode === 'boat' ? g.boat.pos : g.player.mode === 'plane' ? g.seaplane.fm.pos : g.player.pos;
+    return g.player.mode === 'boat' ? g.boat.pos : g.player.mode === 'plane' ? g.seaplane.fm.pos : g.player.mode === 'heli' ? g.heli.hf.pos : g.player.pos;
   }
 
   _updateWaypoint() {
@@ -724,10 +724,11 @@ export class ExpansionUI {
         ${sec('Skiff jobs', shown('boat'), 'No jobs posted yet.')}
         ${sec('Seaplane charters', shown('plane'), 'No charters yet. The ridge station may have news.')}
         ${hiddenN ? `<div class="xp-empty small">${hiddenN} more ${hiddenN === 1 ? 'job is' : 'jobs are'} not posted yet.</div>` : ''}
-        <div class="xp-sec">Moorings</div>
+        <div class="xp-sec">Moorings and helipad</div>
         <div class="xp-services">
           <button type="button" class="xp-btn" data-a="skiff"${g.boat.occupied ? ' disabled' : ''}>Bring the skiff back to the pier</button>
           <button type="button" class="xp-btn" data-a="plane"${sp.occupied ? ' disabled' : ''}>${sp.broken ? 'Salvage and repair the seaplane' : 'Bring the seaplane back to her mooring'}</button>
+          ${g.heli ? `<button type="button" class="xp-btn" data-a="heli"${g.heli.occupied ? ' disabled' : ''}>${g.heli.wrecked ? 'Recover and repair the helicopter' : 'Bring the helicopter back to the helipad'}</button>` : ''}
         </div>
         <button type="button" class="close-hint" data-close>Close · Esc</button>`;
       this._closeBtn(el);
@@ -739,6 +740,7 @@ export class ExpansionUI {
       if (a === 'restart') xp.restart(id);
       if (a === 'skiff' && !g.boat.occupied) { g.boat.recall(); g.toast('The skiff is back at her mooring by the pier.'); }
       if (a === 'plane' && !g.seaplane.occupied) { g.seaplane.atPier(); g.toast('The seaplane is back at her mooring off the pier, fuelled and checked.'); }
+      if (a === 'heli' && g.heli && !g.heli.occupied) { g.heli.atPad(); g.toast('The helicopter is back on the helipad, fuelled and checked.'); }
       g.audio?.play('click', { volume: 0.3 });
       this._trKey = null;
       this.refreshTracker();
@@ -978,6 +980,7 @@ export class ExpansionUI {
     };
     if (g.player.mode !== 'boat') veh(g.boat.pos.x, g.boat.pos.z, 'skiff');
     if (g.player.mode !== 'plane') veh(g.seaplane.fm.pos.x, g.seaplane.fm.pos.z, 'seaplane');
+    if (g.heli && g.player.mode !== 'heli') veh(g.heli.hf.pos.x, g.heli.hf.pos.z, 'helicopter');
     // you
     const me = this._myPos();
     const dir = g.camera.getWorldDirection(this._w);
@@ -991,7 +994,7 @@ export class ExpansionUI {
   }
 
   _chartTab(body) {
-    body.innerHTML = '<div class="xp-chart"></div><div class="xp-chart-key"><span><i class="k-you"></i>you</span><span><i class="k-obj"></i>objective</span><span><i class="k-x"></i>clue</span><span><i class="k-cache"></i>cache (chart fragments)</span><span><i class="k-veh"></i>skiff · seaplane</span></div>';
+    body.innerHTML = '<div class="xp-chart"></div><div class="xp-chart-key"><span><i class="k-you"></i>you</span><span><i class="k-obj"></i>objective</span><span><i class="k-x"></i>clue</span><span><i class="k-cache"></i>cache (chart fragments)</span><span><i class="k-veh"></i>skiff · seaplane · helicopter</span></div>';
     body.querySelector('.xp-chart').append(this._drawChart());
   }
 

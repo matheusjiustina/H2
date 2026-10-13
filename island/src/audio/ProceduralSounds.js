@@ -329,6 +329,88 @@ export const GENERATORS = {
     const out = loopFilter(d, [new Biquad('hp', 35, 0.7, sr), new Biquad('lp', 3200, 0.6, sr)]);
     return normalize(out, 0.85);
   },
+  // ---------------------------------------------------------------- helicopter
+  // Light turboshaft at 100 % N1: the compressor's whine (a few blade-passing tones beating
+  // against each other), the hot rush of the exhaust and the gearbox hum. Every tone is a
+  // multiple of 0.5 Hz so it fits the 2 s buffer; played slower while the turbine winds up.
+  turbine(sr) {
+    const secs = 2, n = sr * secs;
+    const r = rand(171);
+    const white = () => { const w = new Float32Array(n); for (let i = 0; i < n; i++) w[i] = r(); return w; };
+    const hiss = loopFilter(white(), [new Biquad('bp', 1900, 0.5, sr)]);
+    const rush = loopFilter(white(), [new Biquad('lp', 380, 0.6, sr)]);
+    const tones = [[3150, 0.34], [3162.5, 0.3], [4630, 0.15], [6300, 0.07], [1575, 0.12], [520, 0.1], [104, 0.12]];
+    const d = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      let v = 0;
+      for (const [f, a] of tones) v += Math.sin(TAU * f * t) * a;
+      d[i] = v + hiss[i] * 0.5 + rush[i] * 1.6;
+    }
+    const out = loopFilter(d, [new Biquad('hp', 50, 0.7, sr), new Biquad('lp', 7000, 0.5, sr)]);
+    return normalize(out, 0.8);
+  },
+  // Main rotor at 100 % Nr: three blades at 390 rpm pass every 51 ms (19.5 Hz). Each passage is
+  // a pressure pulse (the "whop") with the swish of the blade through the air; the blades are
+  // not quite identical and the one-per-rev wobble keeps it alive. 39 pulses fit the 2 s exactly.
+  rotor(sr) {
+    const secs = 2, n = sr * secs;
+    const r = rand(181);
+    const noise = new Float32Array(n);
+    for (let i = 0; i < n; i++) noise[i] = r();
+    const sw = loopFilter(noise, [new Biquad('bp', 520, 0.7, sr)]);
+    const d = new Float32Array(n);
+    const bpf = 19.5, rev = 6.5;
+    const amps = [1, 0.92, 1.06];
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const ph = (t * bpf) % 1;
+      const amp = amps[Math.floor(t * bpf) % 3];
+      const thump = Math.exp(-((ph - 0.12) ** 2) / 0.004) - 0.25 * Math.exp(-((ph - 0.3) ** 2) / 0.01);
+      const swish = sw[i] * (0.35 + 0.65 * Math.exp(-((ph - 0.15) ** 2) / 0.02));
+      d[i] = (thump + swish * 0.9) * amp * (1 + 0.06 * Math.sin(TAU * rev * t));
+    }
+    const out = loopFilter(d, [new Biquad('hp', 18, 0.7, sr), new Biquad('lp', 2600, 0.6, sr)]);
+    return normalize(out, 0.85);
+  },
+  // Two-blade tail rotor at about 2050 rpm (68.5 Hz blade passing): a hard buzz with a swish.
+  tailRotor(sr) {
+    const secs = 2, n = sr * secs;
+    const r = rand(191);
+    const noise = new Float32Array(n);
+    for (let i = 0; i < n; i++) noise[i] = r();
+    const sw = loopFilter(noise, [new Biquad('bp', 1400, 0.8, sr)]);
+    const d = new Float32Array(n);
+    const f = 68.5;
+    for (let i = 0; i < n; i++) {
+      const w = TAU * f * (i / sr);
+      const tone = Math.sin(w) + 0.6 * Math.sin(2 * w + 0.4) + 0.4 * Math.sin(3 * w + 1.1) + 0.25 * Math.sin(4 * w + 0.3) + 0.15 * Math.sin(5 * w + 2);
+      d[i] = tone * 0.4 + sw[i] * 1.2 * (0.5 + 0.5 * Math.cos(w)) ** 4;
+    }
+    const out = loopFilter(d, [new Biquad('hp', 40, 0.7, sr), new Biquad('lp', 4000, 0.6, sr)]);
+    return normalize(out, 0.8);
+  },
+  // Blade slap: in a loaded descent or a hard turn each blade cuts the tip vortex of the one
+  // ahead and cracks like a whip. Sharp N-wave pulses at the blade-passing rate.
+  bladeSlap(sr) {
+    const secs = 2, n = sr * secs;
+    const r = rand(201);
+    const u = () => (r() + 1) / 2;
+    const d = new Float32Array(n);
+    const period = sr / 19.5;
+    const len = Math.round(sr * 0.008);
+    for (let k = 0; k < 39; k++) {
+      const start = Math.round(k * period);
+      const a = 0.75 + 0.4 * u();
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const v = (t < 0.0012 ? 1 : -0.7 * Math.exp(-(t - 0.0012) / 0.0015)) * Math.exp(-t / 0.003) + r() * 0.3 * Math.exp(-t / 0.002);
+        d[(start + i) % n] += v * a;
+      }
+    }
+    const out = loopFilter(d, [new Biquad('hp', 110, 0.7, sr), new Biquad('lp', 3500, 0.6, sr)]);
+    return normalize(out, 0.9);
+  },
   // a single backfire through the stacks (throttle chopped, or a lean idle)
   backfire(sr) {
     const n = Math.floor(sr * 0.35);

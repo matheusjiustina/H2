@@ -1,4 +1,4 @@
-import { ARCHIPELAGO_POIS } from './Archipelago.js';
+import { ARCHIPELAGO_POIS, HELIPAD } from './Archipelago.js';
 
 // Hand-authored layout of the island region. All coordinates are metres.
 // +X = east, -Z = "north" (towards the lagoon / reef), sea level = 0.
@@ -78,6 +78,7 @@ export const POIS = [
   { id: 'westpoint', name: 'Driftwood Point', x: -296, z: -48, radius: 26 },
   { id: 'overlook', name: 'Ridge Overlook', x: 52, z: 154, radius: 14 },
   { id: 'wreck', name: 'Beached Wreck', x: -168, z: -26, radius: 14 },
+  { id: 'helipad', name: 'Helipad', x: HELIPAD.x, z: HELIPAD.z, radius: 11 },
   ...ARCHIPELAGO_POIS,
 ];
 

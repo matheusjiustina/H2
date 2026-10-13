@@ -38,14 +38,23 @@ export class UI {
     this.fps = h('div', 'fps');
     this.lockHint = h('div', 'lock-hint', 'Click the view to capture the mouse · or drag to look around');
     this.flightStatus = h('div', 'flight-status');
-    this.flightHelp = h('div', 'flight-help', `
+    this.flightHelp = h('div', 'flight-help');
+    this.helpText = {
+      plane: `
       <b>Flying</b> <span class="k">W</span><span class="k">S</span> pitch · <span class="k">A</span><span class="k">D</span> roll (steer on water) · <span class="k">Z</span><span class="k">X</span> rudder ·
       <span class="k">R</span><span class="k">F</span> or wheel throttle · <span class="k">G</span><span class="k">B</span> flaps · hold <span class="k">Q</span> start (tap to stop) ·
       <span class="k">U</span> water rudders · <span class="k">L</span> lights · <span class="k">[</span><span class="k">]</span> trim · hold <span class="k">RMB</span> mouse yoke ·
-      <span class="k">V</span> chase cam · <span class="k">O</span> orbit · <span class="k">E</span> get out (stopped on the water)`);
+      <span class="k">V</span> chase cam · <span class="k">O</span> orbit · <span class="k">E</span> get out (stopped on the water)`,
+      heli: `
+      <b>Helicopter</b> <span class="k">Space</span> collective up · <span class="k">Shift</span> collective down (or wheel) ·
+      <span class="k">W</span><span class="k">S</span><span class="k">A</span><span class="k">D</span> cyclic · <span class="k">Q</span><span class="k">R</span> pedals (yaw) ·
+      <span class="k">T</span> engine · <span class="k">L</span> lights · hold <span class="k">RMB</span> mouse cyclic · <span class="k">V</span> cockpit / chase · <span class="k">O</span> orbit ·
+      <span class="k">E</span> get out (landed, lever down)`,
+    };
     this.prompt.addEventListener('click', () => {
       const g = this.game;
       if (g.player.mode === 'plane' && g.seaplane.canExit()) g.seaplane.exit(g);
+      if (g.player.mode === 'heli' && g.heli.canExit()) g.heli.exit(g);
     });
     this.hud.append(this.reticle, this.prompt, this.hint, this.toastBox, this.discovery, this.fps, this.lockHint, this.flightStatus, this.flightHelp);
     r.append(this.hud);
@@ -81,7 +90,10 @@ export class UI {
     this.pauseMain.addEventListener('click', (e) => {
       const a = e.target.dataset.a;
       if (a === 'continue') this.game.resume();
-      if (a === 'leavePlane' && this.game.seaplane.canExit()) { this.game.resume(); this.game.seaplane.exit(this.game); }
+      if (a === 'leavePlane') {
+        const g = this.game;
+        if (g.player.mode === 'heli' && g.heli.canExit()) { g.resume(); g.heli.exit(g); } else if (g.player.mode === 'plane' && g.seaplane.canExit()) { g.resume(); g.seaplane.exit(g); }
+      }
       if (a === 'journal') this.game.expansion?.ui.openJournal();
       if (a === 'settings') this.showPanel('settings');
       if (a === 'controls') this.showPanel('controls');
@@ -109,6 +121,13 @@ export class UI {
         <div><b>Hold Q</b><span>Start engine (tap to stop)</span></div><div><b>U</b><span>Water rudders</span></div>
         <div><b>L</b><span>Lights</span></div><div><b>Hold right mouse</b><span>Fly with the mouse</span></div>
         <div><b>V · O</b><span>Cockpit / chase · orbit camera</span></div><div><b>E</b><span>Climb out (stopped on the water)</span></div>
+      </div>
+      <div class="menu-sub">Flying the helicopter (on the helipad west of the camp)</div>
+      <div class="keys">
+        <div><b>Space / Shift · wheel</b><span>Collective up / down (High assist: climb / descend)</span></div><div><b>W A S D</b><span>Cyclic: tilt the rotor forward, back, left, right</span></div>
+        <div><b>Q / R · Z / X</b><span>Pedals: yaw left / right</span></div><div><b>T</b><span>Start / shut down the engine (starts when you board)</span></div>
+        <div><b>Hold right mouse</b><span>Fly the cyclic with the mouse</span></div><div><b>L</b><span>Nav lights</span></div>
+        <div><b>V · O</b><span>Chase / cockpit · orbit camera</span></div><div><b>E</b><span>Get out (landed, lever down)</span></div>
       </div>
       <button data-a="back">Back</button>`);
     this.controlsPanel.addEventListener('click', (e) => { if (e.target.dataset.a === 'back') this.showPanel('main'); });
@@ -206,7 +225,8 @@ export class UI {
       <div class="dbg-row wrap">${timeBtns}</div>
       <div class="dbg-row wrap">${weatherBtns}<button data-wa="1">auto</button><button data-wf="1">fast transitions</button></div>
       <div class="dbg-row wrap">${poiBtns}</div>
-      <div class="dbg-row wrap"><label>Plane</label><button data-sp="pier">Moored at pier</button><button data-sp="air">Airborne 300 m</button><button data-sp="repair">Repair</button></div>`;
+      <div class="dbg-row wrap"><label>Plane</label><button data-sp="pier">Moored at pier</button><button data-sp="air">Airborne 300 m</button><button data-sp="repair">Repair</button></div>
+      <div class="dbg-row wrap"><label>Heli</label><button data-hc="pad">On the helipad</button><button data-hc="air">Hover 40 m</button><button data-hc="repair">Repair</button></div>`;
     el.addEventListener('click', (e) => {
       const b = e.target;
       const g = this.game;
@@ -217,6 +237,9 @@ export class UI {
       if (b.dataset.sp === 'pier') { if (g.seaplane.occupied) g.seaplane.exit(g, true); g.seaplane.atPier(); }
       if (b.dataset.sp === 'air') { if (g.boat.occupied) g.boat.exit(g); if (!g.seaplane.occupied) g.seaplane.board(g); g.seaplane.airborne(300); }
       if (b.dataset.sp === 'repair') g.seaplane.repair();
+      if (b.dataset.hc === 'pad') { if (g.heli.occupied) g.heli.exit(g, true); g.heli.atPad(); }
+      if (b.dataset.hc === 'air') { if (g.boat.occupied) g.boat.exit(g); if (g.seaplane.occupied) g.seaplane.exit(g, true); if (!g.heli.occupied) g.heli.board(g); g.heli.airborne(40); }
+      if (b.dataset.hc === 'repair') g.heli.repair();
       if (b.dataset.s !== undefined) {
         const sp = parseFloat(b.dataset.s);
         g.timeOfDay.paused = sp === 0;
@@ -234,14 +257,16 @@ export class UI {
   showPanel(which) {
     this.pauseMain.style.display = which === 'main' ? '' : 'none';
     if (which === 'main') {
-      // in the seaplane: offer to climb out (only once she is stopped on the water)
-      const sp = this.game.seaplane;
+      // in the seaplane or the helicopter: offer to climb out (once stopped on the water / landed)
+      const g = this.game;
       const leave = this.pauseMain.querySelector('[data-a=leavePlane]');
-      const aboard = this.game.player.mode === 'plane' && !!sp;
+      const heli = g.player.mode === 'heli';
+      const aboard = (g.player.mode === 'plane' && !!g.seaplane) || heli;
       leave.hidden = !aboard;
       if (aboard) {
-        leave.disabled = !sp.canExit();
-        leave.textContent = sp.canExit() ? 'Get out of the seaplane' : 'Get out (stop on the water first)';
+        const ok = heli ? g.heli.canExit() : g.seaplane.canExit();
+        leave.disabled = !ok;
+        leave.textContent = heli ? (ok ? 'Get out of the helicopter' : 'Get out (land and lower the collective first)') : (ok ? 'Get out of the seaplane' : 'Get out (stop on the water first)');
       }
     }
     this.settingsPanel.style.display = which === 'settings' ? '' : 'none';
@@ -299,8 +324,8 @@ export class UI {
       html = g.boat.prompt;
     }
     // stopped on the water in the seaplane: a "get out" button (E, or click it when the mouse is free)
-    const canLeave = g.state === 'playing' && g.player.mode === 'plane' && !!g.seaplane?.canExit();
-    if (canLeave) html = '<span class="k">E</span>Get out of the plane';
+    const canLeave = g.state === 'playing' && ((g.player.mode === 'plane' && !!g.seaplane?.canExit()) || (g.player.mode === 'heli' && !!g.heli?.canExit()));
+    if (canLeave) html = `<span class="k">E</span>Get out of the ${g.player.mode === 'heli' ? 'helicopter' : 'plane'}`;
     if (html !== this._lastPrompt) {
       this.prompt.innerHTML = html;
       this.prompt.classList.toggle('show', !!html);
@@ -333,10 +358,11 @@ export class UI {
       this.lockHint.classList.toggle('show', needLock);
       this._lastLock = needLock;
     }
-    // seaplane instruments line
-    const flying = g.player.mode === 'plane' && g.seaplane;
+    // seaplane / helicopter instruments line
+    const craft = g.player.mode === 'plane' ? g.seaplane : g.player.mode === 'heli' ? g.heli : null;
+    const flying = !!craft;
     if (flying) {
-      if (g.seaplane.status !== this._lastStatus) { this.flightStatus.innerHTML = g.seaplane.status; this._lastStatus = g.seaplane.status; }
+      if (craft.status !== this._lastStatus) { this.flightStatus.innerHTML = craft.status; this._lastStatus = craft.status; }
     }
     if (flying !== this._lastFlying) {
       this._lastFlying = flying;
@@ -357,8 +383,9 @@ export class UI {
   toggleDebug() { this.debug.classList.toggle('show'); }
 
   /** The flight controls card shows while flying and fades to a reminder after a while. */
-  showFlightHelp(on) {
+  showFlightHelp(on, kind = 'plane') {
     clearTimeout(this._helpTimer);
+    if (on) this.flightHelp.innerHTML = this.helpText[kind] || this.helpText.plane;
     this.flightHelp.classList.toggle('show', on);
     this.flightHelp.classList.remove('dim');
     if (on) this._helpTimer = setTimeout(() => this.flightHelp.classList.add('dim'), 25000);

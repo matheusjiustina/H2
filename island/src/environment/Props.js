@@ -4,6 +4,7 @@ import { patchMaterial } from '../core/MaterialPatch.js';
 import { rng, smoothstep } from '../utils/MathUtils.js';
 import { woodCylinder, woodBox, place, merge, buildSign } from './PropFactory.js';
 import { VIEWPOINT, POIS } from '../world/Layout.js';
+import { HELIPAD } from '../world/Archipelago.js';
 import { GeoBuilder } from '../vegetation/PlantGeometry.js';
 
 function driftwoodGeometry(seed) {
@@ -75,6 +76,7 @@ export class Props {
       const k = 7 + r() * 5;
       const px = nx + (gx / gl) * k, pz = nz + (gz / gl) * k;
       if (Math.hypot(px, pz - 4) < 20) continue;
+      if (Math.hypot(px - HELIPAD.x, pz - HELIPAD.z) < 18) continue;
       const h = terrainData.heightAt(px, pz);
       if (h < 0.5 || h > 3.5) continue;
       driftSpots.push([px, h, pz]);
