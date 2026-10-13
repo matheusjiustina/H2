@@ -11,6 +11,7 @@ import { PlayerController } from '../player/PlayerController';
 import { CameraController, CameraPose } from '../player/CameraController';
 import { HorizonCuller } from '../render/Culling';
 import { Lighting } from '../render/Lighting';
+import { InkPass } from '../render/InkPass';
 import { Water } from '../render/Water';
 import { worldUniforms } from '../render/materials';
 import { screenState, ScreenKind } from '../render/ScreenContent';
@@ -116,6 +117,7 @@ export class Game {
   private voiceObject = false;
   private voiceAcc = 0;
   ready = false;
+  private ink!: InkPass;
   private frameCount = 0;
   private ray = new Raycaster();
   private occluders: Object3D[] | null = null;
@@ -130,6 +132,7 @@ export class Game {
     this.input = new Input(this.renderer.domElement);
     this.ui = new UI(container);
     this.touch = new TouchControls(this.ui.root, this.input);
+    this.ink = new InkPass(this.renderer);
     this.applyQualityCaps();
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -237,17 +240,21 @@ export class Game {
     this.prCap = Math.min(window.devicePixelRatio || 1, q === 'low' ? 1 : q === 'medium' ? 1.5 : 2);
     this.pixelRatio = this.prCap;
     this.renderer.setPixelRatio(this.pixelRatio);
+    this.ink?.resize();
     if (this.lighting) {
       this.lighting.setShadows(this.shadowSize(q));
       this.renderer.shadowMap.enabled = q !== 'low';
     }
     if (this.content) this.content.screenAtlas.refreshHz = q === 'low' ? 4 : 8;
+    // Drawn surface texture (ground patches, leaf strokes) is the costliest shading; Low skips it.
+    worldUniforms.uDrawn.value = q === 'low' ? 0 : 1;
   }
 
   resize(): void {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h);
+    this.ink?.resize();
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -481,7 +488,7 @@ export class Game {
       const orbit = this.mode === 'title' || this.mode === 'loading';
       this.renderer.shadowMap.autoUpdate = !orbit;
       if (orbit && this.frameCount++ % 30 === 0) this.renderer.shadowMap.needsUpdate = true;
-      this.renderer.render(this.scene, this.camera);
+      this.ink.render(this.scene, this.camera, this.lighting.night);
       this.trackPerformance(raw * 1000);
     };
     requestAnimationFrame(loop);
@@ -1221,6 +1228,7 @@ export class Game {
         if (this.slowTimer > 2 && this.pixelRatio > 0.6) {
           this.pixelRatio = Math.max(0.6, this.pixelRatio - 0.15);
           this.renderer.setPixelRatio(this.pixelRatio);
+          this.ink.resize();
           this.slowTimer = 0;
         }
       } else if (this.frameMs < 14) {
@@ -1229,6 +1237,7 @@ export class Game {
         if (this.fastTimer > 4 && this.pixelRatio < this.prCap) {
           this.pixelRatio = Math.min(this.prCap, this.pixelRatio + 0.1);
           this.renderer.setPixelRatio(this.pixelRatio);
+          this.ink.resize();
           this.fastTimer = 0;
         }
       }

@@ -20,32 +20,32 @@ const TABLES: Record<RegionId, Table> = {
   city: {
     trees: 0.25, forest: 0.2,
     big: [{ kind: 'tree.round', w: 3 }, { kind: 'tree.round', w: 1, params: { leaves: 'blossom' } }, { kind: 'bush', w: 2, params: { flowers: '#f29db0' } }],
-    ground: 0.5, small: [{ kind: 'grass.tuft', w: 5 }, { kind: 'flower', w: 2 }],
+    ground: 0.5, small: [{ kind: 'grass.tuft', w: 5 }, { kind: 'flower', w: 2 }, { kind: 'wildflowers', w: 1 }],
   },
   hills: {
     trees: 1.3, forest: 0.85,
-    big: [{ kind: 'tree.round', w: 5 }, { kind: 'tree.birch', w: 2 }, { kind: 'tree.round', w: 1, params: { leaves: 'autumn' } }, { kind: 'bush', w: 3 }, { kind: 'bush', w: 1, params: { flowers: '#f6d55c' } }, { kind: 'rock', w: 1.2 }],
-    ground: 1.4, small: [{ kind: 'grass.tuft', w: 6 }, { kind: 'flower', w: 3 }, { kind: 'mushroom', w: 0.2 }],
+    big: [{ kind: 'tree.round', w: 5 }, { kind: 'tree.tall', w: 2.5 }, { kind: 'tree.birch', w: 2 }, { kind: 'tree.round', w: 1, params: { leaves: 'autumn' } }, { kind: 'bush', w: 3 }, { kind: 'bush', w: 1, params: { flowers: '#f6d55c' } }, { kind: 'rock', w: 1.2 }],
+    ground: 1.5, small: [{ kind: 'grass.tuft', w: 6 }, { kind: 'grass.clump', w: 3 }, { kind: 'flower', w: 2 }, { kind: 'wildflowers', w: 1.5 }, { kind: 'mushroom', w: 0.2 }],
   },
   coast: {
     trees: 0.55, forest: 0.3,
     big: [{ kind: 'tree.palm', w: 5 }, { kind: 'bush', w: 2 }, { kind: 'rock', w: 1.5 }],
-    ground: 0.8, small: [{ kind: 'grass.tuft', w: 5, params: { color: '#a9b862' } }, { kind: 'flower', w: 0.6, params: { color: '#ffffff' } }],
+    ground: 0.9, small: [{ kind: 'grass.tuft', w: 5, params: { color: '#a9b862' } }, { kind: 'grass.clump', w: 2.5, params: { color: '#b3b866' } }, { kind: 'flower', w: 0.6, params: { color: '#ffffff' } }],
   },
   mining: {
     trees: 0.35, forest: 0.4,
     big: [{ kind: 'tree.pine', w: 2 }, { kind: 'rock', w: 3 }, { kind: 'bush', w: 1 }],
-    ground: 0.5, small: [{ kind: 'grass.tuft', w: 5, params: { color: '#a5a26e' } }],
+    ground: 0.6, small: [{ kind: 'grass.tuft', w: 5, params: { color: '#a5a26e' } }, { kind: 'grass.clump', w: 1.5, params: { color: '#9a9c62' } }],
   },
   heights: {
     trees: 0.8, forest: 0.6,
     big: [{ kind: 'tree.pine', w: 4 }, { kind: 'tree.birch', w: 1 }, { kind: 'rock', w: 2 }, { kind: 'bush', w: 1 }],
-    ground: 1.0, small: [{ kind: 'grass.tuft', w: 6, params: { color: '#86b97c' } }, { kind: 'flower', w: 1, params: { color: '#b8a4f2' } }],
+    ground: 1.1, small: [{ kind: 'grass.tuft', w: 6, params: { color: '#86b97c' } }, { kind: 'grass.clump', w: 2, params: { color: '#7fb072' } }, { kind: 'flower', w: 1, params: { color: '#b8a4f2' } }, { kind: 'wildflowers', w: 0.6, params: { color: '#b8a4f2' } }],
   },
   woods: {
     trees: 2.2, forest: 0.6,
-    big: [{ kind: 'tree.pine', w: 5 }, { kind: 'tree.round', w: 3, params: { leaves: 'dark' } }, { kind: 'tree.birch', w: 1 }, { kind: 'bush', w: 2 }, { kind: 'rock', w: 1 }],
-    ground: 1.2, small: [{ kind: 'grass.tuft', w: 5, params: { color: '#6a9f4b' } }, { kind: 'mushroom', w: 0.8 }, { kind: 'flower', w: 0.8 }],
+    big: [{ kind: 'tree.pine', w: 5 }, { kind: 'tree.round', w: 3, params: { leaves: 'dark' } }, { kind: 'tree.tall', w: 2.5 }, { kind: 'tree.birch', w: 1 }, { kind: 'bush', w: 2 }, { kind: 'rock', w: 1 }],
+    ground: 1.4, small: [{ kind: 'grass.tuft', w: 4, params: { color: '#6a9f4b' } }, { kind: 'fern', w: 3 }, { kind: 'grass.clump', w: 2, params: { color: '#5f9645' } }, { kind: 'mushroom', w: 0.8 }, { kind: 'flower', w: 0.8 }],
   },
   south: {
     trees: 0.9, forest: 0.6,
@@ -54,8 +54,8 @@ const TABLES: Record<RegionId, Table> = {
   },
   wilds: {
     trees: 0.9, forest: 0.75,
-    big: [{ kind: 'tree.round', w: 5 }, { kind: 'tree.pine', w: 2 }, { kind: 'tree.birch', w: 1 }, { kind: 'bush', w: 3 }, { kind: 'rock', w: 1.2 }],
-    ground: 1.1, small: [{ kind: 'grass.tuft', w: 6 }, { kind: 'flower', w: 2.5 }],
+    big: [{ kind: 'tree.round', w: 5 }, { kind: 'tree.tall', w: 2 }, { kind: 'tree.pine', w: 2 }, { kind: 'tree.birch', w: 1 }, { kind: 'bush', w: 3 }, { kind: 'rock', w: 1.2 }],
+    ground: 1.25, small: [{ kind: 'grass.tuft', w: 6 }, { kind: 'grass.clump', w: 3 }, { kind: 'flower', w: 2 }, { kind: 'wildflowers', w: 1.5 }, { kind: 'fern', w: 1 }],
   },
 };
 
@@ -82,7 +82,7 @@ export function scatterVegetation(world: World, content: WorldContent, quality: 
   const area = 4 * Math.PI * R * R;
   const big = Math.round(area / 22);
   const smallMul = quality === 'low' ? 0.35 : quality === 'medium' ? 0.7 : 1;
-  const small = Math.round((area / 3.2) * smallMul);
+  const small = Math.round((area / 2.6) * smallMul);
   const d = new Vector3();
   const e = new Vector3();
   const n = new Vector3();
@@ -112,7 +112,7 @@ export function scatterVegetation(world: World, content: WorldContent, quality: 
     const t = TABLES[world.biomes.regionAt(d).id];
     const forestN = noise.noise3(d.x * 5.5 + 7, d.y * 5.5, d.z * 5.5 - 3) * 0.5 + 0.5;
     const density = t.trees * (1 - t.forest + t.forest * Math.pow(forestN, 2.2) * 2.4);
-    if (rng.next() > Math.min(1, density * 0.55)) continue;
+    if (rng.next() > Math.min(1, density * 0.66)) continue;
     // City core stays clear (streets have planters instead).
     const cityLoc = world.layout.get('city').frame.local(d);
     if (Math.hypot(cityLoc.x, cityLoc.y) < 33) continue;
@@ -132,7 +132,7 @@ export function scatterVegetation(world: World, content: WorldContent, quality: 
     const t = TABLES[world.biomes.regionAt(d).id];
     if (!t.small.length) continue;
     const meadow = noise.noise3(d.x * 9 - 2, d.y * 9 + 5, d.z * 9) * 0.5 + 0.5;
-    if (rng.next() > t.ground * (0.25 + meadow * 0.9) * 0.6) continue;
+    if (rng.next() > t.ground * (0.25 + meadow * 0.9) * 0.68) continue;
     const ok = accept(d, 0.5);
     if (!ok) continue;
     const cityLoc = world.layout.get('city').frame.local(d);

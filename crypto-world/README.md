@@ -118,6 +118,14 @@ Key techniques:
   sphere under its footprint, with verticals that stay rigid near the origin and turn radial far out.
   Long structures such as the pier follow the curvature, buildings keep parallel walls, and visuals
   match their colliders.
+- **Illustrated rendering.** The scene renders off-screen, then an ink pass draws hand-inked
+  contours from the depth buffer alone. It catches silhouettes and creases, colours each line from
+  the paint underneath, and thins lines with distance. Surfaces use a two-tone cel ramp with cool,
+  hue-shifted shadows. The ground is painted in flat patches with inked borders, specks and cliff
+  strata, and paths are crisp shapes with drawn edges. Canopies get leafy shading and drawn leaf
+  contours. The sky has painted two-tone cloud banks, measured from the planet's visible limb. Water
+  uses flat depth bands with contour lines, ripple strokes and a scalloped foam line. On Low quality
+  the drawn texturing is skipped.
 - **Batching and culling.** Kits are merged per 16 m cluster into a few meshes: solid, grass, GPU-animated
   (spin/bob), signs, screens and light pools. A conservative **horizon culler** hides anything behind the
   planet, and grass also fades out with distance. Birds and butterflies are instanced and fireflies are

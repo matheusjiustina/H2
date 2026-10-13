@@ -82,6 +82,7 @@ export function createBiomes(L: LayoutBuilder): Biomes {
   const roads = new RoadIndex(L.roads);
   const tmpA = new Color();
   const tmpB = new Color();
+  const hsl = { h: 0, s: 0, l: 0 };
 
   function weights(d: Vector3): number[] {
     return regions.map((r) => {
@@ -106,6 +107,9 @@ export function createBiomes(L: LayoutBuilder): Biomes {
       total += w[i];
     }
     out.multiplyScalar(1 / total);
+    // Painted-background greens: a touch less saturated and deeper than a toy palette.
+    out.getHSL(hsl);
+    out.setHSL(hsl.h + 0.012, hsl.s * 0.82, hsl.l * 0.95);
 
     // Polar snow regardless of region weighting.
     const lat = Math.asin(d.y) * (180 / Math.PI);
@@ -114,7 +118,7 @@ export function createBiomes(L: LayoutBuilder): Biomes {
 
     // Steep slopes show rock.
     const slope = 1 - Math.max(0, normal.dot(d));
-    const rock = smoothstep(0.16, 0.34, slope);
+    const rock = smoothstep(0.22, 0.28, slope);
     if (rock > 0) {
       tmpB.copy(ROCK).lerp(ROCK_DARK, n2);
       out.lerp(tmpB, rock * (1 - snow * 0.7));
@@ -122,7 +126,7 @@ export function createBiomes(L: LayoutBuilder): Biomes {
 
     // Shorelines and sea floor.
     if (h < SEA_LEVEL + 1.3) {
-      const beach = smoothstep(SEA_LEVEL + 1.3, SEA_LEVEL + 0.55, h);
+      const beach = smoothstep(SEA_LEVEL + 1.0, SEA_LEVEL + 0.82, h);
       out.lerp(SAND, beach * (1 - snow * 0.8));
       if (h < SEA_LEVEL + 0.15) {
         out.lerp(WET_SAND, smoothstep(SEA_LEVEL + 0.15, SEA_LEVEL - 0.3, h));
