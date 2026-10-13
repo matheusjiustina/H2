@@ -37,8 +37,8 @@ check(await page.isVisible('text=SETTINGS'), 'title screen shows SETTINGS');
 
 // ---- Data integrity inside the running world ---------------------------------------------------
 const integrity = await page.evaluate(async () => {
-  const { MISSIONS } = await import('/src/data/missions.ts');
   const g = window.__game;
+  const MISSIONS = g.state.missions;
   const ids = new Set(g.props.interactables.map((i) => i.id));
   const npcs = new Set(g.npcs.npcs.map((n) => n.def.id));
   const missing = [];

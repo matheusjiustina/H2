@@ -154,7 +154,7 @@ export class Input {
       this.touchRun = !!gp.buttons[10]?.pressed || !!gp.buttons[7]?.pressed;
     }
     if (rx || ry) this.addLook(rx * 600 * dt, ry * 400 * dt);
-    const map: [number, Action][] = [[0, 'interact'], [0, 'confirm'], [1, 'skip'], [3, 'jump'], [9, 'pause'], [8, 'journal']];
+    const map: [number, Action][] = [[0, 'interact'], [0, 'confirm'], [1, 'skip'], [3, 'jump'], [9, 'pause'], [8, 'journal'], [12, 'up'], [13, 'down']];
     map.forEach(([b, a]) => {
       const down = !!gp.buttons[b]?.pressed;
       if (down && !this.gamepadPrev[b]) this.pressed.add(a);

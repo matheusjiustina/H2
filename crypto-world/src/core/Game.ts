@@ -116,6 +116,7 @@ export class Game {
   private voiceObject = false;
   private voiceAcc = 0;
   ready = false;
+  private frameCount = 0;
   private ray = new Raycaster();
   private occluders: Object3D[] | null = null;
 
@@ -476,6 +477,10 @@ export class Game {
       this.last = now;
       if (!this.ready) return;
       this.tick(dt);
+      // The title orbit sees half the planet: refresh its (barely moving) shadows only now and then.
+      const orbit = this.mode === 'title' || this.mode === 'loading';
+      this.renderer.shadowMap.autoUpdate = !orbit;
+      if (orbit && this.frameCount++ % 30 === 0) this.renderer.shadowMap.needsUpdate = true;
       this.renderer.render(this.scene, this.camera);
       this.trackPerformance(raw * 1000);
     };
