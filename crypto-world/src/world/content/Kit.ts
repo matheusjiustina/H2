@@ -10,7 +10,7 @@ export type Vec3 = [number, number, number];
 /** Collider authored in kit-local units (x, z on the ground plane, y up from the base). */
 export type KitCollider =
   | { type: 'box'; x: number; z: number; hx: number; hz: number; h: number; y0?: number; rot?: number; camera?: boolean; tag?: string }
-  | { type: 'circle'; x: number; z: number; r: number; h: number; y0?: number; tag?: string };
+  | { type: 'circle'; x: number; z: number; r: number; h: number; y0?: number; camera?: boolean; tag?: string };
 
 export interface KitSurface {
   x: number;

@@ -125,9 +125,11 @@ export class CameraController {
 
     // 6. Obstacle avoidance: pull in quickly when blocked, ease back out slowly.
     const frac = this.world.raycast(this.target, desiredPos);
-    const allowed = frac < 1 ? Math.max(1.6, wanted * frac - 0.45) : wanted;
+    const allowed = frac < 1 ? Math.max(1.1, wanted * frac - 0.35) : wanted;
     this.distance += (allowed - this.distance) * damp(allowed < this.distance ? 16 : 2.5, dt);
-    const pos = new Vector3().copy(this.target).addScaledVector(back, this.distance);
+    // When pulled in by a wall, rise a little and look down so the player never fills the frame.
+    const pulled = Math.max(0, Math.min(wanted, 6) - this.distance);
+    const pos = new Vector3().copy(this.target).addScaledVector(back, this.distance).addScaledVector(U, pulled * 0.18);
 
     // Keep above terrain.
     const pd = this.tmp.copy(pos).normalize();

@@ -120,8 +120,11 @@ export class CharacterAnimator {
   runStride: number;
   idleTime = 0;
   autoLookAround = true;
+  /** Fired when a foot plants (twice per gait cycle). */
+  onStep: (() => void) | null = null;
 
   private phase = 0;
+  private totalPhase = Math.PI * 0.5;
   private t = 0;
   private sitW = 0;
   private airW = 0;
@@ -177,7 +180,12 @@ export class CharacterAnimator {
     const walkW = smoothstep(0.05, 1.2 * sc, sp);
     const runW = smoothstep(3.4 * sc, 5.2 * sc, sp);
     const stride = this.walkStride + (this.runStride - this.walkStride) * runW;
-    this.phase = (this.phase + (distance / stride) * Math.PI * 2) % (Math.PI * 2);
+    const dPhase = (distance / stride) * Math.PI * 2;
+    this.phase = (this.phase + dPhase) % (Math.PI * 2);
+    // Unwrapped phase: every half cycle is one foot plant.
+    const before = Math.floor(this.totalPhase / Math.PI);
+    this.totalPhase += dPhase;
+    if (this.onStep && this.grounded && sp > 0.4 && !this.sitting && Math.floor(this.totalPhase / Math.PI) !== before) this.onStep();
     if (sp < 0.05) this.idleTime += dt; else this.idleTime = 0;
 
     // Stop lean: brief lean back when braking hard.

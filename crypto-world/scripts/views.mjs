@@ -29,8 +29,9 @@ const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 await page.goto(process.env.URL ?? 'http://localhost:5173/');
-await page.waitForFunction(() => window.__game && window.__game.ready !== false, null, { timeout: 120000 });
-await page.waitForTimeout(3000);
+await page.waitForFunction(() => window.__game && window.__game.ready === true, null, { timeout: 120000 });
+await page.evaluate(() => window.__game.skipTitle());
+await page.waitForTimeout(1500);
 for (const [name, code] of Object.entries(VIEWS)) {
   if (filter && !filter.split(',').includes(name)) continue;
   const info = await page.evaluate(`(() => { const g = window.__game; ${code}; g.simulate(1.2); return g.debugState(); })()`);

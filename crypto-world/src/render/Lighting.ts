@@ -65,6 +65,8 @@ export class Lighting {
   readonly sunDir = new Vector3();
   readonly moonDir = new Vector3();
   night = 0;
+  /** Multiplies fog distances (large on the title screen, 1 in play). */
+  fogScale = 1;
   private fog: Fog;
   private tmpC = new Color();
 
@@ -141,6 +143,8 @@ export class Lighting {
     worldUniforms.uNight.value = this.night;
     su.uNight.value = this.night;
     lerpC('fog', this.fog.color);
+    this.fog.near = 50 * this.fogScale;
+    this.fog.far = 165 * this.fogScale;
 
     // Sun path: rises in the east, arcs high toward the south, sets in the west.
     const theta = (this.time - 0.25) * Math.PI * 2;

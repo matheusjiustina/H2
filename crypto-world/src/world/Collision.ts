@@ -191,11 +191,42 @@ export class CollisionWorld {
     let best = 1;
     const dir = new Vector3().subVectors(b, a);
     for (const c of this.qBuf) {
-      if (!c.blocksCamera || c.kind !== 'box') continue;
+      if (!c.blocksCamera) continue;
       const up = c.center;
       const hy = (c.top - c.base) / 2;
       const center = new Vector3().copy(up).multiplyScalar(R + c.base + hy);
       const o = new Vector3().subVectors(a, center);
+      if (c.kind === 'circle') {
+        // Vertical cylinder: radial quadratic, then clip by the height slab.
+        const oh = o.clone().addScaledVector(up, -o.dot(up));
+        const dh = dir.clone().addScaledVector(up, -dir.dot(up));
+        const A = dh.dot(dh);
+        const B = 2 * oh.dot(dh);
+        const C = oh.dot(oh) - c.radius * c.radius;
+        let tmin = 0, tmax = 1;
+        if (A < 1e-12) {
+          if (C > 0) continue;
+        } else {
+          const disc = B * B - 4 * A * C;
+          if (disc < 0) continue;
+          const sq = Math.sqrt(disc);
+          tmin = Math.max(tmin, (-B - sq) / (2 * A));
+          tmax = Math.min(tmax, (-B + sq) / (2 * A));
+        }
+        const e = o.dot(up);
+        const f = dir.dot(up);
+        if (Math.abs(f) < 1e-9) {
+          if (Math.abs(e) > hy) continue;
+        } else {
+          let t1 = (-hy - e) / f;
+          let t2 = (hy - e) / f;
+          if (t1 > t2) { const tt = t1; t1 = t2; t2 = tt; }
+          tmin = Math.max(tmin, t1);
+          tmax = Math.min(tmax, t2);
+        }
+        if (tmin <= tmax && tmin < best) best = tmin;
+        continue;
+      }
       // Slab test in the box frame.
       let tmin = 0, tmax = 1;
       const axes: [Vector3, number][] = [[c.xAxis, c.hx], [up, hy], [c.zAxis, c.hz]];

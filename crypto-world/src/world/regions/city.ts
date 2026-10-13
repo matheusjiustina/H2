@@ -51,6 +51,7 @@ export function layoutCity(L: LayoutBuilder): void {
     sign: { text: 'NOVALABS', sub: 'decentralised apps, centralised snacks', bg: P.violet, fg: P.paper, icon: 'star', accent: P.butter, w: 4, h: 0.7, y: 3.0 },
     screen: { kind: 'contract', w: 2.2, h: 1.3, y: 6.2 },
   }, { id: 'city.novalabs', pad: { hx: 3.6, hz: 3.1 } });
+  L.place(R, 'terminal', 13.4, 22.0, 180, { screen: 'contract', label: 'Use the NovaLabs terminal', iid: 'city.nova.terminal', title: 'NovaLabs — CoffeeVault.sol', accent: P.violet }, { id: 'city.nova.terminal' });
   L.place(R, 'bank', 8.5, 14, 180, { name: 'NONCE & SONS' }, { id: 'city.bank', pad: { hx: 3.6, hz: 4.5 } });
   L.place(R, 'building', -8.5, 14.5, 180, {
     w: 6, d: 5, floors: 3, wall: P.peach, trim: P.paper, roof: 'hip', roofColor: P.brick, base: P.stoneDark,

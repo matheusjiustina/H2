@@ -208,7 +208,7 @@ export class WorldContent {
         const center = dirAt(c.x, c.z);
         const y0 = c.y0 ?? 0;
         if (c.type === 'circle') {
-          world.collision.add({ kind: 'circle', center, radius: c.r, base: base + y0, top: base + y0 + c.h, tag: c.tag });
+          world.collision.add({ kind: 'circle', center, radius: c.r, base: base + y0, top: base + y0 + c.h, blocksCamera: c.camera ?? (c.h > 2.2 && c.r > 0.7), tag: c.tag });
         } else {
           const { ax, az } = rotAxes(c.rot);
           const tx = ax.clone().addScaledVector(center, -ax.dot(center)).normalize();

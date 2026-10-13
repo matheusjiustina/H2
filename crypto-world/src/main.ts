@@ -5,6 +5,7 @@ import '@fontsource/fredoka/700.css';
 import '@fontsource/nunito/400.css';
 import '@fontsource/nunito/600.css';
 import '@fontsource/nunito/800.css';
+import './ui/styles.css';
 import { Game } from './core/Game';
 
 async function boot() {
@@ -19,5 +20,6 @@ async function boot() {
   ]).catch(() => undefined);
   const game = new Game(app);
   game.start();
+  await game.build();
 }
 boot();

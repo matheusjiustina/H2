@@ -25,6 +25,7 @@ export const OBJECT_SPEAKERS: Record<string, string> = {
   'beacon.coast': 'COAST BEACON',
   'beacon.mining': 'MINING BEACON',
   'beacon.heights': 'HEIGHTS BEACON',
+  'secret.vault': 'VAULT KEYPAD',
   terminal: 'TERMINAL',
 };
 
@@ -176,6 +177,21 @@ export const OBJECT_DIALOGUE: Conversation[] = [
   ]),
   conv('socket.empty', 'heights.station.socket', 10, not(done('m11')), [{ text: 'An empty socket in the dish pedestal. Something round and glowing used to live here.' }]),
   conv('socket.full', 'heights.station.socket', 10, done('m11'), [{ text: 'The relay crystal glows steadily in its socket. Clearly not abandoned. Clearly load-bearing.' }]),
+
+  // ---- Cold Storage keypad (a secret) -----------------------------------------------------------------
+  conv('vault.code', 'secret.vault', 50, not({ secret: 'vault' }), [
+    { text: 'COLD STORAGE — KEYPAD. A label reads: “Enter the number that can never grow.”' },
+    { label: 'ask', text: 'The keypad waits, glowing faintly in the cold.', choices: [
+      { text: '21,000,000', goto: 'ok' },
+      { text: '1,000,000', goto: 'small' },
+      { text: '42', goto: 'other' },
+      { text: 'Leave it', end: true },
+    ] },
+    { label: 'small', text: 'BZZT. “Close. Think twenty-one times bigger.”', goto: 'ask' },
+    { label: 'other', text: 'BZZT. “That is the answer to a different question.”', goto: 'ask' },
+    { label: 'ok', text: 'CLICK. The keypad glows green.', effects: [{ secret: 'vault' }], end: true },
+  ]),
+  conv('vault.done', 'secret.vault', 40, { secret: 'vault' }, [{ text: 'COLD STORAGE — “Already verified. Twenty-one million. Not one more.”' }]),
 
   // ---- M12 -------------------------------------------------------------------------------------------
   ...beacon('beacon.city', 'Chain City'),

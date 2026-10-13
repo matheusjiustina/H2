@@ -30,6 +30,8 @@ export const worldUniforms = {
   uPlayerPos: { value: new Vector3() },
   uOverlay: { value: null as Texture | null },
   uOverlayOn: { value: 0 },
+  /** Props closer than this to the camera dissolve with a screen-door dither (camera occlusion). */
+  uCamFade: { value: 1.25 },
 };
 
 let gradientMap: DataTexture | null = null;
@@ -176,7 +178,7 @@ varying vec3 vWorldPos;
 varying vec3 vWorldNormalW;
 ${useEmissive ? 'varying float vEmissive;' : ''}
 ${fade > 0 ? 'varying float vFade;' : ''}
-${useTerrain ? 'uniform samplerCube uOverlay; uniform float uOverlayOn;' : ''}
+${useTerrain ? 'uniform samplerCube uOverlay; uniform float uOverlayOn;' : 'uniform float uCamFade;'}
 float cwHash(vec3 p){ p = fract(p*0.3183099+.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
 float cwNoise(vec3 x){ vec3 i = floor(x); vec3 f = fract(x); f = f*f*(3.0-2.0*f);
   return mix(mix(mix(cwHash(i+vec3(0,0,0)),cwHash(i+vec3(1,0,0)),f.x),mix(cwHash(i+vec3(0,1,0)),cwHash(i+vec3(1,1,0)),f.x),f.y),
@@ -209,6 +211,19 @@ ${
     : ''
 }
 ${fade > 0 ? 'if (vFade < 0.02) discard;' : ''}
+${
+  useTerrain
+    ? ''
+    : `{
+  // Dissolve geometry that gets between the camera and the player instead of clipping through it.
+  float camD = distance(vWorldPos, cameraPosition);
+  if (camD < uCamFade) {
+    vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+    float bayer = mod(q.x * 4.0 + q.y * 7.0 + q.x * q.y * 3.0, 16.0) / 16.0;
+    if (bayer > smoothstep(0.35, 1.0, camD / uCamFade)) discard;
+  }
+}`
+}
 `,
       )
       .replace(

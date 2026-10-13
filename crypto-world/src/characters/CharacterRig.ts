@@ -364,7 +364,8 @@ function hair(g: GeoBuilder, L: Appearance, hy: number, hr: number): void {
       cap(0.75);
       break;
     case 'afro':
-      g.sphere(hr * 1.35, [0, hy + 0.08, -0.05], c, { ws: 14, hs: 10, scale: [1, 0.95, 0.95] });
+      // Big and round, but set high and back so the face stays readable from any angle.
+      g.sphere(hr * 1.24, [0, hy + 0.13, -hr * 0.4], c, { ws: 14, hs: 10, scale: [1.08, 0.98, 0.92] });
       break;
   }
 }

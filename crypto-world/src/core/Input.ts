@@ -3,7 +3,7 @@
  * Edge-triggered actions are consumed once per frame via `consume*` helpers.
  */
 
-export type Action = 'interact' | 'jump' | 'journal' | 'pause' | 'perf' | 'skip' | 'confirm';
+export type Action = 'interact' | 'jump' | 'journal' | 'pause' | 'perf' | 'skip' | 'confirm' | 'c1' | 'c2' | 'c3' | 'c4' | 'up' | 'down';
 
 export class Input {
   private keys = new Set<string>();
@@ -52,6 +52,12 @@ export class Input {
       if (k === 'Enter' || k === 'KeyE') this.pressed.add('confirm');
       if (k === 'Tab' || k === 'KeyJ') this.pressed.add('journal');
       if (k === 'Escape') this.pressed.add('pause');
+      if (k === 'Digit1' || k === 'Numpad1') this.pressed.add('c1');
+      if (k === 'Digit2' || k === 'Numpad2') this.pressed.add('c2');
+      if (k === 'Digit3' || k === 'Numpad3') this.pressed.add('c3');
+      if (k === 'Digit4' || k === 'Numpad4') this.pressed.add('c4');
+      if (k === 'ArrowUp' || k === 'KeyW') this.pressed.add('up');
+      if (k === 'ArrowDown' || k === 'KeyS') this.pressed.add('down');
       if (k === 'F3' || k === 'Backquote') {
         e.preventDefault();
         this.pressed.add('perf');
