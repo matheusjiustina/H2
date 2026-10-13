@@ -102,7 +102,7 @@ export function layoutWilds(L: LayoutBuilder): void {
   // ---- Anchors for collectible block fragments (placed by gameplay) -----------------------------------------
   L.place('hills', 'anchor', 11, 1.6, 0, {}, { id: 'frag.hills' });
   L.place('coast', 'anchor', 15.4, -33.0, 0, {}, { id: 'frag.coast' });
-  L.place('mining', 'anchor', 6.5, 7.8, 0, { y: 2.3 }, { id: 'frag.mining' });
+  L.place('mining', 'anchor', 6.5, 7.8, 0, {}, { id: 'frag.mining' }); // placement snaps onto the catwalk deck
   // Heights and city fragments use kit anchors (institute roof, library steps).
 }
 

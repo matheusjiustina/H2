@@ -267,6 +267,8 @@ export class NpcManager {
   readonly npcs: Npc[] = [];
   readonly group = new Group();
   private markerMats = new Map<string, SpriteMaterial>();
+  /** World points the player must be able to stand on (terminals, collectibles…); residents keep clear. */
+  private reserved: Vector3[] = [];
 
   constructor(readonly world: World, readonly content: WorldContent, scene: Scene, private culler: HorizonCuller) {
     this.group.name = 'npcs';
@@ -276,6 +278,33 @@ export class NpcManager {
       this.npcs.push(npc);
       this.group.add(npc.avatar.group);
     }
+  }
+
+  setReserved(points: Vector3[]): void {
+    this.reserved = points.map((p) => p.clone().normalize().multiplyScalar(PLANET_RADIUS));
+  }
+
+  /** Nudges a standing spot sideways until it is at least ~1 m from every reserved point. */
+  private keepClear(dir: Vector3, side: Vector3): Vector3 {
+    const p = dir.clone().multiplyScalar(PLANET_RADIUS);
+    for (let iter = 0; iter < 4; iter++) {
+      let nearest: Vector3 | null = null;
+      let nd = 1.05;
+      for (const r of this.reserved) {
+        const d = r.distanceTo(p);
+        if (d < nd) {
+          nd = d;
+          nearest = r;
+        }
+      }
+      if (!nearest) break;
+      const up = p.clone().normalize();
+      const away = p.clone().sub(nearest);
+      away.addScaledVector(up, -away.dot(up));
+      if (away.lengthSq() < 1e-6) away.copy(side);
+      p.addScaledVector(away.normalize(), 1.1 - nd);
+    }
+    return p.normalize();
   }
 
   byId(id: string): Npc | undefined {
@@ -302,15 +331,17 @@ export class NpcManager {
       const fwd = src.forward.clone();
       const side = new Vector3().crossVectors(up, fwd).normalize();
       const p = src.pos.clone().addScaledVector(side, spot.dx ?? 0).addScaledVector(fwd, spot.dz ?? 0);
-      const dir = p.normalize();
+      const sit = !!it && it.kind === 'sit';
+      const dir = sit ? p.normalize() : this.keepClear(p.normalize(), side);
       let facing = fwd.clone();
       if (spot.turn) facing.applyAxisAngle(up, spot.turn);
       facing.addScaledVector(dir, -facing.dot(dir)).normalize();
-      return { dir, facing, sit: !!it && it.kind === 'sit' };
+      return { dir, facing, sit };
     }
     const f = this.world.layout.get(spot.region).frame;
     const b = f.basis(spot.x, spot.y, spot.heading);
-    return { dir: b.pos, facing: b.forward, sit: false };
+    const side = new Vector3().crossVectors(b.pos, b.forward).normalize();
+    return { dir: this.keepClear(b.pos.clone().normalize(), side), facing: b.forward, sit: false };
   }
 
   snapAll(hours: number): void {

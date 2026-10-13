@@ -1,4 +1,5 @@
 import {
+  Quaternion,
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
@@ -177,8 +178,55 @@ export class WorldContent {
     const local = new GeoBuilder();
     const grass = new GeoBuilder();
     const world = this.world;
-    const toWorld = (x: number, y: number, z: number) => new Vector3(x, y, z).applyMatrix4(m);
-    const dirAt = (x: number, z: number) => toWorld(x, 0, z).normalize();
+    // ---- Bending kits onto the planet ---------------------------------------------------------
+    // Kits are authored on a flat ground plane. Each local point (x, y, z) maps to the sphere point
+    // under its footprint (x, z) plus y along a "vertical" that stays rigid (the placement's up)
+    // near the origin and turns radial for far-out parts. Long structures (piers, catwalks, sea
+    // walls) therefore hug the curvature like their colliders do, while buildings keep parallel walls.
+    const R = PLANET_RADIUS;
+    const rb = R + base;
+    const fp = new Vector3();
+    const vu = new Vector3();
+    const bq = new Quaternion();
+    const footprint = (x: number, z: number, out: Vector3) => out.copy(up).multiplyScalar(rb).addScaledVector(xAxis, x).addScaledVector(forward, z).normalize();
+    /** Writes the bent vertical at a footprint into `out`; returns the radial blend weight. */
+    const verticalAt = (x: number, z: number, f: Vector3, out: Vector3) => {
+      const d = Math.hypot(x, z);
+      const t = Math.min(1, Math.max(0, (d - 6) / 8));
+      const w = t * t * (3 - 2 * t);
+      if (w <= 0) out.copy(up);
+      else out.copy(up).lerp(f, w).normalize();
+      return w;
+    };
+    const toWorld = (x: number, y: number, z: number) => {
+      const f = footprint(x, z, new Vector3());
+      verticalAt(x, z, f, vu);
+      return f.multiplyScalar(rb).addScaledVector(vu, y);
+    };
+    /** Rotation that takes the placement frame to the bent frame at a footprint. */
+    const bendAt = (x: number, z: number) => {
+      footprint(x, z, fp);
+      verticalAt(x, z, fp, vu);
+      return new Quaternion().setFromUnitVectors(up, vu);
+    };
+    const mapVertex = (pv: Vector3, nv: Vector3) => {
+      const x = pv.x, y = pv.y, z = pv.z;
+      const nx = nv.x, ny = nv.y, nz = nv.z;
+      footprint(x, z, fp);
+      const w = verticalAt(x, z, fp, vu);
+      pv.copy(fp).multiplyScalar(rb).addScaledVector(vu, y);
+      nv.copy(xAxis).multiplyScalar(nx).addScaledVector(up, ny).addScaledVector(forward, nz);
+      if (w > 0) nv.applyQuaternion(bq.setFromUnitVectors(up, vu));
+    };
+    /** Rigid matrix for an animated part around a local pivot, following the bend at that pivot. */
+    const rigidAt = (pivot: Vec3) => {
+      const q = bendAt(pivot[0], pivot[2]);
+      const target = toWorld(pivot[0], pivot[1], pivot[2]);
+      const rot = new Matrix4().makeBasis(xAxis, up, forward).premultiply(new Matrix4().makeRotationFromQuaternion(q));
+      const local = new Vector3(...pivot).applyMatrix4(rot);
+      return rot.setPosition(target.sub(local));
+    };
+    const dirAt = (x: number, z: number) => footprint(x, z, new Vector3());
     const rotAxes = (rot = 0) => {
       const c = Math.cos(rot), s = Math.sin(rot);
       const ax = xAxis.clone().multiplyScalar(c).addScaledVector(forward, -s);
@@ -197,7 +245,7 @@ export class WorldContent {
       spin: (build, pivot, axis, speed) => {
         const b = new GeoBuilder();
         build(b);
-        cluster.anim.add(b, m, pivot, axis, speed, [0, 0, 0, 0]);
+        cluster.anim.add(b, rigidAt(pivot), pivot, axis, speed, [0, 0, 0, 0]);
       },
       bob: (build, amplitude, speed) => {
         const b = new GeoBuilder();
@@ -233,18 +281,25 @@ export class WorldContent {
       },
       screen: (x, y, z, w, h, rotY, kind, seed, span) => {
         const uv = this.screenAtlas.allocate(kind, seed ?? '', span ?? 1);
+        const q = bendAt(x, z);
         const { ax: rx, az: fz } = rotAxes(rotY);
+        rx.applyQuaternion(q);
+        fz.applyQuaternion(q);
         const c = toWorld(x, y, z).addScaledVector(fz, 0.004);
-        cluster.screens.quad(c, rx.multiplyScalar(w / 2), up.clone().multiplyScalar(h / 2), fz, uv.u0, uv.v0, uv.u1, uv.v1);
+        cluster.screens.quad(c, rx.multiplyScalar(w / 2), up.clone().applyQuaternion(q).multiplyScalar(h / 2), fz, uv.u0, uv.v0, uv.u1, uv.v1);
       },
       sign: (x, y, z, w, h, rotY, spec, opts) => {
         const uv = this.signAtlas.add({ ...spec, width: w, height: h });
+        const q = bendAt(x, z);
         const { ax: rx, az: fz } = rotAxes(rotY);
-        let ay = up.clone();
+        rx.applyQuaternion(q);
+        fz.applyQuaternion(q);
+        const sup = up.clone().applyQuaternion(q);
+        let ay = sup.clone();
         if (opts?.tiltX) {
           // Tilt back (for ground-standing plaques).
-          ay = up.clone().multiplyScalar(Math.cos(opts.tiltX)).addScaledVector(fz, -Math.sin(opts.tiltX));
-          fz.copy(fz.clone().multiplyScalar(Math.cos(opts.tiltX)).addScaledVector(up, Math.sin(opts.tiltX)));
+          ay = sup.clone().multiplyScalar(Math.cos(opts.tiltX)).addScaledVector(fz, -Math.sin(opts.tiltX));
+          fz.copy(fz.clone().multiplyScalar(Math.cos(opts.tiltX)).addScaledVector(sup, Math.sin(opts.tiltX)));
         }
         const depth = (opts?.depth ?? 0) + 0.006;
         const c = toWorld(x, y, z).addScaledVector(fz, depth);
@@ -264,19 +319,21 @@ export class WorldContent {
         cluster.pools.quad(c, e.multiplyScalar(radius), f.multiplyScalar(radius), gd, 0, 0, 1, 1);
       },
       anchor: (name, x, y, z, headingRad = 0) => {
+        const q = bendAt(x, z);
         const { az } = rotAxes(headingRad);
-        this.anchors.set(`${id}.${name}`, { pos: toWorld(x, y, z), up: up.clone(), forward: az });
+        this.anchors.set(`${id}.${name}`, { pos: toWorld(x, y, z), up: up.clone().applyQuaternion(q), forward: az.applyQuaternion(q) });
       },
       interact: (spec) => {
+        const q = bendAt(spec.x, spec.z);
         const { az } = rotAxes(spec.heading ?? 0);
-        this.interacts.push({ ...spec, pos: toWorld(spec.x, spec.y, spec.z), up: up.clone(), forward: az });
+        this.interacts.push({ ...spec, pos: toWorld(spec.x, spec.y, spec.z), up: up.clone().applyQuaternion(q), forward: az.applyQuaternion(q) });
       },
     };
     kit(ctx);
     this.kindVerts.set(kind, (this.kindVerts.get(kind) ?? 0) + local.vertexCount + grass.vertexCount);
     this.kindCount.set(kind, (this.kindCount.get(kind) ?? 0) + 1);
-    if (!local.isEmpty()) cluster.solid.push(m).merge(local).pop();
-    if (!grass.isEmpty()) cluster.grass.push(m).merge(grass).pop();
+    if (!local.isEmpty()) cluster.solid.mergeMapped(local, mapVertex);
+    if (!grass.isEmpty()) cluster.grass.mergeMapped(grass, mapVertex);
   }
 
   /** Converts clusters into meshes and registers them with the culler. */

@@ -198,6 +198,7 @@ export class Game {
     this.cam = new CameraController(this.camera, this.world.collision, (d) => this.world.groundHeight(d));
     this.npcs = new NpcManager(this.world, this.content, this.scene, this.culler);
     this.props = new WorldProps(this.world, this.content, this.scene, this.culler, (id) => this.state.hasCollected(id));
+    this.npcs.setReserved(this.props.interactables.filter((i) => i.kind !== 'sit').map((i) => i.pos));
     this.rebuildAvatar();
     this.targetMarker = new Sprite(this.npcs.markerMaterial('target'));
     this.targetMarker.scale.set(0.5, 0.5, 1);
@@ -630,6 +631,8 @@ export class Game {
     }
     for (const it of this.props.interactables) {
       if (!it.enabled()) continue;
+      // A seat a resident is using is not offered.
+      if (it.kind === 'sit' && this.npcs.npcs.some((n) => n.sitting && n.position.distanceTo(it.pos) < 1.2)) continue;
       consider(it.pos, it.radius, { kind: 'object', it });
     }
     this.focus = best;

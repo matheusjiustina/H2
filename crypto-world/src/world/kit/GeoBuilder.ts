@@ -318,6 +318,31 @@ export class GeoBuilder {
     return this;
   }
 
+  /**
+   * Merges another builder through an arbitrary per-vertex mapping (used to bend kits onto the
+   * sphere). `map` receives local position and normal and must overwrite both with world values.
+   */
+  mergeMapped(other: GeoBuilder, map: (p: Vector3, n: Vector3) => void): this {
+    const geo = other.toGeometry();
+    const base = this.vertexCount;
+    const p = geo.getAttribute('position');
+    const n = geo.getAttribute('normal');
+    const pv = new Vector3();
+    const nv = new Vector3();
+    for (let i = 0; i < p.count; i++) {
+      pv.set(p.getX(i), p.getY(i), p.getZ(i));
+      nv.set(n.getX(i), n.getY(i), n.getZ(i));
+      map(pv, nv);
+      this.positions.push(pv.x, pv.y, pv.z);
+      this.normals.push(nv.x, nv.y, nv.z);
+    }
+    this.colors.push(...other.colors);
+    this.emissive.push(...other.emissive);
+    this.wind.push(...other.wind);
+    for (const i of other.indices) this.indices.push(base + i);
+    return this;
+  }
+
   isEmpty(): boolean {
     return this.positions.length === 0;
   }
