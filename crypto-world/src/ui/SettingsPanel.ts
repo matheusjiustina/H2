@@ -1,5 +1,5 @@
 import { Cosmetics, Settings } from '../gameplay/SaveSystem';
-import { el, esc } from './UI';
+import { confirmTwice, el, esc } from './UI';
 import type { BagStyle, HairStyle, HatStyle } from '../characters/Appearance';
 import { SKIN_TONES } from '../characters/Appearance';
 
@@ -140,9 +140,7 @@ export function buildSettings(card: HTMLElement, h: SettingsHandlers): void {
   const actions = el('div', 'actions');
   if (h.inGame) {
     const reset = el('button', 'btn small', 'Reset progress');
-    reset.onclick = () => {
-      if (confirm('Erase your saved progress and start over?')) h.onReset();
-    };
+    confirmTwice(reset, 'Tap again to erase progress', () => h.onReset());
     actions.appendChild(reset);
   }
   const resume = el('button', 'btn small primary', h.inGame ? 'Resume' : 'Done');

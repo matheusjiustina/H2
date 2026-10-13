@@ -61,6 +61,7 @@ html, body {
 .btn.primary:hover { background: #f6bf5d; }
 .btn.ghost { background: rgba(251, 246, 236, 0.16); color: var(--paper); box-shadow: none; backdrop-filter: blur(4px); }
 .btn.small { padding: 9px 20px; font-size: 15px; }
+.btn.armed { background: #d9584a; color: var(--paper); }
 .title-foot { position: absolute; bottom: 18px; color: rgba(251, 246, 236, 0.75); font-size: 13px; letter-spacing: 0.04em; text-align: center; padding: 0 16px; }
 .loading { position: absolute; bottom: 64px; width: min(320px, 70vw); height: 6px; border-radius: 99px; background: rgba(251, 246, 236, 0.25); overflow: hidden; }
 .loading i { display: block; height: 100%; width: 0%; background: var(--amber); transition: width 0.3s; }

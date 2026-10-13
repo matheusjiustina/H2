@@ -141,7 +141,13 @@ export class Input {
   }
 
   pollGamepad(dt: number): void {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    // Embedded frames may deny gamepad access with an exception; treat that as "no gamepad".
+    let pads: (Gamepad | null)[] = [];
+    try {
+      pads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+    } catch {
+      return;
+    }
     const gp = pads && pads[0];
     if (!gp) return;
     const dz = (v: number) => (Math.abs(v) < 0.15 ? 0 : v);

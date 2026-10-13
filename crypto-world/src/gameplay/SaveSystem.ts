@@ -104,11 +104,20 @@ export function migrate(raw: any): SaveData | null {
   return d as SaveData;
 }
 
+/** Browser storage when it is available; reading `localStorage` itself throws when site data is blocked. */
+function defaultStore(): KeyValueStore | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Versioned local persistence with graceful handling of outdated or corrupt data. */
 export class SaveSystem {
   lastError: string | null = null;
 
-  constructor(private store: KeyValueStore | null = typeof localStorage !== 'undefined' ? localStorage : null) {}
+  constructor(private store: KeyValueStore | null = defaultStore()) {}
 
   hasSave(): boolean {
     return this.load() !== null;

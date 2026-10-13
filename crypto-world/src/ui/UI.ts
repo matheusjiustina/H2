@@ -21,6 +21,32 @@ function esc(s: string): string {
 }
 
 /** Inline code spans: `like this`. */
+/**
+ * In-page confirmation for destructive buttons: the first press arms the button and changes its
+ * label, a second press within a few seconds runs the action. (Native confirm() dialogs are not
+ * available everywhere the game runs, e.g. inside embedded frames.)
+ */
+export function confirmTwice(btn: HTMLElement, armedLabel: string, action: () => void): void {
+  const original = btn.innerHTML;
+  let timer = 0;
+  btn.onclick = (e) => {
+    e.preventDefault();
+    if (btn.classList.contains('armed')) {
+      clearTimeout(timer);
+      btn.classList.remove('armed');
+      btn.innerHTML = original;
+      action();
+      return;
+    }
+    btn.classList.add('armed');
+    btn.textContent = armedLabel;
+    timer = window.setTimeout(() => {
+      btn.classList.remove('armed');
+      btn.innerHTML = original;
+    }, 4000);
+  };
+}
+
 export function richText(s: string): string {
   return esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
 }
@@ -124,9 +150,7 @@ export class UI {
     menu.appendChild(play);
     if (hasSave) {
       const nw = el('button', 'btn', 'NEW GAME');
-      nw.onclick = () => {
-        if (confirm('Start a new game? Your current progress will be replaced.')) this.onNewGame();
-      };
+      confirmTwice(nw, 'TAP AGAIN TO START OVER', () => this.onNewGame());
       menu.appendChild(nw);
     }
     const st = el('button', 'btn ghost', 'SETTINGS');
