@@ -29,6 +29,28 @@ export interface TerminalContext {
   wide(): boolean;
   printed(id: number): boolean;
   onClick(): void;
+  /** Station cosmetics catalog (visual only). */
+  cosmetics(): CosmeticGroup[];
+  buyCosmetic(id: string): OrderOutcome;
+  removeCosmetic(slot: string): OrderOutcome;
+  homeLabel(): string;
+}
+
+export interface CosmeticRow {
+  id: string;
+  name: string;
+  blurb: string;
+  cost: number;
+  owned: boolean;
+  equipped: boolean;
+  ok: boolean;
+  why?: string;
+}
+
+export interface CosmeticGroup {
+  key: string;
+  label: string;
+  slots: { slot: string; removable: boolean; items: CosmeticRow[] }[];
 }
 
 interface Btn {
@@ -41,7 +63,7 @@ interface Btn {
   action: () => void;
 }
 
-type Tab = "positions" | "history" | "goals";
+type Tab = "positions" | "history" | "goals" | "station";
 
 const PRESETS: (number | "MAX")[] = [10, 25, 50, 100, 250, "MAX"];
 
@@ -61,6 +83,7 @@ export class Terminal {
   private editing = false;
   private editBuf = "";
   tab: Tab = "positions";
+  private cosCat = "pad";
   private hover: { x: number; y: number } | null = null;
   private buttons: Btn[] = [];
   private toast: { text: string; good: boolean; until: number } | null = null;
@@ -143,7 +166,7 @@ export class Terminal {
     else if (code === "KeyX") this.doSellAll();
     else if (code === "Equal" || code === "NumpadAdd" || code === "ArrowUp") this.bump(1);
     else if (code === "Minus" || code === "NumpadSubtract" || code === "ArrowDown") this.bump(-1);
-    else if (code === "Tab") this.tab = this.tab === "positions" ? "history" : this.tab === "history" ? "goals" : "positions";
+    else if (code === "Tab") this.tab = this.tab === "positions" ? "history" : this.tab === "history" ? "goals" : this.tab === "goals" ? "station" : "positions";
     else return false;
     this.lastDraw = 0;
     return true;
@@ -450,6 +473,7 @@ export class Terminal {
       ["positions", `POSITIONS (${pf.allPositions().length})`],
       ["history", "HISTORY"],
       ["goals", "NIGHT GOALS"],
+      ["station", "STATION"],
     ];
     let tx = bx + u * 0.8;
     for (const [id, label] of tabs) {
@@ -469,6 +493,7 @@ export class Terminal {
     const tableH = bottomH - u * 5.6;
     if (this.tab === "positions") this.drawPositions(bx, tableY, bwid, tableH);
     else if (this.tab === "history") this.drawHistory(bx, tableY, bwid, tableH);
+    else if (this.tab === "station") this.drawStation(bx, tableY, bwid, tableH);
     else this.drawGoals(bx, tableY, bwid, tableH);
 
     // coach line (onboarding)
@@ -610,6 +635,61 @@ export class Terminal {
         this.text(v, x + u * 1.4 + cols[k] * (w - u * 2.8), yy, u * 1.5, col, { font: FONT_MONO });
       });
     });
+  }
+
+  /** Short cosmetics catalog: category chips, then BUY / EQUIP / REMOVE per item. */
+  private drawStation(x: number, y: number, w: number, h: number) {
+    const u = this.H / 100;
+    const ctx = this.ctx;
+    const groups = this.c.cosmetics();
+    // category chips
+    let cx = x + u * 1.4;
+    for (const gr of groups) {
+      ctx.font = `600 ${u * 1.3}px ${FONT_MONO}`;
+      const cw = ctx.measureText(gr.label).width + u * 2;
+      const on = this.cosCat === gr.key;
+      const hv = this.btn(`cos-${gr.key}`, cx, y, cw, u * 2.6, () => (this.cosCat = gr.key));
+      ctx.fillStyle = on ? COLORS.accent : hv ? "#22272d" : "#181c20";
+      ctx.fillRect(cx, y, cw, u * 2.6);
+      this.text(gr.label, cx + cw / 2, y + u * 1.3, u * 1.3, on ? "#15120d" : COLORS.muted, { font: FONT_MONO, weight: 600, align: "center" });
+      cx += cw + u * 0.6;
+    }
+    this.text(`${this.c.credits()} CR`, x + w - u * 1.4, y + u * 1.3, u * 1.4, COLORS.accent, { font: FONT_MONO, weight: 600, align: "right" });
+    const gr = groups.find((g) => g.key === this.cosCat) ?? groups[0];
+    const rows = gr.slots.flatMap((sl) => sl.items.map((it) => ({ it, slot: sl.slot, removable: sl.removable })));
+    const rh = Math.min(u * 4.2, (h - u * 6.2) / Math.max(1, rows.length));
+    rows.forEach(({ it, slot, removable }, i) => {
+      const yy = y + u * 3.6 + i * rh;
+      this.text(it.name, x + u * 1.4, yy + rh * 0.3, u * 1.55, it.equipped ? COLORS.text : COLORS.muted, { weight: 600, maxW: w * 0.42 });
+      this.text(it.blurb, x + u * 1.4, yy + rh * 0.72, u * 1.2, COLORS.dim, { maxW: w * 0.6 });
+      const bw = u * 11;
+      const bx = x + w - u * 1.4 - bw;
+      const by = yy + rh * 0.12;
+      const bh = rh * 0.72;
+      let label: string;
+      let enabled = true;
+      let act = () => this.showToast(this.c.buyCosmetic(it.id).message, true);
+      if (it.equipped) {
+        label = removable ? "REMOVE" : "ON DESK";
+        enabled = removable;
+        act = () => this.showToast(this.c.removeCosmetic(slot).message, true);
+      } else if (it.owned) label = "EQUIP";
+      else if (it.ok) label = it.cost ? `BUY • ${it.cost} CR` : "TAKE";
+      else {
+        label = it.why === "Reward" ? "REWARD" : `NEEDS ${it.why}`;
+        enabled = false;
+      }
+      const hv = this.btn(`cosb-${it.id}`, bx, by, bw, bh, act, enabled);
+      ctx.fillStyle = !enabled ? "#15181b" : it.equipped ? "#2a2620" : hv ? "#3a3326" : "#262a2f";
+      ctx.fillRect(bx, by, bw, bh);
+      if (it.equipped) {
+        ctx.strokeStyle = COLORS.accent;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(bx + 0.75, by + 0.75, bw - 1.5, bh - 1.5);
+      }
+      this.text(label, bx + bw / 2, by + bh / 2, u * 1.3, enabled ? (it.equipped ? COLORS.accent : COLORS.text) : COLORS.dim, { font: FONT_MONO, weight: 600, align: "center" });
+    });
+    this.text(`Cosmetic only — never changes prices, fills or odds. Shows up on ${this.c.homeLabel()}.`, x + u * 1.4, y + h - u * 1.2, u * 1.2, COLORS.dim, { maxW: w - u * 2.8 });
   }
 
   private drawGoals(x: number, y: number, w: number, h: number) {

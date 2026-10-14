@@ -1,5 +1,6 @@
 import { bus } from "../core/EventBus";
 import type { Loadout } from "../world/Station";
+import { COSMETICS, REQUIRED, cosmetic, freshCosmetics, type CosmeticSlot, type CosmeticState } from "./Cosmetics";
 
 export interface UpgradeDef {
   id: string;
@@ -17,7 +18,6 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "deco", name: "Desk decoration", blurb: "A cactus, a little lamp and a framed first green candle.", cost: 25, rep: 0, kind: "station" },
   { id: "monitor", name: "Bigger monitor", blurb: "24-inch widescreen. More candles per glance. Same market.", cost: 60, rep: 15, kind: "station" },
   { id: "second", name: "Second monitor", blurb: "An overview of every token. Still not a crystal ball.", cost: 80, rep: 15, requires: "monitor", kind: "station" },
-  { id: "case", name: "Custom case", blurb: "Glass side panel, three warm fans. Zero alpha.", cost: 70, rep: 40, kind: "station" },
   { id: "locker", name: "Personal locker", blurb: "Locker 03 in the hallway. Keep your stuff safe.", cost: 35, rep: 15, kind: "instant" },
   { id: "mezz", name: "Mezzanine station", blurb: "Premium seat upstairs. Same market, better view.", cost: 150, rep: 75, kind: "instant" },
 ];
@@ -78,6 +78,15 @@ export const SECRETS: Record<string, string> = {
   bell: "Persistent customer",
 };
 
+/** "Become a Regular": the first-session objective chain (only the current step is shown). */
+export const REGULAR_STEPS: { id: string; text: (home: string) => string }[] = [
+  { id: "seat", text: (home) => `Sit at ${home} and open the terminal.` },
+  { id: "close", text: () => "Close a trade — profit or loss, both count." },
+  { id: "print", text: () => "Print the receipt at the counter printer." },
+  { id: "talk2", text: () => "Talk to two regulars." },
+  { id: "custom", text: () => "Customize your station (STATION tab on your PC)." },
+];
+
 export interface ProgressData {
   credits: number;
   rep: number;
@@ -105,6 +114,10 @@ export interface ProgressData {
   challenge: "offered" | "active" | "done" | null;
   stats: { trades: number; nights: number; bestTrade: number; worstTrade: number; throws: number; drinks: number };
   pendingDeliveries: string[];
+  cosmetics: CosmeticState;
+  regular: { flags: string[]; talked: string[]; done: boolean };
+  /** Player chose to hide the objective line (O). */
+  objHidden: boolean;
 }
 
 export const BASE_LOADOUT: Loadout = { chair: "old", keyboard: "old", monitor: "crt", second: false, case: "old", deco: false };
@@ -137,6 +150,9 @@ export function freshProgress(): ProgressData {
     challenge: null,
     stats: { trades: 0, nights: 1, bestTrade: 0, worstTrade: 0, throws: 0, drinks: 0 },
     pendingDeliveries: [],
+    cosmetics: freshCosmetics(),
+    regular: { flags: [], talked: [], done: false },
+    objHidden: false,
   };
 }
 
@@ -210,10 +226,93 @@ export class Progression {
     if (id === "keyboard") lo.keyboard = "mech";
     if (id === "monitor") lo.monitor = "lcdWide";
     if (id === "second") lo.second = true;
-    if (id === "case") lo.case = "custom";
+    if (id === "case") {
+      // older saves: the custom case is now the smoked glass finish
+      if (!this.d.cosmetics.owned.includes("finish-glass")) this.d.cosmetics.owned.push("finish-glass");
+      this.d.cosmetics.equipped.finish = "finish-glass";
+    }
     if (id === "deco") lo.deco = true;
     this.onLoadoutChange?.(lo);
     bus.emit("upgrade:installed", { id });
+  }
+
+  // ------------------------------------------------------------- cosmetics
+
+  cosmeticStatus(id: string): { owned: boolean; equipped: boolean; ok: boolean; why?: string } {
+    const c = cosmetic(id)!;
+    const cs = this.d.cosmetics;
+    const owned = cs.owned.includes(id);
+    const equipped = cs.equipped[c.slot] === id;
+    if (owned) return { owned, equipped, ok: true };
+    if (c.reward) return { owned, equipped, ok: false, why: "Reward" };
+    if (this.d.rep < c.rep) return { owned, equipped, ok: false, why: `${c.rep} REP` };
+    if (this.d.credits < c.cost) return { owned, equipped, ok: false, why: `${c.cost} CR` };
+    return { owned, equipped, ok: true };
+  }
+
+  /** Buy (if needed) and equip. Returns a short message for the terminal toast. */
+  buyCosmetic(id: string): { ok: boolean; message: string } {
+    const c = cosmetic(id);
+    if (!c) return { ok: false, message: "Unknown item." };
+    const st = this.cosmeticStatus(id);
+    if (!st.ok) return { ok: false, message: st.why === "Reward" ? "Earned, not bought." : `Not yet: needs ${st.why}.` };
+    if (!st.owned) {
+      if (!this.spend(c.cost)) return { ok: false, message: "Not enough credits." };
+      this.d.cosmetics.owned.push(id);
+    }
+    return this.equipCosmetic(id, !st.owned);
+  }
+
+  equipCosmetic(id: string, bought = false): { ok: boolean; message: string } {
+    const c = cosmetic(id);
+    if (!c || !this.d.cosmetics.owned.includes(id)) return { ok: false, message: "Not owned." };
+    this.d.cosmetics.equipped[c.slot] = id;
+    this.onLoadoutChange?.(this.d.loadout);
+    bus.emit("cosmetic:changed", { id, slot: c.slot });
+    return { ok: true, message: bought ? `${c.name} bought and set up.` : `${c.name} on your desk.` };
+  }
+
+  removeCosmetic(slot: CosmeticSlot): { ok: boolean; message: string } {
+    if (REQUIRED[slot]) return this.equipCosmetic(REQUIRED[slot]!);
+    this.d.cosmetics.equipped[slot] = null;
+    this.onLoadoutChange?.(this.d.loadout);
+    bus.emit("cosmetic:changed", { id: "", slot });
+    return { ok: true, message: "Removed." };
+  }
+
+  /** Grant a reward cosmetic and put it on the desk. */
+  grantCosmetic(id: string) {
+    if (!this.d.cosmetics.owned.includes(id)) this.d.cosmetics.owned.push(id);
+    this.equipCosmetic(id);
+  }
+
+  cosmeticsFor(slots: CosmeticSlot[]) {
+    return COSMETICS.filter((c) => slots.includes(c.slot) && (!c.reward || this.d.cosmetics.owned.includes(c.id)));
+  }
+
+  // ------------------------------------------------------------- become a regular
+
+  /** Current step of the chain, or null when done. */
+  regularStep(): { index: number; total: number; id: string } | null {
+    const r = this.d.regular;
+    if (r.done) return null;
+    const i = REGULAR_STEPS.findIndex((st) => !r.flags.includes(st.id));
+    return i < 0 ? null : { index: i, total: REGULAR_STEPS.length, id: REGULAR_STEPS[i].id };
+  }
+
+  /** Record a step (any order); returns true the moment the whole chain completes. */
+  markRegular(flag: string): boolean {
+    const r = this.d.regular;
+    if (r.done || r.flags.includes(flag)) return false;
+    const before = this.regularStep();
+    r.flags.push(flag);
+    const now = this.regularStep();
+    if (before && now && now.index !== before.index) bus.emit("toast", { text: `Become a Regular • ${now.index}/${now.total} done`, kind: "good" });
+    if (!now) {
+      r.done = true;
+      return true;
+    }
+    return false;
   }
 
   // ------------------------------------------------------------- goals

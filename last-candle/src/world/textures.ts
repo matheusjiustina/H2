@@ -664,3 +664,115 @@ export function rackTex(): [THREE.CanvasTexture, HTMLCanvasElement, CanvasRender
   }
   return [toTexture(c), c, ctx];
 }
+
+const padCache = new Map<string, THREE.CanvasTexture>();
+/** Original desk-mat designs (cosmetic). */
+export function padTex(id: string): THREE.CanvasTexture {
+  const hit = padCache.get(id);
+  if (hit) return hit;
+  const [c, ctx] = canvas(512, 248);
+  if (id === "pad-grid") {
+    ctx.fillStyle = "#0f141c";
+    ctx.fillRect(0, 0, 512, 248);
+    ctx.strokeStyle = "rgba(90,140,210,0.22)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= 512; x += 24) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, 248);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= 248; y += 24) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(512, y + 0.5);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(120,180,255,0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let y = 170;
+    ctx.moveTo(20, y);
+    for (let x = 20; x < 490; x += 18) {
+      y += Math.sin(x * 0.07) * 9 - 2;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = "rgba(160,190,230,0.55)";
+    ctx.font = `600 13px ${FONT_MONO}`;
+    ctx.fillText("NIGHT GRID • LAST CANDLE", 330, 232);
+  } else if (id === "pad-wick") {
+    ctx.fillStyle = "#1b1511";
+    ctx.fillRect(0, 0, 512, 248);
+    // one candle with an absurdly long upper wick
+    ctx.strokeStyle = "#e7a24a";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(390, 228);
+    ctx.lineTo(390, 18);
+    ctx.stroke();
+    ctx.fillStyle = "#e7a24a";
+    ctx.fillRect(374, 168, 32, 48);
+    ctx.fillStyle = "rgba(231,162,74,0.7)";
+    ctx.font = `400 34px ${FONT_HAND}`;
+    ctx.fillText("patience.", 40, 130);
+    ctx.font = `600 12px ${FONT_MONO}`;
+    ctx.fillStyle = "rgba(231,162,74,0.45)";
+    ctx.fillText("LONG WICK", 40, 226);
+  } else {
+    // rain window
+    const gr = ctx.createLinearGradient(0, 0, 512, 248);
+    gr.addColorStop(0, "#1a2129");
+    gr.addColorStop(1, "#0d1116");
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, 512, 248);
+    for (let i = 0; i < 70; i++) {
+      const x = (i * 97) % 512;
+      const y0 = (i * 53) % 248;
+      ctx.strokeStyle = `rgba(170,200,225,${0.12 + (i % 5) * 0.04})`;
+      ctx.lineWidth = 1 + (i % 3) * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x - 6, y0 + 22 + (i % 4) * 8);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(255,170,90,0.35)";
+    ctx.beginPath();
+    ctx.arc(430, 60, 26, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const t = toTexture(c);
+  padCache.set(id, t);
+  return t;
+}
+
+let placeholder: THREE.CanvasTexture | null = null;
+/** What the receipt stand shows before any trade has been closed. */
+export function placeholderReceipt(): THREE.CanvasTexture {
+  if (placeholder) return placeholder;
+  const [c, ctx] = canvas(144, 310);
+  ctx.fillStyle = "#f6f2e7";
+  ctx.fillRect(0, 0, 144, 310);
+  ctx.fillStyle = "#3a352d";
+  ctx.textAlign = "center";
+  ctx.font = `600 13px ${FONT_MONO}`;
+  ctx.fillText("YOUR BEST", 72, 120);
+  ctx.fillText("TRADE GOES", 72, 140);
+  ctx.fillText("HERE", 72, 160);
+  ctx.font = `400 10px ${FONT_MONO}`;
+  ctx.fillText("(close one first)", 72, 190);
+  placeholder = toTexture(c);
+  return placeholder;
+}
+
+/** Engraved brass nameplate text. */
+export function plateTex(text: string): THREE.CanvasTexture {
+  const [c, ctx] = canvas(512, 108);
+  ctx.clearRect(0, 0, 512, 108);
+  ctx.fillStyle = "#3a2a10";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 46px ${FONT_UI}`;
+  ctx.fillText(text, 256, 56);
+  return toTexture(c);
+}

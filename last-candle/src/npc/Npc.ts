@@ -273,6 +273,12 @@ export class Npc {
     this.rig.root.traverse((o) => (o.userData.npcId = profile.id));
   }
 
+  /** Hands on the keys right now (for the nearby-keyboard audio layer). */
+  get typingNow(): boolean {
+    if (this.mode !== "seated" || (this.overlay && !this.overlay.ambient) || this.convo) return false;
+    return this.typing > 0 || this.act.kind === "type" || this.act.kind === "fidget";
+  }
+
   /** Why this NPC can't chat right now (walking, mid-task), or null when they can. */
   busyReason(): "walking" | "busy" | null {
     if (this.mode === "walk" || this.mode === "sitting" || this.mode === "standing") return "walking";

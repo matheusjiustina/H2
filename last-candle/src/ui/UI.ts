@@ -45,6 +45,7 @@ export class UI {
 
   constructor(root: HTMLDivElement) {
     this.root = root;
+    this.objective.addEventListener("click", () => this.onObjectiveToggle?.());
     root.append(this.crosshair, this.prompt, this.hud, this.objective, this.toasts, this.subtitle, this.dialog, this.hint, this.fps, this.touch, this.fade, this.panel);
     this.dialog.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest("button[data-i]") as HTMLButtonElement | null;
@@ -76,12 +77,23 @@ export class UI {
     this.hud.innerHTML = `<span class="hud-clock">${esc(parts.clock)} <em>Night ${parts.night}</em></span><span class="hud-sep"></span><span class="hud-cr">◆ ${parts.credits} CR</span><span class="hud-sep"></span><span>REP ${parts.rep} <em>${esc(parts.title)}</em></span><span class="hud-sep"></span><span class="hud-cash">${esc(parts.cash)}</span>${parts.session ? `<span class="hud-sep"></span><span class="${parts.sessionLow ? "low" : ""}">${esc(parts.session)}</span>` : ""}`;
   }
 
-  setObjective(text: string | null) {
+  /** Tap/click on the objective line (hide / show). */
+  onObjectiveToggle: (() => void) | null = null;
+  private objKey = "";
+
+  /** Current objective only; `collapsed` leaves a small pill so it can be brought back. */
+  setObjective(text: string | null, hint: string | null = null, collapsed = false) {
+    const key = `${text}|${hint}|${collapsed}`;
+    if (key === this.objKey) return;
+    this.objKey = key;
     if (!text) {
       this.objective.classList.remove("on");
       return;
     }
-    this.objective.innerHTML = `<span class="obj-dot"></span>${esc(text)}`;
+    this.objective.classList.toggle("collapsed", collapsed);
+    this.objective.innerHTML = collapsed
+      ? `<span class="obj-dot"></span><span class="obj-hint">Objective • O</span>`
+      : `<span class="obj-dot"></span><span>${esc(text)}</span>${hint ? `<span class="obj-hint">${esc(hint)}</span>` : ""}`;
     this.objective.classList.add("on");
   }
 
@@ -183,8 +195,10 @@ export class UI {
       ${range("fov", "Field of view", 60, 90, 1, s.fov)}
       ${range("renderScale", "Render resolution", 0.5, 1, 0.05, s.renderScale)}
       <label class="row"><span>Shadows</span><select data-set="shadows">${["off", "low", "high"].map((o) => `<option ${o === s.shadows ? "selected" : ""}>${o}</option>`).join("")}</select></label>
-      ${range("volume", "Volume", 0, 1, 0.05, s.volume)}
-      ${range("ambience", "Ambience (rain, fans)", 0, 1, 0.05, s.ambience)}
+      ${range("volume", "Master volume", 0, 1, 0.05, s.volume)}
+      ${range("ambience", "Ambience (rain, AC, fans)", 0, 1, 0.05, s.ambience)}
+      ${range("effects", "Effects (keys, printer, props)", 0, 1, 0.05, s.effects)}
+      ${range("voices", "Voices", 0, 1, 0.05, s.voices)}
       ${check("showFps", "Show FPS", s.showFps)}`;
   }
 

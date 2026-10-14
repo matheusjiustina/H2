@@ -26,6 +26,7 @@ export interface GameEvents {
   "secret:found": { id: string };
   "task:done": { id: string };
   "upgrade:installed": { id: string };
+  "cosmetic:changed": { id: string; slot: string };
   "night:lastCall": { night: number };
   "night:end": { night: number };
   "night:start": { night: number };

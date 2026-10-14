@@ -34,7 +34,10 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 .hud .low { color: var(--bad); }
 .hud-sep { width: 1px; height: 12px; background: var(--line); }
 .objective { position: absolute; left: 16px; top: 52px; max-width: 420px; padding: 6px 10px; font: 500 14px var(--ui); color: var(--ink); background: rgba(16,14,12,0.5); border-radius: 8px; opacity: 0; transition: opacity .3s; display: flex; gap: 8px; align-items: center; }
-.objective.on { opacity: 1; }
+.objective.on { opacity: 1; pointer-events: auto; cursor: pointer; }
+.objective .obj-hint { margin-left: 4px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; font: 600 10px var(--mono); color: var(--muted, #9a9284); white-space: nowrap; }
+.objective.collapsed { padding: 4px 8px; background: rgba(16,14,12,0.35); }
+.objective.collapsed .obj-hint { margin-left: 0; border: 0; padding: 0; }
 .obj-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; animation: pulse 1.6s infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
 .toasts { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; }

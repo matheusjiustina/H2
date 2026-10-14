@@ -16,11 +16,12 @@ import { Player } from "../player/Player";
 import { Audio } from "../systems/Audio";
 import { EventDirector } from "../systems/Events";
 import { NIGHT_END, NIGHT_START, NightClock } from "../systems/NightClock";
-import { BASE_LOADOUT, CONSUMABLES, Progression, SECRETS, TASKS, UPGRADES, freshProgress } from "../systems/Progression";
+import { REQUIRED, migrateCosmetics, type CosmeticSlot } from "../systems/Cosmetics";
+import { BASE_LOADOUT, CONSUMABLES, Progression, REGULAR_STEPS, SECRETS, TASKS, UPGRADES, freshProgress } from "../systems/Progression";
 import { npcReceipt, receiptFromTrade, receiptTexture } from "../systems/Receipts";
 import { Whiteboard } from "../systems/Whiteboard";
 import { Screens } from "../terminal/Screens";
-import { Terminal, type OrderOutcome } from "../terminal/Terminal";
+import { Terminal, type CosmeticGroup, type OrderOutcome } from "../terminal/Terminal";
 import { UI, type DialogOption } from "../ui/UI";
 import { CollisionWorld } from "../world/Collision";
 import { rbox } from "../world/geometry";
@@ -29,7 +30,7 @@ import { buildLanHouse, type LanHouseHandles } from "../world/LanHouse";
 import { L, SPOTS } from "../world/layout";
 import { materials } from "../world/materials";
 import { Outside } from "../world/Outside";
-import type { StationVisual } from "../world/Station";
+import type { Finish, Loadout, StationVisual } from "../world/Station";
 import { canvas as mkCanvas, drawCandleMark, labelTex, setMaxAnisotropy, toTexture } from "../world/textures";
 import { bus } from "./EventBus";
 import { Input } from "./Input";
@@ -68,6 +69,7 @@ export class Game {
   screens!: Screens;
   npcs!: NpcManager;
   whiteboard!: Whiteboard;
+  private standTradeId = -2;
   printJob: { t: number; root: THREE.Group; pivot: THREE.Group; paper: THREE.Group; trade: TradeRecord; tex: THREE.CanvasTexture } | null = null;
   events!: EventDirector;
   readonly ws: WorldState = {
@@ -177,6 +179,18 @@ export class Game {
       crt: () => this.terminalStation?.monitorKind === "crt",
       wide: () => this.terminalStation?.monitorKind === "lcdWide",
       printed: (id) => this.progress.d.printed.includes(id),
+      cosmetics: () => this.cosmeticGroups(),
+      buyCosmetic: (id) => {
+        const r = this.progress.buyCosmetic(id);
+        if (r.ok) this.save();
+        return r;
+      },
+      removeCosmetic: (slot) => {
+        const r = this.progress.removeCosmetic(slot as CosmeticSlot);
+        this.save();
+        return r;
+      },
+      homeLabel: () => this.house.stations.get(this.progress.d.homeStation)?.def.label ?? "PC 03",
       onClick: () => this.audio.play(this.progress.d.loadout.keyboard === "mech" && this.terminalStation?.def.id === this.progress.d.homeStation ? "keyMech" : "click"),
     });
 
@@ -201,6 +215,7 @@ export class Game {
       this.collision,
       this.physics.world,
     );
+    this.ui.onObjectiveToggle = () => this.toggleObjective();
     this.npcs.onSpeak = (npc, text, quiet, loud) => {
       const head = npc.rig.headAnchor.getWorldPosition(new THREE.Vector3());
       this.audio.voice(text, npc.profile.voice, head, quiet);
@@ -249,8 +264,11 @@ export class Game {
         this.progress.d.repFromTradesTonight++;
         this.progress.addRep(1, "Trade");
       }
+      this.house.stations.get(this.progress.d.homeStation)?.nodOwl();
       if (trade.side === "SELL") {
         this.progress.completeGoal("close");
+        this.refreshStand();
+        if (trade.realizedPnl !== null) this.regularStep("close");
         if (this.progress.d.tradesTonight <= 20) this.progress.addCredits(1, "Closed trade");
         const r = trade.realizedPnl ?? 0;
         this.progress.d.stats.bestTrade = Math.max(this.progress.d.stats.bestTrade, r);
@@ -261,6 +279,17 @@ export class Game {
       this.save();
     });
     bus.on("player:drank", () => this.progress.completeGoal("drink"));
+    bus.on("player:terminalOpen", ({ stationId }) => {
+      if (stationId === this.progress.d.homeStation) this.regularStep("seat");
+    });
+    bus.on("receipt:printed", () => this.regularStep("print"));
+    bus.on("player:talked", ({ npcId }) => {
+      const r = this.progress.d.regular;
+      if (npcId === "owner" || npcId === "courier" || r.talked.includes(npcId)) return;
+      r.talked.push(npcId);
+      if (r.talked.length >= 2) this.regularStep("talk2");
+    });
+    bus.on("cosmetic:changed", () => this.regularStep("custom"));
     bus.on("player:boardWiped", () => undefined);
     bus.on("bin:scored", ({ fromLine }) => {
       this.progress.completeGoal("bin");
@@ -324,7 +353,7 @@ export class Game {
     this.camera.fov = s.fov;
     this.camera.updateProjectionMatrix();
     this.hands?.setFov(s.fov, this.camera.aspect);
-    this.audio.setVolume(s.volume, s.ambience);
+    this.audio.setVolume(s.volume, s.ambience, s.effects, s.voices);
     if (!first) this.resize();
     this.ui.setFps(s.showFps ? this.fpsAcc.v : null);
   }
@@ -445,7 +474,8 @@ export class Game {
   private begin(load: boolean) {
     this.ui.closePanel();
     this.audio.init();
-    this.audio.setVolume(this.settings.data.volume, this.settings.data.ambience);
+    const sd = this.settings.data;
+    this.audio.setVolume(sd.volume, sd.ambience, sd.effects, sd.voices);
     let loaded = false;
     if (load) {
       const d = SaveStore.load();
@@ -606,6 +636,7 @@ export class Game {
     if (this.outside.flashing > 0.95) this.audio.play("thunder", new THREE.Vector3(0, 6, 8), 0.8);
     this.audio.rainIntensity = this.outside.intensity;
     this.audio.update(this.camera);
+    this.npcTypingAudio();
 
     // long terminal sessions: Night Shift suggests a walk (once per night)
     if (this.player.mode === "terminal") {
@@ -738,6 +769,8 @@ export class Game {
         else this.dialogNpc.lookAtPlayer(0.5);
       }
     }
+    // show / hide the objective line
+    if (inp.pressed("KeyO")) this.toggleObjective();
     // quick goals peek
     if (inp.pressed("Tab")) {
       const g = this.progress.goalsView();
@@ -1151,7 +1184,7 @@ export class Game {
       ).join("");
       this.ui.openPanel(
         "shop",
-        `<h2>The Owner's price list</h2><p>You have <b style="color:var(--accent)">◆ ${d.credits} CR</b> and ${d.rep} reputation (${this.progress.title}). Upgrades change your station — none of them predict prices.</p><h3>Station & extras</h3>${items}<h3>PC time</h3>${cons}<div class="actions"><button class="primary" data-act="close">Done</button></div>`,
+        `<h2>The Owner's price list</h2><p>You have <b style="color:var(--accent)">◆ ${d.credits} CR</b> and ${d.rep} reputation (${this.progress.title}). Upgrades change your station — none of them predict prices.</p><h3>Station & extras</h3>${items}<h3>PC time</h3>${cons}<p><small>Desk mats, case finishes, lamps and the bobble owl: <b>STATION</b> tab on your PC.</small></p><div class="actions"><button class="primary" data-act="close">Done</button></div>`,
         (root) => {
           root.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((b) => b.addEventListener("click", () => {
             this.buyUpgrade(b.dataset.buy!);
@@ -1317,9 +1350,73 @@ export class Game {
   }
 
   /** The home station's loadout; premium mezzanine desks never get the old CRT. */
-  effectiveLoadout() {
+  effectiveLoadout(): Loadout {
     const d = this.progress.d;
-    return { ...d.loadout, monitor: d.homeStation === "mz1" && d.loadout.monitor === "crt" ? ("lcdWide" as const) : d.loadout.monitor };
+    const eq = d.cosmetics.equipped;
+    return {
+      ...d.loadout,
+      monitor: d.homeStation === "mz1" && d.loadout.monitor === "crt" ? ("lcdWide" as const) : d.loadout.monitor,
+      finish: (eq.finish ?? "finish-beige").replace("finish-", "") as Finish,
+      pad: eq.pad ?? "pad-house",
+      lamp: eq.lamp,
+      mascot: !!eq.mascot,
+      stand: !!eq.stand,
+      plate: eq.plate,
+    };
+  }
+
+  /** Catalog rows for the terminal's STATION tab. */
+  private cosmeticGroups(): CosmeticGroup[] {
+    const P = this.progress;
+    const row = (slots: CosmeticSlot[]) =>
+      slots.map((slot) => ({
+        slot,
+        removable: !REQUIRED[slot],
+        items: P.cosmeticsFor([slot]).map((c) => {
+          const st = P.cosmeticStatus(c.id);
+          return { id: c.id, name: c.name, blurb: c.blurb, cost: c.cost, owned: st.owned, equipped: st.equipped, ok: st.ok, why: st.why };
+        }),
+      }));
+    return [
+      { key: "pad", label: "DESK MAT", slots: row(["pad"]) },
+      { key: "finish", label: "CASE", slots: row(["finish"]) },
+      { key: "lamp", label: "LAMP", slots: row(["lamp"]) },
+      { key: "extra", label: "EXTRAS", slots: row(["mascot", "stand", "plate"]) },
+    ];
+  }
+
+  toggleObjective() {
+    const d = this.progress.d;
+    d.objHidden = !d.objHidden;
+    this.ui.toast(d.objHidden ? "Objective hidden — press O (or tap the pill) to show it again." : "Objective shown.");
+  }
+
+  /** The receipt stand shows the best closed trade (real data from the history). */
+  private refreshStand() {
+    const home = this.house.stations.get(this.progress.d.homeStation);
+    if (!home) return;
+    let best: TradeRecord | null = null;
+    for (const t of this.portfolio.history) if (t.side === "SELL" && t.realizedPnl !== null && (!best || t.realizedPnl > (best.realizedPnl ?? -Infinity))) best = t;
+    if (best && best.id === this.standTradeId) return;
+    this.standTradeId = best?.id ?? -1;
+    home.setStandTexture(best ? receiptTexture(receiptFromTrade(best, this.market.config(best.assetId).decimals)) : null);
+  }
+
+  /** "Become a Regular": record a step; the Owner closes the chain. */
+  private regularStep(flag: string) {
+    if (!this.progress.markRegular(flag)) return;
+    this.progress.grantCosmetic("plate-regular");
+    this.progress.addRep(12, "Became a Regular");
+    const owner = this.npcs.get("owner");
+    this.events.at(1.2, () => {
+      if (owner.present) {
+        owner.lookAtPlayer(4);
+        owner.play("nod");
+        owner.sayText("Same seat tomorrow?", false, true);
+      }
+      bus.emit("toast", { text: "Became a Regular • Regular's nameplate is on your desk", kind: "good" });
+    });
+    this.save();
   }
 
   private applyMezz() {
@@ -1805,6 +1902,11 @@ export class Game {
     }
     if (d.challenge === "active") return "Challenge: paper ball in the bin from behind the 3 PTS tape.";
     if (this.deliveryBoxes.size) return "A delivery is waiting by the counter — press E on a box to install it.";
+    const step = this.progress.regularStep();
+    if (step) {
+      const home = this.house.stations.get(d.homeStation)?.def.label ?? "PC 03";
+      return `Become a Regular ${step.index + 1}/${step.total} — ${REGULAR_STEPS[step.index].text(home)}`;
+    }
     return null;
   }
 
@@ -1825,7 +1927,9 @@ export class Game {
       cash: `${fmtUsd(eq)} eq`,
       show: showHud,
     });
-    this.ui.setObjective(this.player.mode === "terminal" ? null : this.objectiveText());
+    const intro = this.intro.stage !== "done";
+    const hidden = this.progress.d.objHidden && !intro;
+    this.ui.setObjective(this.player.mode === "terminal" ? null : this.objectiveText(), intro ? null : "O hide", hidden);
     this.ui.setTouchVisible(this.player.mode === "walk" ? "walk" : this.player.mode === "terminal" ? "terminal" : "none");
   }
 
@@ -1960,6 +2064,9 @@ export class Game {
       if (!this.market.restore(d.market)) return false;
       if (!this.portfolio.restore(d.portfolio)) return false;
       this.progress.d = { ...freshProgress(), ...d.progress, loadout: { ...BASE_LOADOUT, ...d.progress.loadout } };
+      // phase-1 saves: cosmetics / "Become a Regular" didn't exist yet
+      this.progress.d.cosmetics = migrateCosmetics(d.progress.cosmetics, this.progress.d.owned);
+      this.progress.d.regular = Object.assign({ flags: [], talked: [], done: false }, d.progress.regular ?? {});
       this.clock.restore(d.clock);
       this.lastCandleMinute = this.clock.minuteOfDay;
       // stations
@@ -1967,6 +2074,8 @@ export class Game {
       this.applyMezz();
       this.house.stations.get(this.progress.d.homeStation)!.applyLoadout(this.effectiveLoadout());
       this.terminalStation = this.house.stations.get(this.progress.d.homeStation)!;
+      this.standTradeId = -2;
+      this.refreshStand();
       // props
       for (const p of [...this.props.props]) {
         this.interaction.remove(`prop-${p.uid}`);
@@ -2072,6 +2181,21 @@ export class Game {
         else this.pause();
       } else inp.tap(code);
     }
+  }
+
+  /** Voice the keyboards of the two closest typing regulars (not every NPC, not every key). */
+  private npcTypingAudio() {
+    const cam = this.camera.position;
+    const typists: { pos: THREE.Vector3; mech: boolean; d: number }[] = [];
+    for (const n of this.npcs.present()) {
+      const st = n.station;
+      if (!st || !n.typingNow) continue;
+      const pos = st.toWorld(-0.08, L.deskH + 0.02, -0.55);
+      const d = pos.distanceTo(cam);
+      if (d < 8) typists.push({ pos, mech: n.id === "topbuyer" || n.id === "wizard", d });
+    }
+    typists.sort((a, b) => a.d - b.d);
+    this.audio.typing(typists);
   }
 
   /**

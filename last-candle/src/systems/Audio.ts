@@ -9,6 +9,8 @@ export class Audio {
   private master!: GainNode;
   private sfxBus!: GainNode;
   private ambBus!: GainNode;
+  private voiceBus!: GainNode;
+  private rainPan!: PannerNode;
   private noiseBuf!: AudioBuffer;
   private rainGain!: GainNode;
   private rainFilter!: BiquadFilterNode;
@@ -20,6 +22,10 @@ export class Audio {
   private lastPlay = new Map<string, number>();
   volume = 0.8;
   ambience = 0.8;
+  effects = 0.9;
+  voices = 0.8;
+  /** Two "typing neighbor" slots: only the nearest typists are voiced, in bursts. */
+  private typers: { pos: THREE.Vector3; next: number; left: number; mech: boolean }[] = [];
   private fridgePos = new THREE.Vector3(-2.85, 1, -3.6);
   private serverPos = new THREE.Vector3(0, 1.2, -19.8);
   private fanPos = new THREE.Vector3(-0.95, 1.1, -3.05);
@@ -40,7 +46,11 @@ export class Audio {
     this.master.gain.value = this.volume;
     this.master.connect(ctx.destination);
     this.sfxBus = ctx.createGain();
+    this.sfxBus.gain.value = this.effects;
     this.sfxBus.connect(this.master);
+    this.voiceBus = ctx.createGain();
+    this.voiceBus.gain.value = this.voices;
+    this.voiceBus.connect(this.master);
     this.ambBus = ctx.createGain();
     this.ambBus.gain.value = this.ambience;
     this.ambBus.connect(this.master);
@@ -66,7 +76,33 @@ export class Audio {
     this.rainFilter.Q.value = 0.5;
     this.rainGain = ctx.createGain();
     this.rainGain.gain.value = 0.0;
-    rain.connect(this.rainFilter).connect(this.rainGain).connect(this.ambBus);
+    // the rain lives on the storefront glass: positional, wide and soft
+    this.rainPan = this.panner(new THREE.Vector3(0, 1.6, 0.3), 3.5, 0.55);
+    rain.connect(this.rainFilter).connect(this.rainGain).connect(this.rainPan).connect(this.ambBus);
+    // a softer, non-positional rain on the roof so the back of the shop isn't silent
+    const roof = this.loopNoise();
+    const rlp = ctx.createBiquadFilter();
+    rlp.type = "lowpass";
+    rlp.frequency.value = 700;
+    const roofG = ctx.createGain();
+    roofG.gain.value = 0.03;
+    roof.connect(rlp).connect(roofG).connect(this.ambBus);
+    // old wall AC: constant ventilation hiss + rattle, positional
+    const acSrc = this.loopNoise();
+    const acBp = ctx.createBiquadFilter();
+    acBp.type = "bandpass";
+    acBp.frequency.value = 420;
+    acBp.Q.value = 0.6;
+    const acG = ctx.createGain();
+    acG.gain.value = 0.11;
+    acSrc.connect(acBp).connect(acG).connect(this.panner(new THREE.Vector3(-3.0, 2.75, -8.3), 1.6, 1.1)).connect(this.ambBus);
+    const acHum = ctx.createOscillator();
+    acHum.type = "triangle";
+    acHum.frequency.value = 49;
+    const acHumG = ctx.createGain();
+    acHumG.gain.value = 0.025;
+    acHum.connect(acHumG).connect(this.panner(new THREE.Vector3(-3.0, 2.75, -8.3), 1.4, 1.2)).connect(this.ambBus);
+    acHum.start();
     // room tone / PC fans
     const room = this.loopNoise();
     const lp = ctx.createBiquadFilter();
@@ -108,6 +144,18 @@ export class Audio {
     fan.connect(flp).connect(this.fanGain).connect(this.ambBus);
   }
 
+  private panner(p: THREE.Vector3, ref: number, rolloff: number): PannerNode {
+    const pan = this.ctx!.createPanner();
+    pan.panningModel = "equalpower";
+    pan.distanceModel = "inverse";
+    pan.refDistance = ref;
+    pan.rolloffFactor = rolloff;
+    pan.positionX.value = p.x;
+    pan.positionY.value = p.y;
+    pan.positionZ.value = p.z;
+    return pan;
+  }
+
   private loopNoise(): AudioBufferSourceNode {
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
@@ -118,12 +166,46 @@ export class Audio {
     return src;
   }
 
-  setVolume(v: number, amb: number) {
+  setVolume(v: number, amb: number, fx = this.effects, voices = this.voices) {
     this.volume = v;
     this.ambience = amb;
+    this.effects = fx;
+    this.voices = voices;
     if (!this.ctx) return;
-    this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
-    this.ambBus.gain.setTargetAtTime(amb, this.ctx.currentTime, 0.1);
+    const t = this.ctx.currentTime;
+    this.master.gain.setTargetAtTime(v, t, 0.1);
+    this.ambBus.gain.setTargetAtTime(amb, t, 0.1);
+    this.sfxBus.gain.setTargetAtTime(fx, t, 0.1);
+    this.voiceBus.gain.setTargetAtTime(voices, t, 0.1);
+  }
+
+  /**
+   * Nearby keyboards: called each frame with the (at most two) closest NPCs who
+   * are typing. Keys come in short bursts with irregular pauses.
+   */
+  typing(sources: { pos: THREE.Vector3; mech: boolean }[]) {
+    if (!this.ctx || this.ctx.state !== "running") return;
+    const now = this.ctx.currentTime;
+    this.typers = sources.slice(0, 2).map((src, i) => {
+      const old = this.typers[i];
+      if (old && old.pos.distanceToSquared(src.pos) < 0.05) {
+        old.mech = src.mech;
+        return old;
+      }
+      return { pos: src.pos.clone(), next: now + Math.random() * 0.6, left: 0, mech: src.mech };
+    });
+    for (const tp of this.typers) {
+      if (now < tp.next) continue;
+      if (tp.left > 0) {
+        tp.left--;
+        const out = this.out(tp.pos, tp.mech ? 0.2 : 0.14);
+        this.noiseBurst(out, 0.03, "bandpass", (tp.mech ? 1900 : 2900) + Math.random() * 1400, 3, 0.001, 0.5);
+        tp.next = now + 0.07 + Math.random() * 0.12;
+      } else {
+        tp.left = 3 + Math.floor(Math.random() * 8);
+        tp.next = now + 0.3 + Math.random() * 1.3;
+      }
+    }
   }
 
   suspend(on: boolean) {
@@ -152,9 +234,7 @@ export class Audio {
       L.upY.value = 1;
       L.upZ.value = 0;
     }
-    const frontDist = Math.max(0, -p.z);
-    const rainNear = 1 / (1 + frontDist * 0.22);
-    this.rainGain.gain.setTargetAtTime((0.05 + 0.32 * this.rainIntensity) * (0.35 + 0.65 * rainNear), t, 0.3);
+    this.rainGain.gain.setTargetAtTime(0.06 + 0.4 * this.rainIntensity, t, 0.3);
     this.rainFilter.frequency.setTargetAtTime(900 + this.rainIntensity * 1200, t, 0.5);
     const fd = p.distanceTo(this.fridgePos);
     this.fridgeGain.gain.setTargetAtTime((this.fridgeOpen ? 0.06 : 0.022) / (1 + fd * 0.6), t, 0.2);
@@ -173,7 +253,7 @@ export class Audio {
   }
 
   /** Route a voice through a panner if a world position is given. */
-  private out(pos?: THREE.Vector3, vol = 1): AudioNode {
+  private out(pos?: THREE.Vector3, vol = 1, bus: GainNode = this.sfxBus): AudioNode {
     const ctx = this.ctx!;
     const g = ctx.createGain();
     g.gain.value = vol;
@@ -186,8 +266,8 @@ export class Audio {
       pan.positionX.value = pos.x;
       pan.positionY.value = pos.y;
       pan.positionZ.value = pos.z;
-      g.connect(pan).connect(this.sfxBus);
-    } else g.connect(this.sfxBus);
+      g.connect(pan).connect(bus);
+    } else g.connect(bus);
     return g;
   }
 
@@ -345,6 +425,10 @@ export class Audio {
         this.tone(o(0.12), 240, 0.2, "square", 0.15, 0, 180);
         this.noiseBurst(o(0.3), 0.12, "bandpass", 900, 2, 0.002, 0.6);
         break;
+      case "sigh":
+        if (!this.throttle("sigh", 400)) return;
+        this.noiseBurst(o(0.12), 0.9, "lowpass", 700, 0.7, 0.25, 0.4);
+        break;
       case "swoosh":
         this.noiseBurst(o(0.25), 0.22, "bandpass", 900, 0.8, 0.05, 0.5);
         break;
@@ -359,7 +443,7 @@ export class Audio {
   /** Gibberish voice blips for NPC speech (quiet). */
   voice(text: string, pitch: number, pos: THREE.Vector3, quiet: boolean) {
     if (!this.ctx || this.ctx.state !== "running") return;
-    const out = this.out(pos, quiet ? 0.05 : 0.09);
+    const out = this.out(pos, quiet ? 0.05 : 0.09, this.voiceBus);
     const n = Math.min(14, Math.max(3, Math.floor(text.length / 5)));
     for (let i = 0; i < n; i++) {
       const f = (140 + Math.random() * 90) * pitch * (quiet ? 0.9 : 1);

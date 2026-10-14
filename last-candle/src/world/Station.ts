@@ -3,10 +3,12 @@ import type { Builder } from "./Builder";
 import { cyl, mergeByMaterial, plane, rbox, sphere } from "./geometry";
 import { L, type StationDef } from "./layout";
 import { colorMat, materials } from "./materials";
-import { screenGlowMat } from "./Dressing";
-import { stickerTex } from "./textures";
+import { glowTexture, screenGlowMat } from "./Dressing";
+import { padTex, placeholderReceipt, plateTex, stickerTex } from "./textures";
 
 export type MonitorKind = "crt" | "lcd4" | "lcdWide";
+
+export type Finish = "beige" | "glass" | "walnut";
 
 export interface Loadout {
   chair: "old" | "gamer";
@@ -15,6 +17,13 @@ export interface Loadout {
   second: boolean;
   case: "old" | "custom";
   deco: boolean;
+  /** Cosmetic layer (the player's own station only; never affects the market). */
+  finish?: Finish;
+  pad?: string;
+  lamp?: string | null;
+  mascot?: boolean;
+  stand?: boolean;
+  plate?: string | null;
 }
 
 export const SCREEN_SIZES: Record<MonitorKind, { w: number; h: number; px: [number, number] }> = {
@@ -66,7 +75,15 @@ export class StationVisual {
     second: new THREE.Group(),
     tower: new THREE.Group(),
     deco: new THREE.Group(),
+    cos: new THREE.Group(),
   };
+  /** Which side of the desk the tower stands on (-1 left, +1 right); the other side is free. */
+  readonly towerSide: number;
+  private owl: THREE.Object3D | null = null;
+  private owlNod = 0;
+  private lava: THREE.Object3D[] = [];
+  private standMat: THREE.MeshStandardMaterial | null = null;
+  private standTex: THREE.Texture | null = null;
   private loadout: Loadout | null = null;
   private screenTex: THREE.Texture | null = null;
   private screen2Tex: THREE.Texture | null = null;
@@ -79,6 +96,7 @@ export class StationVisual {
   ) {
     const m = materials();
     this.variant = CHAIR_VARIANTS[index % CHAIR_VARIANTS.length];
+    this.towerSide = index % 2 === 0 ? -1 : 1;
     this.root.name = `station-${def.id}`;
     this.root.userData.dynamic = true;
     this.root.position.set(def.chair[0], def.chair[1], def.chair[2]);
@@ -239,13 +257,32 @@ export class StationVisual {
       this.finishPart(this.parts.monitor);
     }
     if (!prev || prev.second !== lo.second) this.buildSecond(lo.second);
-    if (!prev || prev.case !== lo.case) {
-      this.buildTower(lo.case);
+    const finish: Finish = lo.finish ?? (lo.case === "custom" ? "glass" : "beige");
+    const prevFinish = prev ? (prev.finish ?? (prev.case === "custom" ? "glass" : "beige")) : null;
+    if (!prev || prevFinish !== finish) {
+      this.buildTower(finish);
       this.finishPart(this.parts.tower);
     }
-    if (!prev || prev.deco !== lo.deco) {
-      this.buildDeco(lo.deco);
+    if (!prev || prev.deco !== lo.deco || !!prev.lamp !== !!lo.lamp) {
+      this.buildDeco(lo.deco, !!lo.lamp);
       this.finishPart(this.parts.deco);
+    }
+    if (!prev || prev.pad !== lo.pad || prev.lamp !== lo.lamp || prev.mascot !== lo.mascot || prev.stand !== lo.stand || prev.plate !== lo.plate || prevFinish !== finish) {
+      this.buildCosmetics(lo, finish);
+    }
+  }
+
+  /** The bobble owl agrees with whatever you just did. */
+  nodOwl() {
+    this.owlNod = 1;
+  }
+
+  /** Texture of the best closed trade's receipt for the stand (null = placeholder). */
+  setStandTexture(tex: THREE.Texture | null) {
+    this.standTex = tex;
+    if (this.standMat) {
+      this.standMat.map = tex ?? placeholderReceipt();
+      this.standMat.needsUpdate = true;
     }
   }
 
@@ -459,36 +496,85 @@ export class StationVisual {
     this.screen2 = screen;
   }
 
-  private buildTower(kind: "old" | "custom") {
+  private buildTower(finish: Finish) {
     const m = materials();
     const g = this.parts.tower;
     this.clear(g);
     this.fans = [];
     const backZ = -(DESK_FRONT + L.deskDepth);
-    const side = this.index % 2 === 0 ? -1 : 1;
+    const side = this.towerSide;
     const x = side * 0.48;
     const z = backZ + 0.3;
     const h = 0.42;
-    if (kind === "custom") {
+    const inner = x - side * 0.1; // the face turned toward the seat
+    if (finish === "glass") {
       const body = new THREE.Mesh(rbox(0.2, h + 0.04, 0.44, 0.012), m.black);
       body.position.set(x, L.deskH + (h + 0.04) / 2, z);
       body.castShadow = true;
       g.add(body);
-      const glass = new THREE.Mesh(plane(0.4, h - 0.02), new THREE.MeshStandardMaterial({ color: "#20160e", roughness: 0.1, transparent: true, opacity: 0.55 }));
-      glass.position.set(x - side * 0.101, L.deskH + h / 2 + 0.02, z);
+      // simplified internals, visible through the smoked glass
+      const pcb = colorMat("#1f2a24", 0.7);
+      const steel = colorMat("#3b3e43", 0.4, 0.6);
+      const board = new THREE.Mesh(rbox(0.008, h - 0.06, 0.36, 0.002), pcb);
+      board.position.set(x + side * 0.07, L.deskH + h / 2 + 0.03, z);
+      g.add(board);
+      const gpu = new THREE.Mesh(rbox(0.11, 0.045, 0.3, 0.006), m.darkGrey);
+      gpu.position.set(x + side * 0.012, L.deskH + 0.17, z + 0.02);
+      g.add(gpu);
+      const gpuStripe = new THREE.Mesh(rbox(0.004, 0.006, 0.26, 0.001), m.neonWarm);
+      gpuStripe.position.set(x - side * 0.044, L.deskH + 0.17, z + 0.02);
+      g.add(gpuStripe);
+      const cooler = new THREE.Mesh(cyl(0.04, 0.04, 0.07, 14), steel);
+      cooler.rotation.z = Math.PI / 2;
+      cooler.position.set(x + side * 0.03, L.deskH + 0.32, z - 0.03);
+      g.add(cooler);
+      for (let i = 0; i < 4; i++) {
+        const ram = new THREE.Mesh(rbox(0.035, 0.06, 0.006, 0.002), m.darkGrey);
+        ram.position.set(x + side * 0.045, L.deskH + 0.33, z + 0.07 + i * 0.014);
+        g.add(ram);
+        const ramLed = new THREE.Mesh(rbox(0.035, 0.005, 0.006, 0.001), m.ledWarm);
+        ramLed.position.set(x + side * 0.045, L.deskH + 0.363, z + 0.07 + i * 0.014);
+        g.add(ramLed);
+      }
+      const shroud = new THREE.Mesh(rbox(0.17, 0.07, 0.4, 0.006), steel);
+      shroud.position.set(x, L.deskH + 0.06, z);
+      g.add(shroud);
+      const glass = new THREE.Mesh(plane(0.4, h - 0.02), new THREE.MeshStandardMaterial({ color: "#3a3330", roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false }));
+      glass.position.set(inner - side * 0.001, L.deskH + h / 2 + 0.02, z);
       glass.rotation.y = -side * Math.PI / 2;
+      glass.userData.keep = true;
       g.add(glass);
       for (let i = 0; i < 3; i++) {
         const fan = this.makeFan(0.055, colorMat("#ffb15c", 0.4));
         ((fan.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial).emissive = new THREE.Color("#a5521a");
-        fan.position.set(x - side * 0.085, L.deskH + 0.1 + i * 0.13, z + 0.17);
-        fan.rotation.y = -side * Math.PI / 2;
+        fan.position.set(x, L.deskH + 0.1 + i * 0.13, z + 0.205);
         g.add(fan);
         this.fans.push(fan.children[1]);
       }
       const strip = new THREE.Mesh(rbox(0.005, 0.005, 0.38, 0.001), m.neonWarm);
-      strip.position.set(x - side * 0.098, L.deskH + h + 0.0, z);
+      strip.position.set(inner + side * 0.004, L.deskH + h + 0.0, z);
       g.add(strip);
+    } else if (finish === "walnut") {
+      const body = new THREE.Mesh(rbox(0.2, h + 0.02, 0.43, 0.01), m.darkGrey);
+      body.position.set(x, L.deskH + (h + 0.02) / 2, z);
+      body.castShadow = true;
+      g.add(body);
+      // slatted walnut front + walnut top
+      for (let i = 0; i < 7; i++) {
+        const slat = new THREE.Mesh(rbox(0.022, h - 0.02, 0.014, 0.004), m.woodMid);
+        slat.position.set(x - 0.075 + i * 0.025, L.deskH + h / 2 + 0.01, z + 0.218);
+        g.add(slat);
+      }
+      const top = new THREE.Mesh(rbox(0.205, 0.016, 0.44, 0.006), m.woodMid);
+      top.position.set(x, L.deskH + h + 0.025, z);
+      g.add(top);
+      const btn = new THREE.Mesh(cyl(0.01, 0.01, 0.006, 12), colorMat("#c9a13a", 0.3, 0.8));
+      btn.rotation.x = Math.PI / 2;
+      btn.position.set(x, L.deskH + h - 0.03, z + 0.228);
+      g.add(btn);
+      const led = new THREE.Mesh(sphere(0.005, 6, 4), m.ledAmber);
+      led.position.set(x + 0.03, L.deskH + h - 0.03, z + 0.228);
+      g.add(led);
     } else {
       const variant = this.index % 3;
       const body = new THREE.Mesh(rbox(0.19, h, 0.42, 0.01), variant === 1 ? m.darkGrey : m.beigeOld);
@@ -507,7 +593,7 @@ export class StationVisual {
       if (variant === 2) {
         // open side panel with a mismatched spinning fan ("reused parts")
         const fan = this.makeFan(0.05, m.darkGrey);
-        fan.position.set(x - side * 0.1, L.deskH + h / 2, z + 0.05);
+        fan.position.set(inner, L.deskH + h / 2, z + 0.05);
         fan.rotation.y = -side * Math.PI / 2;
         g.add(fan);
         this.fans.push(fan.children[1]);
@@ -535,43 +621,181 @@ export class StationVisual {
     return g;
   }
 
-  private buildDeco(on: boolean) {
+  private buildDeco(on: boolean, ownLamp: boolean) {
     const m = materials();
     const g = this.parts.deco;
     this.clear(g);
     if (!on) return;
     const backZ = -(DESK_FRONT + L.deskDepth);
-    // cactus
+    const fs = -this.towerSide; // free side
+    // cactus + photo in the back corner of the free side
     const pot = new THREE.Mesh(cyl(0.035, 0.028, 0.06, 10), m.terracotta);
-    pot.position.set(-0.52, L.deskH + 0.03, backZ + 0.15);
+    pot.position.set(fs * 0.6, L.deskH + 0.03, backZ + 0.1);
     g.add(pot);
     const cactus = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.06, 4, 8), m.plant);
-    cactus.position.set(-0.52, L.deskH + 0.1, backZ + 0.15);
+    cactus.position.set(fs * 0.6, L.deskH + 0.1, backZ + 0.1);
     g.add(cactus);
-    // photo frame
     const frame = new THREE.Mesh(rbox(0.1, 0.13, 0.012, 0.004), m.woodDark);
-    frame.position.set(-0.4, L.deskH + 0.07, backZ + 0.12);
-    frame.rotation.x = -0.15;
+    frame.position.set(fs * 0.47, L.deskH + 0.07, backZ + 0.08);
+    frame.rotation.set(-0.15, -fs * 0.35, 0);
     g.add(frame);
     const photo = new THREE.Mesh(plane(0.08, 0.1), new THREE.MeshStandardMaterial({ map: stickerTex("FIRST\nGREEN\nCANDLE", "#20352a", "#bfe39a", 128, 160), roughness: 0.6 }));
-    photo.position.set(-0.4, L.deskH + 0.071, backZ + 0.127);
-    photo.rotation.x = -0.15;
+    photo.position.set(fs * 0.47 - fs * 0.0025, L.deskH + 0.071, backZ + 0.087);
+    photo.rotation.set(-0.15, -fs * 0.35, 0);
     g.add(photo);
-    // small warm desk lamp (emissive only, no extra light cost)
+    if (ownLamp) return; // a cosmetic lamp replaces the little one
+    // small warm desk lamp (emissive only, no extra light cost) in the front corner
+    const lx = fs * 0.57;
+    const lz = -DESK_FRONT - 0.12;
     const lampBase = new THREE.Mesh(cyl(0.05, 0.06, 0.015, 12), m.black);
-    lampBase.position.set(0.5, L.deskH + 0.008, backZ + 0.45);
+    lampBase.position.set(lx, L.deskH + 0.008, lz);
     g.add(lampBase);
     const arm = new THREE.Mesh(cyl(0.007, 0.007, 0.3, 6), m.black);
-    arm.position.set(0.5, L.deskH + 0.15, backZ + 0.42);
+    arm.position.set(lx, L.deskH + 0.15, lz - 0.03);
     arm.rotation.x = -0.25;
     g.add(arm);
     const head = new THREE.Mesh(cyl(0.025, 0.06, 0.08, 12, true), m.lampShade);
-    head.position.set(0.5, L.deskH + 0.29, backZ + 0.36);
+    head.position.set(lx, L.deskH + 0.29, lz - 0.09);
     head.rotation.x = 0.6;
     g.add(head);
     const bulb = new THREE.Mesh(sphere(0.02, 8, 6), m.bulb);
-    bulb.position.set(0.5, L.deskH + 0.27, backZ + 0.38);
+    bulb.position.set(lx, L.deskH + 0.27, lz - 0.07);
     g.add(bulb);
+  }
+
+  /** Desk mat, lamp, mascot, receipt stand and nameplate (player's station). */
+  private buildCosmetics(lo: Loadout, finish: Finish) {
+    const m = materials();
+    const g = this.parts.cos;
+    this.clear(g);
+    this.owl = null;
+    this.lava = [];
+    this.standMat = null;
+    const deskCZ = -(DESK_FRONT + L.deskDepth / 2);
+    const ts = this.towerSide;
+    const fs = -ts;
+    if (lo.pad && lo.pad !== "pad-house") {
+      const mat = new THREE.Mesh(plane(0.64, 0.31), new THREE.MeshStandardMaterial({ map: padTex(lo.pad), roughness: 0.92 }));
+      mat.rotation.x = -Math.PI / 2;
+      mat.position.set(0.08, L.deskH + 0.0045, deskCZ + 0.2);
+      mat.receiveShadow = true;
+      g.add(mat);
+    }
+    if (lo.lamp === "lamp-banker") {
+      const brass = colorMat("#b08a3a", 0.3, 0.85);
+      const lx = fs * 0.55;
+      const lz = -DESK_FRONT - 0.13;
+      const base = new THREE.Mesh(rbox(0.13, 0.02, 0.08, 0.008), brass);
+      base.position.set(lx, L.deskH + 0.01, lz);
+      g.add(base);
+      const stem = new THREE.Mesh(cyl(0.008, 0.008, 0.2, 8), brass);
+      stem.position.set(lx, L.deskH + 0.11, lz - 0.02);
+      g.add(stem);
+      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 18, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color: "#1f6b45", roughness: 0.25, emissive: new THREE.Color("#0c3a22"), emissiveIntensity: 0.6, side: THREE.DoubleSide }));
+      shade.rotation.set(0, 0, Math.PI / 2);
+      shade.position.set(lx, L.deskH + 0.22, lz - 0.02);
+      g.add(shade);
+      const bulb = new THREE.Mesh(cyl(0.012, 0.012, 0.15, 8), m.bulb);
+      bulb.rotation.z = Math.PI / 2;
+      bulb.position.set(lx, L.deskH + 0.205, lz - 0.02);
+      g.add(bulb);
+      const pool = new THREE.Mesh(plane(0.42, 0.32), new THREE.MeshBasicMaterial({ color: "#ffbf73", map: glowTexture(), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+      pool.rotation.x = -Math.PI / 2;
+      pool.position.set(lx, L.deskH + 0.003, lz + 0.02);
+      g.add(pool);
+    } else if (lo.lamp === "lamp-lava") {
+      const lx = fs * 0.56;
+      const lz = -DESK_FRONT - 0.12;
+      const metal = colorMat("#2f3236", 0.35, 0.7);
+      const base = new THREE.Mesh(cyl(0.035, 0.05, 0.08, 14), metal);
+      base.position.set(lx, L.deskH + 0.04, lz);
+      g.add(base);
+      const glass = new THREE.Mesh(cyl(0.022, 0.035, 0.18, 16), new THREE.MeshStandardMaterial({ color: "#ff9a3c", roughness: 0.15, transparent: true, opacity: 0.55, emissive: new THREE.Color("#b8441a"), emissiveIntensity: 0.8, depthWrite: false }));
+      glass.position.set(lx, L.deskH + 0.17, lz);
+      glass.userData.keep = true;
+      g.add(glass);
+      const cap = new THREE.Mesh(cyl(0.018, 0.024, 0.04, 14), metal);
+      cap.position.set(lx, L.deskH + 0.28, lz);
+      g.add(cap);
+      const blobMat = new THREE.MeshStandardMaterial({ color: "#ffcf6a", emissive: new THREE.Color("#ff8a2c"), emissiveIntensity: 1.6, roughness: 0.4 });
+      for (let i = 0; i < 3; i++) {
+        const blob = new THREE.Mesh(sphere(0.011 + i * 0.003, 10, 8), blobMat);
+        blob.position.set(lx, L.deskH + 0.12 + i * 0.04, lz);
+        blob.userData.keep = true;
+        blob.userData.phase = i * 2.1;
+        g.add(blob);
+        this.lava.push(blob);
+      }
+    }
+    if (lo.mascot) {
+      const owl = new THREE.Group();
+      owl.position.set(ts * 0.56, L.deskH, -DESK_FRONT - 0.1);
+      owl.rotation.y = -ts * 0.35;
+      g.add(owl);
+      const feather = colorMat("#7a5a3a", 0.85);
+      const bellyM = colorMat("#c9a77a", 0.85);
+      const spring = new THREE.Mesh(cyl(0.006, 0.006, 0.03, 6), m.metal);
+      spring.position.y = 0.045;
+      const body = new THREE.Mesh(sphere(0.032, 14, 10), feather);
+      body.scale.set(1, 1.15, 0.9);
+      body.position.y = 0.03;
+      const belly = new THREE.Mesh(sphere(0.022, 12, 8), bellyM);
+      belly.position.set(0, 0.026, 0.016);
+      belly.scale.set(1, 1.1, 0.6);
+      owl.add(spring, body, belly);
+      const head = new THREE.Group();
+      head.position.y = 0.062;
+      owl.add(head);
+      const skull = new THREE.Mesh(sphere(0.03, 14, 10), feather);
+      skull.scale.set(1.15, 0.95, 1);
+      head.add(skull);
+      for (const sx of [-1, 1]) {
+        const eye = new THREE.Mesh(sphere(0.011, 10, 8), colorMat("#f4efe2", 0.4));
+        eye.position.set(sx * 0.013, 0.006, 0.025);
+        const pupil = new THREE.Mesh(sphere(0.0055, 8, 6), m.black);
+        pupil.position.set(sx * 0.013, 0.006, 0.0345);
+        const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.02, 6), feather);
+        tuft.position.set(sx * 0.022, 0.03, 0);
+        tuft.rotation.z = -sx * 0.4;
+        head.add(eye, pupil, tuft);
+      }
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.005, 0.012, 6), colorMat("#d99a2b", 0.5));
+      beak.rotation.x = Math.PI / 2 + 0.3;
+      beak.position.set(0, -0.004, 0.031);
+      head.add(beak);
+      this.owl = head;
+    }
+    if (lo.stand) {
+      // acrylic stand on top of the tower, angled toward the seat
+      const top = L.deskH + (finish === "glass" ? 0.46 : finish === "walnut" ? 0.445 : 0.42);
+      const holder = new THREE.Group();
+      holder.position.set(ts * 0.48, top, -(DESK_FRONT + L.deskDepth) + 0.38);
+      holder.rotation.y = -ts * 0.45;
+      g.add(holder);
+      const acrylic = new THREE.MeshStandardMaterial({ color: "#d8e4ea", roughness: 0.05, transparent: true, opacity: 0.35, depthWrite: false });
+      const base = new THREE.Mesh(rbox(0.11, 0.012, 0.06, 0.003), acrylic);
+      base.position.y = 0.006;
+      holder.add(base);
+      const sheet = new THREE.Mesh(rbox(0.1, 0.2, 0.004, 0.002), acrylic);
+      sheet.position.set(0, 0.11, -0.012);
+      sheet.rotation.x = -0.12;
+      holder.add(sheet);
+      this.standMat = new THREE.MeshStandardMaterial({ map: this.standTex ?? placeholderReceipt(), roughness: 0.9 });
+      const paper = new THREE.Mesh(plane(0.085, 0.185), this.standMat);
+      paper.position.set(0, 0.11, -0.009);
+      paper.rotation.x = -0.12;
+      holder.add(paper);
+    }
+    if (lo.plate) {
+      const plate = new THREE.Mesh(rbox(0.17, 0.04, 0.008, 0.003), colorMat("#b08a3a", 0.3, 0.85));
+      plate.position.set(ts * 0.3, L.deskH + 0.02, -DESK_FRONT - 0.05);
+      plate.rotation.x = -0.35;
+      g.add(plate);
+      const label = new THREE.Mesh(plane(0.16, 0.034), new THREE.MeshBasicMaterial({ map: plateTex(`REGULAR • ${this.def.label}`), transparent: true }));
+      label.position.set(ts * 0.3, L.deskH + 0.0215, -DESK_FRONT - 0.0455);
+      label.rotation.x = -0.35;
+      g.add(label);
+    }
   }
 
   update(dt: number, time: number) {
@@ -594,6 +818,17 @@ export class StationVisual {
     this.chairTilt += (this.tiltTarget - this.chairTilt) * (1 - Math.exp(-4 * dt));
     this.swivel.rotation.x = -this.chairTilt;
     this.parts.chair.position.z = this.chairSlide;
-    void time;
+    // lava lamp blobs drift up and down
+    for (const b of this.lava) {
+      const ph = b.userData.phase as number;
+      b.position.y = L.deskH + 0.105 + (Math.sin(time * 0.35 + ph) * 0.5 + 0.5) * 0.12;
+      b.scale.y = 1 + Math.sin(time * 0.9 + ph) * 0.18;
+    }
+    // bobble owl: a nod after each trade, then a tiny idle wobble
+    if (this.owl) {
+      this.owlNod = Math.max(0, this.owlNod - dt * 0.7);
+      this.owl.rotation.x = Math.sin(time * 9) * 0.35 * this.owlNod + Math.sin(time * 1.3) * 0.03;
+      this.owl.rotation.z = Math.sin(time * 0.9) * 0.04;
+    }
   }
 }

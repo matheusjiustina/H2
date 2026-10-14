@@ -5,8 +5,10 @@ export interface SettingsData {
   fov: number; // 60 .. 90
   renderScale: number; // 0.5 .. 1
   shadows: "off" | "low" | "high";
-  volume: number; // 0..1
+  volume: number; // 0..1 (master)
   ambience: number; // 0..1
+  effects: number; // 0..1
+  voices: number; // 0..1
   showFps: boolean;
 }
 
@@ -21,6 +23,8 @@ export const DEFAULT_SETTINGS: SettingsData = {
   shadows: "high",
   volume: 0.8,
   ambience: 0.8,
+  effects: 0.9,
+  voices: 0.8,
   showFps: false,
 };
 
