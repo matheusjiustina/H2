@@ -37,8 +37,9 @@ Requer um navegador desktop com WebGL2 (Chrome, Edge, Firefox, Safari recentes).
 | Botão direito | inspecionar o objeto (mouse gira) |
 | R / Q | girar o objeto / soltar |
 | Tab | ver as metas da noite |
+| O | ocultar / mostrar o objetivo atual (ou toque na pílula do objetivo) |
 | Esc | sair do terminal (levantar) • pausar |
-| **No terminal** | cursor do mouse clica no monitor 3D • `1-5` tokens • `B` comprar • `S` vender • `X` vender tudo • `+/-` ou roda do mouse ajustam o tamanho • `Tab` abas • `Espaço` recostar e olhar a sala |
+| **No terminal** | cursor do mouse clica no monitor 3D • `1-5` tokens • `B` comprar • `S` vender • `X` vender tudo • `+/-` ou roda do mouse ajustam o tamanho • `Tab` abas (posições, histórico, metas, **STATION**) • `Espaço` recostar e olhar a sala |
 
 Se o navegador não permitir capturar o mouse (por exemplo, dentro de um iframe), o jogo entra em modo “arrastar para olhar”.
 
@@ -55,6 +56,19 @@ Se o navegador não permitir capturar o mouse (por exemplo, dentro de um iframe)
 - **Áudio 100% procedural** (WebAudio): chuva, ventoinhas, geladeira, servidores, ventilador, teclas, cadeiras, impressora térmica, vozes em “murmúrio”, compra/venda curtas.
 - **Configurações**: sensibilidade, inverter Y, head bob, FOV, resolução de render, sombras (off/low/high), volume e ambiência, FPS.
 
+## Segunda etapa (refinamento)
+
+- **Presença**: mãos menores e proporcionais, alcance curto antes de pegar/usar, objeto segurado com peso e um leve atraso controlado, carregamento com as duas mãos para objetos pesados, mãos recuam diante de paredes/mesas/monitores, interações só dentro do alcance e sem obstrução; ao sentar a cadeira se ajusta, ao levantar o jogador vai para um lugar livre ao lado/atrás da cadeira (nunca atravessa a mesa).
+- **Personagens**: roupas e acessórios próprios (camiseta da lan house e chaveiro do dono; jaqueta chamativa, corrente e boné do Top Buyer; moletom escuro com capuz aberto do Lurker; camisa aberta sobre camiseta de triângulos e caneta na mão do Wizard; moletom largo, gorro e copo reutilizável do Night Shift), olhos com íris, pálpebras, olheiras, sobrancelhas com formato, dedo indicador separado. Postura por personagem (Top Buyer inclinado para a frente e inquieto, Night Shift recostado, Lurker discreto e lento, Owner com gestos econômicos) e microatividades com transição suave: digitar, usar o mouse, ler, olhar para o lado, beber, suspirar, comemorar, recostar com as mãos na nuca, explicar gráficos, empurrar a cadeira para trás, levantar e sentar em fases.
+- **Reações sociais** (`NpcManager`): uma voz por vez, falas que não se repetem por minutos, prioridade para quem está perto do jogador, limite de reações simultâneas e por janela de tempo, variação de animação. As reações vêm de trades simulados reais dos NPCs: comemoração precipitada do Top Buyer (e o desânimo quando vira), "I sold. You're welcome." ao fechar no lucro, "That was my last trade. Again." ao fechar no prejuízo de novo, "Bro bought the announcement." quando alguém comprou depois de uma alta e ficou no vermelho, "Unrealized. Emotionally realized." de quem está com posição negativa, "Someone unplug his confidence." para as comemorações altas. Um vizinho olha (e às vezes comenta); outro continua focado. O Lurker observa antes de falar.
+- **THE RECEIPT WALK**: a impressora térmica solta o papel aos poucos (cabeçalho primeiro); o recibo fica na borda, pode ser pego, inspecionado, levado e preso no mural. Dados reais: token, preço médio, saída, quantidade, resultado líquido. Recibos soltos têm limite.
+- **THE CHAIR TURN**: ao falar com um frequentador sentado ele gira a cadeira para conversar e depois volta ao computador; não interrompe quem está andando ou ocupado; a câmera do jogador nunca é movida.
+- **THE WHITEBOARD THEORY**: o Wizard desenha teorias absurdas e originais (triângulos dentro de triângulos, seta exagerada, anotações, "not advice") e substitui só a dele; o jogador desenha e apaga no "GUEST CORNER". Tudo fica salvo.
+- **Visual**: sombras de contato sob móveis e personagens, cabos da estação (monitor/teclado → passa-fio → régua no chão), luz dos monitores na mesa, reflexos sutis no vidro da fachada (capturados uma vez), destaque quente sob o mezanino e no balcão.
+- **Customização** (aba STATION no PC, só visual): 3 mousepads/desk mats, 3 acabamentos de gabinete (bege, nogueira, vidro fumê com peças internas visíveis), 2 luminárias, a coruja que balança a cabeça a cada trade, um suporte com o recibo do seu melhor trade e a placa de Regular. Nada disso altera preços ou chances.
+- **Become a Regular**: usar o PC, fechar um trade, imprimir o recibo, conversar com dois frequentadores e customizar a estação; o dono encerra com "Same seat tomorrow?" e dá a placa + reputação.
+- **Áudio espacial**: chuva posicionada na fachada, ar-condicionado, teclados apenas dos dois NPCs mais próximos que estão digitando, impressora no balcão; volumes separados (geral, ambiente, efeitos, vozes). O áudio só começa depois do clique inicial.
+
 ## Estrutura
 
 ```
@@ -67,16 +81,18 @@ src/
   market/     assets (cadastro configurável dos tokens), MarketEngine, Portfolio, format
   terminal/   Terminal (UI no monitor), Screens (monitores dos NPCs, telão, CRT do balcão), chart
   npc/        CharacterRig, Npc, NpcManager (agendador de reações e balões), Nav, dialogue
-  systems/    Events, Progression, NightClock, Whiteboard, Receipts, Audio
+  systems/    Events, Progression, Cosmetics, NightClock, Whiteboard, Receipts, Audio
   ui/         UI (HUD, diálogos, loja, pausa, resumo, toque)
-tests/        testes do motor de mercado e da carteira
+tests/        testes do motor de mercado, da carteira, dos cosméticos e do "Become a Regular"
 ```
 
 Para trocar nomes, emblemas ou parâmetros dos tokens, edite `src/market/assets.ts` — o motor não precisa mudar.
 
 ## Limitações conhecidas
 
-- Personagens e mãos são modelados por primitivas e animados de forma procedural (sem modelos rigados/skinning nem motion capture); as animações são estilizadas, não realistas.
+- Personagens e mãos são modelados por primitivas e animados de forma procedural (sem modelos rigados/skinning nem motion capture); as animações são estilizadas, não realistas, e as mãos dos NPCs não seguram objetos com precisão de dedos.
+- Os reflexos do vidro vêm de uma captura única do ambiente feita ao carregar: não mostram pessoas nem objetos que se movem depois disso.
+- Customização vale para a sua estação (PC 03 ou MZ 1); as outras estações não mudam.
 - Sem oclusão de ambiente nem iluminação pré-calculada; a iluminação é em tempo real com uma luz de sombra direcional e luzes pontuais sem sombra.
 - Colisão do jogador usa caixas alinhadas aos eixos; NPCs andam por um grafo de pontos fixos (não há navmesh) e são “empurrões suaves” para o jogador, que nunca fica preso.
 - O mercado é deliberadamente simples (regimes estocásticos); não há livro de ofertas, slippage além do spread fixo, nem impacto das ordens no preço. Somente spot — sem alavancagem.

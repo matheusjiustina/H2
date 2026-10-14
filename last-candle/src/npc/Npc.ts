@@ -249,6 +249,8 @@ export class Npc {
   /** Chair turned toward the player for a conversation. */
   convo = false;
   private explained = false;
+  /** After a chat: turn back to the screen even while finishing a sentence. */
+  private turnAwayUntil = 0;
   private timers: { at: number; fn: () => void }[] = [];
   private readonly posture: Posture;
 
@@ -290,6 +292,7 @@ export class Npc {
 
   /** THE CHAIR TURN: swivel round to face the player for a chat. */
   beginConvo() {
+    this.turnAwayUntil = 0;
     if (this.overlay?.ambient) {
       if (this.cupInHand) this.cupHome();
       this.overlay = null;
@@ -304,6 +307,7 @@ export class Npc {
     this.convo = false;
     this.lookPlayerUntil = 0;
     this.lookTarget = null;
+    this.turnAwayUntil = this.host.time() + 5;
     this.act = { kind: "type", t: 0, dur: fx.range(3, 6) };
     if (fx.chance(0.6)) this.after(0.2, () => this.say("chairBack", {}, true));
   }
@@ -1059,7 +1063,7 @@ export class Npc {
     // ---- look at
     let target: THREE.Vector3 | null = null;
     let soft = false;
-    if (this.lookPlayerUntil > time || this.talkUntil > time + 0.5 || this.convo) target = this.host.playerHead();
+    if (this.lookPlayerUntil > time || (this.talkUntil > time + 0.5 && time > this.turnAwayUntil) || this.convo) target = this.host.playerHead();
     else if (this.lookTarget && this.lookUntil > time) {
       target = this.lookTarget;
       soft = this.softLook;
