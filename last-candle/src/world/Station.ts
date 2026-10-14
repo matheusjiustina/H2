@@ -3,6 +3,7 @@ import type { Builder } from "./Builder";
 import { cyl, mergeByMaterial, plane, rbox, sphere } from "./geometry";
 import { L, type StationDef } from "./layout";
 import { colorMat, materials } from "./materials";
+import { screenGlowMat } from "./Dressing";
 import { stickerTex } from "./textures";
 
 export type MonitorKind = "crt" | "lcd4" | "lcdWide";
@@ -111,6 +112,21 @@ export class StationVisual {
     if (index % 3 === 1) {
       b.mesh(new THREE.TorusGeometry(0.08, 0.012, 6, 16, Math.PI), m.black, { pos: [-0.62, L.deskH - 0.08, deskCZ + 0.25], rot: [0, Math.PI / 2, Math.PI], parent: staticGroup });
     }
+    // cable runs: tower ↔ monitor and keyboard through a desk grommet, down to a floor power strip
+    const backZ = -(DESK_FRONT + L.deskDepth);
+    const side = index % 2 === 0 ? -1 : 1;
+    const tx = side * 0.48;
+    const gx = side * 0.3;
+    const dy = L.deskH + 0.004;
+    b.mesh(cyl(0.028, 0.028, 0.004, 14), m.black, { pos: [gx, L.deskH + 0.001, backZ + 0.09], parent: staticGroup });
+    this.wire(b, staticGroup, [[0, dy, backZ + 0.16], [gx * 0.5, dy, backZ + 0.13], [gx, dy, backZ + 0.09]]);
+    this.wire(b, staticGroup, [[tx, L.deskH + 0.04, backZ + 0.09], [tx - side * 0.06, dy, backZ + 0.08], [gx, dy, backZ + 0.09]]);
+    this.wire(b, staticGroup, [[-0.08, dy, deskCZ + 0.1], [-0.12, dy, deskCZ - 0.05], [gx * 0.6, dy, backZ + 0.2], [gx, dy, backZ + 0.09]]);
+    this.wire(b, staticGroup, [[gx, L.deskH - 0.03, backZ + 0.09], [gx + side * 0.02, 0.4, backZ + 0.11], [gx * 0.7, 0.03, backZ + 0.16]]);
+    b.mesh(rbox(0.3, 0.035, 0.06, 0.008), m.darkGrey, { pos: [gx * 0.45, 0.018, backZ + 0.18], parent: staticGroup });
+    b.mesh(sphere(0.006, 6, 4), m.ledAmber, { pos: [gx * 0.45 + 0.13, 0.036, backZ + 0.18], parent: staticGroup });
+    // the screen's light pooling on the desk
+    b.mesh(plane(0.95, 0.6), screenGlowMat(), { pos: [0, L.deskH + 0.002, backZ + 0.46], rot: [-Math.PI / 2, 0, 0], parent: staticGroup, receive: false });
     staticGroup.updateMatrixWorld(true);
 
     // World-space collision: desk footprint
@@ -142,6 +158,11 @@ export class StationVisual {
     // chair base (fixed) + swivel
     this.swivel.position.set(0, 0.47, 0);
     this.parts.chair.add(this.swivel);
+  }
+
+  private wire(b: Builder, parent: THREE.Object3D, pts: [number, number, number][]) {
+    const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)));
+    b.mesh(new THREE.TubeGeometry(curve, 12, 0.0045, 4, false), materials().cable, { parent, receive: false });
   }
 
   private cable(b: Builder, parent: THREE.Object3D, a: [number, number, number], c: [number, number, number]) {

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Builder } from "./Builder";
 import type { CollisionWorld } from "./Collision";
+import { dressContactShadows, spillMat } from "./Dressing";
 import { cyl, mergeByMaterial, mergeDeep, plane, rbox, sphere, worldUvBox } from "./geometry";
 import { L, SPOTS, STATIONS } from "./layout";
 import { colorMat, materials } from "./materials";
@@ -120,6 +121,7 @@ export function buildLanHouse(scene: THREE.Scene, collision: CollisionWorld): La
   const occluders = /^(wall|front|partition|corr|serverWall|serverDoor|door|wcBlock|storeBlock|racks|backShelf)/;
   for (const box of collision.boxes) if (box.tag && occluders.test(box.tag)) box.occludes = true;
 
+  dressContactShadows(b, collision);
   const calls = b.finalize();
   console.info(`[lanhouse] static batches: ${calls}`);
 
@@ -186,12 +188,14 @@ function buildStorefront(b: Builder) {
     g.position.set((x0 + x1) / 2, 0.35 + (H - 0.4) / 2 + 0.02, 0.06);
     g.renderOrder = 2;
     b.scene.add(g);
+    reflectTwin(g);
   }
   // transom over the door
   b.mesh(rbox(L.door.x1 - L.door.x0, 0.06, 0.1, 0.005), m.frame, { pos: [(L.door.x0 + L.door.x1) / 2, L.door.h, 0.06] });
   const tr = new THREE.Mesh(plane(L.door.x1 - L.door.x0, H - L.door.h - 0.08), m.glass);
   tr.position.set((L.door.x0 + L.door.x1) / 2, L.door.h + (H - L.door.h) / 2, 0.06);
   b.scene.add(tr);
+  reflectTwin(tr);
 
   // window lettering (mirrored from inside)
   const letter = new THREE.Mesh(plane(2.2, 0.55), new THREE.MeshBasicMaterial({ map: T.storefrontLetteringTex(), transparent: true, depthWrite: false }));
@@ -209,6 +213,17 @@ function buildStorefront(b: Builder) {
   b.scene.add(neonLabel);
 }
 
+/** Twin plane on top of a glass pane that adds subtle environment / light reflections. */
+function reflectTwin(src: THREE.Mesh) {
+  const r = new THREE.Mesh(src.geometry, materials().reflect);
+  r.position.copy(src.position);
+  r.rotation.copy(src.rotation);
+  r.scale.copy(src.scale);
+  r.renderOrder = src.renderOrder + 1;
+  src.parent?.add(r);
+  return r;
+}
+
 function buildCounter(b: Builder) {
   const m = materials();
   const c = L.counter;
@@ -219,6 +234,9 @@ function buildCounter(b: Builder) {
   b.mesh(rbox(c.x1 - c.x0 + 0.12, 0.04, len + 0.06, 0.01), m.laminate, { pos: [(c.x0 + c.x1) / 2 - 0.05, c.h - 0.02, cz], cast: true });
   // kick plate
   b.mesh(rbox(0.02, 0.1, len, 0.004), m.black, { pos: [c.x0 - 0.005, 0.05, cz] });
+  // focal accent: warm LED tucked under the counter-top lip
+  b.mesh(rbox(0.012, 0.008, len - 0.1, 0.003), m.ledWarm, { pos: [c.x0 - 0.075, c.h - 0.046, cz], receive: false });
+  b.mesh(plane(len - 0.1, 0.42), spillMat(), { pos: [c.x0 - 0.004, c.h - 0.26, cz], rot: [0, -Math.PI / 2, 0], receive: false });
   // return toward the right wall at the front end
   b.mesh(rbox(W - c.x1, c.h - 0.04, 0.5, 0.01), m.woodDark, { pos: [(c.x1 + W) / 2, (c.h - 0.04) / 2, c.z0 - 0.25], cast: true });
   b.mesh(rbox(W - c.x1 + 0.06, 0.04, 0.56, 0.01), m.laminate, { pos: [(c.x1 + W) / 2, c.h - 0.02, c.z0 - 0.25] });
@@ -404,6 +422,7 @@ function buildLounge(b: Builder) {
   const dglass = new THREE.Mesh(plane(dw - 0.12, L.door.h - 0.2), m.glass);
   dglass.position.set(-dw / 2, L.door.h / 2, 0.03);
   door.add(dglass);
+  reflectTwin(dglass);
   for (const [w, h, x, y] of [
     [dw, 0.08, -dw / 2, 0.04],
     [dw, 0.06, -dw / 2, L.door.h - 0.05],
@@ -621,6 +640,10 @@ function buildStairsAndMezz(b: Builder) {
   const rglass = new THREE.Mesh(plane(rx1 - rx0, 0.85), m.glass);
   rglass.position.set((rx0 + rx1) / 2, L.mezzY + 0.48, mz0 + 0.04);
   b.scene.add(rglass);
+  reflectTwin(rglass);
+  // focal accent: warm LED line under the mezzanine edge + a small backlit plaque
+  b.mesh(rbox(W * 2 - 0.3, 0.012, 0.025, 0.004), m.ledWarm, { pos: [0, L.mezzSlabBottom - 0.176, mz0 + 0.1], receive: false });
+  b.mesh(plane(1.1, 0.13), new THREE.MeshBasicMaterial({ map: T.labelTex("MEZZANINE • PREMIUM STATIONS", { w: 1024, h: 120, bg: "#16171a", fg: "#f2c88e", size: 54 }), toneMapped: false }), { pos: [-0.9, L.mezzSlabBottom - 0.06, mz0 + 0.121], receive: false });
   b.block(rx0, rx1, L.mezzY, L.mezzY + rh + 0.05, mz0 - 0.02, mz0 + 0.08, "mezzRail");
   // short side rail where the stairs arrive
   b.mesh(cyl(0.02, 0.02, rh, 8), m.metal, { pos: [s.x0 - 0.02, L.mezzY + rh / 2, mz0 - 0.5] });

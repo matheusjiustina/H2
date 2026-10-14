@@ -47,6 +47,10 @@ export interface MaterialLib {
   mousepad: THREE.MeshStandardMaterial;
   fridgeBody: THREE.MeshStandardMaterial;
   neonWarm: THREE.MeshStandardMaterial;
+  /** Soft warm LED strip (focal accents). */
+  ledWarm: THREE.MeshStandardMaterial;
+  /** Additive mirror layer for glass: only the environment / light reflections show. */
+  reflect: THREE.MeshStandardMaterial;
 }
 
 let lib: MaterialLib | null = null;
@@ -112,6 +116,8 @@ export function materials(): MaterialLib {
     mousepad: std("#1d2128", 0.95),
     fridgeBody: std("#d8d6cf", 0.45, 0.1),
     neonWarm: std("#ffb15c", 0.4, 0, { emissive: new THREE.Color("#ff9a3c"), emissiveIntensity: 2.4 }),
+    ledWarm: std("#ffd6a0", 0.4, 0, { emissive: new THREE.Color("#ffc27a"), emissiveIntensity: 1.5 }),
+    reflect: new THREE.MeshStandardMaterial({ color: "#ffffff", metalness: 1, roughness: 0.06, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, envMapIntensity: 0.22 }),
   };
   return lib;
 }

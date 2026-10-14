@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { damp } from "../core/math";
 import { capsule, cyl, mergeDeep, rbox, sphere } from "../world/geometry";
+import { blobMat } from "../world/Dressing";
 import { toonMat } from "../world/materials";
 import { canvas, drawCandleMark, FONT_UI, toTexture } from "../world/textures";
 
@@ -486,6 +487,14 @@ export class CharacterRig {
     };
     makeLeg(1);
     makeLeg(-1);
+
+    // soft contact shadow under the feet
+    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.62 * w, 0.5), blobMat(0.38));
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.012;
+    shadow.renderOrder = 1;
+    shadow.userData.keep = true;
+    this.root.add(shadow);
 
     this.face = { pupilL: eyeL.pupilPivot, pupilR: eyeR.pupilPivot, lidL: eyeL.lid, lidR: eyeR.lid, browL, browR, mouth, mouthOpen };
     mouth.userData.keep = true;

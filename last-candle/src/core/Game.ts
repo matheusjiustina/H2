@@ -135,6 +135,7 @@ export class Game {
     this.house = buildLanHouse(this.scene, this.collision);
     this.physics.addStatic(this.house.physicsBoxes);
     this.outside = new Outside(this.scene, this.house.lights.street, this.house.lights.car);
+    this.bakeReflections();
     this.player = new Player(this.camera, this.collision);
     this.player.onFootstep = () => this.audio.play("step", undefined, 0.5);
     this.hands = new Hands(this.settings.data.fov);
@@ -2070,6 +2071,33 @@ export class Game {
         if (this.player.mode === "terminal") this.standUp();
         else this.pause();
       } else inp.tap(code);
+    }
+  }
+
+  /**
+   * One-time environment capture from the middle of the shop: glass and chrome
+   * get subtle reflections of the room without any per-frame cost.
+   */
+  private bakeReflections() {
+    try {
+      const pm = new THREE.PMREMGenerator(this.renderer);
+      const env = pm.fromScene(this.scene, 0.03, 0.1, 40, { position: new THREE.Vector3(0.2, 1.6, -3.2), size: 128 }).texture;
+      pm.dispose();
+      const m = materials();
+      m.reflect.envMap = env;
+      for (const [mat, k] of [
+        [m.chrome, 0.7],
+        [m.metal, 0.45],
+        [m.frame, 0.35],
+        [m.glass, 0.6],
+      ] as const) {
+        mat.envMap = env;
+        mat.envMapIntensity = k;
+        mat.needsUpdate = true;
+      }
+      m.reflect.needsUpdate = true;
+    } catch (e) {
+      console.warn("[reflections] skipped", e);
     }
   }
 
