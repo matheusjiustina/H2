@@ -283,11 +283,19 @@ export class NpcManager {
   social(actor: Npc, ev: SocialEvent, vars: Record<string, string>) {
     const now = this.host.time();
     const id = actor.id;
-    const say = (n: Npc, kind: Overlay, line: LineKey | null, delay: number, prio: number, look?: () => THREE.Vector3, quiet = false) =>
+    const say = (n: Npc, kind: Overlay, line: LineKey | null, delay: number, prio: number, look?: () => THREE.Vector3, quiet = false) => {
+      // running gags need air: a comment line is reused at most every 4 minutes per character
+      const gag = line === "unplug" || line === "announcement" || line === "unrealized" || line === "neighborWin" || line === "neighborLoss" || line === "earlyWin";
+      if (gag && line && n.saidWithin(line, 240)) line = null;
+      if (!line && n !== actor && kind === "type") return;
       this.queue.push({ npc: n, kind, line, priority: prio, at: now + delay, vars, cascade: true, look, quiet });
+    };
     const nb = this.neighbors(actor, 4.4);
-    const watcher = nb[0] ?? null;
-    const focused = nb[1] ?? null;
+    // whoever is about as close gets to be the one who looks over
+    const d0 = nb.length ? Math.hypot(nb[0].x - actor.x, nb[0].z - actor.z) : 0;
+    const close = nb.filter((n) => Math.hypot(n.x - actor.x, n.z - actor.z) < d0 + 0.6);
+    const watcher = close.length ? fx.pick(close) : null;
+    const focused = nb.find((n) => n !== watcher) ?? null;
     switch (ev) {
       case "buy":
         if (fx.chance(actor.profile.energy)) say(actor, "type", "buy", 0.3, 1, undefined, actor.profile.energy < 0.5);

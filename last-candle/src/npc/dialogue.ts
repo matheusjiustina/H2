@@ -120,7 +120,7 @@ export const LINES: Record<string, Partial<Record<LineKey, string[]>>> = {
   },
   lurker: {
     announcement: ["Bro bought the announcement.", "Bought the announcement. Hm."],
-    unplug: ["Someone unplug his confidence."],
+    unplug: ["Someone unplug his confidence.", "He's celebrating a wick.", "Volume down. The chart can hear you."],
     unrealized: ["Unrealized. Emotionally realized."],
     neighborWin: ["Hm. He'll buy back higher.", "Quiet exit. Good."],
     neighborLoss: ["Noted.", "Smaller next time."],

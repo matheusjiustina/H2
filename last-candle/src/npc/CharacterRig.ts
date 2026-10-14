@@ -400,9 +400,18 @@ export class CharacterRig {
         mesh(sphere(hs * 0.22, 8, 6), accent, head, [0, hs * 1.28, 0.02]); // pom-pom
         break;
       case "hood":
-        mesh(sphere(hs * 1.18, 18, 12), toonMat(look.top), head, [0, hs * 0.1, hs * 0.22], [1.05, 1.08, 1.05]);
-        mesh(new THREE.TorusGeometry(hs * 0.95, hs * 0.13, 8, 20), toonMat(look.top), head, [0, -0.0, -hs * 0.62], [0.92, 1.08, 1]);
-        mesh(sphere(hs * 0.4, 10, 8), hairM, head, [0, hs * 0.55, -hs * 0.65], [1.6, 0.5, 0.6]);
+        {
+          // hood with an open front (dark lining inside) so the face stays readable
+          const outer = toonMat(look.top);
+          const lining = toonMat("#141518").clone();
+          lining.side = THREE.BackSide;
+          const open = 1.2;
+          const hood = new THREE.SphereGeometry(hs * 1.18, 22, 14, Math.PI * 1.5 + open, Math.PI * 2 - open * 2, 0, Math.PI * 0.8);
+          mesh(hood, outer, head, [0, hs * 0.08, hs * 0.16], [1.05, 1.08, 1.05]);
+          mesh(hood, lining, head, [0, hs * 0.08, hs * 0.16], [1.03, 1.06, 1.03]);
+          mesh(new THREE.TorusGeometry(hs * 1.0, hs * 0.11, 8, 22, Math.PI * 1.25), outer, head, [0, hs * 0.02, -hs * 0.72], [0.98, 1.12, 0.8], [0, 0, -Math.PI / 8]);
+          mesh(sphere(hs * 0.4, 10, 8), hairM, head, [0, hs * 0.6, -hs * 0.62], [1.6, 0.45, 0.6]);
+        }
         break;
       case "bald":
         mesh(sphere(hs * 0.45, 10, 8), hairM, head, [hs * 0.72, hs * 0.05, hs * 0.25], [0.5, 0.9, 1.1]);

@@ -225,6 +225,7 @@ export class Npc {
   private waitT = 0;
   private propInHand: THREE.Object3D | null = null;
   private used = new Map<LineKey, number>();
+  private keyAt = new Map<LineKey, number>();
   readonly circle: DynCircle;
   /** When >0 the NPC was recently hit and is annoyed at the player. */
   annoyed = 0;
@@ -337,8 +338,15 @@ export class Npc {
   say(key: LineKey, vars: Record<string, string> = {}, quiet = false, loud = false): boolean {
     const t = this.line(key, vars);
     if (!t) return false;
+    this.keyAt.set(key, this.host.time());
     this.host.say(this, t, quiet, loud);
     return true;
+  }
+
+  /** Used this kind of line in the last `sec` seconds (keeps running gags from wearing out). */
+  saidWithin(key: LineKey, sec: number): boolean {
+    const t = this.keyAt.get(key);
+    return t !== undefined && this.host.time() - t < sec;
   }
 
   sayText(t: string, quiet = false, loud = false) {
@@ -1196,7 +1204,7 @@ export class Npc {
     } else if (kind === "sigh") {
       this.play("sigh", 2.6, true);
       this.host.sfx("sigh", this.rig.headWorld(), 0.4);
-    } else if (kind === "explain" && fx.chance(0.4)) {
+    } else if (kind === "explain" && fx.chance(0.25)) {
       this.say("explain", {}, true);
     }
   }
