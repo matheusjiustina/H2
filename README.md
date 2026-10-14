@@ -64,3 +64,7 @@ src/
 ## Observação importante
 
 Os produtos em `src/data/products.ts` são **fictícios**, usados apenas para validar o layout (preços, condição, disponibilidade e fotos ilustrativas). Substitua pelo catálogo real antes de divulgar o site.
+
+## LAST CANDLE (jogo)
+
+A pasta [`last-candle/`](last-candle/) contém um jogo 3D independente para navegador (Vite + Three.js + TypeScript), com toolchain própria e excluído do build do site. Veja [`last-candle/README.md`](last-candle/README.md) para rodar (`cd last-candle && npm install && npm run dev`).

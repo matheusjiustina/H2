@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone browser game with its own toolchain (see last-candle/README.md)
+    "last-candle/**",
   ]),
 ]);
 
