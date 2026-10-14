@@ -374,6 +374,13 @@ export class CharacterRig {
     mouth.userData.keep = true;
     mouthOpen.userData.keep = true;
     mergeDeep(this.root);
+    // tiny face details don't need to cast shadows
+    this.root.traverse((o) => {
+      const mm = o as THREE.Mesh;
+      if (!mm.isMesh) return;
+      mm.geometry.computeBoundingSphere();
+      if ((mm.geometry.boundingSphere?.radius ?? 1) < 0.05) mm.castShadow = false;
+    });
     this.eyeHeight = this.hipHeight + 0.05 * s + torsoH * 0.78 + 0.1 * s + 0.1 + hs * 0.9 + hs * 0.18;
     this.root.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).receiveShadow = false;

@@ -1,6 +1,6 @@
 import * as CANNON from "cannon-es";
 import * as THREE from "three";
-import { cyl, rbox, sphere } from "../world/geometry";
+import { cyl, mergeByMaterial, rbox, sphere } from "../world/geometry";
 import { L } from "../world/layout";
 import { colorMat, materials } from "../world/materials";
 import * as T from "../world/textures";
@@ -75,9 +75,16 @@ const matOnce = (key: string, make: () => THREE.Material) => {
 function buildMesh(kind: PropKind, data: Record<string, unknown>): THREE.Group {
   const g = new THREE.Group();
   const m = materials();
+  // one private clone per source material, so the prop can glow alone and still merge its parts
+  const own = new Map<THREE.Material, THREE.Material>();
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, pos: [number, number, number] = [0, 0, 0], rot: [number, number, number] = [0, 0, 0]) => {
-    const mesh = new THREE.Mesh(geo, mat.clone());
-    (mesh.material as THREE.Material).userData.ownGlow = true;
+    let mm = own.get(mat);
+    if (!mm) {
+      mm = mat.clone();
+      mm.userData.ownGlow = true;
+      own.set(mat, mm);
+    }
+    const mesh = new THREE.Mesh(geo, mm);
     mesh.position.set(...pos);
     mesh.rotation.set(...rot);
     mesh.castShadow = true;
@@ -167,6 +174,7 @@ function buildMesh(kind: PropKind, data: Record<string, unknown>): THREE.Group {
       break;
     }
   }
+  mergeByMaterial(g);
   return g;
 }
 

@@ -2,14 +2,15 @@
   "name": "last-candle",
   "private": true,
   "version": "0.1.0",
-  "description": "LAST CANDLE — Degen LAN House. A first-person 3D browser game with a fully simulated market.",
+  "description": "LAST CANDLE \u2014 Degen LAN House. A first-person 3D browser game with a fully simulated market.",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:single": "tsc --noEmit && node scripts/build-single.mjs"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "5.3.0",

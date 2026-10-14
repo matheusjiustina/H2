@@ -223,9 +223,9 @@ export class Game {
     }
     this.events = new EventDirector(this);
     registerWorldInteractables(this, this.ws);
-    this.progress.onLoadoutChange = (lo) => {
+    this.progress.onLoadoutChange = () => {
       const st = this.house.stations.get(this.progress.d.homeStation);
-      st?.applyLoadout(lo);
+      st?.applyLoadout(this.effectiveLoadout());
       this.refreshScreens(true);
     };
   }
@@ -396,7 +396,13 @@ export class Game {
             const a = b.dataset.act;
             if (a === "continue") this.begin(true);
             else if (a === "new") {
-              if (save && !confirm("Start over? Your current progress will be replaced.")) return;
+              // two-step confirmation inside the panel (browser confirm() is not available everywhere)
+              if (save && b.dataset.armed !== "1") {
+                b.dataset.armed = "1";
+                b.textContent = "Click again to replace your save";
+                b.classList.add("danger");
+                return;
+              }
               SaveStore.clear();
               this.begin(false);
             } else if (a === "settings") this.openSettings(() => this.showTitle());
@@ -482,7 +488,11 @@ export class Game {
               this.standUpInstant();
               this.showTitle();
             } else if (a === "reset") {
-              if (!confirm("Delete your save and start a brand-new first night?")) return;
+              if (b.dataset.armed !== "1") {
+                b.dataset.armed = "1";
+                b.textContent = "Click again to delete your save";
+                return;
+              }
               SaveStore.clear();
               this.ui.closePanel();
               this.audio.suspend(false);
@@ -624,6 +634,7 @@ export class Game {
   }
 
   private shadowFrame = 0;
+  private lightBase = new Map<THREE.Light, number>();
   private terminalT = 0;
   walkNudged = false;
 
@@ -679,7 +690,7 @@ export class Game {
     this.holding.update(dt, aimingBoard);
 
     // prompts
-    if (this.ui.dialogOpen) {
+    if (this.ui.dialogOpen || this.hands.inspecting) {
       this.ui.setPrompt(null);
     } else if (cur) {
       this.ui.setPrompt(cur.it.label(), cur.it.hint?.() ?? (held ? this.heldHint() : null));
@@ -1224,6 +1235,12 @@ export class Game {
     });
   }
 
+  /** The home station's loadout; premium mezzanine desks never get the old CRT. */
+  effectiveLoadout() {
+    const d = this.progress.d;
+    return { ...d.loadout, monitor: d.homeStation === "mz1" && d.loadout.monitor === "crt" ? ("lcdWide" as const) : d.loadout.monitor };
+  }
+
   private applyMezz() {
     const on = this.progress.owns("mezz");
     const g = this.house.chainGate;
@@ -1235,7 +1252,7 @@ export class Game {
       this.progress.d.homeStation = "mz1";
     }
     const home = this.house.stations.get(this.progress.d.homeStation)!;
-    home.applyLoadout({ ...this.progress.d.loadout, monitor: this.progress.d.homeStation === "mz1" && this.progress.d.loadout.monitor === "crt" ? "lcdWide" : this.progress.d.loadout.monitor });
+    home.applyLoadout(this.effectiveLoadout());
     if (this.progress.d.homeStation === "mz1") this.terminalStation = home;
   }
 
@@ -1547,10 +1564,15 @@ export class Game {
     if (Math.sin(this.time * 0.37) > 0.995) fv = Math.random() > 0.5 ? 0.2 : 1;
     flu.intensity = 3.0 * fv;
     if (this.flicker > 0) {
+      // dim/restore intensities (never toggle visibility: that would recompile every shader)
+      if (!this.lightBase.size) for (const l of h.lights.all) if (l instanceof THREE.PointLight && l !== h.lights.car) this.lightBase.set(l, l.intensity);
       this.flicker -= dt;
       const on = Math.floor(this.flicker * 8) % 2 === 0;
-      for (const l of h.lights.all) if (l instanceof THREE.PointLight && l !== h.lights.car) l.visible = on;
-      if (this.flicker <= 0) for (const l of h.lights.all) l.visible = true;
+      for (const [l, base] of this.lightBase) l.intensity = on ? base : base * 0.08;
+      if (this.flicker <= 0) {
+        for (const [l, base] of this.lightBase) l.intensity = base;
+        this.lightBase.clear();
+      }
     }
     // server rack LEDs
     this.ledT += dt;
@@ -1682,7 +1704,7 @@ export class Game {
       show: showHud,
     });
     this.ui.setObjective(this.player.mode === "terminal" ? null : this.objectiveText());
-    this.ui.setTouchVisible(this.player.mode === "walk");
+    this.ui.setTouchVisible(this.player.mode === "walk" ? "walk" : this.player.mode === "terminal" ? "terminal" : "none");
   }
 
   // =================================================================== night cycle
@@ -1821,7 +1843,7 @@ export class Game {
       // stations
       for (const st of this.house.stations.values()) st.applyLoadout({ ...BASE_LOADOUT, monitor: st.def.monitor });
       this.applyMezz();
-      this.house.stations.get(this.progress.d.homeStation)!.applyLoadout(this.progress.d.homeStation === "mz1" && this.progress.d.loadout.monitor === "crt" ? { ...this.progress.d.loadout, monitor: "lcdWide" } : this.progress.d.loadout);
+      this.house.stations.get(this.progress.d.homeStation)!.applyLoadout(this.effectiveLoadout());
       this.terminalStation = this.house.stations.get(this.progress.d.homeStation)!;
       // props
       for (const p of [...this.props.props]) {

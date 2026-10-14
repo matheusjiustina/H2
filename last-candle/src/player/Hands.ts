@@ -9,6 +9,8 @@ const CUFF = "#454a52";
 
 interface HandRig {
   root: THREE.Group; // wrist pivot (animated)
+  arm: THREE.Mesh; // forearm sleeve, stretched from wrist to an off-screen shoulder anchor
+  shoulder: THREE.Vector3;
   fingers: { base: THREE.Group; mid: THREE.Group }[];
   thumb: { base: THREE.Group; mid: THREE.Group };
   grip: THREE.Group; // attachment point for held objects
@@ -59,7 +61,7 @@ export class Hands {
     this.scene.add(rim);
     this.right = this.buildHand(1);
     this.left = this.buildHand(-1);
-    this.camera.add(this.right.root, this.left.root);
+    this.camera.add(this.right.root, this.left.root, this.right.arm, this.left.arm);
     this.right.root.visible = false;
     this.left.root.visible = false;
   }
@@ -69,11 +71,9 @@ export class Hands {
     const skin = toonMat(SKIN);
     const sleeve = toonMat(SLEEVE);
     const cuff = toonMat(CUFF);
-    // forearm sleeve going back toward the elbow (+z, down)
-    const arm = new THREE.Mesh(cyl(0.05, 0.062, 0.42, 14), sleeve);
-    arm.rotation.x = Math.PI / 2 - 0.15;
-    arm.position.set(0.0, -0.035, 0.23);
-    root.add(arm);
+    // forearm sleeve: lives on the camera and is aimed at an off-screen shoulder every frame
+    const arm = new THREE.Mesh(cyl(0.05, 0.064, 1, 14), sleeve);
+    arm.frustumCulled = false;
     const cf = new THREE.Mesh(cyl(0.052, 0.052, 0.045, 14), cuff);
     cf.rotation.x = Math.PI / 2 - 0.15;
     cf.position.set(0, -0.005, 0.03);
@@ -131,7 +131,7 @@ export class Hands {
     root.traverse((o) => {
       o.frustumCulled = false;
     });
-    return { root, fingers, thumb: { base: tb, mid: tm }, grip, pos: new THREE.Vector3(0.3 * side, -0.6, -0.4), quat: new THREE.Quaternion(), gripV: 0, visible: 0 };
+    return { root, arm, shoulder: new THREE.Vector3(0.42 * side, -0.62, 0.12), fingers, thumb: { base: tb, mid: tm }, grip, pos: new THREE.Vector3(0.3 * side, -0.6, -0.4), quat: new THREE.Quaternion(), gripV: 0, visible: 0 };
   }
 
   setFov(fov: number, aspect: number) {
@@ -359,6 +359,14 @@ export class Hands {
     h.root.position.copy(h.pos);
     h.root.quaternion.copy(h.quat);
     h.root.visible = h.visible > 0.02;
+    // forearm from just behind the wrist to the shoulder anchor
+    const wrist = new THREE.Vector3(0, -0.01, 0.03).applyQuaternion(h.quat).add(h.pos);
+    const dir = h.shoulder.clone().sub(wrist);
+    const len = dir.length();
+    h.arm.position.copy(wrist).addScaledVector(dir, 0.5);
+    h.arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize().negate());
+    h.arm.scale.set(1, len, 1);
+    h.arm.visible = h.root.visible;
     h.gripV += (grip - h.gripV) * damp(16, dt);
     const g = h.gripV;
     for (const f of h.fingers) {

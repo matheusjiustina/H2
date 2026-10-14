@@ -278,7 +278,10 @@ export class UI {
     });
   }
 
-  setTouchVisible(on: boolean) {
-    this.touch.style.display = this.touchMode && on ? "block" : "none";
+  setTouchVisible(mode: "walk" | "terminal" | "none") {
+    this.touch.style.display = this.touchMode && mode !== "none" ? "block" : "none";
+    this.touch.classList.toggle("terminal-only", mode === "terminal");
+    const esc = this.touch.querySelector<HTMLButtonElement>("button[data-code=Escape]");
+    if (esc) esc.textContent = mode === "terminal" ? "STAND UP" : "☰";
   }
 }

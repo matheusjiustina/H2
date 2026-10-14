@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Builder } from "./Builder";
 import type { CollisionWorld } from "./Collision";
-import { cyl, plane, rbox, sphere, worldUvBox } from "./geometry";
+import { cyl, mergeByMaterial, mergeDeep, plane, rbox, sphere, worldUvBox } from "./geometry";
 import { L, SPOTS, STATIONS } from "./layout";
 import { colorMat, materials } from "./materials";
 import { StationVisual } from "./Station";
@@ -367,6 +367,7 @@ function buildLounge(b: Builder) {
     blade.rotation.z = -(i / 3) * Math.PI * 2;
     rotor.add(blade);
   }
+  mergeDeep(fanRoot);
   const fanHit = new THREE.Mesh(rbox(0.5, 1.3, 0.5, 0), new THREE.MeshBasicMaterial({ visible: false }));
   fanHit.position.y = 0.65;
   fanRoot.add(fanHit);
@@ -417,6 +418,7 @@ function buildLounge(b: Builder) {
   bar.rotation.z = Math.PI / 2;
   bar.position.set(-dw / 2, 1.0, -0.02);
   door.add(bar);
+  mergeByMaterial(door);
   b.solid(L.door.x0, L.door.x1, 0, L.door.h, -0.02, 0.2, "door");
 
   return {
@@ -511,7 +513,7 @@ function buildDividers(b: Builder) {
     b.mesh(rbox(span, 0.03, 0.06, 0.01), m.darkGrey, { pos: [(x0 + x1) / 2, h, z] });
     b.block(x0, x1, 0, h, z - 0.03, z + 0.03, "divider");
   }
-  const rz = [-4.7, -6.1, -7.5, -8.9];
+  const rz = [-4.5, -5.9, -7.3, -8.7];
   for (const z of rz) {
     const x1 = W;
     const x0 = W - span;
@@ -529,7 +531,7 @@ function buildDividers(b: Builder) {
     b.mesh(new THREE.TubeGeometry(curve, 8, 0.01, 5), m.cable, { receive: false });
     b.mesh(rbox(0.05, 0.04, 0.35, 0.01), m.beige, { pos: [-W + 0.06, 0.03, z + 0.2] });
   }
-  for (const z of [-5.4, -6.8, -8.2]) {
+  for (const z of [-5.2, -6.6, -8.0]) {
     const curve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(W - 0.05, 0.05, z + 0.5),
       new THREE.Vector3(W - 0.08, 0.35, z + 0.15),
@@ -599,6 +601,7 @@ function buildStairsAndMezz(b: Builder) {
   const sign = new THREE.Mesh(plane(0.3, 0.41), new THREE.MeshStandardMaterial({ map: T.posterTex("mezz"), roughness: 0.7 }));
   sign.position.set((s.x0 + s.x1) / 2, 0.55, s.zBottom + 0.12);
   gate.add(sign);
+  mergeByMaterial(gate);
   const collider = b.solid(s.x0, s.x1, 0, 1.2, s.zBottom + 0.04, s.zBottom + 0.16, "chainGate");
 
   // mezzanine slab
@@ -734,6 +737,9 @@ function buildBack(b: Builder) {
     num.position.set(-0.012, 0.55, -0.19);
     num.rotation.y = -Math.PI / 2;
     door.add(num);
+    panel.userData.keep = true;
+    num.userData.keep = true;
+    mergeByMaterial(door);
     lockers.push({ door, hit: panel, index: i, inside: new THREE.Vector3(lx, 1.1, z) });
   }
 
@@ -955,11 +961,11 @@ function buildLights(b: Builder, lampPos: THREE.Vector3) {
   server.position.set(0.2, 2.0, -19.6);
 
   // mezzanine warm light
-  b.mesh(cyl(0.006, 0.006, 0.6, 4), m.black, { pos: [-0.5, L.ceiling - 0.3, -15.6] });
-  b.mesh(new THREE.ConeGeometry(0.22, 0.18, 18, 1, true), m.lampShade, { pos: [-0.5, L.ceiling - 0.62, -15.6] });
-  b.mesh(sphere(0.05, 10, 8), m.bulb, { pos: [-0.5, L.ceiling - 0.68, -15.6] });
+  b.mesh(cyl(0.006, 0.006, 0.6, 4), m.black, { pos: [0.5, L.ceiling - 0.3, -15.6] });
+  b.mesh(new THREE.ConeGeometry(0.22, 0.18, 18, 1, true), m.lampShade, { pos: [0.5, L.ceiling - 0.62, -15.6] });
+  b.mesh(sphere(0.05, 10, 8), m.bulb, { pos: [0.5, L.ceiling - 0.68, -15.6] });
   const mezz = add(new THREE.PointLight("#ffcf98", 5.5, 8, 1.6));
-  mezz.position.set(-0.5, L.ceiling - 0.8, -15.6);
+  mezz.position.set(0.5, L.ceiling - 0.8, -15.6);
 
   // candle (secret) tiny light
   const candle = add(new THREE.PointLight("#ffb860", 0.6, 1.6, 2));

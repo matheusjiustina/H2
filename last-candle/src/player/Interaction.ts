@@ -81,7 +81,8 @@ export class Interaction {
     let best: Hit | null = null;
     const occ = this.collision.occlusion(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 4);
     for (const h of hits) {
-      if (h.distance > occ + 0.02) break;
+      // small margin: doors and boards sit on the surface of their own occluder
+      if (h.distance > occ + 0.1) break;
       const it = this.byTarget.get(h.object);
       if (!it) continue;
       if (it.enabled && !it.enabled()) continue;

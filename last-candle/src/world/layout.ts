@@ -24,7 +24,7 @@ export const L = {
   corridorHalfW: 0.8,
   serverZ: -18.6,
   door: { x0: -0.4, x1: 0.8, h: 2.3 },
-  stairs: { x0: 2.25, x1: 3.2, zBottom: -9.0, zTop: -13.0 },
+  stairs: { x0: 2.25, x1: 3.2, zBottom: -9.4, zTop: -13.0 },
   counter: { x0: 1.3, x1: 1.9, z0: -0.9, z1: -3.5, h: 1.05 },
   deskDepth: 0.75,
   deskH: 0.74,
@@ -48,7 +48,7 @@ const LEFT_FACING = Math.PI / 2;
 const RIGHT_FACING = -Math.PI / 2;
 
 const leftZ = [-4.8, -6.2, -7.6, -9.0, -10.4, -11.8];
-const rightZ = [-5.4, -6.8, -8.2];
+const rightZ = [-5.2, -6.6, -8.0];
 
 export const STATIONS: StationDef[] = [
   ...leftZ.map((z, i) => ({
@@ -120,5 +120,5 @@ export const SPOTS = {
   corridor: { x: 0, z: -15.2 },
   doorInside: { x: 0.2, z: -1.0 },
   doorOutside: { x: 0.2, z: 1.2 },
-  stairBottom: { x: 2.7, z: -8.7 },
+  stairBottom: { x: 2.7, z: -9.0 },
 };

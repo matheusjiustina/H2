@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #14120f;
   --ink: #efe6d2;
   --muted: #a69c88;
@@ -101,7 +102,14 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 .touch .look-zone { position: absolute; right: 0; top: 0; width: 55%; height: 70%; pointer-events: auto; touch-action: none; }
 .touch .tbtns { position: absolute; right: 16px; bottom: 24px; display: grid; grid-template-columns: repeat(3, 58px); gap: 10px; pointer-events: auto; }
 .touch .tbtns button { height: 58px; border-radius: 50%; background: rgba(20,18,15,0.7); border: 1px solid var(--line); color: var(--ink); font: 600 13px var(--mono); touch-action: none; }
+.touch.terminal-only .stick, .touch.terminal-only .look-zone, .touch.terminal-only .tbtns button:not([data-code=Escape]) { display: none; }
+.touch.terminal-only .tbtns { grid-template-columns: 72px; }
+.touch.terminal-only .tbtns button[data-code=Escape] { border-radius: 14px; font-size: 12px; }
+.touch-on .subtitle { bottom: 210px; font-size: 15px; }
+.touch-on .center-hint { display: none; }
 @media (max-width: 640px) {
+  .toasts { top: 92px; width: calc(100vw - 24px); }
+  .toast { font-size: 13px; text-align: center; }
   .hud { font-size: 11px; gap: 6px; left: 8px; top: 8px; padding: 5px 8px; flex-wrap: wrap; max-width: calc(100vw - 16px); }
   .objective { top: 64px; left: 8px; font-size: 12px; }
   .title h1 { font-size: 38px; }
