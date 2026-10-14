@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Game } from "../core/Game";
 import { bus } from "../core/EventBus";
 import { fx } from "../core/rng";
+import { Whiteboard } from "../systems/Whiteboard";
 import { Interaction } from "../player/Interaction";
 import type { Prop } from "../physics/Props";
 import { rbox } from "./geometry";
@@ -151,17 +152,32 @@ export function registerWorldInteractables(g: Game, ws: WorldState) {
     targets: [h.whiteboard],
     highlight: null,
     label: () => {
-      if (g.holding.held?.def.use === "draw") return "Whiteboard";
-      return g.whiteboard.strokes.length ? "Wipe the whiteboard" : "Whiteboard";
+      const wb = g.whiteboard;
+      if (wb.wiping) return "Whiteboard";
+      if (wb.playerStrokes) return "Wipe your corner";
+      if (wb.hasTheory) return "Erase the Wizard's theory";
+      return "Whiteboard";
     },
-    hint: () => (g.holding.held?.def.use === "draw" ? "Hold LMB to draw • E wipe" : "Grab the marker from the tray to draw"),
+    hint: () => {
+      if (g.holding.held?.def.use !== "draw") return "Grab a marker from the tray to draw in the guest corner";
+      const uv = g.interaction.current?.uv;
+      const inZone = !!uv && !!Whiteboard.toPlayerZone(uv.x, uv.y);
+      return inZone ? "Hold LMB to draw" : "Draw in the GUEST CORNER (right side)";
+    },
     range: 2.6,
     onInteract: () => {
-      if (g.whiteboard.startWipe()) {
+      const wb = g.whiteboard;
+      const theirs = !wb.playerStrokes && wb.hasTheory;
+      if (wb.startWipe(wb.playerStrokes ? "p" : "w")) {
         g.hands.playLeft("wipe", 1.5);
         g.audio.play("wipe", h.whiteboard.position);
         bus.emit("player:boardWiped", {});
         g.taskProgress("wipe", 1);
+        const wiz = g.npcs.get("wizard");
+        if (theirs && wiz.present) {
+          wiz.lookAtPlayer(3);
+          wiz.sayText(fx.pick(["My theory! ...Fine. I'll draw a better one.", "That was peer-reviewed. By me.", "Erased? The pattern lives on. In here."]));
+        }
       }
     },
   });
@@ -173,9 +189,10 @@ export function registerWorldInteractables(g: Game, ws: WorldState) {
     targets: [h.printer.hit],
     highlight: h.printer.body,
     label: () => {
+      if (g.printJob) return "Printing…";
       const t = g.portfolio.lastClosedTrade();
       if (!t) return "Thermal printer — close a trade to print it";
-      return `Print receipt • TRADE #${String(t.id).padStart(4, "0")}`;
+      return `${g.progress.d.printed.includes(t.id) ? "Reprint" : "Print"} receipt • TRADE #${String(t.id).padStart(4, "0")}`;
     },
     range: 2.2,
     onInteract: () => g.printReceipt(),

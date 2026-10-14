@@ -76,7 +76,9 @@ export interface NpcHost {
   playerSeatedAt(): string | null;
   say(npc: Npc, text: string, quiet?: boolean, loud?: boolean): void;
   sfx(name: string, pos: THREE.Vector3, vol?: number): void;
-  onWizardDraw(npc: Npc, dt: number): void;
+  /** Advance the Wizard's drawing; true while there is still something to draw. */
+  onWizardDraw(npc: Npc, dt: number): boolean;
+  onWizardVisit(npc: Npc): void;
   onNpcTrade(npc: Npc, side: "BUY" | "SELL", pnlPct: number): void;
   onNpcPrintFlex(npc: Npc): void;
   onNpcDrinkDone(npc: Npc): void;
@@ -246,6 +248,7 @@ export class Npc {
   vowed = false;
   /** Chair turned toward the player for a conversation. */
   convo = false;
+  private explained = false;
   private timers: { at: number; fn: () => void }[] = [];
   private readonly posture: Posture;
 
@@ -1484,8 +1487,20 @@ export class Npc {
       if (fx.chance(0.5)) this.say("fridge", {}, true);
     }
     if (kind === "whiteboard") {
-      if (!this.overlay && t > 0.5) this.play("draw", 3);
-      this.host.onWizardDraw(this, _dt);
+      // THE WHITEBOARD THEORY: draw it, then step back and explain it with great enthusiasm
+      if (t > 0.5 && t - _dt <= 0.5) {
+        this.host.onWizardVisit(this);
+        this.explained = false;
+      }
+      if (t > 0.5) {
+        const drawing = (!this.overlay || this.overlay.kind === "draw") && this.host.onWizardDraw(this, _dt);
+        if (drawing && !this.overlay) this.play("draw", 3);
+        else if (!drawing && !this.explained && (!this.overlay || this.overlay.kind === "draw")) {
+          this.explained = true;
+          this.play("explain", 3.6);
+          if (this.talkUntil < this.host.time()) this.say("board", {}, false);
+        }
+      }
       if (t > 1 && t - _dt <= 1) {
         const pf = this.host.playerFeet();
         // asks for board space if the player is hogging it

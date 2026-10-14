@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { ASSETS } from "../market/assets";
 import { fmtUsd, fmtClock, fmtPct } from "../market/format";
 import { MarketEngine } from "../market/MarketEngine";
-import { Portfolio } from "../market/Portfolio";
+import { Portfolio, type TradeRecord } from "../market/Portfolio";
 import { NAME_COLORS } from "../npc/dialogue";
 import type { Npc } from "../npc/Npc";
 import { NpcManager } from "../npc/NpcManager";
@@ -68,6 +68,7 @@ export class Game {
   screens!: Screens;
   npcs!: NpcManager;
   whiteboard!: Whiteboard;
+  printJob: { t: number; root: THREE.Group; pivot: THREE.Group; paper: THREE.Group; trade: TradeRecord; tex: THREE.CanvasTexture } | null = null;
   events!: EventDirector;
   readonly ws: WorldState = {
     fridgeOpen: false,
@@ -190,6 +191,7 @@ export class Game {
         playerSeatedAt: () => this.seat?.def.id ?? null,
         sfx: (name, pos, vol) => this.audio.play(name, pos, vol),
         onWizardDraw: (_n, dt) => this.whiteboard.wizardDraw(dt),
+        onWizardVisit: () => this.whiteboard.beginWizardVisit(),
         onNpcTrade: (n, side, pnl) => this.onNpcTrade(n, side, pnl),
         onNpcPrintFlex: (n) => this.npcPrintFlex(n),
         onNpcDrinkDone: (n) => this.npcLeftCan(n),
@@ -596,6 +598,7 @@ export class Game {
     this.npcs.update(dt, this.time, this.camera.position);
     this.events.update(dt);
     this.whiteboard.update(dt);
+    this.updatePrintJob(dt);
     this.updateIntro(dt);
     this.worldAnim(dt);
     this.outside.update(dt);
@@ -676,14 +679,15 @@ export class Game {
 
     // whiteboard drawing with the marker
     const aimingBoard = !!cur && cur.it.id === "whiteboard" && held?.def.use === "draw";
-    if (aimingBoard && inp.lmb && cur?.uv) {
+    if (aimingBoard && inp.lmb && cur?.uv && (this.whiteboard.drawing || Whiteboard.toPlayerZone(cur.uv.x, cur.uv.y))) {
       if (!this.whiteboard.drawing) {
-        this.whiteboard.begin(cur.uv.x, cur.uv.y, String(held!.data.color ?? "#1b1b1b"));
-        this.progress.completeGoal("draw");
-        bus.emit("player:drew", {});
+        if (this.whiteboard.begin(cur.uv.x, cur.uv.y, String(held!.data.color ?? "#1b1b1b"))) {
+          this.progress.completeGoal("draw");
+          bus.emit("player:drew", {});
+        }
       } else this.whiteboard.extend(cur.uv.x, cur.uv.y);
-      this.hands.drawing = true;
-      this.audio.play("marker", cur.point, 0.6);
+      this.hands.drawing = this.whiteboard.drawing;
+      if (this.whiteboard.drawing) this.audio.play("marker", cur.point, 0.6);
     } else if (this.whiteboard.drawing) {
       this.whiteboard.end();
       this.hands.drawing = false;
@@ -1334,7 +1338,9 @@ export class Game {
 
   // =================================================================== receipts
 
+  /** THE RECEIPT WALK, step 1: the thermal printer feeds the paper out, header first. */
   printReceipt() {
+    if (this.printJob) return;
     const t = this.portfolio.lastClosedTrade();
     if (!t) {
       bus.emit("toast", { text: "Nothing to print yet. Close a trade first." });
@@ -1343,17 +1349,56 @@ export class Game {
     this.hands.play("press", 0.35);
     const slot = this.house.printer.slot.clone();
     this.audio.play("printer", slot);
-    this.events.at(1.3, () => {
-      const tex = receiptTexture(receiptFromTrade(t, this.market.config(t.assetId).decimals));
-      const p = this.props.spawn("receipt", slot.clone().add(new THREE.Vector3(-0.06, 0.02, 0)), { data: { tradeId: t.id, texture: tex } });
-      p.body.velocity.set(-0.6, 0.4, 0);
-      p.home = null;
-      this.registerProp(p);
-      if (!this.progress.d.printed.includes(t.id)) this.progress.d.printed.push(t.id);
-      this.progress.completeGoal("print");
-      bus.emit("receipt:printed", { tradeId: t.id });
-      this.events.onPrinted((t.realizedPnl ?? 0) >= 0);
+    const tex = receiptTexture(receiptFromTrade(t, this.market.config(t.assetId).decimals));
+    // slot faces -x: root turns local -z toward the customer; the pivot lets the paper droop
+    const root = new THREE.Group();
+    root.position.copy(slot);
+    root.rotation.y = Math.PI / 2;
+    const pivot = new THREE.Group();
+    root.add(pivot);
+    const paper = new THREE.Group();
+    pivot.add(paper);
+    const sheet = new THREE.Mesh(rbox(0.09, 0.003, 0.195, 0.001), new THREE.MeshStandardMaterial({ color: "#f3efe4", roughness: 0.95 }));
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.087, 0.19), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }));
+    face.position.y = 0.0021;
+    face.rotation.x = -Math.PI / 2;
+    sheet.castShadow = true;
+    paper.add(sheet, face);
+    paper.position.z = 0.195 / 2;
+    this.scene.add(root);
+    this.printJob = { t: 0, root, pivot, paper, trade: t, tex };
+  }
+
+  private updatePrintJob(dt: number) {
+    const j = this.printJob;
+    if (!j) return;
+    j.t += dt;
+    const L = 0.195;
+    const k = Math.min(1, Math.max(0, (j.t - 0.25) / 1.5));
+    // the part still inside is hidden by the printer body
+    j.paper.position.z = -(L * k - L / 2);
+    j.pivot.rotation.x = -0.55 * k * k * k;
+    if (j.t < 2.0) return;
+    // tear it off: from here on it's a real, physical receipt resting on the lip
+    j.paper.updateMatrixWorld(true);
+    const pos = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    j.paper.matrixWorld.decompose(pos, quat, new THREE.Vector3());
+    j.root.removeFromParent();
+    j.paper.traverse((o) => {
+      const mm = (o as THREE.Mesh).material as THREE.Material | undefined;
+      mm?.dispose();
     });
+    const t = j.trade;
+    const p = this.props.spawn("receipt", pos, { quat, data: { tradeId: t.id, texture: j.tex }, sleep: true });
+    p.home = null;
+    this.registerProp(p);
+    this.printJob = null;
+    this.audio.play("crumple", pos, 0.25);
+    if (!this.progress.d.printed.includes(t.id)) this.progress.d.printed.push(t.id);
+    this.progress.completeGoal("print");
+    bus.emit("receipt:printed", { tradeId: t.id });
+    this.events.onPrinted((t.realizedPnl ?? 0) >= 0);
   }
 
   pinReceipt(p: Prop, point: THREE.Vector3) {

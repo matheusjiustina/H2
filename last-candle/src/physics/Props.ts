@@ -217,7 +217,7 @@ function buildBody(kind: PropKind, def: PropDef, mat: CANNON.Material): CANNON.B
   return b;
 }
 
-const CAPS: Partial<Record<PropKind, number>> = { paper: 10, can: 14, trash: 8, receipt: 16, chips: 6, mouse: 4, crate: 1 };
+const CAPS: Partial<Record<PropKind, number>> = { paper: 10, can: 14, trash: 8, receipt: 6, chips: 6, mouse: 4, crate: 1 };
 
 /** Creates, tracks, cleans up and syncs all physical props. */
 export class PropManager {
@@ -272,7 +272,8 @@ export class PropManager {
   private enforceCap(kind: PropKind) {
     const cap = CAPS[kind];
     if (!cap) return;
-    const list = this.props.filter((p) => p.def.kind === kind && p.state === "free" && !p.def.persistent && !p.data.task);
+    // loose receipts count too (pinned / held / stored ones don't), the oldest goes first
+    const list = this.props.filter((p) => p.def.kind === kind && p.state === "free" && (!p.def.persistent || kind === "receipt") && !p.data.task);
     while (list.length > cap) {
       const old = list.shift()!;
       this.despawn(old);
