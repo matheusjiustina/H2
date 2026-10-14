@@ -18,6 +18,7 @@ Outros comandos:
 
 ```bash
 npm run build      # typecheck + build de produção em dist/ (estático, abre em qualquer servidor)
+npm run build:single  # um único HTML autocontido em dist-single/last-candle.html (abre até com duplo clique)
 npm run preview    # serve o build
 npm test           # testes do motor de mercado e da carteira (vitest)
 npm run typecheck
