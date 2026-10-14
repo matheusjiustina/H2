@@ -22,7 +22,7 @@ export const SCREEN_SIZES: Record<MonitorKind, { w: number; h: number; px: [numb
   lcdWide: { w: 0.62, h: 0.385, px: [1680, 1044] },
 };
 
-const DESK_FRONT = 0.4; // distance chair center → desk front edge
+export const DESK_FRONT = 0.4; // distance chair center → desk front edge
 const DESK_W = 1.28;
 
 const CHAIR_VARIANTS = [
@@ -53,6 +53,11 @@ export class StationVisual {
   readonly monitorProxy: THREE.Mesh;
   chairYaw = 0;
   chairSpin = 0;
+  /** How far the chair is rolled back from the desk (m) and tipped forward (rad). Driven by whoever sits. */
+  chairSlide = 0;
+  chairTilt = 0;
+  slideTarget = 0;
+  tiltTarget = 0;
   private parts = {
     chair: new THREE.Group(),
     keyboard: new THREE.Group(),
@@ -125,8 +130,8 @@ export class StationVisual {
 
     // proxies for interaction raycasts (invisible)
     const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
-    this.chairProxy = new THREE.Mesh(rbox(0.6, 1.1, 0.6, 0), proxyMat);
-    this.chairProxy.position.set(0, 0.55, 0);
+    this.chairProxy = new THREE.Mesh(rbox(0.52, 0.95, 0.5, 0), proxyMat);
+    this.chairProxy.position.set(0, 0.5, 0.04);
     this.chairProxy.userData.stationId = def.id;
     this.root.add(this.chairProxy);
     this.monitorProxy = new THREE.Mesh(rbox(0.75, 0.55, 0.3, 0), proxyMat);
@@ -564,6 +569,10 @@ export class StationVisual {
       }
     }
     this.swivel.rotation.y = this.chairYaw;
+    this.chairSlide += (this.slideTarget - this.chairSlide) * (1 - Math.exp(-2.5 * dt));
+    this.chairTilt += (this.tiltTarget - this.chairTilt) * (1 - Math.exp(-4 * dt));
+    this.swivel.rotation.x = -this.chairTilt;
+    this.parts.chair.position.z = this.chairSlide;
     void time;
   }
 }

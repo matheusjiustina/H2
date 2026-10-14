@@ -48,6 +48,7 @@ export function registerWorldInteractables(g: Game, ws: WorldState) {
       label,
       hint: () => (g.holding.held ? null : "LMB spin"),
       range: 2.0,
+      proxy: true,
       onInteract: () => {
         if (g.reservedBy(id)) {
           bus.emit("toast", { text: "That's a regular's seat. Find a free PC — yours is PC 03." });
@@ -67,6 +68,7 @@ export function registerWorldInteractables(g: Game, ws: WorldState) {
         return `Use terminal • ${st.def.label}`;
       },
       range: 2.4,
+      proxy: true,
       onInteract: () => {
         if (id === "pc09" && ws.pc09Frozen) {
           ws.pc09Frozen = false;

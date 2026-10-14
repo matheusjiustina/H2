@@ -20,7 +20,10 @@ interface HandRig {
   visible: number;
 }
 
-export type HandAction = "none" | "reach" | "press" | "drink" | "eat" | "squeak" | "show" | "throwCharge" | "throw" | "wipe" | "write" | "crumple";
+export type HandAction = "none" | "reach" | "press" | "grab" | "drink" | "eat" | "squeak" | "show" | "throwCharge" | "throw" | "wipe" | "write" | "crumple";
+
+/** Where the hand rests when it is out of the way, and how far an arm can reach (camera space). */
+const REACH_MAX = 0.6;
 
 /**
  * First-person stylized hands, rendered in a separate viewmodel pass so they
@@ -48,6 +51,14 @@ export class Hands {
   private bobT = 0;
   drawing = false;
   visibleIdle = false;
+  /** Camera-space point the hand reaches toward for reach/press/grab (clamped to arm length). */
+  private reachTarget = new THREE.Vector3(0.08, -0.12, -0.62);
+  /** 0..1: how much a nearby wall/desk pushes the hands back so they never poke into it. */
+  wallPush = 0;
+  /** Mass of the held object (kg) — heavier things sit lower and lag more. */
+  private heldMass = 0.2;
+  private lag = new THREE.Vector3();
+  private lagVel = new THREE.Vector3();
 
   constructor(fov: number) {
     this.camera = new THREE.PerspectiveCamera(fov, 1, 0.01, 5);
@@ -72,7 +83,7 @@ export class Hands {
     const sleeve = toonMat(SLEEVE);
     const cuff = toonMat(CUFF);
     // forearm sleeve: lives on the camera and is aimed at an off-screen shoulder every frame
-    const arm = new THREE.Mesh(cyl(0.05, 0.064, 1, 14), sleeve);
+    const arm = new THREE.Mesh(cyl(0.044, 0.058, 1, 14), sleeve);
     arm.frustumCulled = false;
     const cf = new THREE.Mesh(cyl(0.052, 0.052, 0.045, 14), cuff);
     cf.rotation.x = Math.PI / 2 - 0.15;
@@ -127,6 +138,7 @@ export class Hands {
     root.add(knuckles);
     const grip = new THREE.Group();
     grip.position.set(-0.01 * side, -0.05, -0.1);
+    grip.scale.setScalar(1 / 0.88); // the hand is drawn at 0.88 scale; held objects stay true size
     root.add(grip);
     root.traverse((o) => {
       o.frustumCulled = false;
@@ -140,16 +152,36 @@ export class Hands {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Attach a prop mesh to the right hand. */
-  hold(obj: THREE.Object3D, pos: [number, number, number], rot: [number, number, number], inspect?: [number, number, number]) {
+  /**
+   * Attach a prop mesh to the right hand. When `fromCamLocal` is given (the object's
+   * transform relative to the main camera), it starts there and travels into the hand.
+   */
+  hold(obj: THREE.Object3D, pos: [number, number, number], rot: [number, number, number], inspect?: [number, number, number], mass = 0.2, fromCamLocal?: THREE.Matrix4) {
     this.holding = obj;
+    this.heldMass = mass;
     this.inspectBase = inspect ? new THREE.Euler(...inspect) : null;
     this.holdOffset.pos.set(...pos);
     this.holdOffset.rot.set(...rot);
     this.extraYaw = 0;
+    this.lag.set(0, 0, 0);
+    this.lagVel.set(0, 0, 0);
     this.right.grip.add(obj);
     obj.position.copy(this.holdOffset.pos);
     obj.rotation.copy(this.holdOffset.rot);
+    if (fromCamLocal) {
+      // start where the object really is on screen, then the update loop eases it into the grip
+      this.camera.updateMatrixWorld(true);
+      this.right.root.updateMatrixWorld(true);
+      const local = new THREE.Matrix4().copy(this.right.grip.matrixWorld).invert().multiply(fromCamLocal);
+      const p = new THREE.Vector3();
+      const q = new THREE.Quaternion();
+      local.decompose(p, q, new THREE.Vector3());
+      // never start behind the camera or absurdly far
+      if (p.length() < 2) {
+        obj.position.copy(p);
+        obj.quaternion.copy(q);
+      }
+    }
     obj.traverse((o) => {
       o.frustumCulled = false;
       if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = false;
@@ -184,13 +216,31 @@ export class Hands {
     return { pos, quat };
   }
 
-  play(a: HandAction, dur = 0.45) {
+  /** Set right before an interaction fires so whatever hand animation it plays aims at the real spot. */
+  nextReach: THREE.Vector3 | null = null;
+
+  play(a: HandAction, dur = 0.45, target?: THREE.Vector3) {
     this.action = a;
     this.actionT = 0;
     this.actionDur = dur;
+    const t = target ?? this.nextReach;
+    if (t) this.setReach(t);
+    else this.reachTarget.set(0.08, -0.12, -0.62);
+  }
+
+  /** Aim reach/press/grab at a camera-space point, clamped to a comfortable arm length. */
+  setReach(camLocal: THREE.Vector3) {
+    const t = camLocal.clone();
+    if (t.z > -0.25) t.z = -0.25;
+    const len = t.length();
+    if (len > REACH_MAX) t.multiplyScalar(REACH_MAX / len);
+    t.x = Math.max(-0.05, Math.min(0.3, t.x + 0.05));
+    t.y = Math.max(-0.32, Math.min(0.1, t.y - 0.04));
+    this.reachTarget.copy(t);
   }
 
   playLeft(a: HandAction, dur = 0.5) {
+    if (this.nextReach) this.setReach(this.nextReach);
     this.leftAction = a;
     this.leftT = 0;
     this.leftDur = dur;
@@ -221,6 +271,16 @@ export class Hands {
       if (this.leftT >= this.leftDur) this.leftAction = "none";
     }
 
+    // held-object inertia: a damped spring driven by looking around; heavier = more lag
+    const massK = Math.min(1.6, 0.35 + this.heldMass * 0.9);
+    if (this.holding) {
+      this.lagVel.x += (-mouseDX * 0.00012 * massK - this.lag.x * 60) * dt;
+      this.lagVel.y += (mouseDY * 0.00012 * massK - this.lag.y * 60) * dt;
+      this.lagVel.multiplyScalar(Math.exp(-9 * dt));
+      this.lag.addScaledVector(this.lagVel, dt * 60);
+      this.lag.clampScalar(-0.05, 0.05);
+    } else this.lag.multiplyScalar(Math.exp(-10 * dt));
+
     // ---------------------------------------------------------- right hand target
     const R = this.right;
     const tp = new THREE.Vector3();
@@ -231,9 +291,12 @@ export class Hands {
     const arc = Math.sin(k * Math.PI);
     if (this.holding) {
       show = 1;
-      tp.set(0.25, -0.25, -0.46);
+      const heavy = this.heldMass >= 1;
+      tp.set(heavy ? 0.16 : 0.24, heavy ? -0.33 : -0.25, heavy ? -0.42 : -0.46);
       te.set(0.15, 0.12, 0.08);
       grip = 0.85;
+      tp.x += this.lag.x;
+      tp.y += this.lag.y - Math.min(0.06, this.heldMass * 0.02);
       if (this.inspecting) {
         tp.set(0.16, -0.22, -0.36);
         te.set(0.3, -0.1, 0.0);
@@ -251,10 +314,11 @@ export class Hands {
     switch (this.action) {
       case "reach":
       case "press":
+      case "grab":
         show = 1;
-        tp.lerp(new THREE.Vector3(0.08, -0.12, -0.62), arc);
+        tp.lerp(this.reachTarget, arc);
         te.x += -0.5 * arc;
-        grip = this.action === "press" ? 0.55 : 0.15 + 0.6 * k;
+        grip = this.action === "press" ? 0.55 : this.action === "grab" ? (k < 0.5 ? 0.1 : 0.85) : 0.15 + 0.6 * k;
         break;
       case "drink":
         tp.lerp(new THREE.Vector3(0.05, -0.11, -0.22), arc);
@@ -295,6 +359,12 @@ export class Hands {
     if (this.drawing) grip = 0.9;
     tp.x += bx + this.sway.x;
     tp.y += by + this.sway.y;
+    // something right in front of the camera: pull the hands back instead of poking through it
+    if (this.wallPush > 0 && !this.inspecting) {
+      tp.z += this.wallPush * 0.2;
+      tp.y -= this.wallPush * 0.12;
+      tp.x += this.wallPush * 0.05;
+    }
     if (show === 0) tp.set(0.3, -0.7, -0.35);
     this.applyRig(R, tp, te, grip, show, dt);
 
@@ -314,7 +384,7 @@ export class Hands {
         const want = camQ.multiply(this.inspectRot.clone().multiply(base));
         o.quaternion.slerp(gripQ.invert().multiply(want), damp(12, dt));
       } else {
-        o.position.lerp(this.holdOffset.pos, damp(12, dt));
+        o.position.lerp(this.holdOffset.pos, damp(this.heldMass >= 1 ? 7 : 11, dt));
         const q = new THREE.Quaternion().setFromEuler(this.holdOffset.rot);
         q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.extraYaw));
         o.quaternion.slerp(q, damp(14, dt));
@@ -331,7 +401,8 @@ export class Hands {
     const larc = Math.sin(lk * Math.PI);
     if (this.leftAction === "reach" || this.leftAction === "press") {
       lshow = 1;
-      lp.set(-0.26, -0.3, -0.42).lerp(new THREE.Vector3(-0.08, -0.12, -0.62), larc);
+      const lt = new THREE.Vector3(Math.min(0.05, this.reachTarget.x - 0.16), this.reachTarget.y, this.reachTarget.z);
+      lp.set(-0.26, -0.3, -0.42).lerp(lt, larc);
       le.x += -0.5 * larc;
       lgrip = this.leftAction === "press" ? 0.5 : 0.1 + 0.7 * lk;
     } else if (this.leftAction === "wipe") {
@@ -343,6 +414,16 @@ export class Hands {
       lshow = 1;
       lp.set(-0.12, -0.2, -0.4);
       lgrip = 0.4 + 0.6 * Math.abs(Math.sin(lk * Math.PI * 3));
+    } else if (this.holding && this.heldMass >= 1 && !this.inspecting) {
+      // heavy things are carried with both hands
+      lshow = 1;
+      lp.set(-0.16 + this.lag.x, -0.33 + this.lag.y, -0.42);
+      le.set(0.15, -0.12, -0.08);
+      lgrip = 0.8;
+    }
+    if (this.wallPush > 0) {
+      lp.z += this.wallPush * 0.2;
+      lp.y -= this.wallPush * 0.12;
     }
     lp.x += this.sway.x;
     lp.y += this.sway.y + by;
@@ -358,6 +439,7 @@ export class Hands {
     h.quat.slerp(new THREE.Quaternion().setFromEuler(te), damp(14, dt));
     h.root.position.copy(h.pos);
     h.root.quaternion.copy(h.quat);
+    h.root.scale.setScalar(0.88);
     h.root.visible = h.visible > 0.02;
     // forearm from just behind the wrist to the shoulder anchor
     const wrist = new THREE.Vector3(0, -0.01, 0.03).applyQuaternion(h.quat).add(h.pos);

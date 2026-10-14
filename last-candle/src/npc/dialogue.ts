@@ -33,10 +33,31 @@ export type LineKey =
   | "bye"
   | "spin"
   | "throwNear"
-  | "receiptShow";
+  | "receiptShow"
+  // social layer (always tied to a real simulated trade / position)
+  | "earlyWin"
+  | "deflate"
+  | "lastTrade"
+  | "lastTradeAgain"
+  | "announcement"
+  | "unplug"
+  | "unrealized"
+  | "neighborWin"
+  | "neighborLoss"
+  | "explain"
+  | "chairTurn"
+  | "chairBack"
+  | "observe";
 
 export const LINES: Record<string, Partial<Record<LineKey, string[]>>> = {
   owner: {
+    announcement: ["Bro bought the announcement.", "He bought it after the sign went up. Again."],
+    unplug: ["Someone unplug his confidence.", "Volume, champ. People are losing quietly over here."],
+    unrealized: ["Unrealized. Emotionally realized."],
+    neighborWin: ["Print it. Printer's free.", "Good. Now don't give it back."],
+    neighborLoss: ["Keyboard's fine? Good.", "Breathe. Fridge is open."],
+    chairTurn: ["Yeah?", "What's up."],
+    chairBack: ["Counter's mine. Holler."],
     greet: ["You can lose the trade. Just don't break the keyboard.", "Need time, stuff, or work? I do all three.", "Session's running. So is the fridge."],
     idle: ["That AC has been dripping since 2019. It's a feature now.", "Nobody ever orders the noodles. Then everybody does at four.", "The printer is free. Your dignity is not."],
     ownUp: ["My Cashcat woke up. Don't look at it, you'll scare it.", "My old bag is green. I'm not touching it."],
@@ -59,6 +80,15 @@ export const LINES: Record<string, Partial<Record<LineKey, string[]>>> = {
     bye: ["Go on.", "Holler if you need me."],
   },
   topbuyer: {
+    earlyWin: ["We're so back.", "Called it. CALLED it.", "Generational entry. Nobody look at it."],
+    deflate: ["...it's a retest.", "Okay. That was the celebration top.", "I celebrated too loud. It heard me."],
+    lastTrade: ["That was my last trade.", "Okay. I'm done. For real this time."],
+    lastTradeAgain: ["That was my last trade. Again.", "Last trade. Again. Don't count."],
+    unrealized: ["Unrealized. Emotionally realized.", "It's only a loss if I look at it."],
+    neighborWin: ["Wait, you sold? Should I sell? I'm not in anything.", "Nice. I'd have held it to zero."],
+    neighborLoss: ["Welcome to my side of the room.", "Oof. Want a can?"],
+    chairTurn: ["Yo! Neighbor!", "What's up? Got a tip? Don't give me a tip."],
+    chairBack: ["Okay, back to the trenches.", "Gotta watch it. It moves when I don't."],
     greet: ["I waited for confirmation. That was the top.", "Hey neighbor. What are you in? Asking for me."],
     idle: ["I only buy after it's obvious. Which is always too late. But obvious.", "Every chart looks like a rocket once I'm out."],
     ownUp: ["It's working?? Don't say anything.", "Green. Is this what it feels like?", "{sym} up {pct}. Should I sell? I should hold. I should sell."],
@@ -66,7 +96,7 @@ export const LINES: Record<string, Partial<Record<LineKey, string[]>>> = {
     flat: ["Sideways. It knows I'm watching."],
     noPos: ["Waiting for confirmation.", "Not in anything. Which means something's about to pump."],
     buy: ["Okay it's obvious now. Buying {sym}.", "Confirmation achieved. In."],
-    closeWin: ["SOLD. Green! Write it down!", "I got out green. Screenshot this room."],
+    closeWin: ["I sold. You're welcome.", "SOLD. Green! Write it down!", "I got out green. Screenshot this room."],
     closeLoss: ["Sold the bottom. Probably. Definitely.", "Out. It'll go up now. You're welcome."],
     bigHolderUp: ["THAT'S MY {sym}! Wait, is it?", "Go go go go!"],
     bigHolderDown: ["No no no no no.", "Why does it always know?"],
@@ -89,14 +119,22 @@ export const LINES: Record<string, Partial<Record<LineKey, string[]>>> = {
     bye: ["Later. If I'm green, I'll tell you."],
   },
   lurker: {
+    announcement: ["Bro bought the announcement.", "Bought the announcement. Hm."],
+    unplug: ["Someone unplug his confidence."],
+    unrealized: ["Unrealized. Emotionally realized."],
+    neighborWin: ["Hm. He'll buy back higher.", "Quiet exit. Good."],
+    neighborLoss: ["Noted.", "Smaller next time."],
+    observe: ["Everyone got loud. Interesting.", "Watch who's quiet right now."],
+    chairTurn: ["...yes?", "Hm."],
+    chairBack: ["Back to watching.", "."],
     greet: ["...", "Hm.", "Everyone got loud. Interesting."],
     idle: ["Watch the room, not the chart.", "Loud people sell to quiet people."],
     ownUp: ["Hm.", "Fine."],
     ownDown: ["Noted.", "Hm."],
     noPos: ["Watching.", "Nothing worth it yet."],
     buy: ["..."],
-    closeWin: ["Done."],
-    closeLoss: ["Done."],
+    closeWin: ["I sold. You're welcome.", "Done."],
+    closeLoss: ["Done.", "Out."],
     bigHolderUp: ["Hm."],
     bigHolderDown: ["Noted."],
     bigNotice: ["{sym}."],
@@ -114,6 +152,14 @@ export const LINES: Record<string, Partial<Record<LineKey, string[]>>> = {
     bye: ["."],
   },
   wizard: {
+    announcement: ["He bought the announcement. Classic late-cycle pennant.", "Bro bought the announcement. I have a diagram for that."],
+    unplug: ["Someone unplug his confidence. It's distorting my lines."],
+    unrealized: ["Unrealized. Emotionally realized."],
+    neighborWin: ["As my diagram suggested. Loosely.", "The pattern rewards the patient. Sometimes."],
+    neighborLoss: ["The triangle lied to you too.", "Invalidation. Happens to the best of us. Mostly me."],
+    explain: ["...and the wick touches the line, see...", "...triangle inside the triangle...", "...that's the handle. Probably."],
+    chairTurn: ["Ah! You want to see the pattern?", "Yes, yes, come, look at this wedge."],
+    chairBack: ["Back to the lines. They miss me.", "Excuse me, a triangle is forming."],
     greet: ["The triangle needs one more triangle.", "Ah, a fresh pair of eyes. Look at this wedge."],
     idle: ["Every chart is a triangle if you believe hard enough.", "I call this one the inverted teapot. Very bullish. Or bearish."],
     ownUp: ["The pattern completes! As foretold. Roughly.", "See? The wedge resolves. I drew that."],
@@ -143,6 +189,15 @@ export const LINES: Record<string, Partial<Record<LineKey, string[]>>> = {
     bye: ["Draw before you trade."],
   },
   nightshift: {
+    lastTrade: ["That was my last trade.", "Done for tonight. Probably."],
+    lastTradeAgain: ["That was my last trade. Again.", "Said I was done. Here we are."],
+    announcement: ["Bro bought the announcement.", "He bought the announcement. Poor guy."],
+    unplug: ["Someone unplug his confidence.", "Easy, man. Inside voice."],
+    unrealized: ["Unrealized. Emotionally realized.", "Down a bit. Feeling it anyway."],
+    neighborWin: ["Nice one. Now stand up.", "Good exit. Drink some water."],
+    neighborLoss: ["Breathe, man.", "Take a walk. Your position will still be there."],
+    chairTurn: ["Hey. What's up?", "Oh, hey."],
+    chairBack: ["Alright. Back to my slow one.", "Holler if you need anything."],
     greet: ["Take a walk. Your position will still be there.", "Hey. Get some water at some point."],
     idle: ["Night's long. Charts are longer.", "I come for the quiet. And the AC drip."],
     ownUp: ["Pons doing its slow thing. Good.", "Up a bit. No need to look at it every minute."],

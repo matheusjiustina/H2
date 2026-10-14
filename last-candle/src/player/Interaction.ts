@@ -16,6 +16,8 @@ export interface Interactable {
   enabled?: () => boolean;
   /** Higher wins when several are hit at similar distances. */
   priority?: number;
+  /** Invisible helper volume (chair, monitor): real objects just behind it take precedence. */
+  proxy?: boolean;
 }
 
 export interface Hit {
@@ -69,7 +71,7 @@ export class Interaction {
   }
 
   /** Raycast from the camera center. */
-  update(camera: THREE.Camera, time: number, extraFilter?: (it: Interactable) => boolean) {
+  update(camera: THREE.Camera, time: number, extraFilter?: (it: Interactable, hit: THREE.Intersection) => boolean) {
     if (this.dirty) {
       this.targetsCache = this.list.flatMap((i) => i.targets);
       this.dirty = false;
@@ -86,15 +88,15 @@ export class Interaction {
       const it = this.byTarget.get(h.object);
       if (!it) continue;
       if (it.enabled && !it.enabled()) continue;
-      if (extraFilter && !extraFilter(it)) continue;
+      if (extraFilter && !extraFilter(it, h)) continue;
       if (h.distance > (it.range ?? 2.2)) continue;
       if (!it.label()) continue;
       // nearest valid hit wins; a higher-priority target just behind it (≤25cm) can take over
       if (!best) {
         best = { it, point: h.point.clone(), distance: h.distance, object: h.object, uv: h.uv?.clone(), normal: h.face?.normal.clone().transformDirection(h.object.matrixWorld) };
-      } else if ((it.priority ?? 0) > (best.it.priority ?? 0) && h.distance - best.distance < 0.25) {
+      } else if ((it.priority ?? 0) > (best.it.priority ?? 0) && h.distance - best.distance < (best.it.proxy ? 0.9 : 0.25)) {
         best = { it, point: h.point.clone(), distance: h.distance, object: h.object, uv: h.uv?.clone(), normal: h.face?.normal.clone().transformDirection(h.object.matrixWorld) };
-      } else if (h.distance - best.distance >= 0.25) break;
+      } else if (h.distance - best.distance >= (best.it.proxy ? 0.9 : 0.25)) break;
     }
     this.current = best;
     // glow

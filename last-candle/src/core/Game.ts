@@ -215,7 +215,7 @@ export class Game {
         id: `npc-${n.id}`,
         targets: [proxy],
         highlight: null,
-        label: () => (!n.present || n.id === "courier" ? null : this.holding.held?.def.kind === "receipt" ? `Show receipt • ${n.name}` : `Talk • ${n.name}`),
+        label: () => (!n.present || n.id === "courier" ? null : this.holding.held?.def.kind === "receipt" ? `Show receipt • ${n.name}` : n.busyReason() ? `${n.name} • busy` : `Talk • ${n.name}`),
         range: 2.4,
         priority: 2,
         onInteract: () => this.talkTo(n),
@@ -668,7 +668,9 @@ export class Game {
   private walkInput(dt: number) {
     const inp = this.input;
     const it = this.interaction;
-    if (!this.ui.panelOpen) it.update(this.camera, this.time);
+    if (!this.ui.panelOpen) it.update(this.camera, this.time, (target, hit) => this.reachable(target.id, hit));
+    // keep hands from poking into whatever is right in front of the face
+    this.hands.wallPush = this.frontClearance();
     const cur = it.current;
     const held = this.holding.held;
 
@@ -702,7 +704,11 @@ export class Game {
     // E
     if (inp.pressed("KeyE") && !this.ui.panelOpen) {
       if (this.ui.dialogOpen && this.dialogNpc) this.closeDialog();
-      else if (cur) cur.it.onInteract?.();
+      else if (cur) {
+        this.hands.nextReach = this.toCamLocal(cur.point);
+        cur.it.onInteract?.();
+        this.hands.nextReach = null;
+      }
       else if (held) this.holding.placeOrDrop();
     }
     // LMB on an empty chair spins it
@@ -732,6 +738,46 @@ export class Game {
       const g = this.progress.goalsView();
       this.ui.toast(`Night goals: ${g.map((x) => (x.done ? "■ " : "□ ") + x.text).join("  ")}`);
     }
+  }
+
+  /** Camera-space position of a world point. */
+  toCamLocal(p: THREE.Vector3): THREE.Vector3 {
+    this.camera.updateMatrixWorld(true);
+    return p.clone().applyMatrix4(this.camera.matrixWorldInverse.copy(this.camera.matrixWorld).invert());
+  }
+
+  /** Pick-ups must be in reach and not behind another solid thing (monitor, shelf, fridge wall...). */
+  private reachable(id: string, hit: THREE.Intersection): boolean {
+    if (!id.startsWith("prop-")) return true;
+    if (hit.distance > 1.9) return false;
+    const from = this.camera.position;
+    const to = hit.point;
+    const r = this.physics.raycast(new CANNON.Vec3(from.x, from.y, from.z), new CANNON.Vec3(to.x, to.y, to.z));
+    if (!r) return true;
+    const prop = (r.body as unknown as { prop?: Prop }).prop;
+    if (prop && `prop-${prop.uid}` === id) return true;
+    return r.distance > hit.distance - 0.05;
+  }
+
+  private clearanceT = 0;
+  private clearanceV = 0;
+  /** 0 = nothing ahead, 1 = face against a surface. Physics ray, refreshed at ~20 Hz. */
+  private frontClearance(): number {
+    this.clearanceT -= 1;
+    if (this.clearanceT > 0) return this.clearanceV;
+    this.clearanceT = 3;
+    const from = this.camera.position;
+    const dir = this.camera.getWorldDirection(new THREE.Vector3());
+    // aim slightly down and right, where the hands live
+    dir.y -= 0.25;
+    dir.normalize();
+    const to = from.clone().addScaledVector(dir, 0.75);
+    const r = this.physics.raycast(new CANNON.Vec3(from.x, from.y, from.z), new CANNON.Vec3(to.x, to.y, to.z));
+    let d = r ? r.distance : 1;
+    const occ = this.collision.occlusion(from.x, from.y, from.z, dir.x, dir.y, dir.z, 0.75);
+    d = Math.min(d, occ);
+    this.clearanceV = clamp((0.62 - d) / 0.4, 0, 1);
+    return this.clearanceV;
   }
 
   private heldHint(): string {
@@ -779,10 +825,20 @@ export class Game {
     this.terminal.setResolution(st.screenPixelSize());
     this.terminal.update(this.time, 1000);
     this.refreshScreens(true);
-    this.audio.play("chair", st.seatedEye(), 0.7);
     const eye = st.seatedEye();
     const seatPose = Player.poseYawPitch(eye, st.facing, -0.2);
-    this.player.tweenTo(seatPose, 0.45, () => this.enterTerminal());
+    // step 1: come round behind the chair facing the desk (only if we are not already there)
+    const standEye = new THREE.Vector3(st.def.stand[0], st.def.chair[1] + this.player.eyeHeight, st.def.stand[1]);
+    const behind = st.toWorld(0, 0, 0.42);
+    behind.y = standEye.y;
+    const far = Math.hypot(this.player.pos.x - behind.x, this.player.pos.z - behind.z) > 0.3;
+    const sitDown = () => {
+      st.chairYaw = 0;
+      this.audio.play("chair", st.seatedEye(), 0.7);
+      this.player.tweenTo(seatPose, 0.42, () => this.enterTerminal());
+    };
+    if (far) this.player.tweenTo(Player.poseYawPitch(behind, st.facing, -0.35), 0.3, sitDown);
+    else sitDown();
     this.ui.setPrompt(null);
     this.ui.setCrosshair("hidden");
     bus.emit("player:sat", { stationId: st.def.id });
@@ -822,7 +878,11 @@ export class Game {
     this.ui.centerHint(null);
     // pick a free spot behind the chair (never inside furniture or a person)
     const base = new THREE.Vector3(st.def.stand[0], st.def.chair[1], st.def.stand[1]);
-    const candidates = [base, base.clone().add(new THREE.Vector3(0, 0, 0.6)), base.clone().add(new THREE.Vector3(0, 0, -0.6))];
+    // beside the chair first (left/right along the row), then straight behind it — never across the desk
+    const side = new THREE.Vector3(Math.cos(st.facing), 0, -Math.sin(st.facing));
+    const behind = st.toWorld(0, 0, 0.7);
+    behind.y = st.def.chair[1];
+    const candidates = [behind, behind.clone().addScaledVector(side, 0.45), behind.clone().addScaledVector(side, -0.45), base, base.clone().addScaledVector(side, 0.6), base.clone().addScaledVector(side, -0.6)];
     let spot = base;
     for (const c of candidates) {
       if (this.collision.isFree(c.x, c.z, this.player.radius, c.y)) {
@@ -978,10 +1038,21 @@ export class Game {
       this.holding.use();
       return;
     }
+    // never interrupt someone walking or in the middle of something
+    const busy = n.busyReason();
+    if (busy && this.dialogNpc !== n) {
+      n.lookAtPlayer(1.5);
+      n.sayText(busy === "walking" ? fx.pick(["One sec—", "Hold on, walking here.", "Be right with you."]) : fx.pick(["Middle of something. Give me a sec.", "In a minute.", "Hang on, almost done."]), true);
+      return;
+    }
+    if (this.dialogNpc && this.dialogNpc !== n) this.closeDialog();
     this.dialogNpc = n;
+    this.npcs.dialogNpc = n;
     this.dialogT = 0;
+    n.beginConvo();
     n.lookAtPlayer(8);
-    n.play("talk", 2);
+    if (!n.seated) n.play("talk", 2);
+    else if (fx.chance(0.5)) n.after(0.9, () => n.convo && n.say("chairTurn", {}, true));
     const d = this.progress.d;
     if (!d.talkedTonight.includes(n.id) && n.id !== "courier") {
       d.talkedTonight.push(n.id);
@@ -1046,8 +1117,13 @@ export class Game {
       this.ui.hideDialog();
       return;
     }
-    if (sayBye) this.dialogNpc.say("bye");
+    const n = this.dialogNpc;
+    if (sayBye) n.say("bye");
     this.dialogNpc = null;
+    this.npcs.dialogNpc = null;
+    // the chair turns back to the screen after the last word
+    if (sayBye) n.after(1.6, () => n.endConvo());
+    else n.endConvo();
     this.ui.hideDialog();
   }
 
@@ -1352,10 +1428,10 @@ export class Game {
   // =================================================================== NPC hooks
 
   private onNpcTrade(n: Npc, side: "BUY" | "SELL", pnl: number) {
+    // body language and neighbors' comments come from the social layer (NpcManager.social)
     if (side === "SELL") {
       if (n.lastSymbol) n.realizedSymbol = n.lastSymbol;
       const win = pnl >= 0;
-      this.npcs.cascade(n, win ? (n.profile.energy > 0.6 ? "celebrate" : "nod") : n.profile.energy > 0.6 ? "headInHands" : "mutter", win ? "closeWin" : "closeLoss", 0.4, {}, n.profile.energy < 0.4);
       if (win && pnl > 0.02 && n.id === "topbuyer" && fx.chance(0.7)) {
         this.events.at(5, () => n.free && n.seated && n.doActivity("printFlex"));
       } else if (!win && fx.chance(0.4)) {

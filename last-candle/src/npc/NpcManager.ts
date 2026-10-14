@@ -6,7 +6,7 @@ import { FONT_UI } from "../world/textures";
 import type { LineKey } from "./dialogue";
 import { NAME_COLORS } from "./dialogue";
 import { NavGraph } from "./Nav";
-import { Npc, type NpcHost, type NpcProfile, type Overlay } from "./Npc";
+import { Npc, type NpcHost, type NpcProfile, type Overlay, type SocialEvent } from "./Npc";
 
 export const PROFILES: NpcProfile[] = [
   {
@@ -103,7 +103,34 @@ interface ReactionReq {
   vars?: Record<string, string>;
   cascade?: boolean;
   quiet?: boolean;
+  /** Look at this first and only react a moment later (the Lurker always does). */
+  look?: () => THREE.Vector3;
+  looked?: boolean;
 }
+
+interface PendingLine {
+  npc: Npc;
+  text: string;
+  quiet: boolean;
+  loud: boolean;
+  expires: number;
+}
+
+/** Variations so the same body reaction isn't repeated back to back. */
+const ALT: Partial<Record<Overlay, Overlay[]>> = {
+  celebrate: ["fistPump", "leanIn"],
+  fistPump: ["celebrate", "leanIn"],
+  leanIn: ["fistPump", "nod"],
+  headInHands: ["facepalm", "sigh"],
+  facepalm: ["headInHands", "sigh"],
+  mutter: ["sigh", "shrug"],
+  sigh: ["mutter", "shrug"],
+  shrug: ["nod", "mutter"],
+  nod: ["smile", "shrug"],
+  smile: ["nod"],
+};
+/** Characters who never do the big version of a reaction. */
+const SUBDUED: Partial<Record<Overlay, Overlay>> = { celebrate: "smile", fistPump: "nod", headInHands: "sigh", facepalm: "sigh", explain: "nod", leanIn: "nod" };
 
 /**
  * Owns the NPCs, their speech bubbles and the reaction scheduler that keeps
@@ -119,9 +146,17 @@ export class NpcManager {
   private marketT = 0;
   readonly bodies = new Map<string, CANNON.Body>();
   onSpeak: ((npc: Npc, text: string, quiet: boolean, loud: boolean) => void) | null = null;
+  /** NPC the player is talking to (their lines always go through; nearby chatter waits). */
+  dialogNpc: Npc | null = null;
+  private floorUntil = 0;
+  private floorNpc: Npc | null = null;
+  private pending: PendingLine[] = [];
+  private recentText = new Map<string, number>();
+  private recentKinds: Overlay[] = [];
+  private starts: number[] = [];
 
   constructor(
-    private host: Omit<NpcHost, "nav" | "requestReaction" | "say" | "circle">,
+    private host: Omit<NpcHost, "nav" | "requestReaction" | "say" | "circle" | "glanceTarget" | "social">,
     private collision: CollisionWorld,
     private world: CANNON.World,
   ) {
@@ -129,7 +164,9 @@ export class NpcManager {
       ...host,
       nav: this.nav,
       requestReaction: (npc, kind, line, priority) => this.request({ npc, kind, line, priority, at: host.time() }),
-      say: (npc, text, quiet, loud) => this.showBubble(npc, text, !!quiet, !!loud),
+      say: (npc, text, quiet, loud) => this.speak(npc, text, !!quiet, !!loud),
+      glanceTarget: (npc) => this.glanceTarget(npc),
+      social: (npc, ev, vars) => this.social(npc, ev, vars),
       circle: (npc) => this.collision.addCircle({ x: 0, z: 0, r: 0.3, minY: 0, maxY: 1.8, enabled: false, tag: `npc-${npc.profile.id}` }),
     };
     for (const p of PROFILES) {
@@ -160,6 +197,23 @@ export class NpcManager {
     this.queue.push(r);
   }
 
+  private dist2Player(n: Npc): number {
+    const p = this.host.playerFeet();
+    return (n.x - p.x) ** 2 + (n.z - p.z) ** 2;
+  }
+
+  /** Pick a body reaction that fits the character and wasn't just used. */
+  private vary(npc: Npc, kind: Overlay): Overlay {
+    let k = kind;
+    if (npc.profile.energy < 0.3 && SUBDUED[k]) k = SUBDUED[k]!;
+    const recent = this.recentKinds.slice(-2);
+    if (recent.includes(k) && ALT[k]) {
+      const alts = ALT[k]!.filter((a) => !recent.includes(a) && !(npc.profile.energy < 0.3 && SUBDUED[a]));
+      if (alts.length) k = fx.pick(alts);
+    }
+    return k;
+  }
+
   /** Immediate-ish scripted reaction used by events (bypasses cooldown, still staggered by `delay`). */
   cascade(npc: Npc, kind: Overlay | null, line: LineKey | null, delay: number, vars?: Record<string, string>, quiet = false) {
     this.queue.push({ npc, kind: kind ?? "nod", line, priority: 10, at: this.host.time() + delay, vars, cascade: true, quiet });
@@ -167,29 +221,182 @@ export class NpcManager {
   }
 
   private runQueue(now: number) {
-    const active = this.npcs.filter((n) => n.overlay && n.overlay.kind !== "type" && n.overlay.kind !== "wipe" && n.overlay.kind !== "draw").length;
+    const active = this.npcs.filter((n) => n.overlay && !n.overlay.ambient && n.overlay.kind !== "type" && n.overlay.kind !== "wipe" && n.overlay.kind !== "draw").length;
     this.queue = this.queue.filter((q) => (q.cascade ? now - q.at < 12 : now - q.at < 6));
-    this.queue.sort((a, b) => b.priority - a.priority);
+    this.starts = this.starts.filter((t) => now - t < 40);
+    // closer to the player first
+    const score = (q: ReactionReq) => q.priority + 3 * Math.max(0, 1 - Math.sqrt(this.dist2Player(q.npc)) / 12);
+    this.queue.sort((a, b) => score(b) - score(a));
     for (let i = 0; i < this.queue.length; i++) {
       const q = this.queue[i];
       if (q.at > now) continue;
-      if (!q.npc.present || q.npc.mode === "sitting" || q.npc.mode === "standing") continue;
+      if (!q.npc.present || q.npc.mode === "sitting" || q.npc.mode === "standing" || q.npc.convo) continue;
       if (!q.cascade) {
         if (active >= 2 || now - this.lastReactionStart < 2.5) continue;
-        if (q.npc.overlay) continue;
+        if (q.npc.overlay && !q.npc.overlay.ambient) continue;
+        if (this.starts.length >= 4) continue; // the room isn't a stadium
       }
-      // play it
-      if (q.kind !== "type") q.npc.play(q.kind);
+      // observe first, react a beat later
+      if (q.look && !q.looked) {
+        q.looked = true;
+        q.npc.lookAt(q.look(), 3.6, true);
+        q.at = now + (q.npc.id === "lurker" ? 2.2 : 1.1);
+        continue;
+      }
+      const far = this.dist2Player(q.npc) > 100;
+      if (q.kind !== "type") {
+        const k = this.vary(q.npc, q.kind);
+        q.npc.play(k);
+        this.recentKinds.push(k);
+        if (this.recentKinds.length > 6) this.recentKinds.shift();
+      }
       if (q.line) {
         const pv = q.npc.positionVars();
-        q.npc.say(q.line, { sym: pv?.sym ?? "", pct: pv?.pct ?? "", ...(q.vars ?? {}) }, q.quiet || q.line.startsWith("mutter"));
+        q.npc.say(q.line, { sym: pv?.sym ?? "", pct: pv?.pct ?? "", ...(q.vars ?? {}) }, q.quiet || far || q.line.startsWith("mutter"));
       }
       q.npc.reactCd = q.cascade ? 12 : fx.range(30, 60);
       this.lastReactionStart = now;
+      this.starts.push(now);
       this.queue.splice(i, 1);
       i--;
       if (!q.cascade) break;
     }
+  }
+
+  // ------------------------------------------------------------- social layer
+
+  /** Present, seated or standing neighbors of an NPC, nearest first. */
+  private neighbors(of: Npc, radius: number, filter: (n: Npc) => boolean = (n) => n.free): Npc[] {
+    return this.present()
+      .filter((n) => n !== of && filter(n) && Math.hypot(n.x - of.x, n.z - of.z) <= radius)
+      .sort((a, b) => Math.hypot(a.x - of.x, a.z - of.z) - Math.hypot(b.x - of.x, b.z - of.z));
+  }
+
+  private headOf(n: Npc): () => THREE.Vector3 {
+    return () => n.rig.headWorld(new THREE.Vector3());
+  }
+
+  /**
+   * React to something that really happened to an NPC's simulated position.
+   * One neighbor may look over (and maybe comment); another one stays focused.
+   */
+  social(actor: Npc, ev: SocialEvent, vars: Record<string, string>) {
+    const now = this.host.time();
+    const id = actor.id;
+    const say = (n: Npc, kind: Overlay, line: LineKey | null, delay: number, prio: number, look?: () => THREE.Vector3, quiet = false) =>
+      this.queue.push({ npc: n, kind, line, priority: prio, at: now + delay, vars, cascade: true, look, quiet });
+    const nb = this.neighbors(actor, 4.4);
+    const watcher = nb[0] ?? null;
+    const focused = nb[1] ?? null;
+    switch (ev) {
+      case "buy":
+        if (fx.chance(actor.profile.energy)) say(actor, "type", "buy", 0.3, 1, undefined, actor.profile.energy < 0.5);
+        break;
+      case "closeWin": {
+        const kind: Overlay = id === "topbuyer" ? "celebrate" : id === "wizard" ? "explain" : id === "lurker" ? "smile" : "nod";
+        say(actor, kind, "closeWin", 0.4, 4, undefined, actor.profile.energy < 0.4);
+        if (watcher && fx.chance(0.75)) {
+          watcher.lookAt(actor.rig.headWorld(new THREE.Vector3()), 3, true);
+          const wpv = watcher.positionVars();
+          if (fx.chance(0.55)) {
+            const key: LineKey = wpv && wpv.pnl < -0.01 ? "unrealized" : id === "topbuyer" && fx.chance(0.5) ? "unplug" : "neighborWin";
+            say(watcher, key === "unrealized" ? "sigh" : "nod", key, 2.6, 3, this.headOf(actor), watcher.id === "lurker");
+          }
+        }
+        if (focused) focused.typing = 4; // someone always keeps their head down
+        break;
+      }
+      case "closeLoss": {
+        const kind: Overlay = id === "topbuyer" ? "headInHands" : id === "wizard" ? "shrug" : "sigh";
+        const hasVow = id === "topbuyer" || id === "nightshift";
+        const line: LineKey = hasVow ? (actor.vowed ? "lastTradeAgain" : "lastTrade") : "closeLoss";
+        if (hasVow) actor.vowed = true;
+        say(actor, kind, line, 0.4, 4, undefined, actor.profile.energy < 0.4);
+        if (watcher && fx.chance(0.6)) {
+          watcher.lookAt(actor.rig.headWorld(new THREE.Vector3()), 2.5, true);
+          if (fx.chance(0.4)) say(watcher, "shrug", "neighborLoss", 2.8, 2, this.headOf(actor), watcher.id === "lurker");
+        }
+        if (focused) focused.typing = 4;
+        break;
+      }
+      case "earlyWin":
+        say(actor, "celebrate", "earlyWin", 0.2, 4);
+        if (watcher && fx.chance(0.6)) say(watcher, "type", "unplug", 2.4, 3, this.headOf(actor), watcher.id === "lurker");
+        break;
+      case "deflate":
+        say(actor, "deflate", "deflate", 0.2, 3, undefined, true);
+        break;
+      case "boughtTop": {
+        say(actor, "pushBack", null, 0.2, 3);
+        const w = this.neighbors(actor, 5.5, (n) => n.present && n.mode !== "walk" && !n.convo)[0];
+        if (w) say(w, "type", "announcement", 2.2, 3, this.headOf(actor), w.id === "lurker");
+        break;
+      }
+    }
+  }
+
+  /** Something worth a casual look: whoever is being loud nearby, the player, the big screen. */
+  glanceTarget(npc: Npc): THREE.Vector3 | null {
+    const now = this.host.time();
+    const opts: { p: THREE.Vector3; w: number }[] = [];
+    for (const o of this.present()) {
+      if (o === npc) continue;
+      const d = Math.hypot(o.x - npc.x, o.z - npc.z);
+      if (d > 4.6) continue;
+      const loud = (o.overlay && !o.overlay.ambient) || o.talkUntil > now ? 4 : 1;
+      opts.push({ p: o.rig.headWorld(new THREE.Vector3()), w: loud * (npc.id === "lurker" ? 1.6 : 1) });
+    }
+    if (this.dist2Player(npc) < 25) opts.push({ p: this.host.playerHead(), w: npc.id === "lurker" ? 2 : 1.2 });
+    opts.push({ p: this.host.bigScreen.clone(), w: npc.id === "topbuyer" ? 2.5 : 0.6 });
+    let total = 0;
+    for (const o of opts) total += o.w;
+    let r = fx.next() * total;
+    for (const o of opts) {
+      r -= o.w;
+      if (r <= 0) return o.p;
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------------- speech floor
+
+  private floorBusy(npc: Npc, now: number): boolean {
+    if (this.dialogNpc && npc !== this.dialogNpc && this.dist2Player(npc) < 49) return true;
+    return now < this.floorUntil && this.floorNpc !== npc;
+  }
+
+  /** One voice at a time: lines wait for the floor, identical lines don't repeat for a while. */
+  private speak(npc: Npc, text: string, quiet: boolean, loud: boolean) {
+    const now = this.host.time();
+    const priority = loud || npc === this.dialogNpc;
+    if (!priority) {
+      const last = this.recentText.get(text);
+      if (last !== undefined && now - last < 150) return;
+      if (this.floorBusy(npc, now)) {
+        if (!this.pending.some((p) => p.npc === npc)) this.pending.push({ npc, text, quiet, loud, expires: now + (quiet ? 4 : 7) });
+        return;
+      }
+    }
+    this.startLine(npc, text, quiet, loud, now);
+  }
+
+  private startLine(npc: Npc, text: string, quiet: boolean, loud: boolean, now: number) {
+    this.showBubble(npc, text, quiet, loud);
+    npc.markTalking(text);
+    this.recentText.set(text, now);
+    const hold = quiet ? 1.2 : Math.min(4.5, 1.3 + text.length * 0.05);
+    if (now + hold > this.floorUntil || this.floorNpc === npc) {
+      this.floorUntil = now + hold;
+      this.floorNpc = npc;
+    }
+  }
+
+  private runPending(now: number) {
+    this.pending = this.pending.filter((p) => p.expires > now && p.npc.present);
+    const p = this.pending.find((x) => !this.floorBusy(x.npc, now));
+    if (!p) return;
+    this.pending.splice(this.pending.indexOf(p), 1);
+    this.startLine(p.npc, p.text, p.quiet, p.loud, now);
   }
 
   // ------------------------------------------------------------- speech bubbles
@@ -305,6 +512,7 @@ export class NpcManager {
       } else if (this.world.bodies.includes(b)) this.world.removeBody(b);
     }
     this.runQueue(now);
+    this.runPending(now);
     this.updateBubbles(now, camPos);
   }
 

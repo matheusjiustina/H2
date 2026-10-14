@@ -23,16 +23,21 @@ export class Holding {
   grab(p: Prop) {
     const g = this.g;
     if (this.held || p.state === "held") return;
-    if (p.state === "pinned") g.unpinReceipt(p);
     if (p.state === "stored") return;
+    // where the object is relative to the eyes right now (so it visibly travels into the hand)
+    g.camera.updateMatrixWorld(true);
+    p.mesh.updateWorldMatrix(true, false);
+    const camLocal = new THREE.Matrix4().copy(g.camera.matrixWorld).invert().multiply(p.mesh.matrixWorld);
+    const objPos = new THREE.Vector3().setFromMatrixPosition(camLocal);
+    if (p.state === "pinned") g.unpinReceipt(p);
     p.state = "held";
     g.physics.suspend(p.body);
     p.body.velocity.setZero();
     p.body.angularVelocity.setZero();
-    g.hands.hold(p.mesh, p.def.hold.pos, p.def.hold.rot, p.def.inspect);
+    g.hands.hold(p.mesh, p.def.hold.pos, p.def.hold.rot, p.def.inspect, p.def.mass, camLocal);
     this.held = p;
-    g.audio.play("tick", undefined, 0.6);
-    g.hands.play("reach", 0.3);
+    g.audio.play(p.def.mass >= 1 ? "thud" : "tick", undefined, 0.5);
+    g.hands.play("grab", 0.34, objPos);
   }
 
   /** Remove from hand without dropping into the world (stored, consumed). */
