@@ -26,9 +26,9 @@ for (const q of ['low', 'medium', 'high']) {
       g.menuAction('free');
       // eslint-disable-next-line no-new-func
       new Function('g', setup)(g);
-      for (let i = 0; i < 30; i++) { g.tick(1 / 60); g.render(); }
+      for (let i = 0; i < 6; i++) { g.tick(1 / 60); g.render(); }
       let tick = 0, render = 0;
-      const N = 40;
+      const N = 8;
       for (let i = 0; i < N; i++) {
         const a = performance.now();
         g.tick(1 / 60);

@@ -27,7 +27,7 @@ Contracts (`src/game/contracts.js`):
 | id | Talhão | Crop | Area | Challenge |
 | --- | --- | --- | --- | --- |
 | soy | T-07 | soybean 0.8 m | 18.4 ha | wide, flat, beside the strip — learn the circuit |
-| corn | T-12 | corn 2.4 m | 16.1 ha | tall canopy on a swell, tree line west, power line east |
+| corn | T-12 | corn 2.4 m | 16.1 ha | tall canopy on a swell, tree line along the south edge, power line past the east end |
 | cotton | T-03A + T-03B | cotton 1.2 m | 13.8 ha | two fields split by the creek — valve off over the gap |
 
 Evaluation: useful coverage (dose ≥ 0.7 of target), uniformity (1 − CV of
@@ -86,3 +86,24 @@ Browser checks (need `npm run build && npx vite preview --port 4173`):
 - `node test/e2e_ui.mjs out/` — service interruption, crash + recovery,
   stuck reset, key rebinding, tutorial, mobile layout;
 - `node test/perf.mjs` — per-view tick/render time, draw calls, triangles.
+
+### Measured in this container (Chromium + SwiftShader, 1280×720)
+
+The container has no GPU, so `renderMs` is only the CPU time to submit a
+frame to the software rasteriser — it says nothing about real FPS. Game logic
+time and scene complexity carry over to real hardware:
+
+| preset | view | logic ms/frame | draw calls | triangles |
+| --- | --- | --- | --- | --- |
+| low | parked on the pad (chase) | 0.87 | 312 | 534k |
+| low | spraying soy at 4 m (chase) | 1.41 | 270 | 403k |
+| low | cockpit over corn | 0.87 | 293 | 795k |
+| low | 400 m AGL | 0.51 | 236 | 358k |
+| medium | spraying soy at 4 m | 3.51 | 279 | 409k |
+| medium | cockpit over corn | 1.94 | 308 | 915k |
+| high | parked on the pad | 0.57 | 313 | 536k |
+| high | spraying soy at 4 m | 1.91 | 281 | 412k |
+| high | cockpit over corn | 1.66 | 308 | 916k |
+
+FPS on a real GPU was not measured here; the in-game FPS counter (Settings →
+Show FPS) reports fps, draw calls and triangles live.
