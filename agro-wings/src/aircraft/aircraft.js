@@ -233,9 +233,13 @@ export class Aircraft {
     const A = FLIGHT;
     if (e.kind === 'touch') {
       if (e.part !== 'tail') this.lastTouch = { vs: e.speed, t: this.simTime };
-      if (e.speed > A.crashVs) return this.crash('Hard impact');
-      if (e.speed > A.hardLandingVs) {
-        this.hurt((e.speed - A.hardLandingVs) * 22);
+      // The tailwheel sits 4.5 m behind the CG: when the mains touch first it
+      // comes down several times faster than the CG, carrying a small share of
+      // the mass. Judge it with proportionally higher limits.
+      const k = e.part === 'tail' ? 1.5 : 1;
+      if (e.speed > A.crashVs * k) return this.crash('Hard impact');
+      if (e.speed > A.hardLandingVs * k) {
+        this.hurt((e.speed - A.hardLandingVs * k) * 22);
         this._toast('hard', `Hard landing (${e.speed.toFixed(1)} m/s).`);
       }
       this.game.audio?.play('thump', { volume: Math.min(1, 0.2 + e.speed * 0.25) });

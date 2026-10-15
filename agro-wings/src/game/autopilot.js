@@ -152,7 +152,8 @@ export class Autopilot {
         return this._approach(dt);
       case 'rollout': {
         v.throttle = 0;
-        v.pitch = 0.5;
+        // Ease the stick back after touchdown so the tail settles instead of slamming.
+        v.pitch = clamp((this.pt - 0.3) * 0.35, 0, 0.5);
         const hdgErr = wrapAngle(Math.PI / 2 - fm.heading());
         v.yaw = clamp(-hdgErr * 3 + fm.omega.y * 1.5, -1, 1);
         v.brake = o.airspeed < 24;
@@ -384,11 +385,17 @@ export class Autopilot {
     if (o.agl > 5 || !onFinal) {
       this._fly(bank, alt, onFinal ? vref : 42, dt, { kh: onFinal ? 0.5 : 0.3, maxSink: 4.5, thrBase: 0.45 });
     } else {
-      // Flare: idle, raise the nose to arrest the sink, wings level.
-      v.throttle = 0;
+      // Flare: raise the nose to arrest the sink, wings level. Idle when light;
+      // a loaded aircraft keeps some power until just above the ground.
+      const load = clamp((fm.mass - 1450) / 650, 0, 1);
+      v.throttle = load * 0.35 * smoothstep(0.3, 2.5, o.agl);
       v.roll = clamp((0 - this.att.bank) * 2, -1, 1);
+      // Aim for the three-point attitude close to the ground so mains and
+      // tailwheel touch together (ground effect pitches the nose down).
       const vsT = -0.35 - o.agl * 0.12;
-      v.pitch = clamp((vsT - o.vs) * 0.6 + (0.12 - this.att.pitch) * 0.8, -0.4, 1);
+      const near = 1 - smoothstep(0.8, 4, o.agl);
+      const tgtPitch = 0.12 + 0.07 * near;
+      v.pitch = clamp((vsT - o.vs) * 0.6 + (tgtPitch - this.att.pitch) * (0.8 + 2.2 * near), -0.4, 1);
       const hdgErr = wrapAngle(Math.PI / 2 - fm.heading());
       v.yaw = clamp(-hdgErr * 2, -1, 1);
     }
@@ -399,6 +406,6 @@ export class Autopilot {
       this.apStage = 0;
       this.pt = 1;
     }
-    void smoothstep; void SPRAY;
+    void SPRAY;
   }
 }

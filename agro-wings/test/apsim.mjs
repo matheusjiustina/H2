@@ -96,6 +96,10 @@ export function run(game, seconds, { log = 10, dt = 1 / 60, startPhase = 'lineup
     ac._afterPlace();
     ac.fm.engine = 'running'; ac.fm.rpm = 800; ac.fm.hopper = 0;
   }
+  if (startPhase === 'approach') {
+    ac.placeAirborne(-2400, 300, Math.PI / 2, 120, 46);
+    ac.fm.updateMass();
+  }
   ap.set(startPhase);
   let next = 0;
   const mouse = { buttons: 0, dx: 0, dy: 0, wheel: 0 };

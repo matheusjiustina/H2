@@ -34,8 +34,9 @@ await page.evaluate((id) => {
 }, contract);
 
 const snap = async (name) => {
-  // One full (non-headless) tick refreshes camera, streaming and HUD before rendering.
-  await page.evaluate(() => { const g = window.__agro; g.tick(1 / 60); g.render(); });
+  // Fast-forward skips presentation: re-seat the camera, then ~0.75 s of full
+  // (non-headless) ticks refresh camera, spray mist, streaming and HUD.
+  await page.evaluate(() => { const g = window.__agro; g.rig.initialized = false; for (let i = 0; i < 45; i++) g.tick(1 / 60); g.render(); });
   await page.waitForTimeout(150);
   await page.screenshot({ path: `${outDir}/${name}.png` });
 };
