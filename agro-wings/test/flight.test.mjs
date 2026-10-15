@@ -129,6 +129,71 @@ test('banked turn: rate matches g·tan(bank)/V and costs energy', () => {
   assert.ok(turn.v < straight.v - 1, 'a level turn bleeds energy compared with straight flight');
 });
 
+// Keyboard-style pilot (same input shaping as the game) from level flight at
+// spraying speed. pilot(fm, att, turned, st) -> { pitch, roll } | { done }.
+function pilotRun(hopper, pilot, mode = 'normal') {
+  const sim = trimmed(hopper, 46, 0.85);
+  holdSpeed(sim, 46, 6);
+  const { fm } = sim;
+  const h0 = fm.pos.y;
+  const sh = { p: 0, r: 0 };
+  const ap = (c, t, r) => (c < t ? Math.min(t, c + r / 120) : Math.max(t, c - r / 120));
+  let turned = 0, prev = fm.heading(), t = 0, top = 0, low = 0, stall = 0, maxBank = 0;
+  const st = { phase: 0 };
+  while (t < 40) {
+    const a = sim.att();
+    const c = pilot(fm, a, turned, st);
+    if (c.done) break;
+    sh.p = ap(sh.p, c.pitch, c.pitch === 0 ? 4 : 2.6);
+    sh.r = ap(sh.r, c.roll, c.roll === 0 ? 5 : 3.2);
+    sim.step(1, { pitch: sh.p, roll: sh.r, yaw: 0 }, mode);
+    let d = fm.heading() - prev; d = Math.atan2(Math.sin(d), Math.cos(d)); turned += d; prev = fm.heading();
+    t += 1 / 120;
+    top = Math.max(top, fm.pos.y - h0); low = Math.min(low, fm.pos.y - h0);
+    stall = Math.max(stall, fm.out.stall); maxBank = Math.max(maxBank, Math.abs(a.bank));
+  }
+  return { t, dh: fm.pos.y - h0, top, low, stall, maxBank, turned, v: fm.out.airspeed };
+}
+
+test('ailerons: full stick rolls past 75° quickly, no bank cap while held', () => {
+  let t60 = null, t = 0;
+  const r = pilotRun(0, (fm, a) => {
+    t += 1 / 120;
+    if (Math.abs(a.bank) > 1.05 && t60 === null) t60 = t;
+    if (Math.abs(a.bank) > 1.36 || t > 3) return { done: true };
+    return { pitch: 0, roll: 1 };
+  });
+  console.log(`  60° bank after ${t60?.toFixed(2)} s; ${deg(r.maxBank).toFixed(0)}° reached in ${r.t.toFixed(1)} s`);
+  assert.ok(r.maxBank > 1.3, `bank capped at ${deg(r.maxBank)}°`);
+  assert.ok(t60 !== null && t60 < 1.3, `roll to 60° took ${t60} s`);
+});
+
+test('steep turn at 45° with the stick centred holds the flight path (empty and loaded)', () => {
+  for (const hop of [0, 560]) {
+    const r = pilotRun(hop, (fm, a, turned) => (Math.abs(turned) >= Math.PI ? { done: true } : { pitch: 0, roll: Math.abs(a.bank) < 0.7 ? 1 : 0 }));
+    console.log(`  45° turn, hopper ${hop} L: 180° in ${r.t.toFixed(1)} s, height ${r.dh.toFixed(1)} m (lowest ${r.low.toFixed(1)})`);
+    assert.ok(r.low > -12, `sank ${r.low} m`);
+  }
+});
+
+test('balão: pull-up, steep reversal and the nose falls back — energy traded, no stall', () => {
+  const balao = (fm, a, turned, st) => {
+    if (st.phase === 0) { if (a.pitch > 0.42) st.phase = 1; return { pitch: 1, roll: 0 }; }
+    if (st.phase === 1) { if (Math.abs(a.bank) > 1.12) st.phase = 2; return { pitch: 0, roll: 1 }; }
+    if (st.phase === 2) { if (Math.abs(turned) > Math.PI * 0.85) st.phase = 3; return { pitch: 0.25, roll: 0 }; }
+    if (Math.abs(a.bank) < 0.1) return { done: true };
+    return { pitch: 0, roll: -1 };
+  };
+  for (const hop of [0, 560]) {
+    const r = pilotRun(hop, balao);
+    console.log(`  balão, hopper ${hop} L: ${deg(Math.abs(r.turned)).toFixed(0)}° in ${r.t.toFixed(1)} s, top +${r.top.toFixed(0)} m, end ${r.dh.toFixed(0)} m, bank ≤${deg(r.maxBank).toFixed(0)}°, stall ${r.stall.toFixed(2)}`);
+    assert.ok(r.top > 18, `pull-up only gained ${r.top} m`);
+    assert.ok(r.maxBank > 1.2, 'steep bank at the top');
+    assert.ok(r.stall < 0.2, `stalled (${r.stall})`);
+    assert.ok(r.dh > -20, `lost ${r.dh} m in the balão`);
+  }
+});
+
 test('stall: progressive, recoverable without assist; prevented with assist', () => {
   const sim = trimmed(0, 40, 0);
   const { fm } = sim;

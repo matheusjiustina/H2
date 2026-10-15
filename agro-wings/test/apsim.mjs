@@ -7,7 +7,7 @@ import { Sprayer } from '../src/spray/sprayer.js';
 import { Guidance } from '../src/spray/guidance.js';
 import { Job, CONTRACTS } from '../src/game/contracts.js';
 import { createVegetation, makeTreeCollider } from '../src/world/vegetation.js';
-import { POWERLINE, BASE } from '../src/world/layout.js';
+import { POWERLINE, BASE, HQ } from '../src/world/layout.js';
 import { QUALITY } from '../src/config.js';
 
 let obstacles = null;
@@ -34,6 +34,11 @@ function buildObstacles(terrain) {
     [pk.x - 2.6, pk.x + 2.6, pk.z - 2.6, pk.z + 2.6, 2.1, 'pickup'],
     [tk.x - 1.4, tk.x + 1.4, tk.z - 4.5, tk.z + 4.6, 3.3, 'truck'],
     [h.x - h.w / 2 - 0.5, h.x + h.w / 2 + 0.5, h.z - h.d / 2 - 0.5, h.z + h.d / 2 + 0.2, h.h + 3, 'hangar'],
+    // Farm HQ (tops relative to the local ground, as in structures.js).
+    [HQ.house.x - 9.5, HQ.house.x + 9.5, HQ.house.z - 5.5, HQ.house.z + 8.2, 6, 'house', true],
+    ...HQ.sheds.map((s) => [s.x - s.w / 2 - 1, s.x + s.w / 2 + 1, s.z - s.d / 2 - 1, s.z + s.d / 2 + 1, 9.5, 'shed', true]),
+    ...HQ.silos.map((s) => [s.x - 5.8, s.x + 5.8, s.z - 5.8, s.z + 5.8, 18, 'silo', true]),
+    [HQ.dryer.x - 2.5, HQ.dryer.x + 5, HQ.dryer.z - 2.5, HQ.dryer.z + 2.5, 30, 'dryer', true],
   ];
   obstacles = {
     obstacleAt: (x, y, z) => {
@@ -41,7 +46,7 @@ function buildObstacles(terrain) {
       if (y - th > 40) return null;
       const t = hit(x, y, z, th);
       if (t) return t;
-      for (const [x0, x1, z0, z1, top, name] of boxes) if (x > x0 && x < x1 && z > z0 && z < z1 && y < top) return name;
+      for (const [x0, x1, z0, z1, top, name, rel] of boxes) if (x > x0 && x < x1 && z > z0 && z < z1 && y < top + (rel ? th : 0)) return name;
       return null;
     },
     wireDistance: (x, y, z) => {

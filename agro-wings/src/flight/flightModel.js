@@ -207,7 +207,10 @@ export class FlightModel {
     const CmWB = A.Cm0 + A.CmaWB * aC + A.Cmflap * this.flaps - 0.3 * stall;
     const CmT = A.CmaTail * aC + A.Cmq * qHat + A.Cmde * elev;
     const pitchM = qd * A.wingArea * A.chord * CmWB + qTail * A.wingArea * A.chord * CmT;
-    const Cl = A.Clb * beta + A.Clp * pHat + A.Clr * rHat + A.Clda * this.aileron + this.stallWobble * stall * 0.12;
+    // Stalled in a turn: the slower inner wing stalls first and drops, and the
+    // roll damping of an attached-flow wing is lost.
+    const wingDrop = stall * 0.05 * clamp(rHat * 15, -1, 1);
+    const Cl = A.Clb * beta + A.Clp * (1 - 0.7 * stall) * pHat + A.Clr * rHat + A.Clda * this.aileron + this.stallWobble * stall * 0.12 + wingDrop;
     const rollM = qd * A.wingArea * A.span * Cl - 0.025 * thrust;
     const yawM = qd * A.wingArea * A.span * (A.Cnb * beta + A.Cnda * this.aileron)
       + qTail * A.wingArea * A.span * (A.Cnr * rHat + A.Cndr * this.rudder)

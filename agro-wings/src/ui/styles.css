@@ -45,10 +45,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 /* ---------- HUD ---------- */
 .hud { position: absolute; inset: 0; opacity: 0; transition: opacity .4s; }
 .hud.show { opacity: 1; }
-.readouts { position: absolute; left: max(16px, env(safe-area-inset-left)); bottom: max(16px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(5, auto); gap: 4px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.readouts { position: absolute; left: max(16px, env(safe-area-inset-left)); bottom: max(16px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(6, auto); gap: 4px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .ro { display: flex; flex-direction: column; min-width: 54px; }
 .ro .l { font-size: 10px; letter-spacing: .16em; color: var(--ink-faint); text-transform: uppercase; }
 .ro .v { font: 600 22px var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.15; }
+.ro.dim .v { color: var(--ink-faint); }
 .ro .u { font-size: 11px; color: var(--ink-dim); margin-left: 2px; font-family: var(--sans); font-weight: 400; }
 .ro.warn .v { color: var(--warn); }
 .ro.bad .v { color: var(--bad); }

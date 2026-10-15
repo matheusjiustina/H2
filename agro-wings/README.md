@@ -68,13 +68,39 @@ input shaping rates. Changes for an agricultural taildragger:
 
 - spring/damper main gear and steerable tailwheel, rolling resistance per
   surface, brakes (differential with rudder), small ground irregularities;
-- mass, inertia and CG change with fuel and hopper load;
 - fixed-pitch prop: static thrust fades toward pitch speed, windmill drag at
   idle (gives a real glide);
 - fuel burn and starvation; crop-canopy drag and crop strikes.
 
+- mass, inertia and CG change with fuel and hopper load; MTOW 1,800 kg as on
+  the EMB-202 (the load sheet warns above it and shows the steepest bank
+  the wing can hold level at 90 kt for that load);
+- stalled in a turn, the slower inner wing drops and roll damping is lost.
+
 The simulation runs at a fixed 120 Hz with an accumulator and render
 interpolation. All tuning values live in `src/config.js`.
+
+### Assist and the balão
+
+`src/flight/assist.js` (mode *normal*) is tuned for agricultural flying:
+
+- rate command with expo: fine control near centre, full stick rolls
+  ~75°/s and pitches ~26°/s; no bank limit below 80° while the stick is held;
+- stick released: flight-path hold. In a bank the assist asks for the load
+  factor n = cos γ / cos φ that keeps the climb or descent, but never more
+  than the wing can give at that speed and weight. Beyond that the nose
+  falls and the aircraft descends — the real energy trade of a steep turn.
+  A level turn settles at the bank the wing can sustain; a climbing aircraft
+  (top of the balão) keeps up to 75°; a held climb flattens as speed bleeds;
+- stall protection anticipates the alpha trend and the path rotation
+  (α̇ = q − γ̇), g protection at +3.8 / −1 g.
+
+The balão at the end of each pass is flown as in the field: valve off, pull
+up (~2.2–2.5 g, +25–40 m), turn ~45° away, bank 60–75° back toward the next
+swath at the slow top, let the nose fall and dive back to 3 m. The HUD's
+LOAD readout shows the g. Measured with the test pilot (`npm test`): 60°
+bank in 1.1 s, 45° turns hold height within ~7 m, a balão with 560 L tops
+out ~29 m above the pass and ends above it, never stalling.
 
 ## Tests
 
@@ -110,15 +136,16 @@ Show FPS) reports fps, draw calls and triangles live.
 
 ### Validation runs (final build)
 
-- `npm test`: 19/19 (flight model incl. braked pivot, spray deposition).
+- `npm test`: 22/22 (flight model incl. braked pivot, aileron authority,
+  steep turns and the balão; spray deposition).
 - `node test/e2e_ui.mjs`: 15/15 (badeco service, abort and veto, crash,
   stuck reset, rebinding, tutorial, touch layout).
 - `node test/e2e.mjs soy`: full contract in the browser through the player
   inputs — service, taxi, take-off, 12 passes, landing, taxi-in, second
   service, second sortie, 90 % coverage, results and payment.
-- `REFILL=1 node test/apsim.mjs corn|cotton 4500`: corn (one reload) and
-  cotton (one sortie) contracts in Node, 90 % coverage, no hard landing,
-  parked at the pad.
+- `REFILL=1 node test/apsim.mjs soy|corn|cotton 4500`: all three contracts in
+  Node with the farm-HQ and base colliders, one reload each (560/520/500 L
+  loads within MTOW), 90 % coverage, no hard landing, parked at the pad.
 
 ## Aircraft
 

@@ -13,7 +13,7 @@ export const CONTRACTS = [
     fields: ['T-07'],
     payPerHa: 260,
     bonus: 2500,
-    recommended: { fuel: 160, liquid: 820 },
+    recommended: { fuel: 140, liquid: 560 },
     tip: 'Rows run east–west. Use the lightbar to stay on the yellow line.',
   },
   {
@@ -25,7 +25,7 @@ export const CONTRACTS = [
     fields: ['T-12'],
     payPerHa: 330,
     bonus: 3500,
-    recommended: { fuel: 170, liquid: 720 },
+    recommended: { fuel: 140, liquid: 520 },
     tip: 'The orange balls mark the power line at the east end of each pass.',
   },
   {
@@ -37,7 +37,7 @@ export const CONTRACTS = [
     fields: ['T-03A', 'T-03B'],
     payPerHa: 380,
     bonus: 4500,
-    recommended: { fuel: 200, liquid: 650 },
+    recommended: { fuel: 150, liquid: 500 },
     tip: 'Liquid sprayed over the creek or the road counts as waste.',
   },
 ];

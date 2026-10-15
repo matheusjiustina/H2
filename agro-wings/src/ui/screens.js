@@ -125,19 +125,26 @@ export class Screens {
       <div class="field"><label>Application liquid</label><input type="range" min="0" max="${FLIGHT.hopperCapacity}" step="10" value="${liquid}" data-k="liquid"><span class="val vl"></span></div>
       <h3>Weight &amp; performance</h3>
       <div class="stats">
-        <div class="stat"><b class="m"></b><span>Take-off mass</span></div>
+        <div class="stat"><b class="m"></b><span>Take-off mass · MTOW ${FLIGHT.mtow.toLocaleString('en-US')} kg</span></div>
+        <div class="stat"><b class="b"></b><span>Max level bank at 90 kt</span></div>
         <div class="stat"><b class="r"></b><span>Est. ground roll</span></div>
         <div class="stat"><b class="c"></b><span>Fuel cost</span></div>
         <div class="stat"><b class="e"></b><span>Spray time at full flow</span></div>
       </div>
-      <div class="note">Fuel is billed to you. The client supplies the application liquid; whatever lands outside the talhão, drifts away or is over-applied counts as waste in the evaluation. A heavy hopper means a longer take-off roll, slower climb and a higher stall speed.</div>
+      <div class="note">Fuel is billed to you. The client supplies the application liquid; whatever lands outside the talhão, drifts away or is over-applied counts as waste in the evaluation. A heavy hopper means a longer take-off roll, slower climb, a higher stall speed and shallower turns: pull up before the balão, then bank.</div>
       <div class="row2"><span class="money">Balance ${money(g.career.money)}</span><div class="btn-row">
         <button class="btn small" data-a="rec">Recommended</button><button class="btn small" data-a="close">Cancel</button><button class="btn primary" data-a="go">Request service</button></div></div></div>`);
     const upd = () => {
       el.querySelector('.vf').textContent = `${Math.round(fuel)} L`;
       el.querySelector('.vl').textContent = `${Math.round(liquid)} L`;
       const mass = FLIGHT.emptyMass + FLIGHT.pilotMass + fuel * FLIGHT.fuelDensity + liquid * FLIGHT.liquidDensity;
-      el.querySelector('.m').textContent = `${Math.round(mass)} kg`;
+      const mEl = el.querySelector('.m');
+      mEl.textContent = `${Math.round(mass)} kg${mass > FLIGHT.mtow ? ' · OVER' : ''}`;
+      mEl.style.color = mass > FLIGHT.mtow ? 'var(--bad)' : '';
+      // Load factor at the stall-protected angle of attack, 90 kt, sea level.
+      const clProt = FLIGHT.CL0 + FLIGHT.CLa * (FLIGHT.alphaStall - 0.025);
+      const n = (clProt * 0.6125 * 46.3 ** 2 * FLIGHT.wingArea) / (mass * 9.81);
+      el.querySelector('.b').textContent = `${Math.round((Math.acos(1 / Math.max(1.01, n)) * 180) / Math.PI)}°`;
       // Empirical fit to the flight model's measured rolls (empty ~140 m, full ~600 m).
       const roll = 140 * Math.pow(mass / 1303, 2.9);
       el.querySelector('.r').textContent = `${Math.round(roll / 10) * 10} m`;

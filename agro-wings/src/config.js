@@ -9,6 +9,7 @@ export const FLIGHT = {
 
   // Geometry & mass (body frame: +Z nose, +Y up, +X left wing).
   emptyMass: 1060, // airframe + oil
+  mtow: 1800, // EMB-202 class maximum take-off mass (agricultural category)
   pilotMass: 85,
   wingArea: 19.9,
   span: 11.7,

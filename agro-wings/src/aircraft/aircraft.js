@@ -482,7 +482,7 @@ export class Aircraft {
       hgt: this.workHeight(), agl: o.agl, altFt: (fm.pos.y + UNITS.altOffsetM) * FT,
       power: fm.throttle, rpm: fm.rpm, fuel: fm.fuel, hopper: fm.hopper, engine: fm.engine,
       stall: o.stall, onGround: o.onGround, flaps: fm.flaps, brake: fm.brake, parkBrake: fm.parkBrake,
-      vs: o.vs, damage: this.damage, mass: fm.mass, hdg: this.headingDeg(), state: this.state,
+      vs: o.vs, damage: this.damage, mass: fm.mass, hdg: this.headingDeg(), state: this.state, g: o.gLoad,
     };
   }
 }

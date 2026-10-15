@@ -122,20 +122,24 @@ export class Autopilot {
         const top = ac.env.top(fm.pos.x, fm.pos.z);
         const away = this.turnRight ? Math.PI / 4 : -Math.PI / 4; // + = left in yaw terms
         let bankCmd = 0;
+        // Height for the whole balão: the highest clearance seen since the
+        // pull-up began (obstacles leave the look-ahead while turning).
+        this.tdWant = Math.max(this.pt < 0.05 ? 0 : this.tdWant || 0, top + 1.25 + Math.max(28, this._clearance(), this._areaClearance()));
         if (this.tdStage === 0) {
+          // Pull-up: wings level, firm pull, trade speed for height.
           bankCmd = clamp(-wrapAngle(passYaw - hdg) * 1.5, -0.3, 0.3);
-          if (this.pt > 3) { this.tdStage = 1; this.tdT = 0; }
+          this._fly(bankCmd, this.tdWant, 34, dt, { kh: 1.2, maxClimb: 14, thrBase: 1, maxPitch: 0.45 });
+          if (this.pt > 2 && (fm.pos.y > this.tdWant - 8 || this.pt > 5)) { this.tdStage = 1; this.tdT = 0; }
+          return;
         } else if (this.tdStage === 1) {
-          // Obstacles ahead and still low: climb wings-level first, then turn.
-          const want = top + 1.25 + Math.max(28, this._clearance(), this._areaClearance());
-          const climbFirst = fm.pos.y < want - 6 && this._clearance(450) > 0;
-          bankCmd = climbFirst ? 0 : clamp(-wrapAngle(passYaw + away - hdg) * 1.5, -0.55, 0.55);
+          // Turn ~45° away at the top (climb wings-level first if still low).
+          const climbFirst = fm.pos.y < this.tdWant - 6 && this._clearance(450) > 0;
+          bankCmd = climbFirst ? 0 : clamp(-wrapAngle(passYaw + away - hdg) * 1.5, -0.6, 0.6);
           if (!climbFirst) this.tdT = (this.tdT || 0) + dt;
           if (this.tdT > 5) this.tdStage = 2;
         } else {
-          // Steep reversal only once high enough; otherwise keep climbing in a shallow turn.
-          const want = top + 1.25 + Math.max(28, this._clearance(), this._areaClearance());
-          const steep = fm.pos.y > want - 4 ? 0.75 : 0.4;
+          // Steep reversal toward the next swath once high enough.
+          const steep = fm.pos.y > this.tdWant - 4 ? 0.95 : 0.45;
           bankCmd = this.turnRight ? steep : -steep;
           const reverse = wrapAngle(passYaw + Math.PI);
           if (Math.abs(wrapAngle(reverse - hdg)) < 0.6) {
@@ -144,8 +148,9 @@ export class Autopilot {
             return;
           }
         }
-        // Pull-up turn: slower and climbing, like an ag pilot at the end of a pass.
-        this._fly(bankCmd, top + 1.25 + Math.max(28, this._clearance(), this._areaClearance()), 39, dt, { kh: 0.6, maxClimb: 7, thrBase: 0.75 });
+        // Keep the height of the top through the turn (no pushing over into
+        // the trees); the descent to work height belongs to the next pass.
+        this._fly(bankCmd, Math.max(this.tdWant, fm.pos.y - 4), 39, dt, { kh: 0.6, maxClimb: 7, maxSink: 2.5, thrBase: 0.75, minStick: -0.3 });
         return;
       }
       case 'approach':
@@ -295,8 +300,8 @@ export class Autopilot {
     v.roll = clamp((bankCmd - bank) * 2.2 - fm.omega.z * 0.4, -1, 1);
     const hErr = altTarget - (opts.height ?? fm.pos.y);
     const vsT = clamp(hErr * (opts.kh ?? 0.35), -(opts.maxSink ?? 4), opts.maxClimb ?? 4);
-    const pitchT = clamp(0.03 + (vsT - o.vs) * 0.08 + (vsT / Math.max(20, o.airspeed)), -0.25, 0.3);
-    v.pitch = clamp((pitchT - pitch) * 3.5 + fm.omega.x * 1.0, -1, 1);
+    const pitchT = clamp(0.03 + (vsT - o.vs) * 0.08 + (vsT / Math.max(20, o.airspeed)), -0.25, opts.maxPitch ?? 0.3);
+    v.pitch = clamp((pitchT - pitch) * 3.5 + fm.omega.x * 1.0, opts.minStick ?? -1, 1);
     if (Math.abs(v.pitch) < 0.06) v.pitch = Math.sign(v.pitch || 1) * 0.06;
     v.throttle = clamp((opts.thrBase ?? 0.62) + (speedTarget - o.airspeed) * 0.08 + vsT * 0.04, 0, 1);
     v.yaw = 0;

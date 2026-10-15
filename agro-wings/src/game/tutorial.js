@@ -65,8 +65,8 @@ export class Tutorial {
         done: () => this.sprayGood > 5,
       },
       {
-        label: 'Turn around',
-        text: `At the field edge press ${k('spray')} to stop, climb a little, make a procedure turn and line up on the next pass.`,
+        label: 'Balão',
+        text: `At the field edge press ${k('spray')} to stop and fly the balão: pull ${k('pitchUp')} firmly to climb 20–30 m while the speed bleeds off, turn about 45° away, then bank steeply (60–75°) back toward the next line and let the nose fall. Dive back to 3 m on the yellow line. A loaded hopper climbs less and needs a shallower bank — watch the LOAD readout.`,
         done: () => g.guidance.passes.filter((p) => p.done > 0.85).length >= 2,
       },
       {

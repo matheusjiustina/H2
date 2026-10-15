@@ -27,6 +27,7 @@ export class HUD {
       <div class="readouts">
         <div class="ro r-spd"><span class="l">Speed</span><span class="v">0<span class="u">kt</span></span></div>
         <div class="ro r-hgt"><span class="l">Height</span><span class="v">0<span class="u">m</span></span></div>
+        <div class="ro r-g"><span class="l">Load</span><span class="v">1.0<span class="u">G</span></span></div>
         <div class="ro r-pwr"><span class="l">Power</span><span class="v">0<span class="u">%</span></span></div>
         <div class="ro r-fuel"><span class="l">Fuel</span><span class="v">0<span class="u">L</span></span><div class="bar"><span></span></div></div>
         <div class="ro r-hop"><span class="l">Hopper</span><span class="v">0<span class="u">L</span></span><div class="bar blue"><span></span></div></div>
@@ -41,7 +42,7 @@ export class HUD {
       job: q('.jobcard'), jobT: q('.jobcard .t'), jobS1: q('.jobcard .s1'), jobS2: q('.jobcard .s2'), jobBar: q('.jobcard .bar span'),
       crew: q('.crew'), crewMsg: q('.crew .msg'), lf: q('.crew .lf'), lh: q('.crew .lh'), bf: q('.crew .bf'), bh: q('.crew .bh'), crewHint: q('.crew .hint'),
       toasts: q('.toasts'), warnings: q('.warnings'), prompt: q('.prompt'), spray: q('.spraybadge'),
-      spd: q('.r-spd'), hgt: q('.r-hgt'), pwr: q('.r-pwr'), fuel: q('.r-fuel'), hop: q('.r-hop'),
+      spd: q('.r-spd'), hgt: q('.r-hgt'), gl: q('.r-g'), pwr: q('.r-pwr'), fuel: q('.r-fuel'), hop: q('.r-hop'),
       mini: q('.minimap canvas'), tut: q('.tut'), tutStep: q('.tut .step'), tutTxt: q('.tut .txt'), tutDim: q('.tut .dim'),
       fps: q('.fps'), vig: q('.vignette'),
     };
@@ -97,6 +98,10 @@ export class HUD {
     $.hgt.querySelector('.v').firstChild.nodeValue = t.hgt > 99 ? Math.round(t.hgt).toString() : t.hgt.toFixed(1);
     const sprayingNow = g.sprayer.on;
     $.hgt.className = 'ro r-hgt' + (sprayingNow ? (t.hgt < 1.5 ? ' bad' : t.hgt > 6 ? ' warn' : t.hgt >= SPRAY.idealHeight[0] && t.hgt <= SPRAY.idealHeight[1] ? ' good' : '') : '');
+    // Load factor (smoothed): what the pull-up and the balão cost the wing.
+    this.gs = (this.gs ?? 1) + (t.g - (this.gs ?? 1)) * Math.min(1, dt * 6);
+    $.gl.querySelector('.v').firstChild.nodeValue = t.onGround ? '1.0' : this.gs.toFixed(1);
+    $.gl.className = 'ro r-g' + (t.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
     $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round(t.power * 100));
     $.fuel.querySelector('.v').firstChild.nodeValue = String(Math.round(t.fuel));
     $.fuel.querySelector('.bar span').style.width = `${(t.fuel / FLIGHT.fuelCapacity) * 100}%`;
