@@ -7,7 +7,7 @@ import { Sprayer } from '../src/spray/sprayer.js';
 import { Guidance } from '../src/spray/guidance.js';
 import { Job, CONTRACTS } from '../src/game/contracts.js';
 import { createVegetation, makeTreeCollider } from '../src/world/vegetation.js';
-import { POWERLINE } from '../src/world/layout.js';
+import { POWERLINE, BASE } from '../src/world/layout.js';
 import { QUALITY } from '../src/config.js';
 
 let obstacles = null;
@@ -25,8 +25,25 @@ function buildObstacles(terrain) {
       wires.push({ a: [a.x + (b.x - a.x) * t0, y(t0), a.z + (b.z - a.z) * t0], b: [a.x + (b.x - a.x) * t1, y(t1), a.z + (b.z - a.z) * t1] });
     }
   }
+  // Operations-base colliders (same boxes as src/world/structures.js).
+  const ft = BASE.fuelTank, mt = BASE.mixTank, pk = BASE.pickup, tk = BASE.truck, h = BASE.hangar;
+  const boxes = [
+    [ft.x - 3.2, ft.x + 3.6, ft.z - 1.2, ft.z + 1.8, 2.6, 'fuel tank'],
+    [mt.x - 1.2, mt.x + 2.0, mt.z - 1.2, mt.z + 1.4, 3.6, 'mix tank'],
+    ...BASE.reservoirs.map((r) => [r.x - 1.3, r.x + 1.3, r.z - 1.3, r.z + 1.3, 6.1, 'reservoir']),
+    [pk.x - 2.6, pk.x + 2.6, pk.z - 2.6, pk.z + 2.6, 2.1, 'pickup'],
+    [tk.x - 1.4, tk.x + 1.4, tk.z - 4.5, tk.z + 4.6, 3.3, 'truck'],
+    [h.x - h.w / 2 - 0.5, h.x + h.w / 2 + 0.5, h.z - h.d / 2 - 0.5, h.z + h.d / 2 + 0.2, h.h + 3, 'hangar'],
+  ];
   obstacles = {
-    obstacleAt: (x, y, z) => { const th = terrain.heightAt(x, z); return y - th > 40 ? null : hit(x, y, z, th); },
+    obstacleAt: (x, y, z) => {
+      const th = terrain.heightAt(x, z);
+      if (y - th > 40) return null;
+      const t = hit(x, y, z, th);
+      if (t) return t;
+      for (const [x0, x1, z0, z1, top, name] of boxes) if (x > x0 && x < x1 && z > z0 && z < z1 && y < top) return name;
+      return null;
+    },
     wireDistance: (x, y, z) => {
       let best = 1e9;
       for (const w of wires) {
@@ -73,6 +90,12 @@ export function run(game, seconds, { log = 10, dt = 1 / 60, startPhase = 'lineup
   ac.placeOnRunway('west');
   ac.fm.engine = 'running'; ac.fm.rpm = 800;
   ac.fm.fuel = 160; ac.fm.hopper = +(process.env.HOP ?? game.job.c.recommended.liquid);
+  if (startPhase === 'taxiIn') {
+    // Landed eastbound and slowed down: taxi back to the pad.
+    ac.fm.settleOnGround(+(process.env.TX ?? -103), 0, Math.PI / 2, ac.env);
+    ac._afterPlace();
+    ac.fm.engine = 'running'; ac.fm.rpm = 800; ac.fm.hopper = 0;
+  }
   ap.set(startPhase);
   let next = 0;
   const mouse = { buttons: 0, dx: 0, dy: 0, wheel: 0 };
@@ -99,7 +122,7 @@ export function run(game, seconds, { log = 10, dt = 1 / 60, startPhase = 'lineup
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const g = makeGame(process.argv[2] || 'soy');
-  const ap = run(g, +(process.argv[3] || 300), { log: +(process.argv[4] || 10) });
+  const ap = run(g, +(process.argv[3] || 300), { log: +(process.argv[4] || 10), startPhase: process.env.START || 'lineup' });
   console.log(ap.log.map((l) => `${l.t}:${l.phase}`).join(' '));
   const ac = g.aircraft;
   console.log('final', ac.state, ac.crashReason || '', 'pos', ac.fm.pos.x.toFixed(0), ac.fm.pos.y.toFixed(1), ac.fm.pos.z.toFixed(0), 'cov', (g.job.stats().coverage * 100).toFixed(1));

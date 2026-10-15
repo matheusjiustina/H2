@@ -249,4 +249,24 @@ test('taxi: tailwheel steers both ways', () => {
   }
 });
 
+test('pivot: brake + full rudder turns the aircraft around on the spot', () => {
+  const sim = makeSim({ hopper: 0, fuel: 80, wind: false });
+  const { fm } = sim;
+  fm.settleOnGround(-103, 0, Math.PI / 2, sim.env);
+  fm.engine = 'running'; fm.rpm = 700;
+  const p0 = fm.pos.clone();
+  let turned = 0, prev = fm.heading(), t = 0;
+  while (Math.abs(turned) < Math.PI && t < 30) {
+    fm.throttle = 0.42; fm.brake = 1;
+    sim.step(1, { pitch: 0.4, roll: 0, yaw: -1 }, 'normal');
+    let d = fm.heading() - prev;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    turned += d; prev = fm.heading(); t += 1 / 120;
+  }
+  const moved = Math.hypot(fm.pos.x - p0.x, fm.pos.z - p0.z);
+  console.log(`#   180° pivot in ${t.toFixed(1)} s, moved ${moved.toFixed(1)} m`);
+  assert.ok(t < 25, `pivot took ${t.toFixed(1)} s`);
+  assert.ok(moved < 8, `pivot drifted ${moved.toFixed(1)} m`);
+});
+
 void FlightModel; void createFlightEnv;

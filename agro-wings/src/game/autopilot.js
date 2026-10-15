@@ -161,7 +161,9 @@ export class Autopilot {
       }
       case 'taxiIn': {
         const x = fm.pos.x;
-        this.wp ??= [[Math.min(x, -300), 0], [-378, 0], [-382, -14], [-382, -36], [-374, -58], [-366, -64], [BASE.pad.x, BASE.pad.z]];
+        // Slow down on the apron and keep north of the line to the pad: the
+        // left wing passes the mixing station on the way in.
+        this.wp ??= [[Math.min(x, -300), 0], [-378, 0], [-382, -14], [-382, -36, 4], [-378, -50, 3], [-370, -58, 3], [-361, -62, 2.5], [BASE.pad.x, BASE.pad.z, 2.5]];
         if (this._taxi(dt, this.wp, 6)) this.set('park');
         return;
       }
@@ -186,7 +188,8 @@ export class Autopilot {
     const ac = this.game.aircraft, fm = ac.fm, o = fm.out;
     const v = this.v;
     if (this.wi === undefined || this._wpRef !== pts) { this.wi = 0; this._wpRef = pts; }
-    const [tx, tz] = pts[this.wi];
+    const [tx, tz, wpSpeed] = pts[this.wi];
+    if (wpSpeed) speed = wpSpeed;
     const dx = tx - fm.pos.x, dz = tz - fm.pos.z;
     const d = Math.hypot(dx, dz);
     const want = Math.atan2(dx, dz);
@@ -201,14 +204,17 @@ export class Autopilot {
     const sp = o.groundSpeed;
     v.yaw = clamp(-err * 2.5 + fm.omega.y * 1.2, -1, 1);
     if (ae > 0.9) {
-      // Pivot on the inner main wheel: full rudder + differential brake.
-      v.yaw = err > 0 ? -1 : 1;
+      // Pivot on the inner main wheel: full rudder + differential brake. Near
+      // 180° the error flips sign every step; keep turning the same way.
+      if (!this._pivotDir || ae < 2.6) this._pivotDir = err > 0 ? -1 : 1;
+      v.yaw = this._pivotDir;
       v.brake = true;
       v.throttle = sp > 1.5 ? 0.15 : 0.42;
     } else {
+      this._pivotDir = 0;
       const tgtSpeed = Math.min(speed, last ? Math.max(1.5, d * 0.35) : speed) * (ae > 0.4 ? 0.6 : 1);
       v.throttle = clamp(0.2 + (tgtSpeed - sp) * 0.15 + ae * 0.1, 0.05, 0.6);
-      v.brake = sp > tgtSpeed + 1.5;
+      v.brake = sp > tgtSpeed + 1.0;
     }
     v.pitch = 0.4; // stick back: tail wheel stays planted
     v.roll = 0;

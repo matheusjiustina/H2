@@ -273,7 +273,10 @@ export class FlightModel {
         if (this.parkBrake && g.name !== 'tail') b = 1;
         const muR = A.rollingResistance[st] ?? 0.05;
         const Flong = -clamp(vLong / 0.25, -1, 1) * muR * Fn - clamp(vLong / 0.06, -1, 1) * b * A.brakeMu * Fn;
-        const muLat = g.steer ? A.lateralMu * 0.6 : A.lateralMu;
+        // Tailwheel: steerable within its range, full-castering (unlocked) when
+        // the pilot pivots on a braked main wheel with full rudder.
+        const unlocked = g.steer && this.brake * Math.abs(yawCmd) > 0.5;
+        const muLat = g.steer ? (unlocked ? 0.05 : A.lateralMu * 0.6) : A.lateralMu;
         const Flat = -clamp(vLat / 0.18, -1, 1) * muLat * Fn;
         const F = _f.copy(n).multiplyScalar(Fn).addScaledVector(_fw, Flong).addScaledVector(_side, Flat);
         force.add(F);
