@@ -68,8 +68,13 @@ input shaping rates. Changes for an agricultural taildragger:
 
 - spring/damper main gear and steerable tailwheel, rolling resistance per
   surface, brakes (differential with rudder), small ground irregularities;
-- fixed-pitch prop: static thrust fades toward pitch speed, windmill drag at
-  idle (gives a real glide);
+- engine: Lycoming IO-540 on ethanol as on the EMB-202A, 320 hp (the
+  alcohol engine gives ~7 % more than the 300 hp avgas one); fixed climb-pitch
+  prop: static thrust fades toward pitch speed, windmill drag at idle (gives
+  a real glide). Measured: ~990 ft/min at 1,800 kg and 70 kt (published
+  930 ft/min for the 300 hp engine), ~124 kt top speed (published 121 kt);
+- stall-warning vane: the horn sounds ~4° before the critical angle, so a
+  hard pull or an over-steep loaded turn is heard before the wing quits;
 - fuel burn and starvation; crop-canopy drag and crop strikes.
 
 - mass, inertia and CG change with fuel and hopper load; MTOW 1,800 kg as on
@@ -85,7 +90,12 @@ interpolation. All tuning values live in `src/config.js`.
 `src/flight/assist.js` (mode *normal*) is tuned for agricultural flying:
 
 - rate command with expo: fine control near centre, full stick rolls
-  ~75°/s and pitches ~26°/s; no bank limit below 80° while the stick is held;
+  ~75°/s and pitches ~26°/s; no bank limit below 80° while the stick is held.
+  The elevator gets a feed-forward of what the commanded pitch rate needs
+  (the pitch damping), the way a pilot's hand moves the stick at once: full
+  back stick reaches the commanded rate in ~0.3 s and ~1.9 g in 0.5 s at
+  90 kt (before, the loop only reached ~75 % of the rate and the g took over
+  a second, which made pull-outs from the balão feel heavy);
 - stick released: flight-path hold. In a bank the assist asks for the load
   factor n = cos γ / cos φ that keeps the climb or descent, but never more
   than the wing can give at that speed and weight. Beyond that the nose
@@ -150,8 +160,9 @@ Show FPS) reports fps, draw calls and triangles live.
 
 ### Validation runs (final build)
 
-- `npm test`: 22/22 (flight model incl. braked pivot, aileron authority,
-  steep turns and the balão; spray deposition).
+- `npm test`: 24/24 (flight model incl. braked pivot, aileron authority,
+  pitch response, loaded pull-out, steep turns and the balão; spray
+  deposition).
 - `node test/e2e_ui.mjs`: 15/15 (badeco service, abort and veto, crash,
   stuck reset, rebinding, tutorial, touch layout).
 - `node test/e2e.mjs soy`: full contract in the browser through the player

@@ -144,7 +144,7 @@ function pilotRun(hopper, pilot, mode = 'normal') {
     const a = sim.att();
     const c = pilot(fm, a, turned, st);
     if (c.done) break;
-    sh.p = ap(sh.p, c.pitch, c.pitch === 0 ? 4 : 2.6);
+    sh.p = ap(sh.p, c.pitch, c.pitch === 0 ? 4 : 3.4);
     sh.r = ap(sh.r, c.roll, c.roll === 0 ? 5 : 3.2);
     sim.step(1, { pitch: sh.p, roll: sh.r, yaw: 0 }, mode);
     let d = fm.heading() - prev; d = Math.atan2(Math.sin(d), Math.cos(d)); turned += d; prev = fm.heading();
@@ -192,6 +192,45 @@ test('balão: pull-up, steep reversal and the nose falls back — energy traded,
     assert.ok(r.stall < 0.2, `stalled (${r.stall})`);
     assert.ok(r.dh > -20, `lost ${r.dh} m in the balão`);
   }
+});
+
+test('pitch response: full back stick brings the nose up within half a second', () => {
+  for (const v0 of [46, 60]) {
+    const sim = trimmed(300, v0, 0.9);
+    holdSpeed(sim, v0, 6);
+    const { fm } = sim;
+    let s = 0, t = 0, q05 = 0, g05 = 0;
+    while (t < 0.5) {
+      s = Math.min(1, s + 3.4 / 120);
+      sim.step(1, { pitch: s, roll: 0, yaw: 0 }, 'normal');
+      t += 1 / 120;
+    }
+    q05 = -fm.omega.x; g05 = fm.out.gLoad;
+    console.log(`  ${(v0 * KT).toFixed(0)} kt: pitch rate ${deg(q05).toFixed(0)}°/s and ${g05.toFixed(2)} g after 0.5 s`);
+    assert.ok(q05 > 0.38, `pitch rate only ${deg(q05)}°/s`);
+    assert.ok(g05 > 1.8, `only ${g05} g after 0.5 s`);
+  }
+});
+
+test('pull-out: loaded, from a 10° descent at spray speed, levels within ~9 m', () => {
+  const sim = trimmed(560, 50, 1);
+  holdSpeed(sim, 50, 6);
+  const { fm } = sim;
+  // Nose down to a 10° descent and let the speed build.
+  for (let i = 0; i < 120 * 6; i++) {
+    const a = sim.att();
+    sim.step(1, { pitch: Math.max(-1, Math.min(1, (-0.18 - a.pitch) * 3 + fm.omega.x)), roll: -a.bank * 2, yaw: 0 }, 'normal');
+  }
+  const y0 = fm.pos.y, vs0 = fm.out.vs, v0 = fm.out.airspeed;
+  let s = 0, low = 0, stall = 0;
+  for (let i = 0; i < 120 * 4 && fm.out.vs < 0.5; i++) {
+    s = Math.min(1, s + 3.4 / 120);
+    sim.step(1, { pitch: s, roll: 0, yaw: 0 }, 'normal');
+    low = Math.min(low, fm.pos.y - y0); stall = Math.max(stall, fm.out.stall);
+  }
+  console.log(`  from ${(-vs0).toFixed(1)} m/s sink at ${(v0 * KT).toFixed(0)} kt: levelled after ${(-low).toFixed(1)} m, stall ${stall.toFixed(2)}`);
+  assert.ok(-low < 9.3, `lost ${-low} m in the pull-out`);
+  assert.ok(stall < 0.2, 'no stall in the pull-out');
 });
 
 test('stall: progressive, recoverable without assist; prevented with assist', () => {

@@ -28,10 +28,12 @@ export const FLIGHT = {
   Cnb: 0.085, Cnr: -0.17, Cndr: 0.08, Cnda: -0.012,
   CYb: -0.6, CYdr: 0.12,
 
-  // Engine & propeller (300 hp class, ethanol).
-  staticThrust: 5300,
-  maxPower: 224e3,
-  propEfficiency: 0.74,
+  // Engine & propeller: EMB-202A Lycoming IO-540 on ethanol, 320 hp (the
+  // alcohol engine gives ~7 % more than the 300 hp avgas one); climb-pitch
+  // fixed prop, 2.2 m.
+  staticThrust: 5600,
+  maxPower: 239e3,
+  propEfficiency: 0.72, // climb prop: less efficient at cruise speeds
   propRadius: 1.1,
   propPitchSpeed: 95, // m/s at max rpm (fixed-pitch prop advance limit)
   idleRpm: 650,

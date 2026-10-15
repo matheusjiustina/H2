@@ -115,11 +115,17 @@ export class Assist {
       if (pitch > 0.45) qCmd = Math.min(qCmd, -(pitch - 0.45) * 2);
       if (pitch < -0.45) qCmd = Math.max(qCmd, (-0.45 - pitch) * 2);
     }
+    // Rate tracking. Feed-forward of the elevator that cancels the pitch
+    // damping at the commanded rate (what a pilot's hand does at once), so the
+    // nose comes up within ~0.4 s instead of waiting on the integrator; the
+    // PI loop only trims the rest. Without it a full pull only reached ~75 %
+    // of the commanded rate and the g built over more than a second.
     const gain = clamp(1800 / qTail, 0.35, 2.5);
     const qRate = -fm.omega.x;
     const err = qCmd - qRate;
-    this.ei = clamp(this.ei + err * 2.4 * gain * dt, -1, 1);
-    fm.elevator = clamp(this.ei + err * 1.8 * gain, -1, 1);
+    const ff = (-A.Cmq * (qCmd * A.chord) / (2 * Math.max(a.airspeed, 8))) / A.Cmde;
+    this.ei = clamp(this.ei + err * 5 * gain * dt, -1, 1);
+    fm.elevator = clamp(this.ei + ff + err * 2.4 * gain, -1, 1);
 
     // Roll: rate command with expo, bank hold when centred, bank limit.
     let pCmd;

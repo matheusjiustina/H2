@@ -209,7 +209,7 @@ export class Aircraft {
     this.simTime += h;
     // Command shaping, same rates as Tidemark's controller.
     const s = this.shaped, t = this.target;
-    s.elev = approach(s.elev, t.pitch, t.pitch === 0 ? 4 : 2.6, h);
+    s.elev = approach(s.elev, t.pitch, t.pitch === 0 ? 4 : 3.4, h);
     s.ail = approach(s.ail, t.roll, t.roll === 0 ? 5 : 3.2, h);
     s.rud = approach(s.rud, t.yaw, t.yaw === 0 ? 4 : 2.5, h);
     const o = fm.out;

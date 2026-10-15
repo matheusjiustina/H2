@@ -52,7 +52,7 @@ export class FlightModel {
     }));
     this.hard = A.hard.map((h) => ({ ...h, pv: new Vector3(...h.p), prev: -1 }));
     this.out = {
-      airspeed: 0, groundSpeed: 0, alpha: 0, beta: 0, stall: 0, agl: 100, onGround: false, wheelsOnGround: 0,
+      airspeed: 0, groundSpeed: 0, alpha: 0, beta: 0, stall: 0, stallWarn: 0, agl: 100, onGround: false, wheelsOnGround: 0,
       thrust: 0, gLoad: 1, vs: 0, cropDepth: 0, surface: 'grass', density: 1.225, mass: 0,
     };
     this.events = [];
@@ -353,6 +353,9 @@ export class FlightModel {
     out.alpha = alpha;
     out.beta = beta;
     out.stall = u > 12 ? stall : 0;
+    // Stall-warning vane: sounds ~4° before the critical angle (flaps lower it).
+    const aWarn = A.alphaStall - this.flaps * 0.035 - 0.07;
+    out.stallWarn = u > 12 && !out.onGround ? smoothstep(aWarn, aWarn + 0.015, alpha) : 0;
     out.agl = nearGround ? Math.max(0, minClear) : this.pos.y - 1.25 - env.ground(this.pos.x, this.pos.z);
     out.vs = this.vel.y;
     out.density = rho;

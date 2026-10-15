@@ -500,7 +500,7 @@ export class Game {
     const svcD = this.camera.position.distanceTo(this.service.badeco.pos);
     this.audio.update(dt, {
       rpm: fm.rpm, engine: fm.engine, throttle: fm.throttle, airspeed: o.airspeed, groundSpeed: o.groundSpeed,
-      onGround: o.onGround, surface: o.surface, stall: this.playing ? o.stall : 0, spraying: this.sprayer.on && this.sprayer.flowNow > 0,
+      onGround: o.onGround, surface: o.surface, stall: this.playing ? Math.max(o.stall, o.stallWarn) : 0, spraying: this.sprayer.on && this.sprayer.flowNow > 0,
       inside: this.cameraMode === 'cockpit' && this.playing, attached: this.cameraMode !== 'orbit', listenerDist: this.cameraMode === 'cockpit' ? 0 : Math.max(0, camD - 12),
       rough: ac.damage > 55, pumpOn: this.service.pumpOn, serviceAtt: 1 / (1 + svcD / 15),
       ambience: (1 - smoothstep(150, 700, baseD)) * (this.camera.position.y < 80 ? 1 : 0.3),
