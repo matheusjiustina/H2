@@ -146,7 +146,20 @@ export class Sprayer {
         fm.vel.x * 0.32 + _side.x + (Math.random() - 0.5) * 0.8,
         fm.vel.y * 0.3 - 1.2 - Math.random() * 0.8,
         fm.vel.z * 0.32 + _side.z + (Math.random() - 0.5) * 0.8,
-        { life: 2.4 + Math.random() * 2.0, size: 0.5 + Math.random() * 0.4, grow: 8, alpha: 0.13 + Math.random() * 0.08, drag: 1.3, gravity: SPRAY.fallSpeed * 0.5, color: [0.95, 0.97, 0.98], kind: 1 },
+        { life: 2.4 + Math.random() * 2.0, size: 0.6 + Math.random() * 0.45, grow: 8, alpha: 0.17 + Math.random() * 0.1, drag: 1.3, gravity: SPRAY.fallSpeed * 0.5, color: [0.95, 0.97, 0.98], kind: 1 },
+      );
+    }
+    // Dense, short-lived jets right under the nozzles (the bright sheet seen
+    // behind the booms).
+    this.jetAcc = (this.jetAcc || 0) + 520 * (this.flowNow / SPRAY.flow) * dt;
+    while (this.jetAcc >= 1) {
+      this.jetAcc -= 1;
+      const n = nozzles[(Math.random() * nozzles.length) | 0];
+      _p.copy(n).applyQuaternion(ac.rQuat).add(ac.rPos);
+      pool.spawn(
+        _p.x, _p.y - 0.05, _p.z,
+        fm.vel.x * 0.55 + (Math.random() - 0.5) * 0.5, fm.vel.y * 0.5 - 1.6, fm.vel.z * 0.55 + (Math.random() - 0.5) * 0.5,
+        { life: 0.55 + Math.random() * 0.35, size: 0.35 + Math.random() * 0.2, grow: 5, alpha: 0.3 + Math.random() * 0.12, drag: 1.6, gravity: SPRAY.fallSpeed * 0.4, color: [0.97, 0.98, 1.0], kind: 1 },
       );
     }
     void wind;

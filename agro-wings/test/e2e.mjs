@@ -65,7 +65,7 @@ for (let i = 0; i < 900; i++) {
   if (!shots.svcConnect && (s.step === 'transfer')) { shots.svcConnect = true; await snap('02-service-transfer'); await page.evaluate(() => { const g = window.__agro; g.rig.orbit.yaw = 2.2; g.rig.orbit.dist = 9; g.rig.orbit.pitch = 0.3; }); await snap('02b-service-close'); }
   if (!shots.takeoff && s.phase === 'takeoff' && s.kt > 40) { shots.takeoff = true; await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'chase'; g.rig.setMode('chase', g.aircraft); }); await page.evaluate(() => window.__agro.simulate(0.5)); await snap('03-takeoff'); }
   if (!shots.spraying && s.spray && s.cov > 3) { shots.spraying = true; await snap('04-spraying-chase');
-    await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'orbit'; g.rig.setMode('orbit', g.aircraft); const f = g.aircraft.forward(); g.rig.orbit.yaw = Math.atan2(f.x, f.z) + 0.5; g.rig.orbit.dist = 26; g.rig.orbit.pitch = 0.12; g.simulate(0.4); });
+    await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'orbit'; g.rig.setMode('orbit', g.aircraft); const f = g.aircraft.forward(); g.rig.orbit.yaw = Math.atan2(f.x, f.z) + 0.6; g.rig.orbit.dist = 17; g.rig.orbit.pitch = 0.1; g.simulate(0.4); });
     await snap('04b-spraying-side');
     await page.evaluate(() => { const g = window.__agro; g.overlay.setVisible(true, g.job.coverages); g.rig.orbit.pitch = 0.9; g.rig.orbit.dist = 140; g.simulate(0.2); });
     await snap('04c-coverage-overlay');

@@ -46,11 +46,12 @@ export const FLIGHT = {
   hopperOffsetZ: 0.25, // hopper centroid ahead of CG (m) — slightly nose-heavy when full
   fuelTankSpanY: 2.4, // lateral arm of wing tanks (adds roll inertia)
 
-  // Landing gear (contact points at full extension, body frame).
+  // Landing gear (contact points at full extension, body frame). Tall
+  // tubular mains as on the Ipanema: ~11° three-point attitude.
   gear: [
-    { name: 'mainL', p: [1.35, -1.25, 0.75], k: 95000, c: 9500, travel: 0.2, radius: 0.32, steer: false },
-    { name: 'mainR', p: [-1.35, -1.25, 0.75], k: 95000, c: 9500, travel: 0.2, radius: 0.32, steer: false },
-    { name: 'tail', p: [0, -0.3, -4.55], k: 28000, c: 2400, travel: 0.12, radius: 0.13, steer: true },
+    { name: 'mainL', p: [1.35, -1.43, 0.75], k: 95000, c: 9500, travel: 0.2, radius: 0.32, steer: false },
+    { name: 'mainR', p: [-1.35, -1.43, 0.75], k: 95000, c: 9500, travel: 0.2, radius: 0.32, steer: false },
+    { name: 'tail', p: [0, -0.42, -4.55], k: 28000, c: 2400, travel: 0.12, radius: 0.13, steer: true },
   ],
   rollingResistance: { runway: 0.035, dirt: 0.05, grass: 0.075, crop: 0.16 },
   brakeMu: 0.38,

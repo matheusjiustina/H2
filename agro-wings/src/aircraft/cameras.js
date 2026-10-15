@@ -15,6 +15,8 @@ export class CameraRig {
     this.chasePos = new THREE.Vector3();
     this.chaseLook = new THREE.Vector3();
     this.chaseDir = new THREE.Vector3(0, 0, 1);
+    this.chaseOffset = new THREE.Vector3(0, 3.7, -12.5);
+    this.chaseLookOffset = new THREE.Vector3(0, -0.4, 20);
     this.look = { yaw: 0, pitch: -0.3 };
     this.chaseOff = { yaw: 0, pitch: 0 };
     this.orbit = { yaw: 2.3, pitch: 0.22, dist: 16 };
@@ -77,16 +79,20 @@ export class CameraRig {
         this.chaseOff.pitch = damp(this.chaseOff.pitch, 0, 1.5, dt);
       }
       _v.copy(this.chaseDir).applyAxisAngle(Y, this.chaseOff.yaw);
-      const dist = 15 + smoothstep(30, 60, sp) * 2;
-      const target = _v2.copy(pos).addScaledVector(_v, -dist);
-      target.y += 4.4 + this.chaseOff.pitch * 8;
-      if (!this.initialized || this.chasePos.distanceToSquared(target) > 2500) this.chasePos.copy(target);
-      else this.chasePos.lerp(target, 1 - Math.exp(-5 * dt));
+      // Smooth the camera offset relative to the aircraft (not its world
+      // position), so the camera does not fall behind at spraying speed.
+      const dist = 12.5 + smoothstep(30, 60, sp) * 1.5;
+      const off = _v2.copy(_v).multiplyScalar(-dist);
+      off.y += 3.7 + this.chaseOff.pitch * 8;
+      if (!this.initialized) this.chaseOffset.copy(off);
+      else this.chaseOffset.lerp(off, 1 - Math.exp(-5 * dt));
+      this.chasePos.copy(pos).add(this.chaseOffset);
       // Look well ahead of the aircraft so the ground in front stays in view.
-      const lookT = _v.copy(pos).addScaledVector(this.chaseDir, 22);
-      lookT.y -= 0.2;
-      if (!this.initialized) this.chaseLook.copy(lookT);
-      else this.chaseLook.lerp(lookT, 1 - Math.exp(-8 * dt));
+      const lookOff = _v.copy(this.chaseDir).multiplyScalar(20);
+      lookOff.y -= 0.4;
+      if (!this.initialized) this.chaseLookOffset.copy(lookOff);
+      else this.chaseLookOffset.lerp(lookOff, 1 - Math.exp(-8 * dt));
+      this.chaseLook.copy(pos).add(this.chaseLookOffset);
       this._ground(terrain);
       cam.position.copy(this.chasePos);
       cam.up.copy(Y);

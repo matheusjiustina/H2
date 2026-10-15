@@ -37,7 +37,7 @@ export class Aircraft {
       this.model = stubModel();
     } else {
       this.panel = createPanel();
-      this.model = createAircraftModel(this.panel.texture);
+      this.model = createAircraftModel(this.panel);
     }
     game.scene.add(this.model.root);
     this.env = createFlightEnv(this.world.terrain);
@@ -401,6 +401,7 @@ export class Aircraft {
     for (const g of fm.gear) {
       const gg = m.gear[g.name];
       gg.wheel.position.y = gg.rest.y + g.compression;
+      if (gg.legH) gg.leg.scale.y = (gg.legH - g.compression) / gg.legH;
       gg.spin.rotation.x += g.spin * dt;
       if (g.name === 'tail') gg.fork.rotation.y = g.steerAngle;
     }
