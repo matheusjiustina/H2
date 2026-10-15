@@ -69,29 +69,35 @@ export function createGrass(terrain, quality, atlas) {
     return false;
   };
 
+  // Each cell is built once into packed per-kind buffers, so gathering the
+  // visible cells is a couple of typed-array copies per cell.
   function buildCell(cx, cz) {
     const r = rng(((cx * 73856093) ^ (cz * 19349663)) >>> 0);
-    const out = [[], []];
     const n = Math.round(70 * density);
+    const mats = [new Float32Array(n * 16), new Float32Array(n * 16)];
+    const cols = [new Float32Array(n * 3), new Float32Array(n * 3)];
+    const cnt = [0, 0];
     for (let i = 0; i < n; i++) {
       const x = (cx + r()) * CELL, z = (cz + r()) * CELL;
       const s = 0.55 + r() * 0.8, rot = r() * Math.PI * 2, tint = 0.82 + r() * 0.34;
       if (blocked(x, z)) continue;
-      // Dry capim in patches, denser toward fences and verges.
+      // Dry capim in patches.
       const dry = fbm(x / 70 + 3, z / 70, 2) + (r() - 0.5) * 0.6 > 0.25 ? 1 : 0;
       p.set(x, terrain.heightAt(x, z) - 0.03, z);
       q.setFromAxisAngle(UP, rot);
       sc.set(s, s * (0.8 + r() * 0.5), s);
       m4.compose(p, q, sc);
-      out[dry].push(m4.elements.slice(), tint);
+      const k = cnt[dry]++;
+      mats[dry].set(m4.elements, k * 16);
+      cols[dry][k * 3] = tint; cols[dry][k * 3 + 1] = tint; cols[dry][k * 3 + 2] = tint * 0.95;
     }
-    return out;
+    return [0, 1].map((k) => ({ m: mats[k].subarray(0, cnt[k] * 16), c: cols[k].subarray(0, cnt[k] * 3), n: cnt[k] }));
   }
 
   let lastKey = null;
   let visible = true;
   function rebuild(cam) {
-    const R = U.radius.value;
+    const R = U.radius.value + CELL / 2;
     const ccx = Math.floor(cam.x / CELL), ccz = Math.floor(cam.z / CELL);
     const nC = Math.ceil(R / CELL);
     const counts = [0, 0];
@@ -103,22 +109,20 @@ export function createGrass(terrain, quality, atlas) {
       let c = cache.get(key);
       if (!c) { c = buildCell(cx, cz); cache.set(key, c); }
       for (let k = 0; k < 2; k++) {
-        const im = meshes[k], list = c[k];
-        for (let t = 0; t < list.length; t += 2) {
-          if (counts[k] >= cap) break;
-          im.instanceMatrix.array.set(list[t], counts[k] * 16);
-          const tint = list[t + 1];
-          im.instanceColor.array[counts[k] * 3] = tint;
-          im.instanceColor.array[counts[k] * 3 + 1] = tint;
-          im.instanceColor.array[counts[k] * 3 + 2] = tint * 0.95;
-          counts[k]++;
-        }
+        const e = c[k];
+        if (!e.n || counts[k] + e.n > cap) continue;
+        meshes[k].instanceMatrix.array.set(e.m, counts[k] * 16);
+        meshes[k].instanceColor.array.set(e.c, counts[k] * 3);
+        counts[k] += e.n;
       }
     }
     for (let k = 0; k < 2; k++) {
-      meshes[k].count = counts[k];
-      meshes[k].instanceMatrix.needsUpdate = true;
-      meshes[k].instanceColor.needsUpdate = true;
+      const im = meshes[k];
+      im.count = counts[k];
+      im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(0, counts[k] * 16);
+      im.instanceColor.clearUpdateRanges(); im.instanceColor.addUpdateRange(0, counts[k] * 3);
+      im.instanceMatrix.needsUpdate = true;
+      im.instanceColor.needsUpdate = true;
     }
     if (cache.size > 3000) {
       for (const key of cache.keys()) { cache.delete(key); if (cache.size < 2000) break; }
@@ -135,8 +139,9 @@ export function createGrass(terrain, quality, atlas) {
       const show = alt < 120 && U.radius.value > 0;
       if (show !== visible) { group.visible = visible = show; lastKey = null; }
       if (!show) return;
-      // Re-gather when the camera has moved half a cell.
-      const key = Math.round(cam.x / (CELL / 2)) + ',' + Math.round(cam.z / (CELL / 2));
+      // Re-gather when the camera enters another cell (cells are gathered
+      // half a cell beyond the radius, so the fade edge never runs out).
+      const key = Math.floor(cam.x / CELL) + ',' + Math.floor(cam.z / CELL);
       if (key !== lastKey) { lastKey = key; rebuild(cam); }
     },
   };

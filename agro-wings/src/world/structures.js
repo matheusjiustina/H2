@@ -79,19 +79,20 @@ function makeMaterials() {
   M.glass = std({ color: 0x202a30, roughness: 0.08, metalness: 0.2, envMapIntensity: 1.2 });
   M.dirtyWhite = std({ color: 0xdedbd2, roughness: 0.7 });
   M.hoseBlack = std({ color: 0x111111, roughness: 0.7 });
-  // Vehicles and equipment.
+  // Vehicles and equipment. Most parts reuse the materials above so the
+  // merged static meshes (one draw per material) stay few.
   M.paintWhite = new THREE.MeshPhysicalMaterial({ color: 0xe9e9e4, roughness: 0.38, metalness: 0.05, clearcoat: 0.5, clearcoatRoughness: 0.25 });
-  M.plasticBlack = std({ color: 0x1a1b1c, roughness: 0.7 });
-  M.chrome = std({ color: 0xd8dadc, roughness: 0.18, metalness: 1.0 });
   M.alu = std({ color: 0xc9cdd0, roughness: 0.3, metalness: 0.9 });
-  M.lens = std({ color: 0xf4f4ee, roughness: 0.1, emissive: 0x2a2a28 });
-  M.tailLens = std({ color: 0xb01810, roughness: 0.2, emissive: 0x300402 });
-  M.amber = std({ color: 0xff9a10, roughness: 0.3, emissive: 0x402000 });
-  M.poly = std({ color: 0xe8e4d6, roughness: 0.55 });
-  M.tractorRed = new THREE.MeshPhysicalMaterial({ color: 0x9e1c16, roughness: 0.4, clearcoat: 0.4, clearcoatRoughness: 0.3 });
-  M.harvGreen = new THREE.MeshPhysicalMaterial({ color: 0x2f5d2a, roughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.35 });
-  M.rimGrey = std({ color: 0x8c8f90, roughness: 0.45, metalness: 0.6 });
-  M.container = std({ map: corrugatedTex('#5f7f99', '#4b6880'), roughness: 0.6, metalness: 0.3 });
+  M.plasticBlack = M.black;
+  M.chrome = M.alu;
+  M.lens = M.white;
+  M.tailLens = M.red;
+  M.amber = M.orange;
+  M.poly = M.dirtyWhite;
+  M.tractorRed = M.red;
+  M.harvGreen = M.green;
+  M.rimGrey = M.steel;
+  M.container = M.metalWall;
   return M;
 }
 
