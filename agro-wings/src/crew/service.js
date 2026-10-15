@@ -8,21 +8,15 @@ import * as THREE from 'three';
 import { Badeco } from './badeco.js';
 import { Hose } from './hose.js';
 import { BASE } from '../world/layout.js';
-import { wingY } from '../aircraft/model.js';
-import { FLIGHT, GAME } from '../config.js';
 
 export const SERVICE = { fuelRate: 4.5, liquidRate: 14, walk: 1.35, carry: 1.1, run: 3.0 };
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _l = new THREE.Vector3();
 const _qi = new THREE.Quaternion();
 
-// Plane-local waypoints (body x = left, z = forward); y ignored for walking.
-const LOCAL = {
-  A: [6.7, -2.0], // behind the left wingtip trailing edge
-  B: [4.0, -1.6],
-  F: [2.4, -1.45], // stand behind the wing for the fuel filler
-  P: [1.45, -1.5], // stand by the hopper coupler
-};
+// Plane-local waypoints (body x = left, z = forward; y ignored for walking)
+// come from the aircraft type: A behind the wingtip trailing edge, B halfway
+// in, F where the badeco stands for the fuel filler, P by the hopper coupler.
 
 export class GroundService {
   constructor(game) {
@@ -71,14 +65,14 @@ export class GroundService {
     }
     if (this.state === 'aborting') return 'Ground crew is still clearing the aircraft.';
     const ac = this.game.aircraft;
-    if (this.badeco.pos.distanceTo(_v.set(ac.fm.pos.x, this.badeco.pos.y, ac.fm.pos.z)) < 9) return 'Ground crew is too close to the propeller.';
+    if (this.badeco.pos.distanceTo(_v.set(ac.fm.pos.x, this.badeco.pos.y, ac.fm.pos.z)) < ac.type.service.veto) return 'Ground crew is too close to the propeller.';
     return null;
   }
 
   request(fuelTarget, liquidTarget) {
-    const fm = this.game.aircraft.fm;
-    this.target.fuel = Math.min(FLIGHT.fuelCapacity, Math.max(fm.fuel, fuelTarget));
-    this.target.liquid = Math.min(FLIGHT.hopperCapacity, Math.max(fm.hopper, liquidTarget));
+    const ac = this.game.aircraft, fm = ac.fm;
+    this.target.fuel = Math.min(ac.A.fuelCapacity, Math.max(fm.fuel, fuelTarget));
+    this.target.liquid = Math.min(ac.A.hopperCapacity, Math.max(fm.hopper, liquidTarget));
     if (!this.ready()) {
       this.game.toast('Park on the service pad and shut the engine down for service.');
       return false;
@@ -146,7 +140,7 @@ export class GroundService {
 
   _isNearAircraft() {
     const ac = this.game.aircraft;
-    return Math.hypot(this.badeco.pos.x - ac.fm.pos.x, this.badeco.pos.z - ac.fm.pos.z) < 9;
+    return Math.hypot(this.badeco.pos.x - ac.fm.pos.x, this.badeco.pos.z - ac.fm.pos.z) < ac.type.service.veto;
   }
 
   // Which wing faces the service equipment (+1 left, -1 right).
@@ -166,7 +160,7 @@ export class GroundService {
   // Plane-local ground point -> world (yaw only).
   _local(k) {
     const ac = this.game.aircraft;
-    const [lx, z] = LOCAL[k];
+    const [lx, z] = ac.type.service.local[k];
     const x = lx * (this.side || 1);
     const yaw = ac.fm.heading();
     const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -276,15 +270,15 @@ export class GroundService {
         b.speed = 0;
         this.pumpOn = true;
         if (st.kind === 'fuel') {
-          const add = Math.min(SERVICE.fuelRate * dt, this.target.fuel - fm.fuel);
+          const add = Math.min(this.game.aircraft.type.service.rates.fuel * dt, this.target.fuel - fm.fuel);
           if (add > 0) {
             fm.fuel += add;
             this.loaded.fuel += add;
-            this.game.charge?.(add * GAME.fuelPrice, 'fuel');
+            this.game.charge?.(add * this.game.aircraft.type.fuel.price, 'fuel');
           }
           if (this.target.fuel - fm.fuel <= 0.05) this.step = null;
         } else {
-          const add = Math.min(SERVICE.liquidRate * dt, this.target.liquid - fm.hopper);
+          const add = Math.min(this.game.aircraft.type.service.rates.liquid * dt, this.target.liquid - fm.hopper);
           if (add > 0) { fm.hopper += add; this.loaded.liquid += add; }
           if (this.target.liquid - fm.hopper <= 0.05) this.step = null;
         }
@@ -355,29 +349,33 @@ export class GroundService {
     void sdt;
   }
 
-  // Push rope points out of the wing, fuselage and stabiliser (body-frame boxes).
+  // Push rope points out of the wing, fuselage and stabiliser (body-frame
+  // boxes from the aircraft type).
   _keepOut() {
     const ac = this.game.aircraft;
     const pos = ac.fm.pos, q = ac.fm.quat;
+    const K = ac.type.service.keepOut;
+    const [wx, wz0, wz1] = K.wing, [fx, fy0, fy1, fz0, fz1] = K.fus, [sx, sy0, sy1, sz0, sz1] = K.stab;
+    const sm = (sy0 + sy1) / 2;
     _qi.copy(q).invert();
     const lp = new THREE.Vector3();
     return (p) => {
       lp.copy(p).sub(pos).applyQuaternion(_qi);
       const ax = Math.abs(lp.x);
       let moved = false;
-      if (ax < 6.0 && lp.z > -1.0 && lp.z < 0.95) {
-        const yc = wingY(ax);
+      if (ax < wx && lp.z > wz0 && lp.z < wz1) {
+        const yc = K.wingY(ax);
         if (lp.y > yc - 0.2 && lp.y < yc + 0.32) {
           lp.y = lp.y > yc + 0.05 ? yc + 0.33 : yc - 0.21;
           moved = true;
         }
       }
-      if (ax < 0.62 && lp.y > -0.75 && lp.y < 0.9 && lp.z > -4.3 && lp.z < 3.2) {
-        lp.x = Math.sign(lp.x || 1) * 0.63;
+      if (ax < fx && lp.y > fy0 && lp.y < fy1 && lp.z > fz0 && lp.z < fz1) {
+        lp.x = Math.sign(lp.x || 1) * (fx + 0.01);
         moved = true;
       }
-      if (ax < 1.95 && lp.y > 0.2 && lp.y < 0.5 && lp.z > -4.25 && lp.z < -3.2) {
-        lp.y = lp.y > 0.35 ? 0.51 : 0.19;
+      if (ax < sx && lp.y > sy0 && lp.y < sy1 && lp.z > sz0 && lp.z < sz1) {
+        lp.y = lp.y > sm ? sy1 + 0.01 : sy0 - 0.01;
         moved = true;
       }
       if (moved) p.copy(lp.applyQuaternion(q).add(pos));

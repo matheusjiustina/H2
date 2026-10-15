@@ -5,7 +5,7 @@
 import { clamp, wrapAngle, smoothstep } from '../core/math.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { RUNWAY, BASE } from '../world/layout.js';
-import { SPRAY, FLIGHT } from '../config.js';
+import { SPRAY } from '../config.js';
 
 const G = 9.81;
 
@@ -83,7 +83,7 @@ export class Autopilot {
         // Rudder: positive = yaw right. Heading error positive -> need yaw left? heading increases toward north-east
         v.yaw = clamp(-hdgErr * 4 + fm.omega.y * 2.0 - o.beta * 0, -1, 1) * (o.onGround ? 1 : 0.3);
         v.roll = clamp(-this.att.bank * 2, -1, 1);
-        const vs = Math.sqrt((2 * fm.mass * G) / (1.225 * FLIGHT.wingArea * 1.75));
+        const vs = Math.sqrt((2 * fm.mass * G) / (1.225 * fm.A.wingArea * 1.75));
         const vr = vs * 1.08;
         if (o.onGround) v.pitch = o.airspeed < 14 ? 0 : o.airspeed < vr ? -0.25 : 0.6;
         else v.pitch = clamp((0.16 - this.att.pitch) * 3 + (o.airspeed < vr ? -0.3 : 0), -1, 1);
@@ -124,7 +124,7 @@ export class Autopilot {
         let bankCmd = 0;
         // Height for the whole balão: the highest clearance seen since the
         // pull-up began (obstacles leave the look-ahead while turning).
-        this.tdWant = Math.max(this.pt < 0.05 ? 0 : this.tdWant || 0, top + 1.25 + Math.max(28, this._clearance(), this._areaClearance()));
+        this.tdWant = Math.max(this.pt < 0.05 ? 0 : this.tdWant || 0, top + fm.A.aglOffset + Math.max(28, this._clearance(), this._areaClearance()));
         if (this.tdStage === 0) {
           // Pull-up: wings level, firm pull, trade speed for height.
           bankCmd = clamp(-wrapAngle(passYaw - hdg) * 1.5, -0.3, 0.3);
@@ -136,7 +136,7 @@ export class Autopilot {
           const climbFirst = fm.pos.y < this.tdWant - 6 && this._clearance(450) > 0;
           bankCmd = climbFirst ? 0 : clamp(-wrapAngle(passYaw + away - hdg) * 1.5, -0.6, 0.6);
           if (!climbFirst) this.tdT = (this.tdT || 0) + dt;
-          if (this.tdT > 5) this.tdStage = 2;
+          if (this.tdT > 5 * (fm.A.assistSpeedScale ?? 1)) this.tdStage = 2;
         } else {
           // Steep reversal toward the next swath once high enough.
           const steep = fm.pos.y > this.tdWant - 4 ? 0.95 : 0.45;
@@ -278,6 +278,8 @@ export class Autopilot {
   // Lateral L1 guidance onto a line (point + unit direction), returns bank command.
   _l1(px, pz, dx, dz, L1, maxBank) {
     const fm = this.game.aircraft.fm;
+    // Same lateral acceleration for a faster aircraft: L1 grows with V².
+    L1 *= (fm.A.assistSpeedScale ?? 1) ** 2;
     const rx = fm.pos.x - px, rz = fm.pos.z - pz;
     const along = rx * dx + rz * dz;
     const cross = rx * -dz + rz * dx; // positive: right of line? (dir rotated)
@@ -303,7 +305,7 @@ export class Autopilot {
     const pitchT = clamp(0.03 + (vsT - o.vs) * 0.08 + (vsT / Math.max(20, o.airspeed)), -0.25, opts.maxPitch ?? 0.3);
     v.pitch = clamp((pitchT - pitch) * 3.5 + fm.omega.x * 1.0, opts.minStick ?? -1, 1);
     if (Math.abs(v.pitch) < 0.06) v.pitch = Math.sign(v.pitch || 1) * 0.06;
-    v.throttle = clamp((opts.thrBase ?? 0.62) + (speedTarget - o.airspeed) * 0.08 + vsT * 0.04, 0, 1);
+    v.throttle = clamp((opts.thrBase ?? 0.62) + (speedTarget * (fm.A.assistSpeedScale ?? 1) - o.airspeed) * 0.08 + vsT * 0.04, 0, 1);
     v.yaw = 0;
     void dt;
   }
@@ -319,7 +321,7 @@ export class Autopilot {
     const px = axisX ? lineStart : p.c, pz = axisX ? p.c : lineStart;
     // Distance to the line decides how aggressively to manoeuvre.
     const crossNow = (fm.pos.x - px) * -dz + (fm.pos.z - pz) * dx;
-    const far = Math.abs(crossNow) > 60;
+    const far = Math.abs(crossNow) > 60 * (fm.A.assistSpeedScale ?? 1);
     const maxBank = o.agl < 10 ? 0.3 : far ? 0.75 : 0.6;
     const { bank, cross, along } = this._l1(px, pz, dx, dz, far ? 220 : 150, maxBank);
     // Position along the pass relative to the field span.
@@ -331,8 +333,8 @@ export class Autopilot {
     // Descend on the lead-in so the aircraft is at work height at the edge.
     const lead = dir > 0 ? a - (gd.l0 - 1000) : gd.l1 + 1000 - a;
     const workZone = lead > 0 && (dir > 0 ? a < gd.l1 + 40 : a > gd.l0 - 40);
-    if (workZone && Math.abs(cross) < 12) alt = top + 1.25 + 3.6; // CG height for ~3.3 m wheel height over the canopy
-    else alt = top + 1.25 + Math.max(far ? 35 : 22, this._clearance());
+    if (workZone && Math.abs(cross) < 12) alt = top + fm.A.aglOffset + 3.6; // CG height for ~3.3 m wheel height over the canopy
+    else alt = top + fm.A.aglOffset + Math.max(far ? 35 : 22, this._clearance());
     // Look ahead for terrain/canopy/trees/wires.
     let ahead = top;
     const ux = fm.vel.x / Math.max(1, o.groundSpeed), uz = fm.vel.z / Math.max(1, o.groundSpeed);
@@ -345,7 +347,7 @@ export class Autopilot {
       const x = fm.pos.x + ux * s, z = fm.pos.z + uz * s;
       if (s <= 160 && g.world.wireDistance(x, fm.pos.y, z) < 18) ahead = Math.max(ahead, fm.pos.y + 15);
     }
-    if (ahead > top + 2) alt = Math.max(alt, ahead + 4.5 + 1.25);
+    if (ahead > top + 2) alt = Math.max(alt, ahead + 4.5 + fm.A.aglOffset);
     this._fly(bank, alt, inSpan && established ? 46 : 44, dt, { kh: workZone ? 0.45 : 0.35, maxSink: workZone && alt - fm.pos.y > -8 ? 1.8 : 3.0 });
     // Spray only over a target field, never over gaps.
     const over = g.job.fields.some((f) => fm.pos.x > f.x0 + 2 && fm.pos.x < f.x1 - 2 && fm.pos.z > f.z0 + 2 && fm.pos.z < f.z1 - 2);
@@ -374,7 +376,7 @@ export class Autopilot {
       const fx = thrX - 2200, fz = -500;
       const want = Math.atan2(fx - fm.pos.x, fz - fm.pos.z);
       const err = wrapAngle(want - Math.atan2(fm.vel.x, fm.vel.z));
-      this._fly(clamp(-err * 1.4, -0.6, 0.6), ac.env.top(fm.pos.x, fm.pos.z) + 1.25 + 90, 44, dt, { kh: 0.3 });
+      this._fly(clamp(-err * 1.4, -0.6, 0.6), ac.env.top(fm.pos.x, fm.pos.z) + fm.A.aglOffset + 90, 44, dt, { kh: 0.3 });
       if (Math.hypot(fx - fm.pos.x, fz - fm.pos.z) < 350) this.apStage = 1;
       return;
     }
@@ -383,16 +385,17 @@ export class Autopilot {
     const onFinal = dist > -520 && dist < 3000 && Math.abs(fm.pos.z - RUNWAY.z) < 60 && Math.abs(wrapAngle(fm.heading() - Math.PI / 2)) < 0.35;
     let alt;
     if (!onFinal) alt = Math.max(ac.env.top(fm.pos.x, fm.pos.z) + 60, 70);
-    else alt = Math.max(0.5, Math.tan((3.2 * Math.PI) / 180) * dist) + 1.25;
+    else alt = Math.max(0.5, Math.tan((3.2 * Math.PI) / 180) * dist) + fm.A.aglOffset;
     fm.flapsCmd = onFinal && dist < 2200 ? 2 / 3 : 0;
-    const vs0 = Math.sqrt((2 * fm.mass * G) / (1.225 * FLIGHT.wingArea * 1.95));
-    const vref = Math.max(30, vs0 * 1.3);
+    const vs0 = Math.sqrt((2 * fm.mass * G) / (1.225 * fm.A.wingArea * 1.95));
+    const vref = Math.max(30 * (fm.A.assistSpeedScale ?? 1), vs0 * 1.3) / (fm.A.assistSpeedScale ?? 1);
     if (o.agl > 5 || !onFinal) {
       this._fly(bank, alt, onFinal ? vref : 42, dt, { kh: onFinal ? 0.5 : 0.3, maxSink: 4.5, thrBase: 0.45 });
     } else {
       // Flare: raise the nose to arrest the sink, wings level. Idle when light;
       // a loaded aircraft keeps some power until just above the ground.
-      const load = clamp((fm.mass - 1450) / 650, 0, 1);
+      const r = fm.A.mtow / 1800;
+      const load = clamp((fm.mass - 1450 * r) / (650 * r), 0, 1);
       v.throttle = load * 0.35 * smoothstep(0.3, 2.5, o.agl);
       v.roll = clamp((0 - this.att.bank) * 2, -1, 1);
       // Aim for the three-point attitude close to the ground so mains and

@@ -1,6 +1,6 @@
 // HUD: minimal permanent readouts, job card, minimap, contextual warnings,
 // toasts, prompts, crew status and tutorial card.
-import { FLIGHT, SPRAY, GAME } from '../config.js';
+import { SPRAY, GAME } from '../config.js';
 import { buildBaseMap, drawMap } from './maps.js';
 import { keyLabel } from '../core/input.js';
 
@@ -104,10 +104,10 @@ export class HUD {
     $.gl.className = 'ro r-g' + (t.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
     $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round(t.power * 100));
     $.fuel.querySelector('.v').firstChild.nodeValue = String(Math.round(t.fuel));
-    $.fuel.querySelector('.bar span').style.width = `${(t.fuel / FLIGHT.fuelCapacity) * 100}%`;
-    $.fuel.className = 'ro r-fuel' + (t.fuel < FLIGHT.fuelCapacity * 0.15 ? ' bad' : '');
+    $.fuel.querySelector('.bar span').style.width = `${(t.fuel / t.fuelCap) * 100}%`;
+    $.fuel.className = 'ro r-fuel' + (t.fuel < t.fuelCap * 0.15 ? ' bad' : '');
     $.hop.querySelector('.v').firstChild.nodeValue = String(Math.round(t.hopper));
-    $.hop.querySelector('.bar span').style.width = `${(t.hopper / FLIGHT.hopperCapacity) * 100}%`;
+    $.hop.querySelector('.bar span').style.width = `${(t.hopper / t.hopperCap) * 100}%`;
     // Spray badge
     $.spray.classList.toggle('show', sprayingNow || (g.job && !t.onGround));
     $.spray.classList.toggle('off', !sprayingNow);
@@ -130,8 +130,8 @@ export class HUD {
       $.crewMsg.textContent = sv.message;
       $.lf.textContent = `${Math.round(ac.fm.fuel)} / ${Math.round(sv.target.fuel)} L`;
       $.lh.textContent = `${Math.round(ac.fm.hopper)} / ${Math.round(sv.target.liquid)} L`;
-      $.bf.style.width = `${(ac.fm.fuel / FLIGHT.fuelCapacity) * 100}%`;
-      $.bh.style.width = `${(ac.fm.hopper / FLIGHT.hopperCapacity) * 100}%`;
+      $.bf.style.width = `${(ac.fm.fuel / ac.A.fuelCapacity) * 100}%`;
+      $.bh.style.width = `${(ac.fm.hopper / ac.A.hopperCapacity) * 100}%`;
       $.crewHint.innerHTML = `Hold <span class="k">T</span> to speed up · ${this.key('orbit')} free camera`;
     } else $.crew.classList.remove('show');
     // Warnings (only when needed)

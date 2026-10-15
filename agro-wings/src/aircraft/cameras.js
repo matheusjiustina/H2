@@ -37,6 +37,8 @@ export class CameraRig {
   update(dt, ac, mouse, terrain) {
     const cam = this.camera;
     const pos = ac.rPos, quat = ac.rQuat, fm = ac.fm, o = fm.out;
+    const C = ac.type?.camera ?? { dist: 12.5, height: 3.7 };
+    const vib = ac.type?.anim.vib ?? [1500, 2700];
     ac.model.pilot.visible = this.mode !== 'cockpit';
     ac.model.cockpit.visible = true;
     const dragLook = mouse.buttons & 1;
@@ -46,7 +48,7 @@ export class CameraRig {
         this.look.pitch = clamp(this.look.pitch - mouse.dy * 1.6, -1.1, 0.9);
       }
       // Vibration: engine (rpm) + ground roughness; g-load sinks the head.
-      const eng = fm.rpm > 300 ? 0.0009 + 0.0008 * smoothstep(1500, 2700, fm.rpm) : 0;
+      const eng = fm.rpm > 300 ? 0.0009 + 0.0008 * smoothstep(vib[0], vib[1], fm.rpm) * (ac.A?.turbine ? 0.5 : 1) : 0;
       const ground = o.onGround ? 0.004 * smoothstep(1, 25, o.groundSpeed) * (o.surface === 'runway' ? 0.6 : 1) : 0;
       const amp = eng + ground + this.shake * 0.02;
       _v.copy(ac.model.eye);
@@ -81,9 +83,9 @@ export class CameraRig {
       _v.copy(this.chaseDir).applyAxisAngle(Y, this.chaseOff.yaw);
       // Smooth the camera offset relative to the aircraft (not its world
       // position), so the camera does not fall behind at spraying speed.
-      const dist = 12.5 + smoothstep(30, 60, sp) * 1.5;
+      const dist = C.dist + smoothstep(30, 60, sp) * 1.5;
       const off = _v2.copy(_v).multiplyScalar(-dist);
-      off.y += 3.7 + this.chaseOff.pitch * 8;
+      off.y += C.height + this.chaseOff.pitch * 8;
       if (!this.initialized) this.chaseOffset.copy(off);
       else this.chaseOffset.lerp(off, 1 - Math.exp(-5 * dt));
       this.chasePos.copy(pos).add(this.chaseOffset);

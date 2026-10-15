@@ -4,7 +4,8 @@
 import { h } from './hud.js';
 import { CONTRACTS } from '../game/contracts.js';
 import { ACTIONS, keyLabel } from '../core/input.js';
-import { FLIGHT, GAME, SPRAY } from '../config.js';
+import { GAME } from '../config.js';
+import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { drawMap } from './maps.js';
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
@@ -21,6 +22,15 @@ export class Screens {
       <div class="title-inner">
         <div class="brand">AGRO <b>WINGS</b></div>
         <div class="title-sub">Agricultural aviation · Fazenda Boa Esperança, Mato Grosso</div>
+        <div class="ac-select" role="radiogroup" aria-label="Aircraft">${AIRCRAFT_ORDER.map((id) => {
+          const t = AIRCRAFT_TYPES[id];
+          return `<button class="ac-card" role="radio" aria-checked="false" data-ac="${id}">
+            <span class="ac-slot">Aircraft ${t.slot}</span>
+            <span class="ac-label">${t.label}</span>
+            <span class="ac-reg">${t.reg} · ${t.name}</span>
+            <span class="ac-spec">${t.engineName}<br>${t.summary}</span>
+          </button>`;
+        }).join('')}</div>
         <div class="btn-row">
           <button class="btn primary" data-a="career">Contracts</button>
           <button class="btn" data-a="free">Free flight</button>
@@ -32,6 +42,8 @@ export class Screens {
       </div></div>`);
     root.appendChild(this.title);
     this.title.addEventListener('click', (e) => {
+      const ac = e.target.closest('[data-ac]')?.dataset.ac;
+      if (ac) { game.selectAircraft(ac); this._markAircraft(); return; }
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a) game.menuAction(a);
     });
@@ -46,9 +58,18 @@ export class Screens {
   }
   hideLoading() { this.loading.remove(); }
 
+  _markAircraft() {
+    for (const el of this.title.querySelectorAll('[data-ac]')) {
+      const on = el.dataset.ac === this.game.aircraftId;
+      el.classList.toggle('sel', on);
+      el.setAttribute('aria-checked', String(on));
+    }
+  }
+
   showTitle(v) {
     this.title.classList.toggle('show', v);
     if (v) {
+      this._markAircraft();
       const k = (a) => keyLabel(this.game.input.bindings[a][0]);
       this.title.querySelector('.title-keys').innerHTML = this.game.touch?.active
         ? 'Touch: left stick flies, right slider sets power. Buttons for spray, brakes, camera and engine.'
@@ -114,19 +135,23 @@ export class Screens {
   // --------------------------------------------------------------- load sheet
   loadSheet(job) {
     const g = this.game;
-    const fm = g.aircraft.fm;
-    const rec = job ? job.c.recommended : { fuel: FLIGHT.fuelCapacity, liquid: 600 };
-    let fuel = Math.max(fm.fuel, Math.min(FLIGHT.fuelCapacity, rec.fuel));
-    let liquid = Math.max(fm.hopper, Math.min(FLIGHT.hopperCapacity, rec.liquid));
+    const ac = g.aircraft, fm = ac.fm, A = ac.A, T = ac.type;
+    // Contract recommendations are written for the PR-AGW; a bigger aircraft
+    // carries proportionally more per sortie.
+    const kf = A.fuelCapacity / 260, kl = A.hopperCapacity / 900;
+    const rec0 = job ? job.c.recommended : { fuel: A.fuelCapacity, liquid: 600 * kl };
+    const rec = { fuel: Math.round((job ? rec0.fuel * kf : rec0.fuel) / 5) * 5, liquid: Math.round((job ? rec0.liquid * kl : rec0.liquid) / 10) * 10 };
+    let fuel = Math.max(fm.fuel, Math.min(A.fuelCapacity, rec.fuel));
+    let liquid = Math.max(fm.hopper, Math.min(A.hopperCapacity, rec.liquid));
     const st = job ? job.stats() : null;
     const el = h(`<div class="panel" style="width:min(620px,calc(100vw - 32px))"><h2>Load sheet</h2>
-      <div class="sub">${job ? `${job.c.title} — ${pct(st.coverage)} covered. ${job.c.tip}` : 'Free flight — load as you like.'}</div>
-      <div class="field"><label>Fuel (ethanol)</label><input type="range" min="0" max="${FLIGHT.fuelCapacity}" step="5" value="${fuel}" data-k="fuel"><span class="val vf"></span></div>
-      <div class="field"><label>Application liquid</label><input type="range" min="0" max="${FLIGHT.hopperCapacity}" step="10" value="${liquid}" data-k="liquid"><span class="val vl"></span></div>
+      <div class="sub">${T.reg} · ${T.name}. ${job ? `${job.c.title} — ${pct(st.coverage)} covered. ${job.c.tip}` : 'Free flight — load as you like.'}</div>
+      <div class="field"><label>Fuel (${T.fuel.name})</label><input type="range" min="0" max="${A.fuelCapacity}" step="5" value="${fuel}" data-k="fuel"><span class="val vf"></span></div>
+      <div class="field"><label>Application liquid</label><input type="range" min="0" max="${A.hopperCapacity}" step="10" value="${liquid}" data-k="liquid"><span class="val vl"></span></div>
       <h3>Weight &amp; performance</h3>
       <div class="stats">
-        <div class="stat"><b class="m"></b><span>Take-off mass · MTOW ${FLIGHT.mtow.toLocaleString('en-US')} kg</span></div>
-        <div class="stat"><b class="b"></b><span>Max level bank at 90 kt</span></div>
+        <div class="stat"><b class="m"></b><span>Take-off mass · MTOW ${A.mtow.toLocaleString('en-US')} kg</span></div>
+        <div class="stat"><b class="b"></b><span>Max level bank at ${T.loadSheet.bankKt} kt</span></div>
         <div class="stat"><b class="r"></b><span>Est. ground roll</span></div>
         <div class="stat"><b class="c"></b><span>Fuel cost</span></div>
         <div class="stat"><b class="e"></b><span>Spray time at full flow</span></div>
@@ -137,19 +162,21 @@ export class Screens {
     const upd = () => {
       el.querySelector('.vf').textContent = `${Math.round(fuel)} L`;
       el.querySelector('.vl').textContent = `${Math.round(liquid)} L`;
-      const mass = FLIGHT.emptyMass + FLIGHT.pilotMass + fuel * FLIGHT.fuelDensity + liquid * FLIGHT.liquidDensity;
+      const mass = A.emptyMass + A.pilotMass + fuel * A.fuelDensity + liquid * A.liquidDensity;
       const mEl = el.querySelector('.m');
-      mEl.textContent = `${Math.round(mass)} kg${mass > FLIGHT.mtow ? ' · OVER' : ''}`;
-      mEl.style.color = mass > FLIGHT.mtow ? 'var(--bad)' : '';
-      // Load factor at the stall-protected angle of attack, 90 kt, sea level.
-      const clProt = FLIGHT.CL0 + FLIGHT.CLa * (FLIGHT.alphaStall - 0.025);
-      const n = (clProt * 0.6125 * 46.3 ** 2 * FLIGHT.wingArea) / (mass * 9.81);
+      mEl.textContent = `${Math.round(mass)} kg${mass > A.mtow ? ' · OVER' : ''}`;
+      mEl.style.color = mass > A.mtow ? 'var(--bad)' : '';
+      // Load factor at the stall-protected angle of attack, sea level.
+      const clProt = A.CL0 + A.CLa * (A.alphaStall - 0.025);
+      const vb = T.loadSheet.bankKt / 1.943844;
+      const n = (clProt * 0.6125 * vb ** 2 * A.wingArea) / (mass * 9.81);
       el.querySelector('.b').textContent = `${Math.round((Math.acos(1 / Math.max(1.01, n)) * 180) / Math.PI)}°`;
-      // Empirical fit to the flight model's measured rolls (empty ~140 m, full ~600 m).
-      const roll = 140 * Math.pow(mass / 1303, 2.9);
+      // Empirical fit to the flight model's measured rolls for this aircraft.
+      const [r0, m0, ex] = T.loadSheet.roll;
+      const roll = r0 * Math.pow(mass / m0, ex);
       el.querySelector('.r').textContent = `${Math.round(roll / 10) * 10} m`;
-      el.querySelector('.c').textContent = money(Math.max(0, fuel - fm.fuel) * GAME.fuelPrice);
-      el.querySelector('.e').textContent = `${Math.round(liquid / SPRAY.flow)} s`;
+      el.querySelector('.c').textContent = money(Math.max(0, fuel - fm.fuel) * T.fuel.price);
+      el.querySelector('.e').textContent = `${Math.round(liquid / T.spray.flow)} s`;
     };
     el.addEventListener('input', (e) => {
       const k = e.target.dataset.k;

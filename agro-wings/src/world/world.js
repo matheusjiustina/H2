@@ -47,7 +47,7 @@ export class World {
     for (const c of this.structures.colliders) {
       if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y < c.top) return c.name;
     }
-    return null;
+    return this.extraObstacle?.(x, y, z) ?? null;
   }
 
   // Distance from a point to the nearest power-line wire (m).

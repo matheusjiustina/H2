@@ -13,6 +13,9 @@ export const BASE = {
   hangar: { x: -385, z: -128, w: 24, d: 18, h: 7.5 },
   // Service pad: the aircraft parks here heading east, left side to the tanks.
   pad: { x: -352, z: -64, heading: Math.PI / 2, radius: 7 },
+  // Where the aircraft not in use waits, on the west apron clear of the taxi
+  // route from the pad to the strip.
+  parking: { x: -424, z: -52, heading: Math.PI / 2 },
   // Service equipment sits behind/left of the parked aircraft, clear of the prop.
   fuelTank: { x: -358, z: -84 },
   mixTank: { x: -366, z: -74 },

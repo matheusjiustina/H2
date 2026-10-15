@@ -1,5 +1,7 @@
-// Synthesized audio (Web Audio): engine (6-cyl firing frequency from rpm),
-// propeller buzz at blade-pass frequency, wind, wheel rumble, spray hiss,
+// Synthesized audio (Web Audio): piston engine (6-cyl firing frequency from
+// rpm) or PT6 turboprop (compressor whine and gas-generator hum from Ng,
+// exhaust roar with power, light-off whoosh), propeller buzz at blade-pass
+// frequency, wind, wheel rumble, spray hiss,
 // stall horn, starter, one-shots, and a quiet rural ambience at the base
 // (cicadas, birds, breeze). Nothing is loaded from files.
 import { clamp, smoothstep } from '../core/math.js';
@@ -102,6 +104,22 @@ export class GameAudio {
     const stLP = ctx.createBiquadFilter();
     stLP.type = 'lowpass'; stLP.frequency.value = 1200;
     this.starter.connect(stLP).connect(this.starterGain).connect(this.acBus);
+    // Turboprop: compressor whine (two tones from Ng), gas-generator hum,
+    // exhaust roar.
+    this.tWhine = ctx.createOscillator(); this.tWhine.type = 'sine';
+    this.tWhine2 = ctx.createOscillator(); this.tWhine2.type = 'sine';
+    this.tWhineGain = ctx.createGain(); this.tWhineGain.gain.value = 0;
+    this.tWhine2Gain = ctx.createGain(); this.tWhine2Gain.gain.value = 0;
+    this.tWhine.connect(this.tWhineGain).connect(this.acBus);
+    this.tWhine2.connect(this.tWhine2Gain).connect(this.acBus);
+    this.tHum = ctx.createOscillator(); this.tHum.type = 'triangle';
+    const humLP = ctx.createBiquadFilter(); humLP.type = 'lowpass'; humLP.frequency.value = 600;
+    this.tHumGain = ctx.createGain(); this.tHumGain.gain.value = 0;
+    this.tHum.connect(humLP).connect(this.tHumGain).connect(this.acBus);
+    this.tRoar = this._noise(this.pink);
+    this.tRoarBP = ctx.createBiquadFilter(); this.tRoarBP.type = 'bandpass'; this.tRoarBP.Q.value = 0.6;
+    this.tRoarGain = ctx.createGain(); this.tRoarGain.gain.value = 0;
+    this.tRoar.connect(this.tRoarBP).connect(this.tRoarGain).connect(this.acBus);
     // Wind
     this.wind = this._noise(this.white);
     this.windBP = ctx.createBiquadFilter();
@@ -165,7 +183,7 @@ export class GameAudio {
     this.cicGain = ctx.createGain();
     this.cicGain.gain.value = 0;
     cic.connect(cBP).connect(this.cicAM).connect(this.cicGain).connect(this.amb);
-    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod]) o.start();
+    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum]) o.start();
     this.birdT = 2;
     this.cicT = 0;
     this.cicOn = false;
@@ -189,26 +207,40 @@ export class GameAudio {
     const k = 0.06;
     const rpm = s.rpm;
     const run = s.engine === 'running' || s.engine === 'cranking';
+    const turbo = s.profile === 'turboprop';
     const fire = Math.max(1, (rpm / 60) * 3);
-    const on = smoothstep(150, 500, rpm) * (run ? 1 : 0.15);
-    const load = clamp(s.throttle, 0, 1);
+    const on = turbo ? smoothstep(3, 30, s.ng ?? 0) : smoothstep(150, 500, rpm) * (run ? 1 : 0.15);
+    const load = clamp(turbo ? s.power ?? 0 : s.throttle, 0, 1);
+    const piston = turbo ? 0 : 1;
     this.eng.frequency.setTargetAtTime(fire, t, 0.04);
     this.engSub.frequency.setTargetAtTime(fire / 2, t, 0.04);
     this.engLP.frequency.setTargetAtTime(220 + 1200 * load + rpm * 0.35, t, 0.08);
     const dist = s.listenerDist ?? 0;
     const att = s.inside ? 1 : 1 / (1 + dist / 40);
-    this.engGain.gain.setTargetAtTime(on * (0.16 + 0.22 * load) * att * (s.rough ? 0.8 + Math.random() * 0.4 : 1), t, k);
+    this.engGain.gain.setTargetAtTime(piston * on * (0.16 + 0.22 * load) * att * (s.rough ? 0.8 + Math.random() * 0.4 : 1), t, k);
     this.clatMod.frequency.setTargetAtTime(fire, t, 0.04);
     this.clatBP.frequency.setTargetAtTime(600 + rpm * 0.4, t, 0.1);
-    this.clatGain.gain.setTargetAtTime(on * (0.05 + 0.06 * load) * att, t, k);
-    const bpf = Math.max(1, (rpm / 60) * 2);
+    this.clatGain.gain.setTargetAtTime(piston * on * (0.05 + 0.06 * load) * att, t, k);
+    // PT6: the whine follows the gas generator, the roar follows power.
+    const ng = s.ng ?? 0;
+    this.tWhine.frequency.setTargetAtTime(1500 + ng * 58, t, 0.08);
+    this.tWhine2.frequency.setTargetAtTime(280 + ng * 24, t, 0.08);
+    this.tHum.frequency.setTargetAtTime(Math.max(20, ng * 3.2), t, 0.08);
+    this.tWhineGain.gain.setTargetAtTime(turbo ? on * (s.inside ? 0.006 : 0.011 + 0.008 * load) * att : 0, t, k);
+    this.tWhine2Gain.gain.setTargetAtTime(turbo ? on * (0.008 + 0.006 * load) * att : 0, t, k);
+    this.tHumGain.gain.setTargetAtTime(turbo ? on * (0.05 + 0.04 * load) * att * (s.rough ? 0.8 + Math.random() * 0.4 : 1) : 0, t, k);
+    this.tRoarBP.frequency.setTargetAtTime(380 + load * 900, t, 0.1);
+    this.tRoarGain.gain.setTargetAtTime(turbo ? on * (0.03 + 0.2 * load) * att : 0, t, k);
+    const bpf = Math.max(1, (rpm / 60) * (turbo ? s.blades ?? 3 : 2));
     this.prop.frequency.setTargetAtTime(bpf, t, 0.04);
     this.propBP.frequency.setTargetAtTime(bpf * 3, t, 0.05);
-    const pr = smoothstep(300, 2700, rpm);
-    this.propGain.gain.setTargetAtTime(pr * (s.inside ? 0.04 : 0.12) * att * (0.6 + 0.6 * load), t, k);
+    const pr = turbo ? smoothstep(250, 2200, rpm) : smoothstep(300, 2700, rpm);
+    // A turboprop's prop gets much louder as the governor loads the blades.
+    const pl = turbo ? 0.35 + 1.1 * load : 0.6 + 0.6 * load;
+    this.propGain.gain.setTargetAtTime(pr * (s.inside ? 0.04 : 0.12) * att * pl, t, k);
     this.propNBP.frequency.setTargetAtTime(150 + rpm * 0.25, t, 0.1);
-    this.propNGain.gain.setTargetAtTime(pr * pr * (s.inside ? 0.08 : 0.2) * att, t, k);
-    this.starterGain.gain.setTargetAtTime(s.engine === 'cranking' ? 0.08 : 0, t, 0.05);
+    this.propNGain.gain.setTargetAtTime(pr * pr * (s.inside ? 0.08 : 0.2) * att * (turbo ? 0.6 + 0.8 * load : 1), t, k);
+    this.starterGain.gain.setTargetAtTime(s.engine === 'cranking' && !turbo ? 0.08 : 0, t, 0.05);
     this.starter.frequency.setTargetAtTime(s.engine === 'cranking' ? 160 + rpm * 0.6 : 120, t, 0.2);
     this.acTone.frequency.setTargetAtTime(s.inside ? 1500 : 7000, t, 0.1);
     this.acBus.gain.setTargetAtTime(s.inside ? 1.5 : 1.1, t, 0.2);
@@ -299,6 +331,23 @@ export class GameAudio {
       case 'clank': for (const f of [820, 1370, 2210]) tone(0.25, f, f * 0.98, 0.05, 'triangle'); break;
       case 'reel': for (let i = 0; i < 8; i++) tone(0.03, 1800, 1500, 0.03, 'square', i * 0.06); break;
       case 'starter': break;
+      case 'lightoff': {
+        // Fuel lights in the combustor: a soft rising whoosh.
+        const sN = ctx.createBufferSource();
+        sN.buffer = this.pink;
+        const f = ctx.createBiquadFilter();
+        f.type = 'lowpass'; f.Q.value = 0.7;
+        f.frequency.setValueAtTime(180, t);
+        f.frequency.exponentialRampToValueAtTime(1400, t + 1.4);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.25 * volume, t + 0.35);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
+        sN.connect(f).connect(g).connect(this.acBus);
+        sN.start(t, Math.random());
+        sN.stop(t + 2.5);
+        break;
+      }
       case 'crash':
         burst(1.6, 400, 0.4, 0.9, 'lowpass', this.brown);
         burst(0.9, 1800, 0.6, 0.5);

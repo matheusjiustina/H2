@@ -352,7 +352,7 @@ function roundRect(g, x, y, w, h, r) {
   g.closePath();
 }
 
-function drawSightBackground(g) {
+function drawSightBackground(g, cap = 900, step = 50) {
   // Translucent fibreglass hopper wall seen through the sight window, with
   // stencilled level marks (litres).
   g.fillStyle = '#cdb98e';
@@ -367,9 +367,9 @@ function drawSightBackground(g) {
   g.fillStyle = '#17130d';
   g.textAlign = 'left'; g.textBaseline = 'middle';
   const top = 24, bot = 424;
-  for (let v = 0; v <= 900; v += 50) {
-    const y = bot - (v / 900) * (bot - top);
-    const major = v % 100 === 0;
+  for (let v = 0; v <= cap; v += step) {
+    const y = bot - (v / cap) * (bot - top);
+    const major = v % (step * 2) === 0;
     g.fillRect(18, y - 2, major ? 44 : 24, 4);
     if (major && v > 0) {
       g.font = 'bold 34px Arial';
@@ -377,3 +377,6 @@ function drawSightBackground(g) {
     }
   }
 }
+
+// Drawing helpers shared with the other aircraft panels.
+export { gauge, bezel, needle, altimeter, compass, flapInd, gps, roundRect, glassGlint, drawSightBackground };

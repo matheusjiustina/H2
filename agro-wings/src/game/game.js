@@ -1,7 +1,8 @@
 // AGRO WINGS — game shell: boot, main loop, modes, job flow, prompts, warnings.
 import * as THREE from 'three';
 import { World } from '../world/world.js';
-import { QUALITY, GAME, FLIGHT, SPRAY } from '../config.js';
+import { QUALITY, GAME, SPRAY } from '../config.js';
+import { AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { Input } from '../core/input.js';
 import { ParticlePool } from '../core/particles.js';
 import { Aircraft } from '../aircraft/aircraft.js';
@@ -33,7 +34,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false };
+    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema' };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     const q = new URLSearchParams(location.search).get('q');
     if (q && QUALITY[q]) this.settings.quality = q;
@@ -70,7 +71,13 @@ export class Game {
     });
     this.screens.setLoading(0.85, 'Aircraft');
     await new Promise((r) => setTimeout(r, 0));
-    this.aircraft = new Aircraft(this);
+    // Both aircraft live in the world; the one not selected waits parked.
+    this.fleet = {};
+    for (const id of AIRCRAFT_ORDER) {
+      const ac = new Aircraft(this, { type: id });
+      ac.fm.fuel = ac.type.loads.boot; ac.fm.hopper = 0; ac.fm.updateMass();
+      this.fleet[id] = ac;
+    }
     this.rig = new CameraRig(this.camera);
     this.sprayer = new Sprayer(this);
     this.guidance = new Guidance(this);
@@ -86,11 +93,7 @@ export class Game {
     this.hud = new HUD(this, this.uiRoot);
     this.touch = new TouchControls(this, this.uiRoot);
     this.tutorial = new Tutorial(this);
-    this.aircraft.onSimStep = (h) => this.sprayer.step(h);
-    this.aircraft.onEvent = (e) => this._acEvent(e);
-    this.aircraft.fm.fuel = 120;
-    this.aircraft.fm.hopper = 0;
-    this.aircraft.fm.updateMass();
+    this._activate(this.fleet[this.settings.aircraft] ? this.settings.aircraft : AIRCRAFT_ORDER[0]);
     this.canStartEngine = () => this.service.engineVeto();
     window.addEventListener('resize', () => this.resize());
     const startAudio = () => this.audio.start();
@@ -99,7 +102,7 @@ export class Game {
     this.resize();
     this.screens.setLoading(1, 'Ready');
     this.rig.setMode('orbit', this.aircraft);
-    this.rig.orbit.dist = 19;
+    this.rig.orbit.dist = this.aircraft.type.camera.orbit;
     this.rig.orbit.pitch = 0.16;
     this.screens.hideLoading();
     this.screens.showTitle(true);
@@ -140,6 +143,42 @@ export class Game {
     return this.autopilot;
   }
 
+  // Make `id` the flown aircraft (placed on the pad, inputs and spray hooked
+  // up); every other aircraft is parked and becomes an obstacle.
+  _activate(id) {
+    const next = this.fleet[id];
+    for (const ac of Object.values(this.fleet)) {
+      if (ac === next) continue;
+      ac.onSimStep = null; ac.onEvent = null;
+      ac.park(BASE.parking);
+    }
+    this.aircraft = next;
+    this.aircraftId = id;
+    next.parked = false;
+    next.onSimStep = (h) => this.sprayer.step(h);
+    next.onEvent = (e) => this._acEvent(e);
+    next.placeAtPad();
+    next.stuck = false;
+    this.world.extraObstacle = (x, y, z) => {
+      for (const ac of Object.values(this.fleet)) if (ac !== this.aircraft && ac.hitTest(x, y, z)) return `parked ${ac.type.reg}`;
+      return null;
+    };
+  }
+
+  // Aircraft selection (title screen). Fuel, hopper and damage stay with
+  // each aircraft; the chosen one is towed to the pad.
+  selectAircraft(id) {
+    if (!this.fleet[id] || id === this.aircraftId) return;
+    if (this.service.busy()) this.service.abort('Aircraft change — service stopped.');
+    this.sprayer.on = false;
+    this._activate(id);
+    this.setSetting('aircraft', id);
+    if (this.job) this.guidance.setJob(this.job);
+    this.rig.setMode(this.rig.mode, this.aircraft);
+    if (this.rig.mode === 'orbit') this.rig.orbit.dist = this.aircraft.type.camera.orbit;
+    this.audio?.play('ui');
+  }
+
   toast(msg) { this.toastLog = this.toastLog || []; this.toastLog.push(msg); this.hud?.toast(msg); }
   crewMessage(msg) { void msg; }
   charge(amount) { this.career.money -= amount; }
@@ -157,15 +196,15 @@ export class Game {
         this.setJob(null);
         this.aircraft.placeAtPad();
         this.aircraft.repair();
-        this.aircraft.fm.fuel = 220; this.aircraft.fm.hopper = 500; this.aircraft.fm.updateMass();
-        this.toast('Free flight: tanks loaded. Hold Q to start the engine.');
+        { const L = this.aircraft.type.loads.free; this.aircraft.fm.fuel = L.fuel; this.aircraft.fm.hopper = L.hopper; this.aircraft.fm.updateMass(); }
+        this.toast(`Free flight in ${this.aircraft.type.reg}: tanks loaded. Hold Q to start the engine.`);
         break;
       case 'freeAir':
         this._enterPlay('free');
         this.setJob(null);
         this.aircraft.repair();
-        this.aircraft.fm.fuel = 220; this.aircraft.fm.hopper = 500;
-        this.aircraft.placeAirborne(-200, -280, Math.PI / 2, 120, 48);
+        { const L = this.aircraft.type.loads.free; this.aircraft.fm.fuel = L.fuel; this.aircraft.fm.hopper = L.hopper; }
+        this.aircraft.placeAirborne(-200, -280, Math.PI / 2, 120, 48 * (this.aircraft.A.assistSpeedScale ?? 1));
         this.rig.setMode('chase', this.aircraft);
         this.cameraMode = 'chase';
         break;
@@ -460,7 +499,7 @@ export class Game {
     const fm = ac.fm, o = fm.out;
     if (t.stall > 0.5 && !o.onGround) out.push({ text: 'Stall', cls: 'blink' });
     if (!o.onGround && o.agl < 6 && o.vs < -3.5) out.push({ text: 'Sink rate — pull up', cls: 'blink' });
-    if (t.ias > 140) out.push({ text: 'Overspeed', cls: 'amber' });
+    if (t.ias > ac.type.vspeeds.vne) out.push({ text: 'Overspeed', cls: 'amber' });
     if (!o.onGround && o.agl < 30) {
       // Power line ahead?
       const f = ac.forward();
@@ -483,7 +522,7 @@ export class Game {
       if (this.job && !this._overTarget()) out.push({ text: 'Spraying off target', cls: 'amber' });
     }
     if (this.sprayer.on && o.onGround) out.push({ text: 'Spray on the ground', cls: 'amber' });
-    if (t.fuel < FLIGHT.fuelCapacity * 0.12 && fm.engine === 'running') out.push({ text: 'Low fuel', cls: 'amber' });
+    if (t.fuel < ac.A.fuelCapacity * 0.12 && fm.engine === 'running') out.push({ text: 'Low fuel', cls: 'amber' });
     if (t.damage > 50) out.push({ text: `Damage ${Math.round(t.damage)}%`, cls: 'amber' });
     return out;
   }
@@ -503,6 +542,7 @@ export class Game {
       onGround: o.onGround, surface: o.surface, stall: this.playing ? Math.max(o.stall, o.stallWarn) : 0, spraying: this.sprayer.on && this.sprayer.flowNow > 0,
       inside: this.cameraMode === 'cockpit' && this.playing, attached: this.cameraMode !== 'orbit', listenerDist: this.cameraMode === 'cockpit' ? 0 : Math.max(0, camD - 12),
       rough: ac.damage > 55, pumpOn: this.service.pumpOn, serviceAtt: 1 / (1 + svcD / 15),
+      profile: ac.type.audio.profile, blades: ac.type.audio.blades, ng: fm.ng, power: ac.A.turbine ? fm.shaftPower / ac.A.maxPower : fm.throttle, itt: fm.itt,
       ambience: (1 - smoothstep(150, 700, baseD)) * (this.camera.position.y < 80 ? 1 : 0.3),
     });
   }

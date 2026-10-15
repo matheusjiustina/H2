@@ -14,10 +14,10 @@ export function getTerrain() {
   return terrainSingleton;
 }
 
-export function makeSim({ wind = true, hopper = 0, fuel = 200 } = {}) {
+export function makeSim({ wind = true, hopper = 0, fuel = 200, A = FLIGHT } = {}) {
   const terrain = getTerrain();
   const env = createFlightEnv(terrain);
-  const fm = new FlightModel();
+  const fm = new FlightModel(A);
   fm.fuel = fuel;
   fm.hopper = hopper;
   fm.updateMass();

@@ -5,8 +5,7 @@ import * as THREE from 'three';
 import { FlightModel } from '../flight/flightModel.js';
 import { Assist } from '../flight/assist.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
-import { createAircraftModel, createContactShadow } from './model.js';
-import { createPanel } from './panel.js';
+import { aircraftType } from './types.js';
 import { FLIGHT, UNITS } from '../config.js';
 import { BASE, RUNWAY, POWERLINE } from '../world/layout.js';
 import { approach, clamp, smoothstep, KT, FT } from '../core/math.js';
@@ -14,11 +13,12 @@ import { approach, clamp, smoothstep, KT, FT } from '../core/math.js';
 const FLAP_NOTCHES = [0, 1 / 3, 2 / 3, 1];
 
 // Minimal stand-in for the visual model (headless simulation / tests).
-function stubModel() {
+function stubModel(type) {
   const led = () => ({ material: { color: { setHex() {} } } });
+  const s = type.stub;
   return {
     root: new THREE.Group(), nozzles: [], leds: Array.from({ length: 15 }, led),
-    eye: new THREE.Vector3(0, 0.98, -0.42), fuelFiller: new THREE.Vector3(2.4, -0.2, -0.4), hopperPort: new THREE.Vector3(0.6, -0.35, -1.05),
+    eye: new THREE.Vector3(...s.eye), fuelFiller: new THREE.Vector3(...s.fuelFiller), hopperPort: new THREE.Vector3(...s.hopperPort),
     pilot: { visible: true }, cockpit: { visible: true },
   };
 }
@@ -26,21 +26,23 @@ const DT = FLIGHT.sim.dt;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
 
 export class Aircraft {
-  constructor(game, { headless = false } = {}) {
+  constructor(game, { headless = false, type = 'ipanema' } = {}) {
     this.game = game;
     this.world = game.world;
     this.headless = headless;
-    this.fm = new FlightModel();
+    this.type = aircraftType(type);
+    this.A = this.type.flight;
+    this.fm = new FlightModel(this.A);
     this.assist = new Assist();
     if (headless) {
       this.panel = { draw() {}, texture: null };
-      this.model = stubModel();
+      this.model = stubModel(this.type);
     } else {
-      this.panel = createPanel();
-      this.model = createAircraftModel(this.panel, { envMap: game.scene.environment });
+      this.panel = this.type.createPanel();
+      this.model = this.type.createModel(this.panel, { envMap: game.scene.environment });
     }
     game.scene.add(this.model.root);
-    if (!headless) { this.contactShadow = createContactShadow(); game.scene.add(this.contactShadow); }
+    if (!headless) { this.contactShadow = this.type.createShadow(); game.scene.add(this.contactShadow); }
     this.env = createFlightEnv(this.world.terrain);
     this.shaped = { elev: 0, ail: 0, rud: 0 };
     this.cmd = { pitch: 0, roll: 0, yaw: 0 };
@@ -81,7 +83,10 @@ export class Aircraft {
   }
   placeAtPad() {
     const p = BASE.pad;
-    this.fm.settleOnGround(p.x, p.z, p.heading, this.env);
+    this.placeParked(p.x, p.z, p.heading);
+  }
+  placeParked(x, z, heading) {
+    this.fm.settleOnGround(x, z, heading, this.env);
     this.fm.parkBrake = true;
     this._afterPlace();
   }
@@ -98,6 +103,35 @@ export class Aircraft {
     this._afterPlace();
   }
   repair() { this.damage = 0; this.fm.roughness = 0; this.fm.extraDrag = 0; }
+
+  // Shut down and leave the aircraft at a parking spot, settled on its
+  // springs, pilot out. It is not simulated while parked.
+  park(spot) {
+    const fm = this.fm;
+    fm.engine = 'off'; fm.rpm = 0; fm.ng = 0; fm.itt = 30; fm.throttle = 0; fm.brake = 0;
+    fm.flaps = fm.flapsCmd = 0;
+    this.placeParked(spot.x, spot.z, spot.heading);
+    this.env.wind.set(0, 0, 0);
+    for (let i = 0; i < 360; i++) fm.step(DT, this.env);
+    fm.vel.set(0, 0, 0); fm.omega.set(0, 0, 0);
+    this.prevPos.copy(fm.pos); this.prevQuat.copy(fm.quat);
+    this.rPos.copy(fm.pos); this.rQuat.copy(fm.quat);
+    this._sync();
+    this.parked = true;
+    this.model.pilot.visible = false;
+    if (!this.headless) this._animate(0);
+  }
+
+  // Is a world point inside this airframe (body-frame boxes from the type)?
+  hitTest(x, y, z) {
+    const p = _v.set(x - this.fm.pos.x, y - this.fm.pos.y, z - this.fm.pos.z);
+    if (p.lengthSq() > 90) return false;
+    p.applyQuaternion(_q.copy(this.fm.quat).invert());
+    for (const [x0, x1, y0, y1, z0, z1] of this.type.bounds) {
+      if (p.x > x0 && p.x < x1 && p.y > y0 && p.y < y1 && p.z > z0 && p.z < z1) return true;
+    }
+    return false;
+  }
 
   // ------------------------------------------------------------------ per frame
   update(dt, input, opts) {
@@ -231,7 +265,7 @@ export class Aircraft {
 
   _event(e) {
     const g = this.game;
-    const A = FLIGHT;
+    const A = this.A;
     if (e.kind === 'touch') {
       if (e.part !== 'tail') this.lastTouch = { vs: e.speed, t: this.simTime };
       // The tailwheel sits 4.5 m behind the CG: when the mains touch first it
@@ -271,7 +305,9 @@ export class Aircraft {
       this.hurt(Math.min(8, deep * 4));
       this._toast('crop', 'Crop strike — wheels in the canopy. Climb!');
     } else if (e.kind === 'starved') {
-      this._toast('fuel', 'Engine stopped: out of fuel.');
+      this._toast('fuel', this.A.turbine ? 'Flame-out: out of fuel.' : 'Engine stopped: out of fuel.');
+    } else if (e.kind === 'lightoff') {
+      this.game.audio?.play('lightoff');
     }
     this.onEvent?.(e);
   }
@@ -341,7 +377,7 @@ export class Aircraft {
   workHeight() {
     const fm = this.fm;
     let h = 1e9;
-    for (const p of [[0, -1.25, 0.75], [4.9, -0.22, -0.95], [-4.9, -0.22, -0.95]]) {
+    for (const p of this.type.work) {
       _v.set(p[0], p[1], p[2]).applyQuaternion(fm.quat).add(fm.pos);
       h = Math.min(h, _v.y - this.env.top(_v.x, _v.z));
     }
@@ -351,8 +387,7 @@ export class Aircraft {
   _collide() {
     if (this.state !== 'ok') return;
     const fm = this.fm;
-    const pts = [[0, 0.05, 3.3], [5.9, 0.1, -0.1], [-5.9, 0.1, -0.1], [0, 1.75, -4.0], [0, 0.2, -4.3], [0, -1.2, 0.75], [0, 1.3, 0]];
-    for (const p of pts) {
+    for (const p of this.type.collide) {
       _v.set(p[0], p[1], p[2]).applyQuaternion(fm.quat).add(fm.pos);
       const hit = this.world.obstacleAt(_v.x, _v.y, _v.z);
       if (hit) return this.crash(`Hit ${hit}`);
@@ -363,7 +398,7 @@ export class Aircraft {
       return { x0: Math.min(...xs) - 30, x1: Math.max(...xs) + 30, z0: Math.min(...zs) - 30, z1: Math.max(...zs) + 30 };
     })());
     if (fm.pos.x > pl.x0 && fm.pos.x < pl.x1 && fm.pos.z > pl.z0 && fm.pos.z < pl.z1 && fm.pos.y - this.world.terrain.heightAt(fm.pos.x, fm.pos.z) < 25) {
-      for (const p of [[0, 0.05, 3.3], [5.9, 0.1, -0.1], [-5.9, 0.1, -0.1], [0, 1.75, -4.0], [0, -1.2, 0.75], [2.9, -0.4, 0], [-2.9, -0.4, 0]]) {
+      for (const p of this.type.wire) {
         _v.set(p[0], p[1], p[2]).applyQuaternion(fm.quat).add(fm.pos);
         if (this.world.wireDistance(_v.x, _v.y, _v.z) < 0.5) return this.crash('Wire strike');
       }
@@ -397,15 +432,16 @@ export class Aircraft {
       this.rQuat.multiply(_q);
       this._sync();
     }
+    const an = this.type.anim;
     const el = clamp(fm.elevator + fm.trim * 0.3, -1, 1);
-    m.elevator.rotation.x = el * 0.35;
-    m.rudder.rotation.y = fm.rudder * 0.42;
-    m.ailerons[0].rotation.x = -fm.aileron * 0.33;
-    m.ailerons[1].rotation.x = fm.aileron * 0.33;
-    for (const f of m.flaps) f.rotation.x = -fm.flaps * 0.52;
+    m.elevator.rotation.x = el * an.elev;
+    m.rudder.rotation.y = fm.rudder * an.rud;
+    m.ailerons[0].rotation.x = -fm.aileron * an.ail;
+    m.ailerons[1].rotation.x = fm.aileron * an.ail;
+    for (const f of m.flaps) f.rotation.x = -fm.flaps * an.flap;
     // Propeller: blades fade into a disc as rpm rises.
     m.blades.rotation.z += (fm.rpm / 60) * Math.PI * 2 * dt;
-    const disc = smoothstep(380, 900, fm.rpm);
+    const disc = smoothstep(an.disc[0], an.disc[1], fm.rpm);
     m.disc.material.opacity = disc * 0.85;
     m.disc.rotation.z += dt * 2.3;
     const ba = 1 - smoothstep(0.3, 0.92, disc);
@@ -422,15 +458,16 @@ export class Aircraft {
     // Cockpit controls.
     m.stick.rotation.x = -fm.elevator * 0.25;
     m.stick.rotation.z = fm.aileron * 0.25;
-    m.pedals[0].position.z = 0.42 - fm.rudder * 0.05;
-    m.pedals[1].position.z = 0.42 + fm.rudder * 0.05;
+    m.pedals[0].position.z = an.pedalZ - fm.rudder * 0.05;
+    m.pedals[1].position.z = an.pedalZ + fm.rudder * 0.05;
     m.throttle.rotation.x = -0.5 + fm.throttle * 0.95;
     const spraying = this.game.sprayer?.on;
     m.valve.rotation.x = spraying ? 0.6 : -0.3;
     m.pumpFan.rotation.z += (spraying ? fm.out.airspeed * 1.6 : fm.out.airspeed * 0.3) * dt;
     // Instrument panel at 15 Hz while visible.
+    m.update?.(dt, fm, this);
     this.panelT -= dt;
-    if (this.panelT <= 0 && this.game.cameraMode === 'cockpit') {
+    if (this.panelT <= 0 && this.game.cameraMode === 'cockpit' && this.game.aircraft === this) {
       this.panelT = 1 / 15;
       this.panel.draw(this.instruments());
     }
@@ -442,8 +479,10 @@ export class Aircraft {
     const ias = o.airspeed * KT * Math.sqrt(o.density / 1.225);
     return {
       ias, altFt: (fm.pos.y + UNITS.altOffsetM) * FT, rpm: fm.rpm,
-      fuel: fm.fuel, fuelCap: FLIGHT.fuelCapacity, hopper: fm.hopper, hopperCap: FLIGHT.hopperCapacity,
-      vs0: 48, vs1: 55, vfe: 95,
+      fuel: fm.fuel, fuelCap: this.A.fuelCapacity, hopper: fm.hopper, hopperCap: this.A.hopperCapacity,
+      ...this.type.vspeeds,
+      ng: fm.ng, itt: fm.itt, torque: fm.torque, fuelFlow: fm.fuelFlow, throttle: fm.throttle, beta: fm.beta,
+      gLoad: o.gLoad, slip: o.beta, yawRate: -fm.omega.y, onGround: o.onGround, reg: this.type.reg,
       stall: o.stall, spray: !!this.game.sprayer?.on, brake: fm.brake > 0.3 || fm.parkBrake,
       engine: fm.engine, flaps: fm.flaps, hdg: this.headingDeg(), hgt: this.workHeight(), vsFpm: o.vs * FT * 60,
       flow: this.game.sprayer?.flowNow ?? 0, gps: this.game.guidance, pitch: att.pitch, bank: att.bank,
@@ -471,20 +510,21 @@ export class Aircraft {
       }
     }
     // Prop wash raising dust on the ground at high power.
-    if (o.agl < 4 && fm.rpm > 1500 && o.groundSpeed < 30) {
-      _v.set((Math.random() - 0.5) * 2, -1.0, -2 - Math.random() * 3).applyQuaternion(fm.quat).add(fm.pos);
+    const an = this.type.anim, wp = this.type.wash;
+    if (o.agl < 4 && fm.rpm > an.wash[0] && o.groundSpeed < 30) {
+      _v.set((Math.random() - 0.5) * 2, wp[1], wp[2] - Math.random() * 3).applyQuaternion(fm.quat).add(fm.pos);
       const gh = this.world.terrain.heightAt(_v.x, _v.z);
       const s = this.env.surface(_v.x, _v.z);
       if (s !== 'grass' && s !== 'crop') {
         _v2.set(0, 0, -1).applyQuaternion(fm.quat);
-        const k = smoothstep(1500, 2600, fm.rpm);
+        const k = smoothstep(an.wash[0], an.wash[1], fm.rpm) * (this.A.turbine ? 0.4 + fm.shaftPower / this.A.maxPower : 1);
         dust.spawn(_v.x, gh + 0.2, _v.z, _v2.x * 8 * k + wind.x, 0.4, _v2.z * 8 * k + wind.z,
           { life: 1.8, size: 1.2, grow: 3.5, alpha: 0.22 * k, drag: 0.9, gravity: -0.1, color: col(s) });
       }
     }
     // Rough engine smoke.
     if (this.damage > 55 && fm.engine !== 'off') {
-      _v.set(-0.5, -0.3, 2.0).applyQuaternion(fm.quat).add(fm.pos);
+      _v.fromArray(this.type.smoke).applyQuaternion(fm.quat).add(fm.pos);
       dust.spawn(_v.x, _v.y, _v.z, fm.vel.x * 0.4, 0.5, fm.vel.z * 0.4, { life: 2.2, size: 0.4, grow: 3, alpha: 0.3, drag: 1.2, gravity: -0.3, color: [0.15, 0.15, 0.15] });
     }
   }
@@ -495,6 +535,7 @@ export class Aircraft {
       ias: o.airspeed * KT * Math.sqrt(o.density / 1.225), gs: o.groundSpeed * KT,
       hgt: this.workHeight(), agl: o.agl, altFt: (fm.pos.y + UNITS.altOffsetM) * FT,
       power: fm.throttle, rpm: fm.rpm, fuel: fm.fuel, hopper: fm.hopper, engine: fm.engine,
+      fuelCap: this.A.fuelCapacity, hopperCap: this.A.hopperCapacity, ng: fm.ng, itt: fm.itt, torque: fm.torque,
       stall: o.stall, onGround: o.onGround, flaps: fm.flaps, brake: fm.brake, parkBrake: fm.parkBrake,
       vs: o.vs, damage: this.damage, mass: fm.mass, hdg: this.headingDeg(), state: this.state, g: o.gLoad,
     };

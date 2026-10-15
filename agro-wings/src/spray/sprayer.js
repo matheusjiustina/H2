@@ -43,8 +43,9 @@ export class Sprayer {
 
   // Effective swath width for a nozzle height above the canopy.
   swathFor(h) {
-    const w = SPRAY.swath * (0.42 + 0.58 * smoothstep(0.4, 2.8, h)) * (1 + 0.05 * Math.max(0, h - 4.5));
-    return clamp(w, 6, SPRAY.swath * 1.45);
+    const sw = this.game.aircraft.type.spray.swath;
+    const w = sw * (0.42 + 0.58 * smoothstep(0.4, 2.8, h)) * (1 + 0.05 * Math.max(0, h - 4.5));
+    return clamp(w, 6, sw * 1.45);
   }
 
   // Called once per fixed simulation step.
@@ -54,7 +55,7 @@ export class Sprayer {
     const o = fm.out;
     // Wind-driven pump: needs airflow.
     const pump = smoothstep(10, 28, o.airspeed);
-    this.flowNow = this.on && fm.hopper > 0 ? SPRAY.flow * pump : 0;
+    this.flowNow = this.on && fm.hopper > 0 ? ac.type.spray.flow * pump : 0;
     if (!this.on) return;
     if (fm.hopper <= 0) {
       this.on = false;
@@ -67,8 +68,9 @@ export class Sprayer {
     this.sprayed += litres;
 
     // Boom line in world space.
-    _a.set(4.7, -0.3, -0.95).applyQuaternion(fm.quat).add(fm.pos);
-    _b.set(-4.7, -0.3, -0.95).applyQuaternion(fm.quat).add(fm.pos);
+    const bm = ac.type.spray.boom;
+    _a.set(bm[0], bm[1], bm[2]).applyQuaternion(fm.quat).add(fm.pos);
+    _b.set(-bm[0], bm[1], bm[2]).applyQuaternion(fm.quat).add(fm.pos);
     const mid = _p.copy(_a).add(_b).multiplyScalar(0.5);
     const top = ac.env.top(mid.x, mid.z);
     const hMid = mid.y - top;
@@ -89,17 +91,19 @@ export class Sprayer {
     const taper = 0.35 * W;
     const half = W / 2;
     let wsum = 0;
-    const wts = this._w || (this._w = new Float32Array(SAMPLES));
-    const us = this._u || (this._u = new Float32Array(SAMPLES));
-    for (let i = 0; i < SAMPLES; i++) {
-      const u = -half - taper / 2 + ((i + 0.5) / SAMPLES) * (W + taper);
+    // Same sample spacing for a wider boom (avoids aliasing on the 2 m grid).
+    const NS = Math.round((SAMPLES * ac.type.spray.swath) / 24);
+    const wts = this._w?.length >= NS ? this._w : (this._w = new Float32Array(NS));
+    const us = this._u?.length >= NS ? this._u : (this._u = new Float32Array(NS));
+    for (let i = 0; i < NS; i++) {
+      const u = -half - taper / 2 + ((i + 0.5) / NS) * (W + taper);
       us[i] = u;
       const au = Math.abs(u);
       const w = au < half - taper / 2 ? 1 : au > half + taper / 2 ? 0 : (half + taper / 2 - au) / taper;
       wts[i] = w;
       wsum += w;
     }
-    for (let i = 0; i < SAMPLES; i++) {
+    for (let i = 0; i < NS; i++) {
       if (wts[i] <= 0) continue;
       const u = us[i];
       // Nozzle point on the boom that "feeds" this landing position.
@@ -132,7 +136,7 @@ export class Sprayer {
     if (!pool || !this.on || this.flowNow <= 0) return;
     const fm = ac.fm;
     const nozzles = ac.model.nozzles;
-    const rate = 1400 * (this.flowNow / SPRAY.flow); // particles per second
+    const rate = 1400 * (this.flowNow / SPRAY.flow); // particles per second (more for a bigger pump)
     this.emitAcc += rate * dt;
     const wind = ac.windVec;
     while (this.emitAcc >= 1) {

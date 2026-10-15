@@ -1229,7 +1229,54 @@ export function createAircraftModel(panel, opts = {}) {
   cockpit.add(hl);
   root.add(cockpit);
 
-  // ---------------- pilot (seen from outside) ----------------
+  const pilot = buildPilot(M, stick, throttle);
+  root.add(pilot);
+
+  // ---------------- merge static parts ----------------
+  const fine = new THREE.Group();
+  for (const [k, parts] of Object.entries(B)) {
+    const isFine = k.startsWith('fine:');
+    const mat = M[isFine ? k.slice(5) : k];
+    const m = new THREE.Mesh(mergeGeometries(parts), mat);
+    // Fine parts are smaller than a shadow texel: skip them in the shadow pass.
+    m.castShadow = !isFine && mat !== M.glass && mat !== M.lens;
+    m.receiveShadow = true;
+    if (mat === M.lens) m.renderOrder = 9;
+    (isFine ? fine : root).add(m);
+  }
+  const lod = new THREE.LOD();
+  lod.addLevel(fine, 0);
+  lod.addLevel(new THREE.Group(), 80);
+  root.add(lod);
+  root.add(glassMesh);
+  root.traverse((o) => { if (o.isMesh && o.castShadow === undefined) o.castShadow = true; });
+
+  return {
+    root, M,
+    prop, blades, bladeMats: [bladeMat, tipMat], disc,
+    ailerons, flaps, elevator, rudder,
+    gear: gearGroups,
+    stick, pedals, throttle, valve, leds, panelMesh,
+    pumpFan, nozzles, pilot, cockpit, glassMesh,
+    eye: new THREE.Vector3(0, 1.0, -0.5),
+    // Service points (body frame) used by the badeco.
+    fuelFiller: new THREE.Vector3(2.4, wingY(2.4) + 0.14, -0.4),
+    hopperPort: new THREE.Vector3(0.6, -0.35, -1.05),
+  };
+}
+
+// ---------------- pilot (seen from outside) ----------------
+// Seated pilot in a flight suit and helmet, built in the PR-AGW cockpit frame
+// (seat cushion at z -0.55). The forearms and gloves ride on the stick and the
+// throttle groups, positioned relative to where those sit in that frame
+// (stick at 0, -0.22, -0.12; throttle at 0.415, 0.5, 0.05), so another
+// aircraft can reuse it by moving the pilot, stick and throttle by the same
+// offset.
+export function buildPilot(M, stick, throttle, { throttleAt = [0.415, 0.5, 0.05] } = {}) {
+  // A throttle placed elsewhere (in the same frame) moves the left elbow part
+  // of the way with it so the forearm stays attached.
+  const dT = throttleAt.map((v, i) => v - [0.415, 0.5, 0.05][i]);
+  const elbowL = [0.32 + dT[0] * 0.6, 0.56 + dT[1] * 0.6, -0.4 + dT[2] * 0.6];
   const pilot = new THREE.Group();
   const capsule = (a, b, r, mat, parent = pilot) => {
     const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
@@ -1308,7 +1355,7 @@ export function createAircraftModel(panel, opts = {}) {
   }
   // Upper arms (static); forearms + gloves ride on the stick and the throttle.
   limb(T(-0.19, 0.69, 0), [-0.2, 0.52, -0.45], 0.047, M.suit);
-  limb(T(0.19, 0.69, 0), [0.32, 0.56, -0.4], 0.047, M.suit);
+  limb(T(0.19, 0.69, 0), elbowL, 0.047, M.suit);
   // Thighs on the cushion, knees, shins to the pedals, boots; kneeboard on
   // the right thigh.
   for (const sx of [1, -1]) {
@@ -1332,14 +1379,13 @@ export function createAircraftModel(panel, opts = {}) {
   gR.scale.set(1, 1.2, 0.9);
   handR.add(gR);
   stick.add(handR);
-  capsule(rel([0.32, 0.56, -0.4], T0), rel([0.41, 0.64, 0.0], T0), 0.042, M.suit, handL);
+  capsule(rel(elbowL, new THREE.Vector3(...throttleAt)), rel([0.41, 0.64, 0.0], T0), 0.042, M.suit, handL);
   capsule(rel([0.39, 0.62, -0.06], T0), rel([0.41, 0.64, 0.0], T0), 0.046, M.glove, handL);
   const gL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 14, 10), M.glove);
   gL.position.set(...rel([0.415, 0.67, 0.04], T0));
   handL.add(gL);
   throttle.add(handL);
   pilot.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  root.add(pilot);
   // The camera rig hides the pilot in the cockpit view; the hands ride on the
   // controls, so they follow the pilot's visibility.
   {
@@ -1347,54 +1393,26 @@ export function createAircraftModel(panel, opts = {}) {
     Object.defineProperty(pilot, 'visible', { get: () => vis, set: (v) => { vis = v; handR.visible = v; handL.visible = v; } });
   }
 
-  // ---------------- merge static parts ----------------
-  const fine = new THREE.Group();
-  for (const [k, parts] of Object.entries(B)) {
-    const isFine = k.startsWith('fine:');
-    const mat = M[isFine ? k.slice(5) : k];
-    const m = new THREE.Mesh(mergeGeometries(parts), mat);
-    // Fine parts are smaller than a shadow texel: skip them in the shadow pass.
-    m.castShadow = !isFine && mat !== M.glass && mat !== M.lens;
-    m.receiveShadow = true;
-    if (mat === M.lens) m.renderOrder = 9;
-    (isFine ? fine : root).add(m);
-  }
-  const lod = new THREE.LOD();
-  lod.addLevel(fine, 0);
-  lod.addLevel(new THREE.Group(), 80);
-  root.add(lod);
-  root.add(glassMesh);
-  root.traverse((o) => { if (o.isMesh && o.castShadow === undefined) o.castShadow = true; });
-
-  return {
-    root, M,
-    prop, blades, bladeMats: [bladeMat, tipMat], disc,
-    ailerons, flaps, elevator, rudder,
-    gear: gearGroups,
-    stick, pedals, throttle, valve, leds, panelMesh,
-    pumpFan, nozzles, pilot, cockpit, glassMesh,
-    eye: new THREE.Vector3(0, 1.0, -0.5),
-    // Service points (body frame) used by the badeco.
-    fuelFiller: new THREE.Vector3(2.4, wingY(2.4) + 0.14, -0.4),
-    hopperPort: new THREE.Vector3(0.6, -0.35, -1.05),
-  };
+  return pilot;
 }
 
 // Soft contact shadow (ambient occlusion on the ground under the aircraft):
 // a blurred planform decal laid on the terrain, fading with height. Visual only.
-export function createContactShadow() {
-  const S = 256, W = 13, L = 9;
+// The default planform is the PR-AGW's; other aircraft pass their own.
+const SHADOW_PR_AGW = { W: 13, L: 9, wing: [5.9, -0.85, 0.85], fus: [0.62, -0.55, 3.8], tail: [1.9, -4.15, -3.3], core: [4.2, 2.6] };
+export function createContactShadow(P = SHADOW_PR_AGW) {
+  const S = 256, W = P.W, L = P.L;
   const c = canvas(S, S);
   const g = c.getContext('2d');
   const px = (x) => ((x + W / 2) / W) * S, pz = (z) => ((z + L / 2) / L) * S;
   g.filter = 'blur(9px)';
   g.fillStyle = 'rgba(0,0,0,0.9)';
-  g.fillRect(px(-5.9), pz(-0.85), px(5.9) - px(-5.9), pz(0.85) - pz(-0.85)); // wing
-  g.beginPath(); g.ellipse(px(0), pz(-0.55), (0.62 / W) * S, (3.8 / L) * S, 0, 0, Math.PI * 2); g.fill(); // fuselage
-  g.fillRect(px(-1.9), pz(-4.15), px(1.9) - px(-1.9), pz(-3.3) - pz(-4.15)); // tailplane
+  g.fillRect(px(-P.wing[0]), pz(P.wing[1]), px(P.wing[0]) - px(-P.wing[0]), pz(P.wing[2]) - pz(P.wing[1])); // wing
+  g.beginPath(); g.ellipse(px(0), pz(P.fus[1]), (P.fus[0] / W) * S, (P.fus[2] / L) * S, 0, 0, Math.PI * 2); g.fill(); // fuselage
+  g.fillRect(px(-P.tail[0]), pz(P.tail[1]), px(P.tail[0]) - px(-P.tail[0]), pz(P.tail[2]) - pz(P.tail[1])); // tailplane
   g.filter = 'blur(22px)';
   g.fillStyle = 'rgba(0,0,0,0.5)';
-  g.beginPath(); g.ellipse(px(0), pz(0), (4.2 / W) * S, (2.6 / L) * S, 0, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.ellipse(px(0), pz(0), (P.core[0] / W) * S, (P.core[1] / L) * S, 0, 0, Math.PI * 2); g.fill();
   const geo = new THREE.PlaneGeometry(W, L).rotateX(-Math.PI / 2);
   const mat = new THREE.MeshBasicMaterial({ map: canvasTexture(c), transparent: true, opacity: 0, depthWrite: false, color: 0xffffff });
   const m = new THREE.Mesh(geo, mat);
@@ -1403,3 +1421,6 @@ export function createContactShadow() {
   return m;
 }
 
+
+// Geometry and texture helpers shared with the other aircraft models.
+export { sampleStations, ring, loft, K, airfoil, wingPanel, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, patch, patchEdge, speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV };

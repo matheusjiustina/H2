@@ -82,6 +82,116 @@ export const FLIGHT = {
   // Damage thresholds (m/s at contact).
   hardLandingVs: 2.6,
   crashVs: 5.0,
+
+  // Geometry the shared systems need (CG to the main-wheel bottom, wing).
+  wheelPoint: [0, -1.25, 0.75],
+  aglOffset: 1.25,
+  wingDrop: 0.55,
+};
+
+// ---------------------------------------------------------------------------
+// Air Tractor AT-502B (second aircraft, own registration PR-AWT).
+// Published figures used (Air Tractor / dealer spec sheets, Wikipedia AT-500
+// family): P&WC PT6A-34AG 750 shp at 2,200 prop rpm; Hartzell 3-blade
+// constant-speed prop, 2.82 m; span 52 ft (15.85 m); wing area 312 ft²
+// (29.0 m²); empty ≈ 4,570 lb (2,073 kg); max take-off 9,400 lb (4,264 kg);
+// hopper 500 US gal (1,893 L); fuel 170 US gal (643 L); stall 71 kt flaps up
+// / 59 kt flaps down at 8,000 lb; climb 870 ft/min at 9,400 lb; working
+// speed 120–145 mph.
+// Derived here (not published): CLmax 1.50 / 2.18 from those stall speeds;
+// CD0 0.058 with e 0.80 so that the 870 ft/min climb at 9,400 lb (sea level)
+// and a 75 %-power cruise of 134 kt at 8,000 ft both come out of the same
+// polar; inertias scaled from mass and size; static thrust ≈ 12.5 kN from
+// momentum theory (figure of merit 0.64); fuel flow from a PT6A-34 specific
+// consumption of ~0.6 lb/shp/h.
+export const FLIGHT_AT502 = {
+  ...FLIGHT,
+  emptyMass: 2073,
+  mtow: 4264,
+  pilotMass: 85,
+  wingArea: 29.0,
+  span: 15.85,
+  chord: 1.83,
+  oswald: 0.8,
+  inertiaEmpty: [9000, 12500, 8500],
+
+  CL0: 0.28, CLa: 5.0, alphaStall: 0.244, alphaStallNeg: -0.2,
+  CD0: 0.058,
+  CDflap: 0.06, CLflap: 0.85,
+  Cm0: 0.04, CmaWB: 0.25, CmaTail: -1.4, Cmq: -16, Cmde: 0.46, Cmflap: -0.06,
+  Clb: -0.085, Clp: -0.52, Clr: 0.11, Clda: 0.08,
+  Cnb: 0.09, Cnr: -0.18, Cndr: 0.075, Cnda: -0.012,
+  CYb: -0.6, CYdr: 0.12,
+
+  engineType: 'turboprop',
+  maxPower: 559e3, // 750 shp, flat rated
+  propRadius: 1.41,
+  maxRpm: 2200, // governed prop rpm
+  idleRpm: 1150, // prop on the fine stop at ground idle
+  turbine: {
+    idleNg: 53, maxNg: 101.5, // gas generator %
+    accel: 14, decel: 22, // Ng %/s limits
+    idleFrac: 0.022, // shaft power at ground idle
+    lightoff: 3.2, // s of starter before fuel is introduced
+    govFrac: 0.3, // power fraction at which the governor holds 2,200 rpm
+    betaDrag: 2600, // N of braking thrust in beta (power lever at idle, on the ground)
+    etaStatic: 0.64, // static figure of merit (≈ 12.5 kN static at 750 shp)
+    etaCruise: 0.85, // propulsive efficiency of the constant-speed prop in climb/cruise
+    discDrag: 0.1, // windmilling disc drag on the fine-pitch stop (flight idle)
+    maxTorque: 1790, // ft·lb at 750 shp / 2,200 rpm
+    flatSigma: 0.78, // density ratio down to which 750 shp is available
+  },
+  fuelFlowFull: 255 / 3600, // L/s at max power (Jet-A)
+  fuelFlowIdle: 60 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.8,
+
+  fuelCapacity: 643,
+  hopperCapacity: 1893,
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.3,
+  fuelTankSpanY: 2.9,
+
+  // Spring-steel main gear and a steerable tailwheel; ~10° three-point attitude.
+  gear: [
+    { name: 'mainL', p: [1.45, -1.62, 0.95], k: 190000, c: 19000, travel: 0.24, radius: 0.37, steer: false },
+    { name: 'mainR', p: [-1.45, -1.62, 0.95], k: 190000, c: 19000, travel: 0.24, radius: 0.37, steer: false },
+    { name: 'tail', p: [0, -0.48, -5.45], k: 52000, c: 4600, travel: 0.14, radius: 0.16, steer: true },
+  ],
+  brakeMu: 0.4,
+  tailSteer: 0.36,
+
+  hard: [
+    { name: 'wingtipL', p: [7.95, -0.12, -0.3] },
+    { name: 'wingtipR', p: [-7.95, -0.12, -0.3] },
+    { name: 'boomL', p: [7.0, -0.42, -1.22] },
+    { name: 'boomR', p: [-7.0, -0.42, -1.22] },
+    { name: 'prop', p: [0, -1.12, 3.92] },
+    { name: 'spinner', p: [0, 0.3, 4.32] },
+    { name: 'belly', p: [0, -0.86, 0.45] },
+    { name: 'tail', p: [0, 0.18, -5.62] },
+    { name: 'fin', p: [0, 2.35, -5.45] },
+    { name: 'stabL', p: [2.75, 0.42, -5.55] },
+    { name: 'stabR', p: [-2.75, 0.42, -5.55] },
+    { name: 'roof', p: [0, 1.66, -1.0] },
+  ],
+  hardLandingVs: 3.0,
+  crashVs: 5.5,
+
+  wheelPoint: [0, -1.45, 0.95],
+  aglOffset: 1.45,
+  wingDrop: 0.6,
+  // The assist's rate loops act through a heavier, larger airframe.
+  assistGain: { pitch: 2.0, roll: 1.5 },
+  assistSpeedScale: 1.28, // stall speed ratio to the PR-AGW at max weight
+};
+
+export const SPRAY_AT502 = {
+  // Longer boom (≈ 14 m) and bigger pump: a swath scaled from the AT-502's
+  // real ~21 m the same way as the PR-AGW's, and the flow that gives the same
+  // dose as the PR-AGW at a 60 m/s (117 kt) working speed.
+  swath: 30,
+  flow: 6.4,
 };
 
 export const ASSIST = {

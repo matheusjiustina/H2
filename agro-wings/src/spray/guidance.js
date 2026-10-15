@@ -27,7 +27,7 @@ export class Guidance {
     const a1 = Math.max(...fs.map((f) => (axis === 'x' ? f.z1 : f.x1)));
     const l0 = Math.min(...fs.map((f) => (axis === 'x' ? f.x0 : f.z0)));
     const l1 = Math.max(...fs.map((f) => (axis === 'x' ? f.x1 : f.z1)));
-    const W = SPRAY.swath;
+    const W = this.game.aircraft.type.spray.swath;
     const n = Math.max(1, Math.round((a1 - a0) / W));
     const sp = (a1 - a0) / n;
     for (let k = 0; k < n; k++) {

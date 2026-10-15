@@ -6,7 +6,8 @@ import { makeSim } from './harness.mjs';
 import { Sprayer } from '../src/spray/sprayer.js';
 import { FieldCoverage } from '../src/spray/coverage.js';
 import { CONTRACT_FIELDS } from '../src/world/layout.js';
-import { SPRAY, FLIGHT } from '../src/config.js';
+import { SPRAY, FLIGHT, FLIGHT_AT502 } from '../src/config.js';
+import { AIRCRAFT_TYPES } from '../src/aircraft/types.js';
 
 const soy = CONTRACT_FIELDS.find((f) => f.name === 'T-07');
 const cotA = CONTRACT_FIELDS.find((f) => f.name === 'T-03A');
@@ -14,15 +15,15 @@ const cotB = CONTRACT_FIELDS.find((f) => f.name === 'T-03B');
 
 // Fly a straight eastbound line at a given height over the canopy with the
 // valve open, using the real flight model + spray step at 120 Hz.
-function fly({ z, height = 3.4, x0, x1, wind = null, coverages, speed = 46, hopper = 900 }) {
-  const sim = makeSim({ hopper, fuel: 160, wind: false });
+function fly({ z, height = 3.4, x0, x1, wind = null, coverages, speed = 46, hopper = 900, type = AIRCRAFT_TYPES.ipanema }) {
+  const sim = makeSim({ hopper, fuel: 160, wind: false, A: type.flight });
   const { fm, env } = sim;
   const windVec = new Vector3();
-  const game = { aircraft: { fm, env, windVec }, toast() {}, audio: null };
+  const game = { aircraft: { fm, env, windVec, type, A: type.flight }, toast() {}, audio: null };
   const sp = new Sprayer(game);
   sp.setTargets(coverages);
   const top = env.top(x0, z);
-  fm.reset(new Vector3(x0, top + 1.25 + height, z), Math.PI / 2, { speed, engineOn: true });
+  fm.reset(new Vector3(x0, top + type.flight.aglOffset + height, z), Math.PI / 2, { speed, engineOn: true });
   fm.throttle = 0.75;
   sp.on = true;
   const h = FLIGHT.sim.dt;
@@ -33,7 +34,7 @@ function fly({ z, height = 3.4, x0, x1, wind = null, coverages, speed = 46, hopp
     fm.quat.setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2);
     fm.omega.set(0, 0, 0);
     fm.vel.set(speed, 0, 0);
-    fm.pos.y = env.top(fm.pos.x, z) + 1.25 + height;
+    fm.pos.y = env.top(fm.pos.x, z) + type.flight.aglOffset + height;
     fm.pos.z = z;
     fm.step(h, env);
     sp.step(h);
@@ -58,6 +59,18 @@ test('one pass at work height lays a ~24 m swath close to the target dose', () =
   const centre = prof[Math.floor((zc - soy.z0) / cov.cell)];
   console.log(`  treated width ${treated} m, centre dose ${centre.toFixed(2)}`);
   assert.ok(treated >= 18 && treated <= 30, `swath ${treated}`);
+  assert.ok(centre > 0.8 && centre < 1.4, `centre dose ${centre}`);
+});
+
+test('AT-502B: one pass at 117 kt lays a ~30 m swath at the same dose', () => {
+  const cov = new FieldCoverage(soy);
+  const zc = -280;
+  fly({ z: zc, x0: soy.x0 - 30, x1: soy.x1 + 30, coverages: [cov], speed: 60, hopper: 1800, type: AIRCRAFT_TYPES.at502 });
+  const prof = profileAcross(cov, 450);
+  const treated = prof.filter((d) => d >= SPRAY.doseGood[0]).length * cov.cell;
+  const centre = prof[Math.floor((zc - soy.z0) / cov.cell)];
+  console.log(`  treated width ${treated} m, centre dose ${centre.toFixed(2)} (${FLIGHT_AT502.hopperCapacity} L hopper)`);
+  assert.ok(treated >= 24 && treated <= 38, `swath ${treated}`);
   assert.ok(centre > 0.8 && centre < 1.4, `centre dose ${centre}`);
 });
 
@@ -117,7 +130,7 @@ test('liquid outside the talhão counts as waste; the creek gap between cotton f
 test('progress needs liquid to land: flying over the field with the valve shut adds nothing', () => {
   const cov = new FieldCoverage(soy);
   const sim = makeSim({ hopper: 500, wind: false });
-  const game = { aircraft: { fm: sim.fm, env: sim.env, windVec: new Vector3() }, toast() {} };
+  const game = { aircraft: { fm: sim.fm, env: sim.env, windVec: new Vector3(), type: AIRCRAFT_TYPES.ipanema, A: FLIGHT }, toast() {} };
   const sp = new Sprayer(game);
   sp.setTargets([cov]);
   sim.fm.reset(new Vector3(300, sim.env.top(300, -280) + 4.6, -280), Math.PI / 2, { speed: 46, engineOn: true });

@@ -8,7 +8,6 @@
 // On the ground the stick drives the surfaces directly (taxi feel unchanged).
 import { clamp } from '../core/math.js';
 import { FlightModel } from './flightModel.js';
-import { FLIGHT } from '../config.js';
 
 const G = 9.81;
 
@@ -26,7 +25,10 @@ export class Assist {
 
   update(fm, cmd, mode, dt) {
     const a = fm.out;
-    const A = FLIGHT;
+    const A = fm.A;
+    // Per-type scaling: control power per unit inertia (gain) and the speed
+    // scale of the airframe (stall speed relative to the PR-AGW).
+    const kp = A.assistGain?.pitch ?? 1, kr = A.assistGain?.roll ?? 1, vk = A.assistSpeedScale ?? 1;
     const flying = !a.onGround && a.agl > 0.8;
     const att = FlightModel.attitude(fm, this._att);
     if (!flying || mode === 'off') {
@@ -48,9 +50,9 @@ export class Assist {
       this.airborne = true;
     }
     const v = Math.max(a.airspeed, 12);
-    const auth = clamp(v / 32, 0.45, 1);
+    const auth = clamp(v / (32 * vk), 0.45, 1);
     const qd = 0.6125 * v * v;
-    const qTail = qd + (0.3 * a.thrust) / 5.3;
+    const qTail = qd + (0.3 * a.thrust) / (5.3 * (A.propRadius / 1.1) ** 2);
     const pitch = att.pitch, bank = att.bank;
     const high = mode === 'high';
 
@@ -86,11 +88,11 @@ export class Assist {
         // Dives level off on their own; slow climbs give the speed back.
         if (this.holdPitch < -0.03) this.holdPitch = Math.min(-0.03, this.holdPitch + 0.06 * dt);
         if (a.agl < 25 && this.holdPitch < -0.02) this.holdPitch = Math.min(-0.02, this.holdPitch + 0.25 * dt);
-        const minV = 36 - fm.flaps * 6;
+        const minV = (36 - fm.flaps * 6) * vk;
         if (v < minV) this.holdPitch = Math.max(-0.08, this.holdPitch - (minV - v) * 0.012 * dt);
         // Speed stability: a held climb flattens as the speed bleeds off (a
         // released pull-up tops out instead of climbing on and on).
-        const gMax = clamp(((v - 30) / 16) * 0.45, 0.04, lim[1]);
+        const gMax = clamp(((v - 30 * vk) / (16 * vk)) * 0.45, 0.04, lim[1]);
         if (this.holdPitch > gMax) this.holdPitch = Math.max(gMax, this.holdPitch - 0.25 * dt);
       }
       const gH = this.holdPitch ?? gamma;
@@ -120,7 +122,7 @@ export class Assist {
     // nose comes up within ~0.4 s instead of waiting on the integrator; the
     // PI loop only trims the rest. Without it a full pull only reached ~75 %
     // of the commanded rate and the g built over more than a second.
-    const gain = clamp(1800 / qTail, 0.35, 2.5);
+    const gain = clamp(1800 / qTail, 0.35, 2.5) * kp;
     const qRate = -fm.omega.x;
     const err = qCmd - qRate;
     const ff = (-A.Cmq * (qCmd * A.chord) / (2 * Math.max(a.airspeed, 8))) / A.Cmde;
@@ -153,7 +155,7 @@ export class Assist {
     if (bank > bLim) pCmd = Math.min(pCmd, -(bank - bLim) * 2.5);
     if (bank < -bLim) pCmd = Math.max(pCmd, (-bLim - bank) * 2.5);
     const pRate = fm.omega.z;
-    const rg = clamp(1500 / qd, 0.35, 2.5);
+    const rg = clamp(1500 / qd, 0.35, 2.5) * kr;
     fm.aileron = clamp((pCmd * 0.85 + (pCmd - pRate) * 1.3) * rg, -1, 1);
     fm.rudder = clamp(cmd.yaw + a.beta * 3.2 + fm.omega.y * 0.6, -1, 1);
     this.nAvail = nAvail;

@@ -43,6 +43,8 @@ export class FlightModel {
     this.throttle = 0; this.flaps = 0; this.flapsCmd = 0;
     this.brake = 0; this.parkBrake = false;
     this.engine = 'off'; this.crankTime = 0; this.rpm = 0; this.roughness = 0;
+    // Turboprop state (gas-generator %, ITT °C, torque ft·lb, fuel flow L/h).
+    this.ng = 0; this.itt = 30; this.torque = 0; this.fuelFlow = 0; this.shaftPower = 0; this.beta = false;
     this.fuel = A.fuelCapacity * 0.6;
     this.hopper = 0;
     this.extraDrag = 0; // spray valve, damage
@@ -87,6 +89,12 @@ export class FlightModel {
     this.flaps = this.flapsCmd = flaps;
     this.engine = engineOn ? 'running' : 'off';
     this.rpm = engineOn ? 2200 : 0;
+    if (this.A.turbine) {
+      const T = this.A.turbine;
+      this.ng = engineOn ? T.idleNg + (T.maxNg - T.idleNg) * Math.pow(this.throttle, 0.7) : 0;
+      this.itt = engineOn ? 600 : 30;
+      this.shaftPower = 0; this.torque = 0; this.fuelFlow = 0; this._tGuess = 0;
+    }
     this.brake = 0;
     this.stallWobble = 0;
     for (const g of this.gear) { g.prevPen = -1; g.compression = 0; g.onGround = false; }
@@ -131,21 +139,25 @@ export class FlightModel {
     const beta = u > 0.5 ? Math.asin(clamp(side / u, -1, 1)) : 0;
     const qd = 0.5 * rho * u * u;
     const top = env.top(this.pos.x, this.pos.z);
-    const wingH = this.pos.y - 0.55 - top;
+    const wingH = this.pos.y - A.wingDrop - top;
     const ge = (16 * Math.max(0.1, wingH) / A.span) ** 2;
     const geB = ge / (1 + ge);
     const sigma = rho / 1.225;
-    const S = this.rpm / A.maxRpm;
     const ceiling = smoothstep(4400, 3000, altMSL);
-    const power = A.maxPower * Math.pow(Math.max(S, 0), 1.5) * sigma * ceiling;
-    // Tidemark thrust law (static vs power-limited), plus two additions for a
-    // fixed-pitch prop: static thrust fades as airspeed approaches the blade
-    // pitch speed, and a slow-turning prop windmills (drag) — so idle gives a
-    // real glide instead of a gentle push.
-    const pitchSpeed = Math.max(S, 0.05) * A.propPitchSpeed;
-    const staticT = A.staticThrust * S * S * sigma * (1 - 0.6 * Math.min(1, u / pitchSpeed));
-    const windmill = 0.5 * rho * u * u * Math.PI * A.propRadius ** 2 * 0.12 * (1 - smoothstep(0.25, 0.6, S));
-    const thrust = (this.engine === 'off' ? 0 : Math.min(staticT, (A.propEfficiency * power) / Math.max(u, 6))) - windmill;
+    let thrust;
+    if (A.turbine) thrust = this._propThrust(u, rho, ceiling);
+    else {
+      const S = this.rpm / A.maxRpm;
+      const power = A.maxPower * Math.pow(Math.max(S, 0), 1.5) * sigma * ceiling;
+      // Tidemark thrust law (static vs power-limited), plus two additions for a
+      // fixed-pitch prop: static thrust fades as airspeed approaches the blade
+      // pitch speed, and a slow-turning prop windmills (drag) — so idle gives a
+      // real glide instead of a gentle push.
+      const pitchSpeed = Math.max(S, 0.05) * A.propPitchSpeed;
+      const staticT = A.staticThrust * S * S * sigma * (1 - 0.6 * Math.min(1, u / pitchSpeed));
+      const windmill = 0.5 * rho * u * u * Math.PI * A.propRadius ** 2 * 0.12 * (1 - smoothstep(0.25, 0.6, S));
+      thrust = (this.engine === 'off' ? 0 : Math.min(staticT, (A.propEfficiency * power) / Math.max(u, 6))) - windmill;
+    }
     this.out.thrust = thrust;
 
     // --- forces (body frame) ------------------------------------------
@@ -319,7 +331,7 @@ export class FlightModel {
     if (ch > 0) {
       const ground = env.ground(this.pos.x, this.pos.z);
       // Lowest point of the aircraft that can touch the crop (wheels).
-      const wheelY = this.pos.y + _v1.set(0, -1.25, 0.75).applyQuaternion(q).y;
+      const wheelY = this.pos.y + _v1.fromArray(A.wheelPoint).applyQuaternion(q).y;
       const depth = ground + ch - wheelY;
       if (depth > 0) {
         out.cropDepth = depth;
@@ -356,7 +368,7 @@ export class FlightModel {
     // Stall-warning vane: sounds ~4° before the critical angle (flaps lower it).
     const aWarn = A.alphaStall - this.flaps * 0.035 - 0.07;
     out.stallWarn = u > 12 && !out.onGround ? smoothstep(aWarn, aWarn + 0.015, alpha) : 0;
-    out.agl = nearGround ? Math.max(0, minClear) : this.pos.y - 1.25 - env.ground(this.pos.x, this.pos.z);
+    out.agl = nearGround ? Math.max(0, minClear) : this.pos.y - A.aglOffset - env.ground(this.pos.x, this.pos.z);
     out.vs = this.vel.y;
     out.density = rho;
     out.gLoad = _v4.copy(this._accel).add(_v1.set(0, G, 0)).applyQuaternion(_qInv).y / G;
@@ -366,6 +378,7 @@ export class FlightModel {
 
   _engine(dt, env) {
     const A = this.A;
+    if (A.turbine) return this._turbine(dt);
     if (this.engine === 'cranking') {
       this.crankTime += dt;
       this.rpm += (260 - this.rpm) * Math.min(1, dt * 3);
@@ -381,6 +394,99 @@ export class FlightModel {
     } else {
       this.rpm += (Math.min(this.out.airspeed * 10, 900) - this.rpm) * Math.min(1, dt * 0.9);
     }
+  }
+
+  // Free-turbine turboprop (PT6A class). The power lever schedules a
+  // gas-generator speed Ng, which the fuel control reaches within its
+  // acceleration/deceleration limits (the turbine lag a pilot feels). Shaft
+  // power follows Ng and is flat-rated: full power down to a density ratio of
+  // flatSigma, less above. The constant-speed prop governs Np at maxRpm once
+  // there is enough power; below that it sits on the fine-pitch stop, where a
+  // windmilling disc makes drag. Start: starter to ~17 % Ng, light-off, then
+  // acceleration to ground idle; shutdown: the spools run down over seconds.
+  _turbine(dt) {
+    const A = this.A, T = A.turbine;
+    const sigma = Math.exp(-Math.max(0, this.pos.y + UNITS.altOffsetM) / 8500);
+    const u = this.out.airspeed;
+    let ngT = 0, fuelOn = false, tau = 4, lim = 9;
+    if (this.engine === 'cranking') {
+      const before = this.crankTime;
+      this.crankTime += dt;
+      fuelOn = this.crankTime > T.lightoff && this.fuel > 0;
+      if (fuelOn && before <= T.lightoff) this.events.push({ kind: 'lightoff' });
+      ngT = fuelOn ? T.idleNg + 1 : 17;
+      tau = fuelOn ? 2.2 : 0.9;
+      lim = fuelOn ? 7 : 8;
+      if (fuelOn && this.ng >= T.idleNg - 0.4) this.engine = 'running';
+      if (!fuelOn && this.crankTime > T.lightoff + 1) this.engine = 'off';
+    } else if (this.engine === 'running') {
+      fuelOn = true;
+      ngT = T.idleNg + (T.maxNg - T.idleNg) * Math.pow(this.throttle, 0.7);
+      tau = 0.9;
+      lim = ngT > this.ng ? T.accel : T.decel;
+    }
+    this.ng = Math.max(0, this.ng + clamp((ngT - this.ng) / tau, -lim, lim) * dt);
+
+    // Shaft power from the gas generator.
+    const x = clamp((this.ng - T.idleNg) / (T.maxNg - T.idleNg), 0, 1);
+    let frac = 0;
+    if (fuelOn) frac = this.ng >= T.idleNg - 1 ? T.idleFrac + (1 - T.idleFrac) * x ** 1.5 : T.idleFrac * smoothstep(25, T.idleNg, this.ng);
+    frac *= Math.min(1, sigma / T.flatSigma) * (1 - this.roughness * 0.4);
+    this.shaftPower = frac * A.maxPower;
+    this.beta = this.engine === 'running' && this.throttle < 0.04 && this.out.onGround;
+
+    // Prop rpm: governed, on the fine stop, windmilling or running down.
+    const gov = Math.sqrt(clamp((frac - T.idleFrac) / (T.govFrac - T.idleFrac), 0, 1));
+    const wind = Math.min(u * 30, A.maxRpm * 0.75);
+    let npT;
+    if (this.engine === 'running') npT = Math.min(A.maxRpm, Math.max(A.idleRpm + (A.maxRpm - A.idleRpm) * gov, wind));
+    else if (fuelOn) npT = Math.max(A.idleRpm * smoothstep(24, T.idleNg, this.ng), wind);
+    else npT = this.out.onGround ? 0 : wind; // feathered on the ground, windmilling aloft
+    const npTau = npT > this.rpm ? (this.engine === 'running' ? 0.7 : 1.6) : this.engine === 'running' ? 0.9 : 3.5;
+    this.rpm += (npT - this.rpm) * Math.min(1, dt / npTau);
+    if (this.rpm < 1) this.rpm = 0;
+    const w = Math.max(this.rpm, 300) * Math.PI / 30;
+    this.torque = (this.shaftPower / w) * 0.7376;
+
+    // Inter-turbine temperature: light-off peak, then with power and altitude.
+    let ittT = 30;
+    if (fuelOn) {
+      ittT = 470 + 225 * frac ** 0.8 + 110 * (1 - sigma) + this.roughness * 80;
+      if (this.engine === 'cranking') ittT += 300 * (1 - smoothstep(0, 5, this.crankTime - T.lightoff));
+    } else if (this.engine === 'cranking') ittT = 30 + this.ng;
+    this.itt += (ittT - this.itt) * Math.min(1, dt / (ittT > this.itt ? 0.8 : 5));
+
+    // Fuel flow (Jet-A) and flame-out.
+    const pf = this.shaftPower / A.maxPower;
+    this.fuelFlow = fuelOn ? (A.fuelFlowIdle + (A.fuelFlowFull - A.fuelFlowIdle) * clamp((pf - T.idleFrac) / (1 - T.idleFrac), 0, 1)) * (this.engine === 'cranking' ? smoothstep(25, T.idleNg, this.ng) : 1) : 0;
+    this.fuel = Math.max(0, this.fuel - this.fuelFlow * A.fuelBurnScale * dt);
+    if (fuelOn && this.fuel <= 0) { this.engine = 'off'; this.events.push({ kind: 'starved' }); }
+    this.fuelFlow *= 3600;
+  }
+
+  // Thrust of the constant-speed prop from shaft power: actuator disc with
+  // losses, η·P = T·(V/2 + √(V²/4 + T/2ρA)), solved by Newton from the
+  // previous step. η rises from the static figure of merit to the cruise
+  // propulsive efficiency. Plus disc drag on the fine stop and beta braking.
+  _propThrust(u, rho, ceiling) {
+    const A = this.A, T = A.turbine;
+    const disc = Math.PI * A.propRadius ** 2;
+    const P = this.shaftPower * ceiling;
+    let t = 0;
+    if (P > 1) {
+      const ep = (T.etaStatic + (T.etaCruise - T.etaStatic) * smoothstep(0, 40, u)) * P;
+      const k = 1 / (2 * rho * disc), h = u / 2;
+      let x = Math.max(this._tGuess || 0, 200);
+      for (let i = 0; i < 5; i++) {
+        const sq = Math.sqrt(h * h + x * k);
+        x = Math.max(1, x - (x * (h + sq) - ep) / (h + sq + (x * k) / (2 * sq)));
+      }
+      t = this._tGuess = x;
+    } else this._tGuess = 0;
+    const fine = 1 - smoothstep(T.idleFrac * 2, T.govFrac * 0.6, this.shaftPower / A.maxPower);
+    t -= 0.5 * rho * u * u * disc * T.discDrag * fine * (this.rpm > 50 || !this.out.onGround ? 1 : 0);
+    if (this.beta) t = -T.betaDrag * smoothstep(1.5, 12, u);
+    return t;
   }
 
   _recover() {

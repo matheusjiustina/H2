@@ -1,6 +1,13 @@
 // Headless autopilot simulation (Node): debug the test pilot quickly.
 import * as THREE from 'three';
 import { getTerrain } from './harness.mjs';
+
+// The vegetation builder paints its foliage atlas on a canvas; the Node sim
+// only needs the tree positions, so a no-op canvas stands in.
+if (typeof document === 'undefined') {
+  const ctx = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });
+  globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) };
+}
 import { Aircraft } from '../src/aircraft/aircraft.js';
 import { Autopilot } from '../src/game/autopilot.js';
 import { Sprayer } from '../src/spray/sprayer.js';
@@ -77,7 +84,7 @@ export function makeGame(contractId = 'soy') {
     service: { busy: () => false, inZone: () => false },
     controlsLocked: false,
   };
-  game.aircraft = new Aircraft(game, { headless: true });
+  game.aircraft = new Aircraft(game, { headless: true, type: process.env.AC || 'ipanema' });
   game.sprayer = new Sprayer(game);
   game.guidance = new Guidance(game);
   game.job = new Job(CONTRACTS.find((c) => c.id === contractId));
@@ -94,12 +101,16 @@ export function run(game, seconds, { log = 10, dt = 1 / 60, startPhase = 'lineup
   const ac = game.aircraft;
   ac.placeOnRunway('west');
   ac.fm.engine = 'running'; ac.fm.rpm = 800;
-  ac.fm.fuel = 160; ac.fm.hopper = +(process.env.HOP ?? game.job.c.recommended.liquid);
+  if (ac.A.turbine) ac.fm.ng = ac.A.turbine.idleNg;
+  // Contract loads are written for the PR-AGW; scale them with the tanks.
+  const kf = ac.A.fuelCapacity / 260, kl = ac.A.hopperCapacity / 900;
+  ac.fm.fuel = 160 * kf; ac.fm.hopper = +(process.env.HOP ?? game.job.c.recommended.liquid * kl);
   if (startPhase === 'taxiIn') {
     // Landed eastbound and slowed down: taxi back to the pad.
     ac.fm.settleOnGround(+(process.env.TX ?? -103), 0, Math.PI / 2, ac.env);
     ac._afterPlace();
     ac.fm.engine = 'running'; ac.fm.rpm = 800; ac.fm.hopper = 0;
+    if (ac.A.turbine) ac.fm.ng = ac.A.turbine.idleNg;
   }
   if (startPhase === 'approach') {
     ac.placeAirborne(-2400, 300, Math.PI / 2, 120, 46);
@@ -119,7 +130,7 @@ export function run(game, seconds, { log = 10, dt = 1 / 60, startPhase = 'lineup
     }
     if (ap.phase === 'service' && process.env.REFILL && !game.job.complete()) {
       // Stand-in for the badeco in the Node sim: reload, then carry on.
-      ac.fm.fuel = 160; ac.fm.hopper = game.job.c.recommended.liquid; ac.fm.updateMass();
+      ac.fm.fuel = 160 * kf; ac.fm.hopper = game.job.c.recommended.liquid * kl; ac.fm.updateMass();
       game.job.sorties++;
       console.log(`---- reload at t=${t.toFixed(0)} (coverage ${(game.job.stats().coverage * 100).toFixed(1)}%)`);
       ap.set('start');

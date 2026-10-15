@@ -170,4 +170,4 @@ export class Job {
   }
 }
 
-export const swathInfo = () => ({ swath: SPRAY.swath, rate: SPRAY.targetRate });
+export const swathInfo = (type) => ({ swath: type?.spray.swath ?? SPRAY.swath, rate: SPRAY.targetRate });
