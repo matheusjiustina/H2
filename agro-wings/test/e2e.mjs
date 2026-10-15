@@ -1,6 +1,6 @@
 // End-to-end validation in Chromium: full contract flown by the test
 // autopilot through the normal player inputs. Usage:
-//   node test/e2e.mjs [contractId] [outDir]
+//   [AC=at502] node test/e2e.mjs [contractId] [outDir]
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -18,9 +18,10 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto(url + '?q=low', { waitUntil: 'load' });
 await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null, { timeout: 180000 });
-await page.evaluate((id) => {
+await page.evaluate(([id, ac]) => {
   const g = window.__agro;
   localStorage.clear();
+  if (ac) g.selectAircraft(ac);
   g.career.resetAll();
   g.career.tutorialDone = true;
   g.menuAction('career');
@@ -31,7 +32,7 @@ await page.evaluate((id) => {
   g.noRender = true; // only render for snapshots: keeps the software GPU free for the simulation
   g.input.press('KeyT');
   g.startAutopilot('contract');
-}, contract);
+}, [contract, process.env.AC]);
 
 const snap = async (name) => {
   // Fast-forward skips presentation: re-seat the camera, then ~0.75 s of full

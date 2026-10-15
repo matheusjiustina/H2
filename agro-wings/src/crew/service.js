@@ -85,6 +85,11 @@ export class GroundService {
     if (!needFuel && !needLiq) { this.game.toast('Tanks already at the requested levels.'); return false; }
     this.queue = [];
     const Lp = (k) => this._local(k);
+    // A turboprop's prop takes many seconds to run down after shutdown: the
+    // badeco stays at his post until it has stopped.
+    if (ac.A.turbine && fm.rpm > 60) {
+      this.queue.push({ a: 'wait', t: 40, until: () => this.game.aircraft.fm.rpm < 40, msg: 'Badeco waits for the propeller to stop.' });
+    }
     if (needFuel) {
       this.queue.push(
         { a: 'walk', to: () => [this._near(this.fuelReel)], speed: SERVICE.walk, msg: 'Badeco is heading to the fuel pump.' },
@@ -307,6 +312,10 @@ export class GroundService {
       case 'signal':
         b.speed = 0;
         if (st.time >= st.t) this.step = null;
+        break;
+      case 'wait':
+        b.speed = 0;
+        if (st.time >= st.t || st.until?.()) this.step = null;
         break;
       default:
         this.step = null;

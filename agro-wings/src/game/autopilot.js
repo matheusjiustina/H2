@@ -55,7 +55,9 @@ export class Autopilot {
         const job = g.job;
         if (!g.service.busy() && !this.requested) {
           const rec = job ? job.c.recommended : { fuel: 200, liquid: 600 };
-          g.requestService(rec.fuel, rec.liquid);
+          // Same scaling as the load sheet's recommendation for a bigger aircraft.
+          const A = g.aircraft.A;
+          g.requestService(rec.fuel * (A.fuelCapacity / 260), rec.liquid * (A.hopperCapacity / 900));
           this.requested = true;
         }
         if (this.requested && !g.service.busy()) { this.requested = false; this.set('start'); }

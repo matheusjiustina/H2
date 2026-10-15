@@ -119,6 +119,7 @@ export class Aircraft {
     this._sync();
     this.parked = true;
     this.model.pilot.visible = false;
+    this.model.cockpit.visible = false; // nobody looks into an empty cockpit from outside
     if (!this.headless) this._animate(0);
   }
 

@@ -4,11 +4,16 @@ Agricultural aviation on a Mato Grosso farm (Fazenda Boa Esperança, fictional).
 Three.js + Vite, everything procedural (no external assets), built into a
 single self-contained `dist/index.html`.
 
+Two aircraft share the world and are chosen on the title screen:
+**AIRCRAFT 01 · Original** — the EMB-202A Ipanema (PR-AGW), and
+**AIRCRAFT 02 · Air Tractor** — an AT-502B turboprop (PR-AWT). The one not
+selected waits parked on the west apron.
+
 ```bash
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # dist/index.html (single file)
-npm test           # flight + spray validation (Node)
+npm test           # flight (both aircraft) + spray validation (Node)
 ```
 
 URL option: `?q=low|medium|high` forces a graphics preset.
@@ -114,7 +119,8 @@ out ~29 m above the pass and ends above it, never stalling.
 
 ## Tests
 
-`npm test` runs `test/flight.test.mjs` and `test/spray.test.mjs` (Node).
+`npm test` runs `test/flight.test.mjs` (PR-AGW), `test/at502.test.mjs`
+(AT-502B) and `test/spray.test.mjs` (Node).
 Browser checks (need `npm run build && npx vite preview --port 4173`):
 
 - `node test/e2e.mjs soy out/` — full contract flown by the test autopilot
@@ -155,6 +161,15 @@ software rasteriser builds its pipelines then). The build before the
 aircraft overhaul stalls on the same frames, so they are not a cost of the
 new model.
 
+With two aircraft (this build): flying the PR-AGW with the parked AT in
+view on the pad costs 459 calls / 721k triangles (low; 435 / 655k before);
+views where the parked aircraft is not on screen are unchanged (369 calls
+spraying, 361 in the cockpit, 327 at 400 m). Flying the AT: 382 / 370 / 339
+calls in those views, +11 to +13 over the PR-AGW. Logic averaged over 600
+frames: PR-AGW 0.34–0.70 ms, AT 0.37–0.78 ms (it flies 28 % faster, so
+grass cells stream in more often). The parked aircraft is not simulated,
+its cockpit and pilot are hidden and it is not drawn beyond 1.2 km.
+
 FPS on a real GPU was not measured here; the in-game counter (Settings →
 Show FPS) reports fps, draw calls and triangles live.
 
@@ -176,6 +191,23 @@ Show FPS) reports fps, draw calls and triangles live.
 - `REFILL=1 node test/apsim.mjs soy|corn|cotton 4500`: all three contracts in
   Node with the farm-HQ and base colliders, one reload each (560/520/500 L
   loads within MTOW), 90 % coverage, no hard landing, parked at the pad.
+
+Air Tractor expansion (this build):
+
+- `npm test`: 35/35 — the PR-AGW suite unchanged, 10 AT-502B checks
+  against published figures, and an AT spray pass (flat 0.88 dose plateau
+  over a 30 m swath).
+- `AC=at502 node test/e2e.mjs soy`: the whole contract in the browser with
+  the AT through the player inputs — crew service (+1,178 L), PT6 start,
+  taxi, take-off, passes, landing, taxi-in, park — 90 % in one sortie.
+  `node test/e2e.mjs soy` (PR-AGW): two sorties, 90 %, as before.
+- `node test/e2e_ui.mjs`: 15/15.
+- `AC=at502 REFILL=1 node test/apsim.mjs soy 2400`: 90 % in one load, parked
+  at the pad (the Node sim needed a no-op canvas since the world upgrade).
+- PR-AGW unchanged: seeded trajectory identical to the previous build;
+  model geometry and materials identical (117 meshes, 218,895 vertices).
+- Look-dev of the AT from the front, sides, rear, above, under, close-ups
+  and the cockpit (`LOOKDEV_VIEWS` + `selectAircraft('at502')`).
 
 ## World
 
@@ -278,3 +310,101 @@ changing how the aircraft flies.
 (exterior close-ups, low sun, against the sun, cockpit); `LOOKDEV_VIEWS`
 points it at a JSON list of custom views, each with an optional `post`
 snippet (e.g. deflect the control surfaces) run before the render.
+
+## Aircraft 02 — Air Tractor AT-502B (PR-AWT)
+
+A second, independent aircraft. The Ipanema keeps its paint, registration,
+configuration and flight model: its trajectory is bit-identical to the
+previous build (seeded comparison) and its model's 117 meshes have the same
+geometry, normals, UVs, vertex colours and materials (checksum in the
+browser).
+
+**Reference.** The uploaded video is game footage of a yellow Air Tractor
+(blue cheat line with white pinstripes, blue fin and rudder, blue wingtip
+bands, three-blade prop with a silver spinner, booms under the trailing edge,
+spring-steel gear with white hubs, framed canopy, dark panel with round
+gauges, stick with a red button); its features match the AT-502B. The
+YouTube link could not be opened from this environment. The reference's
+registration is not used.
+
+**Published figures used** (Air Tractor AT-502B spec sheet, dealer and
+operator data, Wikipedia AT-500 family):
+
+| | |
+| --- | --- |
+| Engine | P&WC PT6A-34AG, 750 shp flat-rated, prop 2,200 rpm |
+| Propeller | Hartzell 3-blade constant speed, 2.82 m |
+| Span / wing area | 15.85 m (52 ft) / 29.0 m² (312 ft²) |
+| Empty / max take-off | ≈ 2,073 kg (4,570 lb) / 4,264 kg (9,400 lb) |
+| Hopper / fuel | 1,893 L (500 US gal) / 643 L (170 US gal) |
+| Stall at 8,000 lb | 71 kt flaps up, 59 kt flaps down |
+| Climb at 9,400 lb | 870 ft/min |
+| Working speed | 120–145 mph |
+
+Derived here (not published): CLmax 1.50/2.18 from the stall speeds; CD0
+0.058 and Oswald 0.80 so the climb and a 75 %-power cruise of 134 kt at
+8,000 ft come out of one polar; inertias scaled from mass and size; static
+thrust ≈ 12.5 kN (figure of merit 0.64); fuel flow from ~0.6 lb/shp/h. No
+speed multipliers: every number above enters the same equations as the
+Ipanema's (`FLIGHT_AT502` in `src/config.js`).
+
+**PT6A model** (`FlightModel._turbine`, `_propThrust`): the power lever
+schedules gas-generator speed Ng, reached within the fuel control's
+acceleration limits (≈ 3.7 s from idle to 90 % torque, the turbine lag a
+pilot feels); shaft power follows Ng and is flat-rated; the constant-speed
+prop governs 2,200 rpm and sits on its fine stop at low power, where the
+windmilling disc makes drag; on the ground at idle the prop goes into beta.
+Thrust comes from actuator-disc momentum theory with losses. Start: starter
+to ~17 % Ng, light-off at 3.2 s (ITT peak, whoosh), ground idle 53 % Ng /
+1,150 rpm at ~12 s. Shutdown: the spools run down over ~15 s and the prop
+feathers. Torque (ft·lb), ITT, Ng, Np and fuel flow drive the cockpit gauges.
+
+**Measured** (`node --test test/at502.test.mjs`):
+
+| check | result | published |
+| --- | --- | --- |
+| climb, 9,400 lb, 95 kt | 847 ft/min | 870 ft/min |
+| 1 g stall, 8,000 lb, flaps up | 73 kt | 71 kt |
+| full power level, 8,000 lb | 139 kt IAS, 255 L/h | — |
+| 62 % power lever | 113 kt (working speed) | 104–126 kt |
+| ground roll 2,672 / 4,264 kg | 188 / 485 m | — |
+| spool-up idle → 90 % torque | 3.7 s | — |
+| roll to 60° (1,000 L) | 1.2 s | — |
+| balão with 1,200 L | no stall, +44 m | — |
+| landing with beta + brakes | 0.5 m/s touchdown, 261 m roll | — |
+
+Spray: a 14 m boom with 50 nozzles; swath 30 m (scaled from the real ~21 m
+the same way as the Ipanema's) and 6.4 L/s, the same 40 L/ha dose at a
+117 kt working speed. A full hopper covers the soybean contract in one
+sortie (Node autopilot: 90 % coverage, single load).
+
+**Model** (`src/aircraft/atModel.js`, shared helpers from `model.js`):
+lofted fuselage with the long PT6 cowling, matte anti-glare strip, chin
+intake with screen, oval exhaust stacks with soot, big hopper lid, open
+cabin under a framed canopy (curved windshield, doors, tinted roof),
+wire cutter and deflector cable to the fin; constant-chord cantilever wing
+with large flaps and long ailerons on their hinges, blue tip caps, nav and
+strobe lights, landing lights, walkway and tank caps; booms on streamlined
+hangers with check valves and nozzles; fan-driven pump; spring-steel main
+gear (flexes with the suspension), white hubs, brakes; steerable tailwheel;
+strut-braced tailplane, fin and slanted-hinge rudder, beacon. The polished
+spinner carries three twisted blades that feather when the engine is
+stopped, come out of feather in the start, and coarsen with speed. Cockpit:
+dark panel with airspeed, attitude, altimeter, turn coordinator, heading,
+VSI, torque, ITT, Ng, prop rpm, fuel, fuel flow, oil, hopper, flaps,
+annunciators (BETA, START, GEN, CHIP…), the guidance GPS, flow monitor,
+lightbar, hopper sight gauge; PT6 quadrant (power, prop and condition
+levers). The seated pilot is the same model as the Ipanema's, laid into
+this cockpit with the hands on the stick and power lever.
+
+**Architecture.** `src/aircraft/types.js` is the registry: each type
+carries its flight profile, model and panel factories, spray boom, crew
+service points, collision bounds, cameras, audio profile and loads. Every
+system reads the active aircraft (`game.aircraft`); the game keeps a fleet,
+parks the other aircraft (settled on its springs, pilot out, an obstacle for
+the flown one, not drawn beyond 1.2 km) and swaps on selection. Per-type:
+load sheet, HUD bars, crew service (rates and walking points), guidance
+swath spacing, chase/orbit cameras, cockpit vibration, overspeed and
+low-fuel warnings, and audio (`profile: 'turboprop'`: compressor whine and
+gas-generator hum from Ng, exhaust roar with power, prop buzz from Np,
+light-off whoosh). Key bindings are unchanged.

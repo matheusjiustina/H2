@@ -103,9 +103,10 @@ export function createTurbinePanel() {
 function drawBackground(g) {
   const W = AT_PANEL.W, H = AT_PANEL.H;
   const grd = g.createLinearGradient(0, 0, 0, H);
-  grd.addColorStop(0, '#80888f');
-  grd.addColorStop(0.08, '#8e979e');
-  grd.addColorStop(1, '#868f96');
+  // Black-anodised panel, as in Air Tractor cockpits.
+  grd.addColorStop(0, '#202326');
+  grd.addColorStop(0.08, '#2a2e32');
+  grd.addColorStop(1, '#25282c');
   g.fillStyle = grd;
   g.fillRect(0, 0, W, H);
   const sh = g.createLinearGradient(0, 0, 0, 30);
@@ -120,24 +121,25 @@ function drawBackground(g) {
     g.fillRect(r() * W, r() * H, 1 + r() * 30, 1);
   }
   // Sub-panels: flight block, engine block, lower strip.
-  g.strokeStyle = 'rgba(30,34,38,0.55)'; g.lineWidth = 2;
+  g.strokeStyle = 'rgba(150,160,170,0.35)'; g.lineWidth = 2;
   g.strokeRect(14, 84, 438, 296);
   g.strokeRect(462, 84, 242, 296);
   g.strokeRect(14, 388, 530, 82);
-  g.fillStyle = '#20262c';
+  g.fillStyle = '#c3c9cf';
   g.font = 'bold 10px Arial'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   g.fillText('PT6A-34AG', 470, 98);
   g.fillText('PR-AWT', 22, 98);
   g.font = '9px Arial';
-  g.fillText('VNE 155 KIAS · MÁX. TORQUE 1790 FT-LB · ITT 695 °C', 22, 380);
+  g.fillText('VNE 155 KIAS · MÁX. TORQUE 1790 FT-LB · ITT 695 °C', 140, 80);
   g.fillText('NÃO DECOLAR COM O HOPPER ABERTO', 712, 432);
   // Screws.
-  g.fillStyle = '#353b42';
+  g.fillStyle = '#5a6168';
   const screw = (x, y) => { g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); };
   for (const x of [16, 190, 360, 530, 700, 870, 1008]) { screw(x, 22); screw(x, 500); }
   for (const y of [140, 260, 380]) { screw(8, y); screw(1016, y); }
   // Switch strip labels.
   const sw = ['BATT', 'GEN', 'IGN', 'START', 'B. COMB', 'NAV', 'STROBE', 'BEACON', 'VÁLVULA', 'GPS'];
+  g.fillStyle = '#c3c9cf';
   g.font = 'bold 9px Arial'; g.textAlign = 'center';
   sw.forEach((t, i) => g.fillText(t, 586 + i * 43, 456));
 }

@@ -11,14 +11,16 @@ const browser = await chromium.launch({
 });
 const views = {
   base: `g.aircraft.placeAtPad(); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
-  lowSoy: `g.aircraft.placeAirborne(300, -280, Math.PI/2, 4, 46); g.sprayer.on = true; g.aircraft.fm.hopper = 500; g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
-  cockpitCorn: `g.aircraft.placeAirborne(-200, 470, Math.PI/2, 6, 46); g.cameraMode='cockpit'; g.rig.setMode('cockpit', g.aircraft);`,
+  lowSoy: `g.aircraft.placeAirborne(300, -280, Math.PI/2, 4, 46 * (g.aircraft.A.assistSpeedScale ?? 1)); g.sprayer.on = true; g.aircraft.fm.hopper = 500; g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
+  cockpitCorn: `g.aircraft.placeAirborne(-200, 470, Math.PI/2, 6, 46 * (g.aircraft.A.assistSpeedScale ?? 1)); g.cameraMode='cockpit'; g.rig.setMode('cockpit', g.aircraft);`,
   high: `g.aircraft.placeAirborne(500, 0, Math.PI/2, 400, 50); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
 };
 for (const q of ['low', 'medium', 'high']) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   await page.goto(url + '?q=' + q, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null, { timeout: 180000 });
+  // AC=at502 measures with the Air Tractor flown (the other aircraft parked).
+  if (process.env.AC) await page.evaluate((id) => window.__agro.selectAircraft(id), process.env.AC);
   for (const [name, setup] of Object.entries(views)) {
     const r = await page.evaluate((setup) => {
       const g = window.__agro;

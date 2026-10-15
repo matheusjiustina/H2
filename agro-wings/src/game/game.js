@@ -159,6 +159,7 @@ export class Game {
     next.onEvent = (e) => this._acEvent(e);
     next.placeAtPad();
     next.stuck = false;
+    this._parked = Object.values(this.fleet).filter((ac) => ac !== next);
     this.world.extraObstacle = (x, y, z) => {
       for (const ac of Object.values(this.fleet)) if (ac !== this.aircraft && ac.hitTest(x, y, z)) return `parked ${ac.type.reg}`;
       return null;
@@ -399,6 +400,12 @@ export class Game {
       this._presT = 0;
       if (!this.playing) this.rig.orbit.yaw += pdt * 0.06;
       this.rig.update(pdt, ac, this.playing && !this.controlsLocked ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
+      // Parked aircraft: drawn only within 1.2 km (a few pixels beyond that).
+      for (const p of this._parked) {
+        const d = this.camera.position.distanceTo(p.rPos);
+        p.model.root.visible = d < 1200;
+        if (p.contactShadow) p.contactShadow.visible = d < 400;
+      }
       this.world.update(this.camera, ac.rPos, pdt, this.time);
       if (!headless) this._audio(rawDt);
       if (this.playing) this._prompts();
