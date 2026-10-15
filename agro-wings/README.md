@@ -131,23 +131,23 @@ time and scene complexity carry over to real hardware:
 
 | preset | view | logic ms/frame | draw calls | triangles |
 | --- | --- | --- | --- | --- |
-| low | parked on the pad (chase) | 0.96 | 395 | 642k |
-| low | spraying soy at 4 m (chase) | 2.94 | 347 | 505k |
-| low | cockpit over corn | 2.21 | 333 | 884k |
-| low | 400 m AGL | 0.95 | 315 | 464k |
-| medium | spraying soy at 4 m | 3.57 | 357 | 511k |
-| medium | cockpit over corn | 2.86 | 348 | 1004k |
-| high | parked on the pad | 1.25 | 396 | 645k |
-| high | spraying soy at 4 m | 2.30 | 359 | 514k |
-| high | cockpit over corn | 2.65 | 348 | 1004k |
+| low | parked on the pad (chase) | 1.38 | 426 | 668k |
+| low | spraying soy at 4 m (chase) | 2.58 | 369 | 574k |
+| low | cockpit over corn | 2.60 | 361 | 931k |
+| low | 400 m AGL | 2.25 | 327 | 489k |
+| medium | spraying soy at 4 m | 4.01 | 379 | 582k |
+| medium | cockpit over corn | 3.38 | 378 | 1054k |
+| high | parked on the pad | 1.40 | 427 | 696k |
+| high | spraying soy at 4 m | 3.91 | 381 | 585k |
+| high | cockpit over corn | 3.81 | 378 | 1057k |
 
 The logic column averages only 8 frames and moves by ±1 ms between runs of
-the same build (the soy pass read 1.79 and 2.94 ms in two runs minutes apart); averaged
-over 600 frames a parked tick is 0.2–0.4 ms, of which the aircraft's visual
-update is 0.03 ms. The detailed aircraft costs about 50 draw calls and 100k
-triangles more than the first model (parked on the pad: 343 → 395 calls,
-541k → 642k triangles); it accounts for about half the draw calls of a
-chase view, main and shadow pass together.
+the same build. Averaged over 600 frames while flying at spray speed over
+pasture and over the soy (grass streaming and crop rows included), a tick
+costs 0.6–0.7 ms on both low and high presets, the same as before the
+world upgrade (0.5–0.8 ms). The detailed aircraft and world together cost
+about 80 draw calls and 130k triangles more than the first build (parked on
+the pad: 343 → 426 calls, 541k → 668k triangles).
 
 SwiftShader stalls for 80–110 s on one frame when the spray mist first
 appears and once in the 400 m view (no new WebGL program is linked; the
@@ -163,6 +163,8 @@ Show FPS) reports fps, draw calls and triangles live.
 - `npm test`: 24/24 (flight model incl. braked pivot, aileron authority,
   pitch response, loaded pull-out, steep turns and the balão; spray
   deposition).
+- `node test/worldviews.mjs`: world look-dev from the apron, strip, crops,
+  forest, creek, HQ, the air, chase and cockpit (before/after compared).
 - `node test/e2e_ui.mjs`: 15/15 (badeco service, abort and veto, crash,
   stuck reset, rebinding, tutorial, touch layout).
 - `node test/e2e.mjs soy`: full contract in the browser through the player
