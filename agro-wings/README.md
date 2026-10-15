@@ -89,21 +89,44 @@ Browser checks (need `npm run build && npx vite preview --port 4173`):
 
 ### Measured in this container (Chromium + SwiftShader, 1280×720)
 
-The container has no GPU, so `renderMs` is only the CPU time to submit a
-frame to the software rasteriser — it says nothing about real FPS. Game logic
+The container has no GPU, so render times are only the CPU cost of handing
+frames to a software rasteriser and say nothing about real FPS. Game logic
 time and scene complexity carry over to real hardware:
 
 | preset | view | logic ms/frame | draw calls | triangles |
 | --- | --- | --- | --- | --- |
-| low | parked on the pad (chase) | 0.87 | 312 | 534k |
-| low | spraying soy at 4 m (chase) | 1.41 | 270 | 403k |
-| low | cockpit over corn | 0.87 | 293 | 795k |
-| low | 400 m AGL | 0.51 | 236 | 358k |
-| medium | spraying soy at 4 m | 3.51 | 279 | 409k |
-| medium | cockpit over corn | 1.94 | 308 | 915k |
-| high | parked on the pad | 0.57 | 313 | 536k |
-| high | spraying soy at 4 m | 1.91 | 281 | 412k |
-| high | cockpit over corn | 1.66 | 308 | 916k |
+| low | parked on the pad (chase) | 0.60 | 343 | 541k |
+| low | spraying soy at 4 m (chase) | 1.81 | 295 | 406k |
+| low | cockpit over corn | 1.11 | 307 | 800k |
+| low | 400 m AGL | 1.88 | 264 | 365k |
+| medium | spraying soy at 4 m | 4.08 | 305 | 413k |
+| medium | cockpit over corn | 1.54 | 322 | 920k |
+| high | parked on the pad | 0.63 | 344 | 543k |
+| high | spraying soy at 4 m | 2.34 | 307 | 416k |
+| high | cockpit over corn | 1.69 | 322 | 921k |
 
-FPS on a real GPU was not measured here; the in-game FPS counter (Settings →
+FPS on a real GPU was not measured here; the in-game counter (Settings →
 Show FPS) reports fps, draw calls and triangles live.
+
+### Validation runs (final build)
+
+- `npm test`: 19/19 (flight model incl. braked pivot, spray deposition).
+- `node test/e2e_ui.mjs`: 15/15 (badeco service, abort and veto, crash,
+  stuck reset, rebinding, tutorial, touch layout).
+- `node test/e2e.mjs soy`: full contract in the browser through the player
+  inputs — service, taxi, take-off, 12 passes, landing, taxi-in, second
+  service, second sortie, 90 % coverage, results and payment.
+- `REFILL=1 node test/apsim.mjs corn|cotton 4500`: corn (one reload) and
+  cotton (one sortie) contracts in Node, 90 % coverage, no hard landing,
+  parked at the pad.
+
+## Aircraft
+
+Modelled on the EMB-202 Ipanema (own registration PR-AGW): orange with navy
+stripes and the Brazilian flag on the fin, dark anti-glare hopper deck,
+raised cabin, tall tubular main gear, 3-blade prop, booms with nozzles on
+drop tubes and a wind-driven pump. The cockpit follows a real Ipanema panel:
+light grey, warning lamps, round gauges, switch rows, a guidance GPS in a
+black bezel, lightbar at the centre post and a hopper sight window that
+shows the live liquid level. `node test/planeviews.mjs <dir>` renders the
+look-dev angles.
