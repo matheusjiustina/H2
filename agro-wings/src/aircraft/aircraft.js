@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { FlightModel } from '../flight/flightModel.js';
 import { Assist } from '../flight/assist.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
-import { createAircraftModel } from './model.js';
+import { createAircraftModel, createContactShadow } from './model.js';
 import { createPanel } from './panel.js';
 import { FLIGHT, UNITS } from '../config.js';
 import { BASE, RUNWAY, POWERLINE } from '../world/layout.js';
@@ -37,9 +37,10 @@ export class Aircraft {
       this.model = stubModel();
     } else {
       this.panel = createPanel();
-      this.model = createAircraftModel(this.panel);
+      this.model = createAircraftModel(this.panel, { envMap: game.scene.environment });
     }
     game.scene.add(this.model.root);
+    if (!headless) { this.contactShadow = createContactShadow(); game.scene.add(this.contactShadow); }
     this.env = createFlightEnv(this.world.terrain);
     this.shaped = { elev: 0, ail: 0, rud: 0 };
     this.cmd = { pitch: 0, roll: 0, yaw: 0 };
@@ -316,6 +317,19 @@ export class Aircraft {
     r.position.copy(this.rPos);
     r.quaternion.copy(this.rQuat);
     r.updateMatrixWorld(true);
+    // Contact shadow on the ground under the aircraft (visual only).
+    const cs = this.contactShadow;
+    if (cs) {
+      const gy = this.env.ground(this.rPos.x, this.rPos.z);
+      const k = 1 - smoothstep(0.6, 6, this.rPos.y - gy - 1.2);
+      cs.visible = k > 0.01 && this.state !== 'crashed';
+      if (cs.visible) {
+        _v.set(0, 0, 1).applyQuaternion(this.rQuat);
+        cs.position.set(this.rPos.x, gy + 0.05, this.rPos.z);
+        cs.rotation.set(0, Math.atan2(_v.x, _v.z), 0);
+        cs.material.opacity = 0.5 * k;
+      }
+    }
   }
   toWorld(local, out = new THREE.Vector3()) {
     return out.copy(local).applyQuaternion(this.rQuat).add(this.rPos);

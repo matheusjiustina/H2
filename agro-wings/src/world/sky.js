@@ -93,6 +93,9 @@ export function createSky(renderer, scene, quality) {
       cam.left = -r; cam.right = r; cam.top = r; cam.bottom = -r;
       cam.updateProjectionMatrix();
       const unit = (2 * r) / sun.shadow.mapSize.x;
+      // Normal offset of ~2 shadow texels: enough against acne on the terrain,
+      // small enough to keep the aircraft's own fine self-shadowing.
+      sun.shadow.normalBias = Math.max(0.15, unit * 1.9);
       texel.copy(focus);
       texel.x = Math.round(texel.x / unit) * unit;
       texel.z = Math.round(texel.z / unit) * unit;

@@ -155,5 +155,46 @@ raised cabin, tall tubular main gear, 3-blade prop, booms with nozzles on
 drop tubes and a wind-driven pump. The cockpit follows a real Ipanema panel:
 light grey, warning lamps, round gauges, switch rows, a guidance GPS in a
 black bezel, lightbar at the centre post and a hopper sight window that
-shows the live liquid level. `node test/planeviews.mjs <dir>` renders the
-look-dev angles.
+shows the live liquid level.
+
+The model (`src/aircraft/model.js`) is purely visual: the flight model, gear
+contact points, colliders and mass in `src/config.js` do not read it (it only
+reads the gear points to place the wheels), so the look can change without
+changing how the aircraft flies.
+
+- **Fuselage**: stations interpolated along Catmull-Rom splines and lofted
+  as superellipse rings (separate upper/lower roundness), so the cowling,
+  cabin and tail cone are single smooth surfaces; the turtle deck is part of
+  the aft loft rather than a separate box.
+- **Livery**: side-projected 2048×1024 canvas with a matching bump map, so
+  panel seams, rivet rows, inspection doors, louvres and the orange-peel of
+  the paint are in relief; stripes, PR-AGW, AGRO WINGS and the flag are drawn
+  in the same places as before.
+- **Wings and tail**: real airfoil sections, Hoerner wingtips, ailerons,
+  flaps, elevator and rudder hinged at their spars (with trim tabs), panel
+  and rib lines in relief, walkway, fuel cap, hinge brackets, pitot,
+  navigation lights.
+- **Cabin**: curved windshield, tubular frame with joints, door handles and
+  hinges, headliner; inside, a tubular cage, rounded seat with harness,
+  gauge bezels with depth, pedals, stick with grip and trigger, throttle and
+  prop levers; the pilot has a helmet, visor, boom mic and gloved hands on
+  the stick and throttle.
+- **Gear**: lathed tyres with sidewall and tread bump, hubs with bolts and
+  valve stems, brake discs and calipers, A-frame legs with fittings and
+  brake lines; leaf-spring tailwheel with fork.
+- **Propeller**: three twisted blades (pitch angle from radius) with yellow
+  tips, fading into a translucent disc with blade-shadow lobes as rpm rises,
+  driven by the engine rpm as before.
+- **Materials and light**: physical paint with a light clearcoat and its own
+  environment reflection, metal, rubber and glass; ambient occlusion baked
+  into vertex colours; a soft contact shadow under the aircraft near the
+  ground; shadow normal offset scaled to the shadow texel size so the
+  aircraft keeps its fine self-shadowing.
+- **Cost**: parts are merged per material; nozzles, bolts, hinge brackets
+  and other small fittings sit in a level-of-detail group dropped
+  beyond 80 m.
+
+`node test/planeviews.mjs <dir> [view,...]` renders the look-dev angles
+(exterior close-ups, low sun, against the sun, cockpit); `LOOKDEV_VIEWS`
+points it at a JSON list of custom views, each with an optional `post`
+snippet (e.g. deflect the control surfaces) run before the render.
