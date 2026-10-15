@@ -1302,7 +1302,8 @@ export function createAircraftModel(panel, opts = {}) {
     const isFine = k.startsWith('fine:');
     const mat = M[isFine ? k.slice(5) : k];
     const m = new THREE.Mesh(mergeGeometries(parts), mat);
-    m.castShadow = mat !== M.glass && mat !== M.lens;
+    // Fine parts are smaller than a shadow texel: skip them in the shadow pass.
+    m.castShadow = !isFine && mat !== M.glass && mat !== M.lens;
     m.receiveShadow = true;
     if (mat === M.lens) m.renderOrder = 9;
     (isFine ? fine : root).add(m);
