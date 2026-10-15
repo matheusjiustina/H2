@@ -72,7 +72,8 @@ export function canvasTexture(c, { srgb = true, repeat = false, aniso = 8 } = {}
 const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
 
 // Side-view crop strip (used on row "fins" and field edges). Width = 4 m of
-// row, height = 1 crop height. Alpha-tested.
+// row, height = 1 crop height. Alpha-tested. Plants are drawn back to front
+// with light from above: sunlit tops, shaded lower leaves, a few yellowing.
 export function makeCropCard(kind, seed = 3) {
   const W = 512, H = 256;
   const c = canvas(W, H);
@@ -91,59 +92,79 @@ export function makeCropCard(kind, seed = 3) {
     g.fill();
     g.restore();
   };
+  const wrapX = (x) => ((x % W) + W) % W;
   if (kind === 'soy') {
-    // Bushy rounded trifoliate canopy.
-    for (let i = 0; i < 900; i++) {
-      const x = r() * W, y = H * (0.12 + 0.88 * Math.pow(r(), 0.7));
-      const l = 10 + r() * 16;
-      const shade = 26 + r() * 22 - (y / H) * 12;
-      g.fillStyle = hsl(88 + r() * 18, 55 + r() * 15, shade);
-      g.beginPath();
-      g.ellipse(x, y, l * 0.55, l * 0.4, r() * Math.PI, 0, Math.PI * 2);
-      g.fill();
-    }
+    // Bushy plants every ~6 cm, trifoliate leaves on petioles.
     for (let i = 0; i < 40; i++) { // stems
-      g.strokeStyle = hsl(80, 35, 28, 0.9);
+      g.strokeStyle = hsl(70, 30, 26, 0.9);
       g.lineWidth = 2;
       const x = r() * W;
-      g.beginPath(); g.moveTo(x, H); g.lineTo(x + (r() - 0.5) * 20, H * 0.4); g.stroke();
+      g.beginPath(); g.moveTo(x, H); g.lineTo(x + (r() - 0.5) * 24, H * 0.35); g.stroke();
+    }
+    for (let i = 0; i < 520; i++) {
+      const x = r() * W, yN = 0.1 + 0.9 * Math.pow(r(), 0.75), y = H * yN;
+      const l = 9 + r() * 11;
+      const yellow = yN > 0.75 && r() < 0.25;
+      const light = 24 + (1 - yN) * 20 + r() * 8;
+      const col = yellow ? hsl(52 + r() * 10, 45, 38 + r() * 8) : hsl(84 + r() * 16, 38 + r() * 12, light);
+      const a = r() * Math.PI * 2;
+      for (let k = 0; k < 3; k++) { // trifoliate
+        const aa = a + (k - 1) * 0.9;
+        leaf(wrapX(x), y, l, aa, l * 0.38, col);
+      }
+    }
+    // Pods along the stems low down.
+    for (let i = 0; i < 90; i++) {
+      g.fillStyle = hsl(70, 25, 32 + r() * 10);
+      g.beginPath(); g.ellipse(r() * W, H * (0.55 + r() * 0.4), 1.6, 5, r() - 0.5, 0, Math.PI * 2); g.fill();
     }
   } else if (kind === 'corn') {
-    // Stalks with long arching blades and tassels.
+    // Stalks with long arching blades, ears and tassels.
     const n = 22;
     for (let i = 0; i < n; i++) {
       const x = ((i + 0.5) / n) * W + (r() - 0.5) * 10;
-      g.strokeStyle = hsl(78, 40, 30 + r() * 8);
-      g.lineWidth = 4;
+      g.strokeStyle = hsl(86, 30, 20 + r() * 6);
+      g.lineWidth = 3;
       g.beginPath(); g.moveTo(x, H); g.lineTo(x + (r() - 0.5) * 4, H * 0.08); g.stroke();
-      for (let k = 0; k < 9; k++) {
-        const y = H * (0.18 + k * 0.09) + r() * 6;
+      for (let k = 0; k < 10; k++) {
+        const y = H * (0.16 + k * 0.08) + r() * 6;
         const side = k % 2 ? 1 : -1;
-        leaf(x, y, 50 + r() * 40, side > 0 ? -0.35 + r() * 0.5 : Math.PI + 0.35 - r() * 0.5, 5 + r() * 3,
-          hsl(84 + r() * 16, 45 + r() * 20, 26 + r() * 16));
+        const dry = k > 7 && r() < 0.5;
+        const light = 22 + (1 - y / H) * 22 + r() * 8;
+        leaf(x, y, 50 + r() * 45, side > 0 ? -0.35 + r() * 0.55 : Math.PI + 0.35 - r() * 0.55, 4 + r() * 3,
+          dry ? hsl(45, 35, 45) : hsl(78 + r() * 14, 34 + r() * 14, light));
       }
-      g.strokeStyle = hsl(45, 55, 60);
-      g.lineWidth = 2;
+      g.strokeStyle = hsl(40, 32, 44);
+      g.lineWidth = 1.4;
       for (let k = 0; k < 5; k++) {
-        g.beginPath(); g.moveTo(x, H * 0.1); g.lineTo(x + (r() - 0.5) * 24, H * (0.0 + r() * 0.05)); g.stroke();
+        g.beginPath(); g.moveTo(x, H * 0.1); g.lineTo(x + (r() - 0.5) * 26, H * (0.0 + r() * 0.06)); g.stroke();
       }
-      // Ear
-      g.fillStyle = hsl(70, 35, 45);
-      g.beginPath(); g.ellipse(x + 6, H * 0.5, 4, 14, 0.3, 0, Math.PI * 2); g.fill();
+      g.fillStyle = hsl(68, 30, 42);
+      g.beginPath(); g.ellipse(x + 6, H * 0.52, 4, 15, 0.3, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = hsl(30, 40, 40); g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(x + 8, H * 0.45); g.lineTo(x + 12, H * 0.41); g.stroke(); // silk
     }
   } else if (kind === 'cotton') {
-    for (let i = 0; i < 700; i++) {
-      const x = r() * W, y = H * (0.15 + 0.85 * Math.pow(r(), 0.8));
-      const l = 12 + r() * 14;
-      g.fillStyle = hsl(95 + r() * 20, 40 + r() * 15, 22 + r() * 18 - (y / H) * 8);
+    for (let i = 0; i < 30; i++) {
+      g.strokeStyle = hsl(20, 30, 28, 0.9); g.lineWidth = 2.5;
+      const x = r() * W;
+      g.beginPath(); g.moveTo(x, H); g.lineTo(x + (r() - 0.5) * 30, H * 0.25); g.stroke();
+    }
+    for (let i = 0; i < 620; i++) {
+      const x = r() * W, yN = 0.12 + 0.88 * Math.pow(r(), 0.8), y = H * yN;
+      const l = 11 + r() * 13;
+      const red = r() < 0.08;
+      g.fillStyle = red ? hsl(10, 35, 35) : hsl(92 + r() * 18, 30 + r() * 12, 20 + (1 - yN) * 18 + r() * 8);
       g.beginPath();
       g.ellipse(x, y, l * 0.5, l * 0.45, r() * Math.PI, 0, Math.PI * 2);
       g.fill();
     }
-    for (let i = 0; i < 140; i++) { // open bolls
-      const x = r() * W, y = H * (0.15 + 0.6 * r());
-      g.fillStyle = hsl(40, 20, 92 + r() * 6);
+    for (let i = 0; i < 170; i++) { // open bolls
+      const x = r() * W, y = H * (0.15 + 0.65 * r());
+      g.fillStyle = hsl(40, 15, 88 + r() * 8);
       g.beginPath(); g.arc(x, y, 3 + r() * 3, 0, Math.PI * 2); g.fill();
+      g.fillStyle = hsl(30, 25, 30);
+      g.beginPath(); g.arc(x + 1, y + 3, 1.6, 0, Math.PI * 2); g.fill();
     }
   }
   const t = canvasTexture(c, { repeat: true });
@@ -152,40 +173,69 @@ export function makeCropCard(kind, seed = 3) {
 }
 
 // Top-view canopy texture: one tile covers 4 rows x 4 m. Rows run along U.
+// Individual plants with a sunlit side and a shaded side, soil and straw
+// (palhada, no-till) showing in the inter-row.
 export function makeCanopyTop(kind, seed = 5) {
-  const S = 256;
+  const S = 512;
   const c = canvas(S, S);
   const g = c.getContext('2d');
   const r = rng(seed);
-  const soil = '#4a2a1c';
-  g.fillStyle = kind === 'corn' ? '#2f4a18' : soil;
+  g.fillStyle = '#3c2a1e';
   g.fillRect(0, 0, S, S);
+  // Straw mulch in the inter-row.
+  for (let i = 0; i < 2600; i++) {
+    g.strokeStyle = hsl(36 + r() * 10, 26, 26 + r() * 14, 0.7);
+    g.lineWidth = 1;
+    const x = r() * S, y = r() * S, a = r() * Math.PI;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); g.stroke();
+  }
   const rows = 4;
+  const put = (x, y, fn) => {
+    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+      const px = x + ox, py = y + oy;
+      if (px < -60 || px > S + 60 || py < -60 || py > S + 60) continue;
+      fn(px, py);
+    }
+  };
   for (let k = 0; k < rows; k++) {
     const yc = ((k + 0.5) / rows) * S;
-    const n = kind === 'corn' ? 220 : 380;
-    for (let i = 0; i < n; i++) {
-      const x = r() * S;
-      const spread = kind === 'soy' ? 30 : kind === 'cotton' ? 26 : 34;
-      const y = yc + (r() - 0.5) * spread;
-      const l = kind === 'corn' ? 18 + r() * 22 : 7 + r() * 9;
-      g.fillStyle = kind === 'corn'
-        ? hsl(84 + r() * 14, 55 + r() * 20, 26 + r() * 18)
-        : kind === 'cotton' ? hsl(95 + r() * 18, 45 + r() * 14, 26 + r() * 18)
-          : hsl(90 + r() * 14, 62 + r() * 16, 30 + r() * 18);
-      g.save();
-      g.translate(((x % S) + S) % S, ((y % S) + S) % S);
-      g.rotate(r() * Math.PI);
-      g.beginPath();
-      if (kind === 'corn') g.ellipse(0, 0, l, 2.4, 0, 0, Math.PI * 2);
-      else g.ellipse(0, 0, l * 0.6, l * 0.45, 0, 0, Math.PI * 2);
-      g.fill();
-      g.restore();
+    if (kind === 'corn') {
+      // Long arching blades crossing the inter-row; dense.
+      for (let i = 0; i < 520; i++) {
+        const x = r() * S, y = yc + (r() - 0.5) * 18, a = (r() - 0.5) * 2.6 + (r() < 0.5 ? 0 : Math.PI);
+        const L = 26 + r() * 40, l = 24 + r() * 22, col = hsl(78 + r() * 12, 34 + r() * 14, l);
+        put(x, y, (px, py) => {
+          g.save(); g.translate(px, py); g.rotate(a + Math.PI / 2);
+          g.fillStyle = col;
+          g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(L * 0.5, -3.2, L, 0); g.quadraticCurveTo(L * 0.5, 3.2, 0, 0); g.fill();
+          g.restore();
+        });
+      }
+      for (let i = 0; i < 70; i++) { // tassels
+        g.fillStyle = hsl(42, 40, 60 + r() * 12);
+        g.fillRect(r() * S, yc + (r() - 0.5) * 10, 2, 2);
+      }
+      continue;
+    }
+    const spread = kind === 'soy' ? 104 : 92;
+    for (let i = 0; i < 560; i++) {
+      const x = r() * S, y = yc + (r() - 0.5) * spread * (0.6 + r() * 0.4);
+      const l = kind === 'cotton' ? 9 + r() * 10 : 8 + r() * 9;
+      const hue = kind === 'cotton' ? 95 + r() * 14 : 86 + r() * 14;
+      const sat = kind === 'cotton' ? 30 + r() * 12 : 40 + r() * 12;
+      const L = 30 + r() * 16, a1 = r() * Math.PI, a2 = r() * Math.PI;
+      put(x, y, (px, py) => {
+        // shadow side then lit side
+        g.fillStyle = hsl(hue, sat, L * 0.6);
+        g.beginPath(); g.ellipse(px + 2, py + 2, l * 0.62, l * 0.48, a1, 0, Math.PI * 2); g.fill();
+        g.fillStyle = hsl(hue, sat, L);
+        g.beginPath(); g.ellipse(px - 1, py - 1, l * 0.5, l * 0.38, a2, 0, Math.PI * 2); g.fill();
+      });
     }
     if (kind === 'cotton') {
-      for (let i = 0; i < 70; i++) {
-        g.fillStyle = hsl(40, 15, 93);
-        g.beginPath(); g.arc(r() * S, yc + (r() - 0.5) * 20, 1.6 + r() * 1.8, 0, Math.PI * 2); g.fill();
+      for (let i = 0; i < 110; i++) {
+        g.fillStyle = hsl(40, 12, 90);
+        g.beginPath(); g.arc(r() * S, yc + (r() - 0.5) * 30, 2 + r() * 2.2, 0, Math.PI * 2); g.fill();
       }
     }
   }
@@ -233,4 +283,56 @@ export function makeSoftDot() {
   grd.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grd; g.fillRect(0, 0, S, S);
   return canvasTexture(c, { srgb: false });
+}
+
+// Ground micro-detail (tileable, linear data): R pebbles (height), G cracks of
+// dry compacted soil, B grass-clump speckle, A fine grain. Sampled by the
+// terrain shader near the camera for colour breakup and bump.
+export function makeGroundDetail(size = 256) {
+  const data = new Uint8Array(size * size * 4);
+  const r = rng(321);
+  const peb = new Float32Array(size * size);
+  // Pebbles: small domes, wrapped.
+  for (let i = 0; i < 900; i++) {
+    const cx = r() * size, cy = r() * size, rad = 1.2 + Math.pow(r(), 2) * 4.5, h = 0.4 + r() * 0.6;
+    const R = Math.ceil(rad);
+    for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) {
+      const d = Math.hypot(x + (cx % 1), y + (cy % 1)) / rad;
+      if (d >= 1) continue;
+      const px = ((Math.floor(cx) + x) % size + size) % size, py = ((Math.floor(cy) + y) % size + size) % size;
+      peb[py * size + px] = Math.max(peb[py * size + px], h * Math.sqrt(1 - d * d));
+    }
+  }
+  // Cracks: jittered-grid Voronoi, F2 - F1 small near cell borders.
+  const G = 9, cell = size / G;
+  const pts = [];
+  for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) pts.push([(i + 0.15 + r() * 0.7) * cell, (j + 0.15 + r() * 0.7) * cell]);
+  const gr = tileNoise(32, 97);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const gi = Math.floor(x / cell), gj = Math.floor(y / cell);
+      let f1 = 1e9, f2 = 1e9;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = (gi + di + G) % G, jj = (gj + dj + G) % G;
+        const [px, py] = pts[jj * G + ii];
+        const ox = px + (gi + di - ii) * cell, oy = py + (gj + dj - jj) * cell;
+        const d = Math.hypot(x - ox, y - oy);
+        if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
+      }
+      const crack = Math.max(0, 1 - (f2 - f1) / 2.2);
+      const i = (y * size + x) * 4;
+      const grain = gr((x / size) * 32, (y / size) * 32);
+      data[i] = Math.round(peb[y * size + x] * 255);
+      data[i + 1] = Math.round(crack * 255);
+      data[i + 2] = Math.round(r() * 255);
+      data[i + 3] = Math.round((0.6 * grain + 0.4 * r()) * 255);
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
 }

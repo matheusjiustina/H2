@@ -8,12 +8,14 @@ import {
   WORLD_HALF, FAR_HALF, RUNWAY, BASE, FIELDS, ROADS, CREEK,
 } from './layout.js';
 import { rawHeight } from './terrainData.js';
+import { makeGroundDetail } from '../core/textures.js';
 
 const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5 };
 
 const GLSL_FUNCS = /* glsl */ `
 varying vec3 vWPos;
 uniform sampler2D uNoise;
+uniform sampler2D uDetail;
 uniform vec4 uFieldRect[NF];
 uniform vec4 uFieldInfo[NF];
 uniform vec4 uRoadSeg[NR];
@@ -22,7 +24,14 @@ uniform vec2 uCreek[NC];
 uniform vec4 uRunway;
 uniform vec4 uApron;
 uniform vec4 uTaxi;
+uniform vec2 uPad;
+uniform vec2 uFuel;
 uniform float uWorldHalf;
+
+// Micro-relief written by terrainColor() and turned into a bump normal later.
+float tBump = 0.0;
+float tBumpK = 0.0;
+float tNearC = 0.0; // crack detail fades much sooner (its texel pattern tiles)
 
 float sdBox(vec2 p, vec4 r) {
   vec2 c = 0.5 * (r.xy + r.zw);
@@ -39,23 +48,55 @@ float rows(float coord, float spacing, out float fade) {
   fade = 1.0 - smoothstep(0.2, 0.7, w);
   return 0.5 + 0.5 * cos(6.2831853 * coord / spacing);
 }
+float segD(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a, ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+}
 
+// Ground micro-detail at two scales; 'near' fades it out as a pixel covers
+// more ground (no shimmer from the air).
+vec4 detailAt(vec2 p, out float near) {
+  float fw = length(fwidth(p));
+  near = 1.0 - smoothstep(0.025, 0.14, fw);
+  tNearC = 1.0 - smoothstep(0.01, 0.045, fw);
+  vec4 a = texture2D(uDetail, p * 0.42);
+  vec4 b = texture2D(uDetail, p * 0.097 + 0.37);
+  // Cracks only at the fine scale: a coarse crack net reads as tiling from the air.
+  vec4 m = mix(b, a, 0.62);
+  m.g = a.g;
+  return m;
+}
+
+// Braquiária pasture: olive green, straw-dry patches, darker moist swales.
 vec3 grassColor(vec2 p, vec4 nA, vec4 nB, vec4 nC, vec4 nD) {
-  vec3 g1 = vec3(0.090, 0.185, 0.030);
-  vec3 g2 = vec3(0.190, 0.215, 0.055);
-  vec3 g3 = vec3(0.060, 0.120, 0.025);
+  vec3 g1 = vec3(0.100, 0.148, 0.040);
+  vec3 g2 = vec3(0.150, 0.172, 0.052);
+  vec3 g3 = vec3(0.066, 0.112, 0.030);
+  vec3 dry = vec3(0.255, 0.205, 0.092);
   vec3 c = mix(g1, g2, smoothstep(0.35, 0.78, nA.r));
-  c = mix(c, g3, smoothstep(0.55, 0.85, nB.g) * 0.55);
-  c *= 0.78 + 0.42 * nC.b;
-  c *= 0.86 + 0.28 * nD.a;
+  c = mix(c, g3, smoothstep(0.55, 0.85, nB.g) * 0.5);
+  c = mix(c, dry, smoothstep(0.56, 0.9, nA.b) * 0.36 + smoothstep(0.64, 0.82, nC.g) * 0.18);
+  c *= 0.82 + 0.36 * nC.b;
+  c *= 0.86 + 0.26 * nD.a;
   return c;
 }
 
+// Mato Grosso red latosol, muted by dust.
 vec3 dirtColor(vec4 nB, vec4 nC, vec4 nD) {
-  vec3 d1 = vec3(0.30, 0.036, 0.009);
-  vec3 d2 = vec3(0.43, 0.078, 0.022);
+  vec3 d1 = vec3(0.235, 0.074, 0.034);
+  vec3 d2 = vec3(0.350, 0.135, 0.064);
   vec3 c = mix(d1, d2, smoothstep(0.3, 0.8, nC.r));
   c *= 0.85 + 0.25 * nD.b;
+  return c;
+}
+
+// Soil breakup near the camera: pebbles, cracks, grain (+ bump).
+vec3 soilDetail(vec3 c, vec4 det, float near, float peb, float crack) {
+  c *= mix(1.0, 0.86 + 0.28 * det.a, near);
+  c = mix(c, c * 1.28 + vec3(0.03, 0.02, 0.012), det.r * peb * near);
+  c = mix(c, c * 0.55, det.g * crack * tNearC);
+  tBump = det.r * peb - det.g * crack * 0.6 * tNearC + det.a * 0.25;
+  tBumpK = near;
   return c;
 }
 
@@ -64,30 +105,33 @@ vec3 fieldColor(vec2 p, vec4 info, float edgeIn, vec4 nA, vec4 nB, vec4 nC, vec4
   float coord = info.y < 0.5 ? p.y : p.x;
   float fade;
   float s = rows(coord, info.w > 0.0 ? info.w : 0.9, fade);
-  vec3 soil = mix(vec3(0.17, 0.050, 0.022), vec3(0.25, 0.075, 0.030), nC.r);
+  vec3 soil = mix(vec3(0.160, 0.058, 0.028), vec3(0.230, 0.085, 0.040), nC.r);
   vec3 c;
   if (type < 2.5) {
-    vec3 straw = vec3(0.34, 0.25, 0.12);
+    vec3 straw = vec3(0.30, 0.23, 0.11);
     c = mix(soil, straw, smoothstep(0.45, 0.75, nD.g) * 0.45);
-    vec3 green = type < 0.5 ? vec3(0.070, 0.190, 0.030) : type < 1.5 ? vec3(0.075, 0.165, 0.030) : vec3(0.070, 0.150, 0.040);
+    vec3 green = type < 0.5 ? vec3(0.072, 0.150, 0.034) : type < 1.5 ? vec3(0.078, 0.140, 0.034) : vec3(0.075, 0.130, 0.042);
     float cover = smoothstep(0.0, 0.7, info.z);
     c = mix(c, green * (0.85 + 0.3 * nB.r), cover * mix(0.9, s, fade * (1.0 - info.z * 0.6)));
     rough = 0.9;
   } else if (type < 3.5) {
-    vec3 a = vec3(0.47, 0.37, 0.18), b = vec3(0.33, 0.24, 0.11);
+    // Stubble (palhada) after harvest: straw rows over dark soil.
+    vec3 a = vec3(0.36, 0.285, 0.14), b = vec3(0.24, 0.18, 0.085);
     c = mix(b, a, mix(0.55, s, fade * 0.8));
     c = mix(c, soil, smoothstep(0.6, 0.85, nC.g) * 0.35);
     c *= 0.88 + 0.24 * nD.r;
     rough = 0.95;
   } else if (type < 4.5) {
-    vec3 a = vec3(0.40, 0.075, 0.028), b = vec3(0.27, 0.050, 0.020);
+    // Fallow: harrowed soil furrows with sparse weeds.
+    vec3 a = vec3(0.30, 0.105, 0.048), b = vec3(0.205, 0.070, 0.032);
     c = mix(b, a, mix(0.6, s, fade));
     c *= 0.82 + 0.3 * nC.b;
+    c = mix(c, vec3(0.09, 0.13, 0.04), smoothstep(0.72, 0.9, nD.r) * 0.6);
     rough = 1.0;
   } else {
-    c = grassColor(p * 1.7, nA, nB, nC, nD) * vec3(1.05, 1.15, 1.0);
+    c = grassColor(p * 1.7, nA, nB, nC, nD) * vec3(1.04, 1.1, 1.0);
     // Cattle paths.
-    c = mix(c, vec3(0.30, 0.10, 0.04), smoothstep(0.62, 0.66, nB.b) * (1.0 - smoothstep(0.66, 0.70, nB.b)) * 0.7);
+    c = mix(c, vec3(0.27, 0.105, 0.05), smoothstep(0.62, 0.66, nB.b) * (1.0 - smoothstep(0.66, 0.70, nB.b)) * 0.7);
     rough = 0.95;
   }
   return c;
@@ -100,13 +144,13 @@ vec3 farPatchwork(vec2 p, vec4 nA, vec4 nB, vec4 nC, vec4 nD, inout float rough)
   float edge = min(min(f.x, 950.0 - f.x), min(f.y, 950.0 - f.y));
   vec3 c;
   float k = h.r;
-  if (k < 0.32) c = vec3(0.070, 0.190, 0.030) * (0.85 + 0.3 * nB.g);
-  else if (k < 0.45) c = vec3(0.075, 0.150, 0.028);
-  else if (k < 0.55) c = vec3(0.42, 0.33, 0.16);
-  else if (k < 0.63) c = vec3(0.36, 0.070, 0.026);
-  else if (k < 0.82) c = vec3(0.030, 0.075, 0.018) * (0.8 + 0.4 * nC.r);
+  if (k < 0.32) c = vec3(0.075, 0.150, 0.036) * (0.85 + 0.3 * nB.g);
+  else if (k < 0.45) c = vec3(0.080, 0.135, 0.034);
+  else if (k < 0.55) c = vec3(0.34, 0.27, 0.13);
+  else if (k < 0.63) c = vec3(0.26, 0.085, 0.040);
+  else if (k < 0.82) c = vec3(0.034, 0.072, 0.022) * (0.8 + 0.4 * nC.r);
   else c = grassColor(p, nA, nB, nC, nD);
-  c = mix(vec3(0.50, 0.11, 0.04), c, aaStep(9.0, edge));
+  c = mix(vec3(0.36, 0.13, 0.06), c, aaStep(9.0, edge));
   rough = 0.95;
   return c;
 }
@@ -118,7 +162,13 @@ vec3 terrainColor(vec2 p, out float rough) {
   vec4 nD = texture2D(uNoise, p * 0.9);
   rough = 0.95;
   if (abs(p.x) > uWorldHalf - 2.0 || abs(p.y) > uWorldHalf - 2.0) return farPatchwork(p, nA, nB, nC, nD, rough);
+  float near;
+  vec4 det = detailAt(p, near);
   vec3 col = grassColor(p, nA, nB, nC, nD);
+  // Grass clumps: darker hollows and lit tops close up.
+  col *= mix(1.0, 0.78 + 0.42 * det.b * det.a + 0.12 * det.a, near);
+  tBump = det.b * 0.6 + det.a * 0.4;
+  tBumpK = near * 0.7;
 
   // Fields + carreadores.
   float dmin = 1e9;
@@ -127,75 +177,110 @@ vec3 terrainColor(vec2 p, out float rough) {
     float d = sdBox(p, uFieldRect[i]);
     if (d < dmin) { dmin = d; imin = i; }
   }
-  if (dmin < 12.0) {
+  if (dmin < 14.0) {
     vec4 info = uFieldInfo[imin];
     float inField = 1.0 - aaStep(-0.4, dmin);
     vec3 fc = fieldColor(p, info, -dmin, nA, nB, nC, nD, rough);
     float rough2 = rough;
-    // Carreador ring, slightly irregular edge.
+    // Carreador ring, slightly irregular edge, and a rank grass verge outside it.
     float ringOuter = 7.0 + (nB.g - 0.5) * 2.0;
     float ring = aaStep(0.6, dmin) * (1.0 - aaStep(ringOuter, dmin));
     vec3 dc = dirtColor(nB, nC, nD);
-    col = mix(col, dc, ring);
+    // Two wheel tracks along the carreador.
+    float tr = 1.0 - smoothstep(0.3, 0.7, abs(abs(dmin - ringOuter * 0.5) - 1.0));
+    dc = mix(dc, dc * vec3(0.8, 0.74, 0.72), tr * 0.6);
+    float verge = (1.0 - aaStep(ringOuter + 3.5, dmin)) * aaStep(ringOuter, dmin);
+    col = mix(col, col * vec3(0.78, 0.86, 0.78), verge);
+    vec3 dcd = soilDetail(dc, det, near, 0.5, 0.35);
+    col = mix(col, dcd, ring);
     col = mix(col, fc, inField);
     rough = mix(0.95, rough2, inField);
   }
 
-  // Roads with tyre ruts.
+  // Farm roads: compacted red earth, two tyre ruts, grass in the middle of
+  // the lighter-used tracks.
   for (int i = 0; i < NR; i++) {
     vec4 s = uRoadSeg[i];
-    vec2 a = s.xy, b = s.zw;
-    vec2 pa = p - a, ba = b - a;
-    float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-    float d = length(pa - ba * t);
+    float d = segD(p, s.xy, s.zw);
     float hw = uRoadW[i] * 0.5 + (nB.g - 0.5) * 1.2;
     if (d < hw + 2.0) {
       float m = 1.0 - aaStep(hw, d);
       vec3 rc = dirtColor(nB, nC, nD);
-      float rut = 1.0 - smoothstep(0.25, 0.55, abs(d - 1.15));
-      rc = mix(rc, rc * vec3(0.72, 0.62, 0.6), rut * 0.8);
-      rc = mix(rc, rc * 1.12 + vec3(0.03, 0.015, 0.0), (1.0 - smoothstep(0.0, 0.7, d)) * 0.5);
+      float rut = 1.0 - smoothstep(0.25, 0.6, abs(d - 1.2));
+      rc = mix(rc, rc * vec3(0.74, 0.66, 0.64), rut * 0.75);
+      rc = mix(rc, rc * 1.12 + vec3(0.025, 0.012, 0.0), (1.0 - smoothstep(0.0, 0.9, abs(d - hw + 0.6))) * 0.5);
+      float mid = (1.0 - smoothstep(0.25, 0.6, d)) * step(uRoadW[i], 7.5) * smoothstep(0.4, 0.7, nC.g);
+      rc = mix(rc, grassColor(p, nA, nB, nC, nD) * 0.9, mid * 0.75);
+      rc = soilDetail(rc, det, near, 0.8, 0.5 * (1.0 - rut));
       col = mix(col, rc, m);
       rough = mix(rough, 0.97, m);
     }
   }
 
-  // Strip (light compacted gravel) and apron/taxiway (compacted red earth).
+  // Airstrip: compacted laterite (cascalho) with two darker, smoother wheel
+  // tracks, loose gravel between and beside them, grass creeping in at the
+  // edges, worn turn-around patches at both ends and tyre scuffs where
+  // aircraft touch down. Apron / taxiway: compacted red earth, oil stains at
+  // the service pad, darker taxi tracks.
   float dRw = sdBox(p, uRunway);
   float dAp = min(sdBox(p, uApron), sdBox(p, uTaxi));
   float dr = min(dRw, dAp);
-  if (dr < 6.0) {
-    vec3 g = mix(vec3(0.30, 0.205, 0.125), vec3(0.42, 0.32, 0.21), smoothstep(0.25, 0.8, nC.r));
-    vec3 ap = mix(vec3(0.30, 0.10, 0.045), vec3(0.40, 0.17, 0.08), smoothstep(0.25, 0.8, nC.r));
+  if (dr < 8.0) {
+    float zc = 0.5 * (uRunway.y + uRunway.w);
+    float hwR = 0.5 * (uRunway.w - uRunway.y);
+    float cl = p.y - zc + (nB.r - 0.5) * 1.6;
+    vec3 lat = mix(vec3(0.285, 0.150, 0.078), vec3(0.385, 0.215, 0.120), smoothstep(0.25, 0.8, nC.r));
+    lat *= 0.9 + 0.18 * nD.g;
+    float track = exp(-pow((abs(cl) - 1.55) / 0.95, 2.0));
+    float ends = max(1.0 - smoothstep(10.0, 26.0, length(p - vec2(uRunway.x + 14.0, zc))), 1.0 - smoothstep(10.0, 26.0, length(p - vec2(uRunway.z - 14.0, zc))));
+    track = max(track, ends * 0.8);
+    float scuff = smoothstep(0.55, 0.9, nD.r) * track * (1.0 - smoothstep(60.0, 200.0, abs(p.x - uRunway.x - 120.0))) ;
+    lat = mix(lat, lat * vec3(0.76, 0.70, 0.68), track * 0.65);
+    lat = mix(lat, vec3(0.06, 0.05, 0.045), scuff * 0.35);
+    lat = soilDetail(lat, det, near, 1.0 - track * 0.6, 0.2 * track);
+    float edgeIn = hwR - abs(p.y - zc);
+    float creep = 1.0 - smoothstep(0.0, 2.2 + nC.g * 2.5, edgeIn + (nD.r - 0.5) * 1.6);
+    vec3 g = mix(lat, grassColor(p, nA, nB, nC, nD) * 0.92, creep * 0.75 * step(dRw, dAp));
+
+    vec3 ap = dirtColor(nB, nC, nD) * vec3(1.06, 1.08, 1.1);
+    float tx = 1.0 - smoothstep(1.2, 2.6, min(segD(p, vec2(-382.0, -14.0), vec2(-370.0, -46.0)), segD(p, vec2(-370.0, -46.0), uPad)));
+    float padWear = 1.0 - smoothstep(4.0, 11.0, length(p - uPad));
+    ap = mix(ap, ap * vec3(0.78, 0.72, 0.7), max(tx * 0.6, padWear * 0.45));
+    float oil = smoothstep(0.62, 0.8, nC.b) * (1.0 - smoothstep(4.0, 9.0, length(p - uFuel))) + smoothstep(0.7, 0.85, nD.g) * padWear * 0.5;
+    ap = mix(ap, vec3(0.045, 0.035, 0.03), oil * 0.6);
+    ap = soilDetail(ap, det, near, 0.6, 0.3 * (1.0 - padWear) * smoothstep(0.4, 0.7, nB.b));
     g = mix(ap, g, step(dRw, dAp));
-    g *= 0.9 + 0.18 * nD.g;
-    float cl = abs(p.y - 0.5 * (uRunway.y + uRunway.w));
-    float onRw = step(uRunway.x, p.x) * step(p.x, uRunway.z);
-    g = mix(g, g * vec3(0.82, 0.74, 0.7), onRw * (1.0 - smoothstep(1.5, 6.0, cl)) * 0.55);
-    g *= 1.0 - 0.25 * smoothstep(0.66, 0.8, nB.b) * (1.0 - onRw);
-    float m = 1.0 - aaStep(0.0, dr + (nC.b - 0.5) * 0.6);
+    float m = 1.0 - aaStep(0.0, dr + (nC.b - 0.5) * 0.8);
     col = mix(col, g, m);
-    rough = mix(rough, 0.9, m);
+    rough = mix(rough, 0.92, m);
   }
 
   // Creek banks: wet earth and sand.
   float dc = 1e9;
-  for (int i = 0; i < NC - 1; i++) {
-    vec2 a = uCreek[i], b = uCreek[i + 1];
-    vec2 pa = p - a, ba = b - a;
-    float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-    dc = min(dc, length(pa - ba * t));
-  }
+  for (int i = 0; i < NC - 1; i++) dc = min(dc, segD(p, uCreek[i], uCreek[i + 1]));
   if (dc < 20.0) {
-    vec3 mud = mix(vec3(0.11, 0.055, 0.03), vec3(0.32, 0.24, 0.15), smoothstep(0.4, 0.7, nC.r));
+    vec3 mud = mix(vec3(0.11, 0.055, 0.03), vec3(0.30, 0.22, 0.14), smoothstep(0.4, 0.7, nC.r));
     float m = 1.0 - smoothstep(7.0, 14.0 + nC.g * 4.0, dc);
     col = mix(col, mud, m);
   }
   return col;
 }
+
+// Bump from tBump (Mikkelsen's surface-gradient perturbation, as in three's
+// bumpmap chunk) so pebbles, ruts and grass clumps catch the low sun.
+vec3 terrainBump(vec3 surf_pos, vec3 surf_norm, float faceDirection) {
+  vec2 dHdxy = vec2(dFdx(tBump), dFdy(tBump)) * 0.022 * tBumpK; // ~2 cm relief
+  vec3 vSigmaX = dFdx(surf_pos);
+  vec3 vSigmaY = dFdy(surf_pos);
+  vec3 R1 = cross(vSigmaY, surf_norm);
+  vec3 R2 = cross(surf_norm, vSigmaX);
+  float fDet = dot(vSigmaX, R1) * faceDirection;
+  vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2);
+  return normalize(abs(fDet) * surf_norm - vGrad);
+}
 `;
 
-export function createTerrainMaterial(noiseTex) {
+export function createTerrainMaterial(noiseTex, detailTex) {
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0.0 });
   const nf = FIELDS.length;
   const segs = [];
@@ -205,6 +290,9 @@ export function createTerrainMaterial(noiseTex) {
   mat.defines = { NF: nf, NR: nr, NC: nc };
   const uniforms = {
     uNoise: { value: noiseTex },
+    uDetail: { value: detailTex },
+    uPad: { value: new THREE.Vector2(BASE.pad.x, BASE.pad.z) },
+    uFuel: { value: new THREE.Vector2(BASE.fuelTank.x, BASE.fuelTank.z) },
     uFieldRect: { value: FIELDS.map((f) => new THREE.Vector4(f.x0, f.z0, f.x1, f.z1)) },
     uFieldInfo: {
       value: FIELDS.map((f) => {
@@ -228,9 +316,10 @@ export function createTerrainMaterial(noiseTex) {
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\n' + GLSL_FUNCS)
       .replace('#include <color_fragment>', '#include <color_fragment>\nfloat tRough;\ndiffuseColor.rgb = terrainColor(vWPos.xz, tRough);')
-      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;');
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => 'terrain-v1';
+  mat.customProgramCacheKey = () => 'terrain-v2';
   return mat;
 }
 
@@ -288,7 +377,7 @@ function buildChunk(td, cx, cz, size, step) {
 export function createTerrain(td, noiseTex) {
   const group = new THREE.Group();
   group.name = 'terrain';
-  const mat = createTerrainMaterial(noiseTex);
+  const mat = createTerrainMaterial(noiseTex, makeGroundDetail(256));
   const CH = 32; // cells per chunk (500 m)
   const chunks = GRID_N / CH;
   for (let j = 0; j < chunks; j++) {

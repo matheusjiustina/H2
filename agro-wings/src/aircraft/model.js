@@ -599,6 +599,7 @@ export function createAircraftModel(panel, opts = {}) {
     skin: new THREE.MeshStandardMaterial({ color: 0xc28c6a, roughness: 0.7 }),
     helmet: new THREE.MeshPhysicalMaterial({ color: 0xeeeae2, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2 }),
     visor: new THREE.MeshPhysicalMaterial({ color: 0x15181c, roughness: 0.05, metalness: 0.3, clearcoat: 1 }),
+    helmStripe: new THREE.MeshPhysicalMaterial({ color: 0x1b2a55, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2 }),
   };
 
   // Part buckets merged per material at the end. `fine` buckets go into a LOD
@@ -1239,54 +1240,104 @@ export function createAircraftModel(panel, opts = {}) {
     parent.add(m);
     return m;
   };
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.3, 6, 16), M.suit);
-  torso.scale.set(1.18, 1, 0.78);
-  torso.position.set(0, 0.55, -0.66);
-  torso.rotation.x = -0.12;
-  pilot.add(torso);
-  pilot.add(at(new THREE.Mesh(new RoundedBoxGeometry(0.36, 0.16, 0.3, 3, 0.06), M.suit), 0, 0.2, -0.6));
-  capsule([0, 0.76, -0.68], [0, 0.86, -0.67], 0.045, M.skin);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.095, 20, 14), M.skin);
-  head.position.set(0, 0.95, -0.64);
-  pilot.add(head);
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.128, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.62), M.helmet);
-  helmet.scale.set(1, 1.04, 1.12);
-  helmet.position.set(0, 0.97, -0.66);
-  pilot.add(helmet);
-  const visor = new THREE.Mesh(new THREE.SphereGeometry(0.133, 20, 10, -Math.PI * 0.32, Math.PI * 0.64, Math.PI * 0.32, Math.PI * 0.2), M.visor);
-  visor.scale.set(1, 1.04, 1.12);
-  visor.position.set(0, 0.97, -0.66);
-  pilot.add(visor);
+  // Static body parts are collected per material and merged (one mesh per
+  // material instead of one per part).
+  const PB = new Map();
+  const pput = (mat, g) => { if (!PB.has(mat)) PB.set(mat, []); PB.get(mat).push(g.index ? g.toNonIndexed() : g); };
+  const place = (g, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => g.applyMatrix4(new THREE.Matrix4().compose(
+    new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz)));
+  const limb = (a, b, r, mat) => {
+    const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+    const g = new THREE.CapsuleGeometry(r, Math.max(0.01, va.distanceTo(vb)), 4, 12);
+    g.applyMatrix4(new THREE.Matrix4().compose(va.clone().add(vb).multiplyScalar(0.5),
+      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize()), new THREE.Vector3(1, 1, 1)));
+    pput(mat, g);
+  };
+  const LEAN = -0.12; // seat-back recline
+  const TZ = -0.66;
+  // Torso: lathed chest-to-shoulders profile, wider than deep, reclined.
+  const torsoProf = [[0.0, 0.0], [0.128, 0.0], [0.138, 0.1], [0.158, 0.2], [0.168, 0.28], [0.162, 0.34], [0.13, 0.4], [0.07, 0.44], [0.0, 0.45]]
+    .map(([r, y]) => new THREE.Vector2(r, y));
+  pput(M.suit, place(new THREE.LatheGeometry(torsoProf, 20), 0, 0.3, TZ + 0.02, LEAN, 0, 0, 1.24, 1, 0.74));
+  const T = (x, y, z) => { // point on the reclined torso frame
+    const v = new THREE.Vector3(x, y - 0.3, z).applyAxisAngle(new THREE.Vector3(1, 0, 0), LEAN);
+    return [v.x, v.y + 0.3, v.z + TZ + 0.02];
+  };
+  for (const sx of [1, -1]) pput(M.suit, place(new THREE.SphereGeometry(0.068, 14, 10), ...T(sx * 0.18, 0.71, 0)));
+  pput(M.suit, place(new RoundedBoxGeometry(0.36, 0.16, 0.3, 3, 0.06), 0, 0.2, -0.6));
+  // Collar, zip, chest pockets, name patch.
+  for (const sx of [1, -1]) pput(M.suit, place(new RoundedBoxGeometry(0.08, 0.05, 0.02, 2, 0.008), ...T(sx * 0.045, 0.73, 0.115), LEAN - 0.5, sx * 0.4, 0));
+  pput(M.gloss, place(new THREE.BoxGeometry(0.008, 0.36, 0.006), ...T(0, 0.52, 0.12), LEAN));
   for (const sx of [1, -1]) {
-    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.035, 16), M.gloss);
-    cup.position.set(sx * 0.125, 0.95, -0.66);
-    cup.rotation.z = Math.PI / 2;
-    pilot.add(cup);
+    pput(M.suit, place(new RoundedBoxGeometry(0.085, 0.1, 0.022, 2, 0.008), ...T(sx * 0.075, 0.6, 0.118), LEAN));
+    pput(M.dark, place(new THREE.BoxGeometry(0.087, 0.028, 0.012), ...T(sx * 0.075, 0.645, 0.128), LEAN));
   }
-  capsule([0.13, 0.93, -0.62], [0.06, 0.9, -0.54], 0.006, M.gloss);
+  // Four-point harness: shoulder straps, lap belt, rotary buckle.
+  for (const sx of [1, -1]) {
+    const a = T(sx * 0.1, 0.74, 0.02), b = T(sx * 0.07, 0.36, 0.128);
+    const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+    const g = new THREE.BoxGeometry(0.045, va.distanceTo(vb), 0.012);
+    g.applyMatrix4(new THREE.Matrix4().compose(va.clone().add(vb).multiplyScalar(0.5),
+      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize()), new THREE.Vector3(1, 1, 1)));
+    pput(M.harness, g);
+    pput(M.harness, place(new THREE.BoxGeometry(0.05, 0.012, 0.16), sx * 0.1, 0.83, -0.76, 0.3, 0, 0)); // over the shoulder
+  }
+  pput(M.harness, place(new RoundedBoxGeometry(0.38, 0.05, 0.03, 2, 0.01), 0, 0.33, -0.5));
+  pput(M.alu, place(new THREE.CylinderGeometry(0.035, 0.035, 0.018, 16), 0, 0.36, -0.49, Math.PI / 2, 0, 0));
+  // Neck, head, flight helmet (shell + rubber edge + visor housing + navy
+  // stripe), tinted visor down, boom mic, filtered-air hose to the seat.
+  limb([0, 0.77, -0.68], [0, 0.86, -0.67], 0.045, M.skin);
+  pput(M.skin, place(new THREE.SphereGeometry(0.095, 20, 14), 0, 0.95, -0.64));
+  pput(M.helmet, place(new THREE.SphereGeometry(0.128, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.64), 0, 0.97, -0.665, 0.12, 0, 0, 1, 1.05, 1.12));
+  pput(M.dark, place(new THREE.TorusGeometry(0.1235, 0.008, 6, 28), 0, 0.97 - 0.056, -0.665 - 0.017, Math.PI / 2 + 0.12, 0, 0, 1, 1.12, 1));
+  pput(M.helmet, place(new RoundedBoxGeometry(0.17, 0.04, 0.07, 2, 0.015), 0, 1.088, -0.575, 0.55, 0, 0));
+  for (const sx of [1, -1]) pput(M.dark, place(new THREE.CylinderGeometry(0.014, 0.014, 0.012, 12), sx * 0.122, 1.0, -0.6, 0, 0, Math.PI / 2));
+  pput(M.helmStripe, place(new THREE.SphereGeometry(0.1295, 6, 14, Math.PI / 2 - 0.12, 0.24, 0, Math.PI * 0.6), 0, 0.97, -0.665, 0.12, 0, 0, 1, 1.05, 1.12));
+  pput(M.visor, place(new THREE.SphereGeometry(0.133, 20, 10, -Math.PI * 0.32, Math.PI * 0.64, Math.PI * 0.32, Math.PI * 0.2), 0, 0.97, -0.66, 0, 0, 0, 1, 1.04, 1.12));
+  limb([0.124, 0.93, -0.63], [0.06, 0.89, -0.535], 0.0055, M.gloss);
+  pput(M.gloss, place(new THREE.SphereGeometry(0.014, 10, 8), 0.05, 0.885, -0.53));
+  {
+    const c = new THREE.CatmullRomCurve3([[0, 0.94, -0.8], [0.06, 0.82, -0.86], [0.17, 0.6, -0.87], [0.24, 0.36, -0.86]].map((v) => new THREE.Vector3(...v)));
+    pput(M.rubber, new THREE.TubeGeometry(c, 20, 0.02, 8, false));
+    for (let i = 1; i < 12; i++) {
+      const g = new THREE.TorusGeometry(0.021, 0.004, 4, 10);
+      g.applyMatrix4(new THREE.Matrix4().compose(c.getPoint(i / 12),
+        new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), c.getTangent(i / 12)), new THREE.Vector3(1, 1, 1)));
+      pput(M.rubber, g);
+    }
+  }
   // Upper arms (static); forearms + gloves ride on the stick and the throttle.
-  capsule([-0.21, 0.72, -0.66], [-0.2, 0.52, -0.45], 0.045, M.suit);
-  capsule([0.21, 0.72, -0.66], [0.32, 0.56, -0.4], 0.045, M.suit);
+  limb(T(-0.19, 0.69, 0), [-0.2, 0.52, -0.45], 0.047, M.suit);
+  limb(T(0.19, 0.69, 0), [0.32, 0.56, -0.4], 0.047, M.suit);
+  // Thighs on the cushion, knees, shins to the pedals, boots; kneeboard on
+  // the right thigh.
+  for (const sx of [1, -1]) {
+    limb([sx * 0.1, 0.18, -0.55], [sx * 0.13, 0.3, -0.13], 0.068, M.suit);
+    pput(M.suit, place(new THREE.SphereGeometry(0.06, 12, 10), sx * 0.13, 0.3, -0.13));
+    limb([sx * 0.13, 0.3, -0.13], [sx * 0.17, -0.06, 0.33], 0.052, M.suit);
+    pput(M.glove, place(new RoundedBoxGeometry(0.095, 0.085, 0.22, 2, 0.03), sx * 0.17, -0.1, 0.38));
+  }
+  pput(M.white, place(new RoundedBoxGeometry(0.13, 0.014, 0.19, 2, 0.005), -0.12, 0.365, -0.33, -0.28, 0, 0));
+  for (const [mat, list] of PB) {
+    const m = new THREE.Mesh(mergeGeometries(list.map((g) => tagged(g))), mat);
+    pilot.add(m);
+  }
   const S0 = new THREE.Vector3(0, -0.22, -0.12), T0 = new THREE.Vector3(0.415, 0.5, 0.05);
   const rel = (p, o) => [p[0] - o.x, p[1] - o.y, p[2] - o.z];
   const handR = new THREE.Group(), handL = new THREE.Group();
-  capsule(rel([-0.2, 0.52, -0.45], S0), rel([-0.02, 0.42, -0.14], S0), 0.04, M.suit, handR);
+  capsule(rel([-0.2, 0.52, -0.45], S0), rel([-0.02, 0.42, -0.14], S0), 0.042, M.suit, handR);
+  capsule(rel([-0.05, 0.44, -0.2], S0), rel([-0.02, 0.425, -0.15], S0), 0.046, M.glove, handR); // gauntlet
   const gR = new THREE.Mesh(new THREE.SphereGeometry(0.042, 14, 10), M.glove);
   gR.position.set(...rel([-0.01, 0.42, -0.11], S0));
   gR.scale.set(1, 1.2, 0.9);
   handR.add(gR);
   stick.add(handR);
-  capsule(rel([0.32, 0.56, -0.4], T0), rel([0.41, 0.64, 0.0], T0), 0.04, M.suit, handL);
+  capsule(rel([0.32, 0.56, -0.4], T0), rel([0.41, 0.64, 0.0], T0), 0.042, M.suit, handL);
+  capsule(rel([0.39, 0.62, -0.06], T0), rel([0.41, 0.64, 0.0], T0), 0.046, M.glove, handL);
   const gL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 14, 10), M.glove);
   gL.position.set(...rel([0.415, 0.67, 0.04], T0));
   handL.add(gL);
   throttle.add(handL);
-  // Legs to the pedals, boots.
-  for (const sx of [1, -1]) {
-    capsule([sx * 0.1, 0.18, -0.55], [sx * 0.13, 0.3, -0.13], 0.06, M.suit);
-    capsule([sx * 0.13, 0.3, -0.13], [sx * 0.17, -0.06, 0.33], 0.05, M.suit);
-    pilot.add(at(new THREE.Mesh(new RoundedBoxGeometry(0.09, 0.08, 0.2, 2, 0.03), M.glove), sx * 0.17, -0.1, 0.38));
-  }
   pilot.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   root.add(pilot);
   // The camera rig hides the pilot in the cockpit view; the hands ride on the

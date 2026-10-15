@@ -7,6 +7,7 @@ import { createCrops } from './crops.js';
 import { makeNoiseTexture } from '../core/textures.js';
 import { createVegetation, makeTreeCollider } from './vegetation.js';
 import { createStructures } from './structures.js';
+import { createGrass } from './grass.js';
 
 export class World {
   constructor(renderer, scene, quality) {
@@ -31,6 +32,8 @@ export class World {
     this.scene.add(this.crops.group);
     this.vegetation = await step('Forest', () => createVegetation(this.terrain, this.quality));
     this.scene.add(this.vegetation.group);
+    this.grass = createGrass(this.terrain, this.quality, this.vegetation.atlas);
+    this.scene.add(this.grass.group);
     this.structures = await step('Base', () => createStructures(this.terrain, this.scene));
     this.treeHit = makeTreeCollider(this.vegetation);
   }
@@ -66,6 +69,7 @@ export class World {
     this.quality = q;
     this.sky.setQuality(q);
     this.crops.setQuality(q);
+    this.grass.setQuality(q);
     for (const u of this.updaters) u.setQuality?.(q);
   }
 
@@ -73,6 +77,7 @@ export class World {
     this.sky.update(camera, focus, dt, time);
     this.crops.update(camera.position);
     this.vegetation.update(camera);
+    this.grass.update(camera, time);
     for (const u of this.updaters) u.update?.(camera, focus, dt, time);
   }
 }

@@ -8,140 +8,64 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FORESTS, CREEK, FIELDS, HQ, BASE, ROADS, RUNWAY } from './layout.js';
 import { rng, fbm, segDist } from '../core/math.js';
+import {
+  makeFoliageAtlas, makeCanopyTexture, foliageMaterial, tileRect, TILES,
+  broadTree, mangoTree, ipeTree, eucalyptusTree, buritiPalm, shrub,
+} from './foliage.js';
+
+const C = (r, g, b) => new THREE.Color(r, g, b);
 
 const CELL = 500;
 
-function colorize(g, c, jitter = 0.08, seed = 1) {
+// Variants per kind: [hi, lo] geometry pairs, all card-built (foliage.js).
+function buildVariants() {
+  const tints = [C(1, 1, 1), C(0.88, 1.0, 0.86), C(1.08, 1.04, 0.9), C(0.84, 0.94, 0.92)];
+  const pair = (fn) => [fn(true), fn(false)];
+  return {
+    mata: [0, 1, 2, 3].map((i) => pair((hi) => broadTree(hi, 11 + i, {
+      height: 1.25 + 0.08 * (i % 3), spread: 1.05 + 0.1 * (i % 2), tint: tints[i % 4],
+      tiles: i === 2 ? [...TILES.fine, TILES.broad[2]] : [TILES.broad[i], TILES.broad[(i + 1) % 4]],
+    }))),
+    shade: [
+      pair((hi) => mangoTree(hi, 41)),
+      pair((hi) => broadTree(hi, 42, { height: 0.85, spread: 1.45, girth: 1.4, tiles: [...TILES.fine, TILES.broad[1]], tint: C(0.95, 1.0, 0.9) })),
+    ],
+    ipe: [pair((hi) => ipeTree(hi, 61))],
+    euca: [0, 1].map((i) => pair((hi) => eucalyptusTree(hi, 71 + i))),
+    buriti: [0, 1].map((i) => pair((hi) => buritiPalm(hi, 81 + i))),
+    bush: [0, 1].map((i) => pair((hi) => shrub(hi, 91 + i))),
+    mound: [(() => { const g = termiteMound(95); return [g, g]; })()],
+  };
+}
+
+// Cupinzeiro: lumpy red-earth cone, iconic in Mato Grosso pastures.
+function termiteMound(seed) {
   const r = rng(seed);
-  const n = g.attributes.position.count;
-  const col = new Float32Array(n * 3);
+  const g = new THREE.ConeGeometry(0.55, 1.0, 9, 3);
   const p = g.attributes.position;
-  for (let i = 0; i < n; i++) {
-    const k = 1 - jitter + r() * jitter * 2;
-    const y = p.getY(i);
-    col[i * 3] = c.r * k; col[i * 3 + 1] = c.g * k; col[i * 3 + 2] = c.b * k;
-    void y;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const k = 1 + 0.18 * fbm(x * 3 + seed, z * 3 + y * 2, 2);
+    p.setXYZ(i, x * k * (1 + (0.5 - y) * 0.25), y + 0.5, z * k);
+  }
+  g.computeVertexNormals();
+  const [u0, v0, u1, v1] = tileRect(TILES.bark);
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + (u1 - u0) * uv.getX(i), v0 + (v1 - v0) * uv.getY(i));
+  const col = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const k = 0.9 + r() * 0.2;
+    col[i * 3] = 2.3 * k; col[i * 3 + 1] = 1.12 * k; col[i * 3 + 2] = 0.72 * k;
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return g;
 }
 
-function lumpy(radius, detail, seed, sx = 1, sy = 1, sz = 1) {
-  const g = new THREE.IcosahedronGeometry(radius, detail);
-  const p = g.attributes.position;
-  const r = rng(seed);
-  const o = r() * 100;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const n = 1 + 0.22 * fbm(x * 0.9 + o, z * 0.9 + y * 0.7, 2);
-    p.setXYZ(i, x * n * sx, y * n * sy, z * n * sz);
-  }
-  g.computeVertexNormals();
-  return g;
-}
-
-function crownShade(g, base, top) {
-  // Darker underside, lighter sunlit top: cheap volumetric feel.
-  const p = g.attributes.position;
-  const col = g.attributes.color;
-  g.computeBoundingBox();
-  const y0 = g.boundingBox.min.y, y1 = g.boundingBox.max.y;
-  for (let i = 0; i < p.count; i++) {
-    const t = (p.getY(i) - y0) / Math.max(0.01, y1 - y0);
-    const k = base + (top - base) * t;
-    col.setXYZ(i, col.getX(i) * k, col.getY(i) * k, col.getZ(i) * k);
-  }
-}
-
-function broadleaf(hi, seed, crownCol, height = 1, spread = 1) {
-  const r = rng(seed);
-  const parts = [];
-  const trunkH = 4.5 * height;
-  const trunk = new THREE.CylinderGeometry(0.22, 0.38, trunkH, hi ? 7 : 4, 1);
-  trunk.translate(0, trunkH / 2, 0);
-  parts.push(colorize(trunk, new THREE.Color(0.12, 0.085, 0.06), 0.1, seed));
-  const blobs = hi ? 5 + Math.floor(r() * 3) : 2;
-  for (let i = 0; i < blobs; i++) {
-    const rad = (hi ? 2.0 + r() * 1.3 : 3.2) * spread;
-    const b = lumpy(rad, hi ? 1 : 0, seed * 13 + i, 1, 0.78, 1);
-    const a = r() * Math.PI * 2, d = hi ? r() * 2.4 * spread : (i ? 1.6 : -0.8) * spread;
-    b.translate(Math.cos(a) * d, trunkH + 1.2 + r() * 2.6 * height, Math.sin(a) * d);
-    const k = 0.8 + r() * 0.35;
-    colorize(b, new THREE.Color(crownCol.r * k, crownCol.g * k, crownCol.b * k), 0.12, seed + i);
-    parts.push(b);
-  }
-  const g = mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)));
-  crownShade(g, 0.55, 1.15);
-  return g;
-}
-
-function eucalyptus(hi, seed) {
-  const r = rng(seed);
-  const parts = [];
-  const H = 22 + r() * 6;
-  const trunk = new THREE.CylinderGeometry(0.14, 0.3, H * 0.8, hi ? 6 : 3, 1);
-  trunk.translate(0, H * 0.4, 0);
-  parts.push(colorize(trunk, new THREE.Color(0.30, 0.26, 0.20), 0.1, seed));
-  const n = hi ? 5 : 2;
-  for (let i = 0; i < n; i++) {
-    const b = lumpy(hi ? 1.5 + r() * 0.8 : 2.2, hi ? 1 : 0, seed + i * 7, 0.9, 1.7, 0.9);
-    b.translate((r() - 0.5) * 2.2, H * (0.6 + i * (0.4 / n)) + (r() - 0.5), (r() - 0.5) * 2.2);
-    colorize(b, new THREE.Color(0.055, 0.11, 0.035), 0.15, seed + i);
-    parts.push(b);
-  }
-  const g = mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)));
-  crownShade(g, 0.6, 1.1);
-  return g;
-}
-
-function buriti(hi, seed) {
-  const r = rng(seed);
-  const parts = [];
-  const H = 11 + r() * 5;
-  const trunk = new THREE.CylinderGeometry(0.28, 0.34, H, hi ? 7 : 4, 1);
-  trunk.translate(0, H / 2, 0);
-  parts.push(colorize(trunk, new THREE.Color(0.30, 0.26, 0.21), 0.08, seed));
-  const fronds = hi ? 12 : 6;
-  for (let i = 0; i < fronds; i++) {
-    // Fan leaf: a flattened, tilted cone.
-    const f = new THREE.ConeGeometry(1.9, 3.2, hi ? 6 : 3, 1, true);
-    f.scale(1, 1, 0.18);
-    f.rotateX(Math.PI / 2 + 0.6 + r() * 0.5);
-    f.rotateY((i / fronds) * Math.PI * 2 + r() * 0.3);
-    f.translate(0, H + 0.4, 0);
-    colorize(f, new THREE.Color(0.07, 0.14, 0.03), 0.15, seed + i);
-    parts.push(f);
-  }
-  const g = mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)));
-  return g;
-}
-
-function bush(seed) {
-  const b = lumpy(1.1, 0, seed, 1.2, 0.7, 1.2);
-  b.translate(0, 0.6, 0);
-  colorize(b, new THREE.Color(0.08, 0.13, 0.03), 0.15, seed);
-  crownShade(b, 0.6, 1.1);
-  return b.index ? b.toNonIndexed() : b;
-}
-
-// Variants per kind: [hi, lo] geometry pairs.
-function buildVariants() {
-  const mata = [new THREE.Color(0.06, 0.13, 0.025), new THREE.Color(0.045, 0.10, 0.02), new THREE.Color(0.09, 0.15, 0.03)];
-  const v = {
-    mata: [0, 1, 2, 3].map((i) => [broadleaf(true, 11 + i, mata[i % 3], 1.3 + 0.15 * i, 1.1), broadleaf(false, 11 + i, mata[i % 3], 1.3 + 0.15 * i, 1.1)]),
-    shade: [0, 1].map((i) => [broadleaf(true, 41 + i, new THREE.Color(0.07, 0.15, 0.03), 0.9, 1.4), broadleaf(false, 41 + i, new THREE.Color(0.07, 0.15, 0.03), 0.9, 1.4)]),
-    ipe: [[broadleaf(true, 61, new THREE.Color(0.75, 0.45, 0.02), 1.0, 1.15), broadleaf(false, 61, new THREE.Color(0.75, 0.45, 0.02), 1.0, 1.15)]],
-    euca: [0, 1].map((i) => [eucalyptus(true, 71 + i), eucalyptus(false, 71 + i)]),
-    buriti: [0, 1].map((i) => [buriti(true, 81 + i), buriti(false, 81 + i)]),
-    bush: [[bush(91), bush(91)], [bush(92), bush(92)]],
-  };
-  return v;
-}
-
 export function createVegetation(terrain, quality) {
   const group = new THREE.Group();
   group.name = 'vegetation';
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+  const atlas = makeFoliageAtlas();
+  const mat = foliageMaterial(atlas);
   const variants = buildVariants();
   const r = rng(2024);
   const trees = []; // {kind, v, x, z, s, rot}
@@ -251,6 +175,62 @@ export function createVegetation(terrain, quality) {
   }
   for (const t of trees) if (t.kind === 'shade' || t.kind === 'ipe') colliders.push({ x: t.x, z: t.z, r: 4.5 * t.s, top: terrain.heightAt(t.x, t.z) + 11 * t.s });
 
+  // --- extra natural detail (own random stream: the trees above, and their
+  // colliders, stay exactly where they were) ---------------------------------
+  const r2 = rng(5150);
+  const add2 = (kind, x, z, s = 1) => {
+    trees.push({ kind, v: Math.floor(r2() * variants[kind].length), x, z, s, rot: r2() * Math.PI * 2 });
+  };
+  for (const fb of FORESTS) {
+    if (fb.kind !== 'mata') continue;
+    const sides = [
+      [fb.x0, fb.z0, fb.x1, fb.z0, 0, 1], [fb.x1, fb.z0, fb.x1, fb.z1, -1, 0],
+      [fb.x1, fb.z1, fb.x0, fb.z1, 0, -1], [fb.x0, fb.z1, fb.x0, fb.z0, 1, 0],
+    ];
+    for (const [ax, az, bx, bz, ix, iz] of sides) {
+      const len = Math.hypot(bx - ax, bz - az);
+      for (let s = r2() * 4; s < len; s += 3 + r2() * 5) {
+        const t = s / len, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+        // Shrubby forest border (capoeira) just outside and inside the edge.
+        const off = -1.5 + r2() * 4;
+        const px = x + ix * off + (r2() - 0.5) * 2, pz = z + iz * off + (r2() - 0.5) * 2;
+        if (!avoid(px, pz, 1)) add2('bush', px, pz, 0.7 + r2() * 0.9);
+        // Irregular extra trees break the planted look of the two edge rows.
+        if (r2() < 0.28) {
+          const o2 = 3 + r2() * 12;
+          const qx = x + ix * o2 + (r2() - 0.5) * 4, qz = z + iz * o2 + (r2() - 0.5) * 4;
+          if (!avoid(qx, qz, 3)) add2('mata', qx, qz, 0.65 + r2() * 0.85);
+        }
+      }
+    }
+  }
+  // Cupinzeiros in the pasture and scattered over the grassland.
+  const past = FIELDS.find((f) => f.crop === 'pasture');
+  if (past) {
+    for (let i = 0; i < 170; i++) {
+      const x = past.x0 + 6 + r2() * (past.x1 - past.x0 - 12), z = past.z0 + 6 + r2() * (past.z1 - past.z0 - 12);
+      add2('mound', x, z, 0.6 + r2() * 0.9);
+    }
+  }
+  for (let i = 0; i < 240; i++) {
+    const x = -2600 + r2() * 5600, z = -2600 + r2() * 5200;
+    if (avoid(x, z, 8)) continue;
+    add2('mound', x, z, 0.5 + r2() * 0.8);
+  }
+  // Scrub along the fence lines and road verges.
+  for (const rd of ROADS) {
+    for (let i = 0; i < rd.pts.length - 1; i++) {
+      const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      const nx = -(bz - az) / len, nz = (bx - ax) / len;
+      for (let s = r2() * 30; s < len; s += 18 + r2() * 40) {
+        const side = r2() < 0.5 ? -1 : 1, off = rd.w / 2 + 4 + r2() * 5;
+        const x = ax + (bx - ax) * (s / len) + nx * off * side, z = az + (bz - az) * (s / len) + nz * off * side;
+        if (!avoid(x, z, 4)) add2('bush', x, z, 0.5 + r2() * 0.7);
+      }
+    }
+  }
+
   // --- build instanced cells ----------------------------------------------
   const cells = new Map();
   for (const t of trees) {
@@ -284,7 +264,7 @@ export function createVegetation(terrain, quality) {
         });
         im.instanceMatrix.needsUpdate = true;
         im.computeBoundingSphere();
-        im.castShadow = grp === hi && kind !== 'bush';
+        im.castShadow = grp === hi && kind !== 'bush' && kind !== 'mound';
         im.receiveShadow = grp === hi;
         grp.add(im);
       }
@@ -294,7 +274,7 @@ export function createVegetation(terrain, quality) {
   }
   if (canopyParts.length) {
     const cg = mergeGeometries(canopyParts);
-    const cm = new THREE.Mesh(cg, mat);
+    const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ map: makeCanopyTexture(), vertexColors: true, roughness: 0.9, metalness: 0 }));
     cm.receiveShadow = true;
     cm.name = 'forestCanopy';
     group.add(cm);
@@ -304,6 +284,7 @@ export function createVegetation(terrain, quality) {
   const far = 1800;
   return {
     group,
+    atlas,
     colliders,
     count: trees.length,
     setQuality(qq) { near = qq.treeNear; },
@@ -323,16 +304,17 @@ function forestCanopy(fb, terrain) {
   const inset = 6;
   const x0 = fb.x0 + inset, x1 = fb.x1 - inset, z0 = fb.z0 + inset, z1 = fb.z1 - inset;
   const nx = Math.ceil((x1 - x0) / step) + 1, nz = Math.ceil((z1 - z0) / step) + 1;
-  const pos = [], col = [], idx = [];
+  const pos = [], col = [], idx = [], uv = [];
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
     const x = Math.min(x1, x0 + i * step), z = Math.min(z1, z0 + j * step);
+    uv.push(x / 36, z / 36);
     const edge = Math.min(x - x0, x1 - x, z - z0, z1 - z);
     const lump = fbm(x / 16, z / 16, 3), big = fbm(x / 120 + 4, z / 120, 2);
     const h = edge < 0.5 ? 4 : 17 + 4 * big + 3.2 * lump;
     pos.push(x, terrain.heightAt(x, z) + h, z);
     const k = 0.7 + 0.35 * (lump * 0.5 + 0.5) + 0.1 * big;
     const tint = fbm(x / 60, z / 60 + 9, 2);
-    col.push(0.05 * k * (1 + Math.max(0, tint) * 0.8), 0.105 * k, 0.025 * k);
+    col.push(0.95 * k * (1 + Math.max(0, tint) * 0.5), 1.0 * k, 0.9 * k);
   }
   for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
     const a = j * nx + i, d = a + 1, b = a + nx, c = b + 1;
@@ -341,6 +323,7 @@ function forestCanopy(fb, terrain) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g.toNonIndexed();

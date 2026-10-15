@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { BASE, RUNWAY, HQ, FENCES, POWERLINE, CREEK } from './layout.js';
 import { canvas, canvasTexture, makeLabel } from '../core/textures.js';
 import { rng } from '../core/math.js';
+import { pickup, tanker, tractor, sprayer, harvester, ibc, drumPallet, officeContainer } from './vehicles.js';
 
 // ---------------------------------------------------------------------------
 // Materials
@@ -78,6 +79,19 @@ function makeMaterials() {
   M.glass = std({ color: 0x202a30, roughness: 0.08, metalness: 0.2, envMapIntensity: 1.2 });
   M.dirtyWhite = std({ color: 0xdedbd2, roughness: 0.7 });
   M.hoseBlack = std({ color: 0x111111, roughness: 0.7 });
+  // Vehicles and equipment.
+  M.paintWhite = new THREE.MeshPhysicalMaterial({ color: 0xe9e9e4, roughness: 0.38, metalness: 0.05, clearcoat: 0.5, clearcoatRoughness: 0.25 });
+  M.plasticBlack = std({ color: 0x1a1b1c, roughness: 0.7 });
+  M.chrome = std({ color: 0xd8dadc, roughness: 0.18, metalness: 1.0 });
+  M.alu = std({ color: 0xc9cdd0, roughness: 0.3, metalness: 0.9 });
+  M.lens = std({ color: 0xf4f4ee, roughness: 0.1, emissive: 0x2a2a28 });
+  M.tailLens = std({ color: 0xb01810, roughness: 0.2, emissive: 0x300402 });
+  M.amber = std({ color: 0xff9a10, roughness: 0.3, emissive: 0x402000 });
+  M.poly = std({ color: 0xe8e4d6, roughness: 0.55 });
+  M.tractorRed = new THREE.MeshPhysicalMaterial({ color: 0x9e1c16, roughness: 0.4, clearcoat: 0.4, clearcoatRoughness: 0.3 });
+  M.harvGreen = new THREE.MeshPhysicalMaterial({ color: 0x2f5d2a, roughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.35 });
+  M.rimGrey = std({ color: 0x8c8f90, roughness: 0.45, metalness: 0.6 });
+  M.container = std({ map: corrugatedTex('#5f7f99', '#4b6880'), roughness: 0.6, metalness: 0.3 });
   return M;
 }
 
@@ -108,6 +122,14 @@ class Builder {
     return this.add(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z, ry, rx, rz);
   }
   collider(x0, x1, z0, z1, top, name) { this.colliders.push({ x0, x1, z0, z1, top, name }); }
+  // Geometry already in world space (vehicle kits).
+  addRaw(g, mat) {
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    if (!this.parts.has(mat)) this.parts.set(mat, []);
+    this.parts.get(mat).push(g);
+  }
   build(group) {
     for (const [mat, list] of this.parts) {
       const g = mergeGeometries(list);
@@ -308,7 +330,7 @@ function buildService(B, M, group, H) {
   // Service spot marked like a farm strip: white tyres at the corners and a
   // painted stop board, aircraft parks on the compacted red earth.
   const pad = BASE.pad;
-  const tyre = new THREE.TorusGeometry(0.42, 0.16, 6, 12);
+  const tyre = new THREE.TorusGeometry(0.42, 0.16, 10, 22);
   for (const [dx, dz] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) B.add(tyre, M.white, pad.x + dx, 0.12, pad.z + dz, 0, Math.PI / 2);
   B.box(0.1, 1.2, 0.1, M.wood, pad.x + 9, 0.6, pad.z);
   B.box(0.06, 0.6, 1.2, M.yellow, pad.x + 9, 1.3, pad.z);
@@ -317,43 +339,37 @@ function buildService(B, M, group, H) {
 }
 
 function buildVehicles(B, M, H) {
-  // Support pickup (white) with a small tank in the bed.
+  // Support pickup (white double cab) with a chemical tank in the bed.
   const pk = BASE.pickup;
-  const pickup = (x, z, ry, body) => {
-    const c = Math.cos(ry), s = Math.sin(ry);
-    const P = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c];
-    let [px, pz] = P(0, 0.9);
-    B.box(1.85, 0.75, 1.9, body, px, 0.95, pz, ry); // cab lower
-    [px, pz] = P(0, 0.75);
-    B.box(1.7, 0.6, 1.4, M.glass, px, 1.6, pz, ry);
-    [px, pz] = P(0, 0.75);
-    B.box(1.72, 0.08, 1.45, body, px, 1.93, pz, ry);
-    [px, pz] = P(0, 2.3);
-    B.box(1.85, 0.7, 1.1, body, px, 0.9, pz, ry); // hood
-    [px, pz] = P(0, -1.3);
-    B.box(1.85, 0.55, 2.3, body, px, 0.85, pz, ry); // bed
-    [px, pz] = P(0, -1.3);
-    B.cyl(0.55, 0.55, 1.5, M.blue, px, 1.55, pz, 16, 0, Math.PI / 2, ry);
-    for (const [lx, lz] of [[0.85, 2.0], [-0.85, 2.0], [0.85, -1.6], [-0.85, -1.6]]) {
-      [px, pz] = P(lx, lz);
-      B.cyl(0.38, 0.38, 0.28, M.rubber, px, 0.38, pz, 14, 0, Math.PI / 2, ry);
-    }
-    B.collider(x - 2.6, x + 2.6, z - 2.6, z + 2.6, 2.1, 'pickup');
-  };
-  pickup(pk.x, pk.z, pk.heading, M.white);
-  // Tanker truck (caminhão de apoio)
+  pickup(B, M, pk.x, 0, pk.z, pk.heading);
+  B.collider(pk.x - 2.6, pk.x + 2.6, pk.z - 2.6, pk.z + 2.6, 2.1, 'pickup');
+  // Tanker truck (caminhão de apoio).
   const tk = BASE.truck;
-  B.box(2.4, 1.6, 2.0, M.yellow, tk.x, 1.7, tk.z + 3.4);
-  B.box(2.2, 0.7, 0.1, M.glass, tk.x, 2.2, tk.z + 4.42);
-  B.box(2.4, 0.4, 7.0, M.black, tk.x, 0.9, tk.z - 0.8);
-  B.cyl(1.05, 1.05, 5.4, M.white, tk.x, 2.15, tk.z - 1.2, 20, Math.PI / 2);
-  for (const dz of [3.4, -0.6, -2.6]) for (const dx of [-1.05, 1.05]) B.cyl(0.5, 0.5, 0.35, M.rubber, tk.x + dx, 0.5, tk.z + dz, 14, 0, Math.PI / 2);
+  tanker(B, M, tk.x, 0, tk.z, tk.heading);
   B.collider(tk.x - 1.4, tk.x + 1.4, tk.z - 4.5, tk.z + 4.6, 3.3, 'truck');
+  // Chemical stock behind the mixing station: IBC totes and drum pallets.
+  const mt = BASE.mixTank;
+  ibc(B, M, mt.x - 3.2, 0, mt.z - 16.5, 0.05);
+  ibc(B, M, mt.x - 1.9, 0, mt.z - 16.6, -0.04);
+  ibc(B, M, mt.x - 3.2, 0, mt.z - 17.8, 0.02);
+  ibc(B, M, mt.x - 3.15, 1.33, mt.z - 16.5, 0.0);
+  drumPallet(B, M, mt.x - 6.0, 0, mt.z - 16.8, 0.1, [M.blue, M.blue, M.white, M.blue]);
+  drumPallet(B, M, mt.x - 7.4, 0, mt.z - 16.7, -0.05, [M.green, M.white, M.green, M.green]);
+  B.collider(mt.x - 8.2, mt.x - 1.2, mt.z - 18.5, mt.z - 15.8, 2.7, 'chemical store');
+  // Operations office (converted container) east of the hangar.
+  const h = BASE.hangar;
+  officeContainer(B, M, h.x + h.w / 2 + 9, 0, h.z + 4, 0);
+  B.collider(h.x + h.w / 2 + 7.6, h.x + h.w / 2 + 10.4, h.z + 0.8, h.z + 7.2, 3.0, 'office');
+  // Fire extinguisher stand at the fuel slab.
+  const ft = BASE.fuelTank;
+  B.box(0.08, 1.4, 0.08, M.steel, ft.x - 4.6, 0.7, ft.z + 1.6);
+  B.box(0.5, 0.6, 0.05, M.red, ft.x - 4.6, 1.15, ft.z + 1.66);
+  B.cyl(0.11, 0.11, 0.62, M.red, ft.x - 4.6, 0.62, ft.z + 1.82, 14);
 }
 
 function buildStripMarks(B, M, group, H) {
   // Half-buried white tyres along the edges, rows across each threshold.
-  const tyre = new THREE.TorusGeometry(0.42, 0.16, 6, 12);
+  const tyre = new THREE.TorusGeometry(0.42, 0.16, 10, 22);
   const z = RUNWAY.z, hw = RUNWAY.width / 2;
   for (let x = RUNWAY.x0; x <= RUNWAY.x1 + 0.1; x += 50) {
     for (const s of [-1, 1]) B.add(tyre, M.white, x, 0.1, z + s * (hw + 1.2), 0, Math.PI / 2 * 0, Math.PI / 2 * 0, 1, 1, 1);
@@ -404,8 +420,11 @@ function buildHQ(B, M, group, H) {
   }
   // Machines under the first shed: tractor + self-propelled sprayer + harvester.
   const s0 = HQ.sheds[0], sy0 = H(s0.x, s0.z);
-  tractor(B, M, s0.x - 12, sy0, s0.z + 2);
-  harvester(B, M, s0.x + 6, sy0, s0.z + 1);
+  tractor(B, M, s0.x - 14, sy0, s0.z + 2, 0);
+  harvester(B, M, s0.x + 6, sy0, s0.z + 1, 0);
+  const s1 = HQ.sheds[1], sy1 = H(s1.x, s1.z);
+  sprayer(B, M, s1.x - 6, sy1, s1.z + 1.5, 0);
+  tractor(B, M, s1.x + 7, sy1, s1.z + 2.5, 0.15);
   // Silos + dryer + elevator
   for (const si of HQ.silos) {
     const yy = H(si.x, si.z);
@@ -426,23 +445,6 @@ function buildHQ(B, M, group, H) {
   for (let i = 0; i <= 10; i++) for (const [ox, oz, ry] of [[-15 + i * 3, -12, 0], [-15 + i * 3, 12, 0]]) B.box(0.15, 1.6, 0.15, M.wood, c.x + ox, cy + 0.8, c.z + oz, ry);
   for (const zz of [-12, 12]) for (const yy of [0.6, 1.1, 1.5]) B.box(30, 0.12, 0.06, M.wood, c.x, cy + yy, c.z + zz);
   for (const xx of [-15, 15]) for (const yy of [0.6, 1.1, 1.5]) B.box(0.06, 0.12, 24, M.wood, c.x + xx, cy + yy, c.z);
-}
-
-function tractor(B, M, x, y, z) {
-  B.box(1.6, 1.0, 3.0, M.green, x, y + 1.3, z);
-  B.box(1.5, 1.5, 1.4, M.glass, x, y + 2.5, z - 0.6);
-  B.box(1.6, 0.1, 1.6, M.green, x, y + 3.3, z - 0.6);
-  for (const dx of [-1.05, 1.05]) {
-    B.cyl(0.85, 0.85, 0.55, M.rubber, x + dx, y + 0.85, z - 1.0, 18, 0, Math.PI / 2);
-    B.cyl(0.5, 0.5, 0.4, M.rubber, x + dx, y + 0.5, z + 1.2, 14, 0, Math.PI / 2);
-  }
-}
-function harvester(B, M, x, y, z) {
-  B.box(3.2, 3.0, 6, M.yellow, x, y + 2.4, z);
-  B.box(2, 1.6, 1.8, M.glass, x, y + 4.6, z + 2.2);
-  B.box(7, 0.8, 1.6, M.yellow, x, y + 0.9, z + 4.0);
-  B.cyl(0.25, 0.25, 4.5, M.yellow, x + 2.6, y + 4.5, z - 1, 10, 0, 0.9);
-  for (const dx of [-1.5, 1.5]) B.cyl(0.85, 0.85, 0.7, M.rubber, x + dx, y + 0.85, z + 1.5, 18, 0, Math.PI / 2);
 }
 
 function buildFences(B, M, group, H, dyn) {

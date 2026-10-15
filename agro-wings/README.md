@@ -175,6 +175,53 @@ Show FPS) reports fps, draw calls and triangles live.
   Node with the farm-HQ and base colliders, one reload each (560/520/500 L
   loads within MTOW), 90 % coverage, no hard landing, parked at the pad.
 
+## World
+
+The farm layout, strip, roads, fields and colliders are unchanged
+(`src/world/layout.js`, `terrainData.js`); everything below is how the
+world is drawn, built for perceived realism at low cost.
+
+- **Trees** (`foliage.js`, `vegetation.js`): every plant is a cloud of
+  alpha-tested leaf-cluster cards around a tapered trunk with branches, with
+  "spherized" normals so a crown lights as a volume. One procedural 4×4 atlas
+  (1024²) holds broadleaf and fine (leguminous) clusters, eucalyptus, ipê in
+  bloom, buriti fronds, mango, shrub, two barks and two grass tufts, so each
+  variant is one geometry, one material and one instanced draw per 500 m
+  cell (two LODs: ~400 tris near, ~50 far). Alpha is boosted with the mip
+  level so far crowns stay full. Species: mata/cerrado broadleaves, mango
+  shade trees, ipê-amarelo, eucalyptus windbreaks, buriti palms by the
+  creek, shrubby forest borders, scrub on road verges, cupinzeiros (termite
+  mounds) in the pasture. The original trees and their colliders keep their
+  exact positions; the extra detail uses its own random stream.
+- **Grass** (`grass.js`): instanced green and dry tufts in 16 m cells
+  streamed around the camera on pasture and verges only (2 draws), swaying
+  in the wind and shrinking into the ground at the edge of the radius (45 /
+  60 / 75 m by preset); off above 120 m.
+- **Crops** (`crops.js`): canopy textures with individual plants, closed
+  rows and straw in the inter-row; from the air the ground sprayer's
+  tramlines (two wheel tracks every 27 m) and the headlands, where rows run
+  across and the turning track shows; near the ground the rows under the
+  tramlines are missing, so the tracks are real gaps.
+- **Ground** (`terrain.js`): olive braquiária with dry patches instead of a
+  flat green, muted red latosol, carreadores with wheel tracks and a rank
+  verge, farm roads with ruts and grass between them; a tileable
+  micro-detail texture (pebbles, dry-soil cracks, grass clumps) adds colour
+  break-up and a ~2 cm bump close up and fades out with distance so nothing
+  tiles from the air. The strip is compacted laterite with two darker wheel
+  tracks, worn turn-arounds, tyre scuffs and grass creeping in at the edges;
+  the apron has taxi tracks, a worn pad and oil stains by the fuel tank.
+- **Base and farm** (`vehicles.js`, `structures.js`): double-cab support
+  pickup with a tank in the bed, cab-over tanker with walkway, rail, domes,
+  ladder and valve cabinet, IBC totes and drum pallets at the chemical
+  store, an office container, a fire point; at the farm HQ a tractor, a
+  combine with its platform and a self-propelled sprayer. Vehicles are
+  extruded side profiles, rounded boxes and lathed tyres merged into the
+  static per-material meshes, so they add no draw calls of their own.
+
+`node test/worldviews.mjs <dir> [view,...]` renders the world look-dev views
+(apron, service area, strip, low passes over each crop, forest, creek, HQ,
+aerial, chase while spraying, cockpit).
+
 ## Aircraft
 
 Modelled on the EMB-202 Ipanema (own registration PR-AGW): orange with navy
@@ -205,8 +252,11 @@ changing how the aircraft flies.
 - **Cabin**: curved windshield, tubular frame with joints, door handles and
   hinges, headliner; inside, a tubular cage, rounded seat with harness,
   gauge bezels with depth, pedals, stick with grip and trigger, throttle and
-  prop levers; the pilot has a helmet, visor, boom mic and gloved hands on
-  the stick and throttle.
+  prop levers; the pilot wears a flight suit (collar, zip, chest pockets),
+  a four-point harness, a flight helmet with visor housing, tinted visor,
+  boom mic and the filtered-air hose ag pilots use, a kneeboard on the right
+  thigh, and has gloved hands on the stick and throttle (static parts merged
+  per material).
 - **Gear**: lathed tyres with sidewall and tread bump, hubs with bolts and
   valve stems, brake discs and calipers, A-frame legs with fittings and
   brake lines; leaf-spring tailwheel with fork.

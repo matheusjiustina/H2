@@ -39,6 +39,44 @@ function finMaterial(tex, radiusU) {
   return m;
 }
 
+// Canopy seen from altitude: the row texture plus what makes a real field read
+// from the air — the ground sprayer's tramlines (two wheel tracks every
+// 27 m, plants flattened to soil and straw) and the headlands at the row
+// ends, where rows turn across and the machines' turning track shows.
+function canopyMaterial(tex, kind) {
+  const m = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.88, metalness: 0 });
+  const tramK = kind === 'corn' ? 0.45 : 0.8;
+  m.onBeforeCompile = (s) => {
+    s.vertexShader = s.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec4 aField;\nattribute vec4 aInfo;\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvField = aField; vInfo = aInfo; vCWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    s.fragmentShader = s.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        {
+          vec2 p = vCWP.xz;
+          bool ax = vInfo.x < 0.5;
+          float along = ax ? p.x : p.y;
+          float across = ax ? p.y : p.x;
+          float a0 = ax ? vField.x : vField.y, a1 = ax ? vField.z : vField.w;
+          float e = min(along - a0, a1 - along);
+          float head = 1.0 - smoothstep(9.0, 10.5, e);
+          vec4 tH = texture2D(map, vec2(across / 4.0, along / (4.0 * vInfo.y)));
+          diffuseColor.rgb = mix(diffuseColor.rgb, tH.rgb, head);
+          float fwA = fwidth(across), fwE = fwidth(e);
+          float vis = 1.0 - smoothstep(0.25, 0.9, max(fwA, fwE));
+          float tp = mod(across - vInfo.w, vInfo.z) - vInfo.z * 0.5;
+          float tr = 1.0 - smoothstep(0.16, 0.42 + fwA, abs(abs(tp) - 0.9));
+          tr *= (1.0 - head) * step(4.0, abs(across - (ax ? vField.y : vField.x))) * step(4.0, abs((ax ? vField.w : vField.z) - across));
+          float turn = 1.0 - smoothstep(0.16, 0.42 + fwE, abs(abs(e - 5.2) - 0.9));
+          float t = max(tr, turn * head) * vis * ${tramK.toFixed(2)};
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.4, 0.32) + vec3(0.035, 0.022, 0.012), t);
+        }`);
+  };
+  m.customProgramCacheKey = () => 'canopy-' + kind;
+  return m;
+}
+
 export function createCrops(terrain, quality) {
   const group = new THREE.Group();
   group.name = 'crops';
@@ -48,7 +86,7 @@ export function createCrops(terrain, quality) {
   const radiusU = { value: quality.cropRadius };
   for (const k of CROP_KINDS) {
     tex[k] = { card: makeCropCard(k, 7 + k.length), top: makeCanopyTop(k, 3 + k.length) };
-    canopyMats[k] = new THREE.MeshStandardMaterial({ map: tex[k].top, vertexColors: true, roughness: 0.88, metalness: 0 });
+    canopyMats[k] = canopyMaterial(tex[k].top, k);
     cardMats[k] = finMaterial(tex[k].card, radiusU);
   }
 
@@ -152,7 +190,11 @@ function buildCanopy(f, h, terrain, mat) {
   const nrm = new Float32Array(nx * nz * 3);
   const n = { x: 0, y: 1, z: 0 };
   const hc = h * CANOPY;
-  const hue = f.crop === 'corn' ? [1.0, 1.15, 0.8] : f.crop === 'cotton' ? [1.1, 1.2, 1.05] : [1.2, 1.4, 1.0];
+  const hue = f.crop === 'corn' ? [1.0, 1.0, 0.82] : f.crop === 'cotton' ? [1.0, 1.0, 0.95] : [1.02, 1.06, 0.88];
+  // Tramlines of the ground sprayer every 27 m, phase per field.
+  const tram = [f.rowAxis === 'x' ? 0 : 1, sp, 27, (f.id * 7.3) % 27];
+  const fld = [f.x0, f.z0, f.x1, f.z1];
+  const aF = new Float32Array(nx * nz * 4), aI = new Float32Array(nx * nz * 4);
   for (let j = 0; j < nz; j++) {
     for (let i = 0; i < nx; i++) {
       const x = Math.min(f.x1, f.x0 + i * step), z = Math.min(f.z1, f.z0 + j * step);
@@ -170,6 +212,7 @@ function buildCanopy(f, h, terrain, mat) {
       const v2 = fbm(x / 35, z / 35 + f.id, 2);
       const tone = 0.86 + 0.2 * v + 0.07 * v2;
       const yellow = Math.max(0, -v) * 0.25;
+      aF.set(fld, k * 4); aI.set(tram, k * 4);
       col[k * 3] = tone * hue[0] * (1 + yellow);
       col[k * 3 + 1] = tone * hue[1];
       col[k * 3 + 2] = tone * hue[2] * (1 - yellow);
@@ -185,6 +228,8 @@ function buildCanopy(f, h, terrain, mat) {
   g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setAttribute('aField', new THREE.BufferAttribute(aF, 4));
+  g.setAttribute('aInfo', new THREE.BufferAttribute(aI, 4));
   g.setIndex(idx);
   g.computeBoundingSphere();
   const m = new THREE.Mesh(g, mat);
@@ -250,8 +295,13 @@ function buildFins(f, x0, x1, z0, z1, terrain) {
   const l0 = alongX ? x0 : z0, l1 = alongX ? x1 : z1; // along-row extent
   const k0 = Math.ceil(a0 / sp - 0.5), k1 = Math.floor(a1 / sp - 0.5);
   const n = Math.max(1, Math.ceil((l1 - l0) / seg));
+  const tramPhase = (f.id * 7.3) % 27;
   for (let k = k0; k <= k1; k++) {
     const c = (k + 0.5) * sp;
+    // Rows under the ground sprayer's wheel tracks are flattened (matches the
+    // tramlines drawn on the canopy from the air).
+    const tp = (((c - tramPhase) % 27) + 27) % 27 - 13.5;
+    if (Math.abs(Math.abs(tp) - 0.9) < 0.3 && f.crop !== 'corn') continue;
     const start = pos.length / 3;
     // Each row gets its own texture offset so rows don't line up.
     const uOff = ((k * 0.618) % 1) * 4;
