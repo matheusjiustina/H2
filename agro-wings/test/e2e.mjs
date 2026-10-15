@@ -28,12 +28,14 @@ await page.evaluate((id) => {
   g.selectContract(id);
   g.screens.close();
   g.frozen = true;
+  g.noRender = true; // only render for snapshots: keeps the software GPU free for the simulation
   g.input.press('KeyT');
   g.startAutopilot('contract');
 }, contract);
 
 const snap = async (name) => {
-  await page.evaluate(() => window.__agro.render());
+  // One full (non-headless) tick refreshes camera, streaming and HUD before rendering.
+  await page.evaluate(() => { const g = window.__agro; g.tick(1 / 60); g.render(); });
   await page.waitForTimeout(150);
   await page.screenshot({ path: `${outDir}/${name}.png` });
 };

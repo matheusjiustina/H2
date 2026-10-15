@@ -91,7 +91,7 @@ export const CREEK = {
 // 'eucalyptus' (planted windbreak), 'riparian' (along the creek).
 export const FORESTS = [
   { kind: 'mata', x0: -2500, x1: -1600, z0: -1700, z1: 300 },
-  { kind: 'mata', x0: -380, x1: -300, z0: 260, z1: 680 }, // tree line west of the corn
+  { kind: 'mata', x0: -260, x1: 220, z0: 652, z1: 688 }, // tree line along the south edge of the corn
   { kind: 'mata', x0: 2700, x1: 3700, z0: -1900, z1: -200 },
   { kind: 'mata', x0: -1300, x1: 200, z0: 1900, z1: 2700 },
   { kind: 'mata', x0: 2700, x1: 3600, z0: 400, z1: 1600 },
@@ -99,7 +99,7 @@ export const FORESTS = [
   { kind: 'mata', x0: 900, x1: 1500, z0: -2600, z1: -1800 },
   { kind: 'mata', x0: -3400, x1: -2700, z0: 700, z1: 2000 },
   // Windbreaks behind the base, out of the extended pass lines of T-07.
-  { kind: 'eucalyptus', x0: -540, x1: -500, z0: -110, z1: 60 },
+  { kind: 'eucalyptus', x0: -540, x1: -500, z0: -130, z1: -75 },
   { kind: 'eucalyptus', x0: -540, x1: -500, z0: -270, z1: -175 },
 ];
 

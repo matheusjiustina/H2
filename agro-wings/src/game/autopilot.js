@@ -124,10 +124,14 @@ export class Autopilot {
         let bankCmd = 0;
         if (this.tdStage === 0) {
           bankCmd = clamp(-wrapAngle(passYaw - hdg) * 1.5, -0.3, 0.3);
-          if (this.pt > 3) this.tdStage = 1;
+          if (this.pt > 3) { this.tdStage = 1; this.tdT = 0; }
         } else if (this.tdStage === 1) {
-          bankCmd = clamp(-wrapAngle(passYaw + away - hdg) * 1.5, -0.55, 0.55);
-          if (this.pt > 8) this.tdStage = 2;
+          // Obstacles ahead and still low: climb wings-level first, then turn.
+          const want = top + 1.25 + Math.max(28, this._clearance(), this._areaClearance());
+          const climbFirst = fm.pos.y < want - 6 && this._clearance(450) > 0;
+          bankCmd = climbFirst ? 0 : clamp(-wrapAngle(passYaw + away - hdg) * 1.5, -0.55, 0.55);
+          if (!climbFirst) this.tdT = (this.tdT || 0) + dt;
+          if (this.tdT > 5) this.tdStage = 2;
         } else {
           // Steep reversal only once high enough; otherwise keep climbing in a shallow turn.
           const want = top + 1.25 + Math.max(28, this._clearance(), this._areaClearance());
@@ -319,11 +323,15 @@ export class Autopilot {
     else alt = top + 1.25 + Math.max(far ? 35 : 22, this._clearance());
     // Look ahead for terrain/canopy/trees/wires.
     let ahead = top;
-    for (const s of [40, 80, 120]) {
-      const x = fm.pos.x + fm.vel.x / Math.max(1, o.groundSpeed) * s, z = fm.pos.z + fm.vel.z / Math.max(1, o.groundSpeed) * s;
-      ahead = Math.max(ahead, ac.env.top(x, z));
-      if (g.world.obstacleAt(x, fm.pos.y - 2, z)) ahead = Math.max(ahead, fm.pos.y + 25);
-      if (g.world.wireDistance(x, fm.pos.y, z) < 18) ahead = Math.max(ahead, fm.pos.y + 15);
+    const ux = fm.vel.x / Math.max(1, o.groundSpeed), uz = fm.vel.z / Math.max(1, o.groundSpeed);
+    for (let s = 10; s <= 260; s += 10) {
+      for (const lat of [-6, 0, 6]) {
+        const x = fm.pos.x + ux * s - uz * lat, z = fm.pos.z + uz * s + ux * lat;
+        if (s <= 90) ahead = Math.max(ahead, ac.env.top(x, z)); // terrain/canopy: short look
+        if (g.world.obstacleAt(x, fm.pos.y - 2, z)) ahead = Math.max(ahead, fm.pos.y + 25); // trees: long look
+      }
+      const x = fm.pos.x + ux * s, z = fm.pos.z + uz * s;
+      if (s <= 160 && g.world.wireDistance(x, fm.pos.y, z) < 18) ahead = Math.max(ahead, fm.pos.y + 15);
     }
     if (ahead > top + 2) alt = Math.max(alt, ahead + 4.5 + 1.25);
     this._fly(bank, alt, inSpan && established ? 46 : 44, dt, { kh: workZone ? 0.45 : 0.35, maxSink: workZone && alt - fm.pos.y > -8 ? 1.8 : 3.0 });

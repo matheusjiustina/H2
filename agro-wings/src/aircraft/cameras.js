@@ -15,7 +15,7 @@ export class CameraRig {
     this.chasePos = new THREE.Vector3();
     this.chaseLook = new THREE.Vector3();
     this.chaseDir = new THREE.Vector3(0, 0, 1);
-    this.look = { yaw: 0, pitch: -0.06 };
+    this.look = { yaw: 0, pitch: -0.3 };
     this.chaseOff = { yaw: 0, pitch: 0 };
     this.orbit = { yaw: 2.3, pitch: 0.22, dist: 16 };
     this.shake = 0;
@@ -24,7 +24,7 @@ export class CameraRig {
 
   setMode(m, aircraft) {
     this.mode = m;
-    if (m === 'cockpit') { this.look.yaw = 0; this.look.pitch = -0.06; }
+    if (m === 'cockpit') { this.look.yaw = 0; this.look.pitch = -0.3; }
     if (m === 'orbit' && aircraft) {
       const f = aircraft.forward(_v);
       this.orbit.yaw = Math.atan2(f.x, f.z) + Math.PI * 0.75;
@@ -79,11 +79,12 @@ export class CameraRig {
       _v.copy(this.chaseDir).applyAxisAngle(Y, this.chaseOff.yaw);
       const dist = 15 + smoothstep(30, 60, sp) * 2;
       const target = _v2.copy(pos).addScaledVector(_v, -dist);
-      target.y += 3.6 + this.chaseOff.pitch * 8;
+      target.y += 4.4 + this.chaseOff.pitch * 8;
       if (!this.initialized || this.chasePos.distanceToSquared(target) > 2500) this.chasePos.copy(target);
       else this.chasePos.lerp(target, 1 - Math.exp(-5 * dt));
-      const lookT = _v.copy(pos).addScaledVector(this.chaseDir, 9);
-      lookT.y += 1.0;
+      // Look well ahead of the aircraft so the ground in front stays in view.
+      const lookT = _v.copy(pos).addScaledVector(this.chaseDir, 22);
+      lookT.y -= 0.2;
       if (!this.initialized) this.chaseLook.copy(lookT);
       else this.chaseLook.lerp(lookT, 1 - Math.exp(-8 * dt));
       this._ground(terrain);

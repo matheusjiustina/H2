@@ -285,7 +285,7 @@ export class Game {
     const now = performance.now();
     const rawDt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
-    if (this.frozen) { this.render(); return; }
+    if (this.frozen) { if (!this.noRender) this.render(); return; }
     this.tick(rawDt);
     this.render();
   }

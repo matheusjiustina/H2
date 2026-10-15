@@ -67,11 +67,12 @@ function propDiscTexture() {
 
 // --------------------------------------------------------------------------
 // Geometry helpers
-function superRing(hw, yb, yt, n, p) {
+function superRing(hw, yb, yt, n, p, arc = null) {
   const out = [];
   const mid = (yt + yb) / 2, hh = (yt - yb) / 2;
+  const a0 = arc ? arc[0] : 0, a1 = arc ? arc[1] : Math.PI * 2;
   for (let k = 0; k <= n; k++) {
-    const a = (k / n) * Math.PI * 2;
+    const a = a0 + (k / n) * (a1 - a0);
     const c = Math.cos(a), s = Math.sin(a);
     out.push([hw * Math.sign(c) * Math.abs(c) ** (2 / p), mid + hh * Math.sign(s) * Math.abs(s) ** (2 / p)]);
   }
@@ -80,11 +81,11 @@ function superRing(hw, yb, yt, n, p) {
 
 // Loft along Z through stations {z, hw, yb, yt, p}. Vertex colours carry a
 // subtle grime gradient (darker belly, exhaust area).
-function loftZ(stations, n = 24, grime = null) {
+function loftZ(stations, n = 24, grime = null, arc = null) {
   const pos = [], uv = [], col = [], idx = [];
   const len = stations[0].z - stations[stations.length - 1].z;
   stations.forEach((s, si) => {
-    const ring = superRing(s.hw, s.yb, s.yt, n, s.p ?? 4);
+    const ring = superRing(s.hw, s.yb, s.yt, n, s.p ?? 4, arc);
     ring.forEach(([x, y], k) => {
       pos.push(x, y, s.z);
       uv.push((k / n) * 3, ((stations[0].z - s.z) / len) * 6);
@@ -213,19 +214,22 @@ export function createAircraftModel(panelTexture) {
     if (z > 1.2 && z < 2.6 && y < 0.1) g *= 0.82 + 0.18 * Math.min(1, (z - 1.2) / 1.4); // exhaust staining behind stacks
     return Math.max(0.55, g);
   };
-  const fus = loftZ([
-    { z: 3.12, hw: 0.40, yb: -0.36, yt: 0.44, p: 3 },
-    { z: 2.9, hw: 0.47, yb: -0.48, yt: 0.52, p: 3.4 },
-    { z: 2.1, hw: 0.53, yb: -0.58, yt: 0.58, p: 4 },
-    { z: 1.2, hw: 0.56, yb: -0.66, yt: 0.62, p: 4.5 },
-    { z: 0.45, hw: 0.57, yb: -0.69, yt: 0.64, p: 4.5 },
-    { z: -0.75, hw: 0.56, yb: -0.62, yt: 0.66, p: 4.5 },
-    { z: -1.35, hw: 0.49, yb: -0.48, yt: 0.78, p: 4 },
-    { z: -2.4, hw: 0.33, yb: -0.22, yt: 0.62, p: 3.5 },
-    { z: -3.5, hw: 0.17, yb: 0.02, yt: 0.46, p: 3 },
-    { z: -4.15, hw: 0.07, yb: 0.12, yt: 0.36, p: 3 },
-    { z: -4.32, hw: 0.01, yb: 0.2, yt: 0.3, p: 3 },
+  // Fuselage in three lofts: cowling/hopper (closed), cabin (open on top so
+  // the pilot sees the panel; the glass sits on the U-shaped sides), tail cone.
+  const S = (z, hw, yb, yt, p) => ({ z, hw, yb, yt, p });
+  const fwd = loftZ([
+    S(3.12, 0.40, -0.36, 0.44, 3), S(2.9, 0.47, -0.48, 0.52, 3.4), S(2.1, 0.53, -0.58, 0.58, 4),
+    S(1.2, 0.56, -0.66, 0.62, 4.5), S(0.45, 0.57, -0.69, 0.64, 4.5),
   ], 28, grime);
+  const cabinArc = [Math.PI * 0.75, Math.PI * 2.25]; // from upper-left shoulder round the belly
+  const cab = loftZ([S(0.45, 0.57, -0.69, 0.64, 4.5), S(-0.2, 0.565, -0.66, 0.65, 4.5), S(-0.95, 0.55, -0.6, 0.67, 4.5)], 24, grime, cabinArc);
+  const aftCone = loftZ([
+    S(-0.95, 0.55, -0.6, 0.67, 4.5), S(-1.35, 0.49, -0.48, 0.78, 4), S(-2.4, 0.33, -0.22, 0.62, 3.5),
+    S(-3.5, 0.17, 0.02, 0.46, 3), S(-4.15, 0.07, 0.12, 0.36, 3), S(-4.32, 0.01, 0.2, 0.3, 3),
+  ], 28, grime);
+  const fus = mergeGeometries([tagged(fwd), tagged(cab), tagged(aftCone)]);
+  // Cabin side sills along the open top edge.
+  for (const sx of [1, -1]) paintParts.push(tagged(tx(new THREE.BoxGeometry(0.05, 0.06, 1.42), sx * 0.49, 0.6, -0.25)));
   paintParts.push(tagged(fus));
   // Anti-glare panel on top of the cowling + dark stripe along the side.
   const ag = new THREE.BoxGeometry(0.62, 0.02, 1.3);
@@ -253,7 +257,7 @@ export function createAircraftModel(panelTexture) {
 
   // ---------------- cabin ----------------
   const cabinFrame = [];
-  const cz0 = -0.95, cz1 = 0.5, roof = 1.34;
+  const cz0 = -0.95, cz1 = 0.45, roof = 1.34;
   const glassG = [];
   // Windshield (sloped), side windows, roof glass panel, rear window.
   const ws = new THREE.BufferGeometry();
@@ -581,17 +585,19 @@ export function createAircraftModel(panelTexture) {
   // Instrument panel with live canvas texture + glareshield.
   const panelMat = new THREE.MeshStandardMaterial({ map: panelTexture, roughness: 0.6, emissive: 0xffffff, emissiveMap: panelTexture, emissiveIntensity: 0.18 });
   const panelMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.46), panelMat);
-  panelMesh.position.set(0, 0.47, 0.36);
+  panelMesh.position.set(0, 0.46, 0.33);
   panelMesh.rotation.y = Math.PI;
-  panelMesh.rotation.x = 0.18;
   cockpit.add(panelMesh);
-  interiorParts.push(tagged(tx(new THREE.BoxGeometry(0.96, 0.5, 0.06), 0, 0.47, 0.4, -0.18)));
-  const glare = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.04, 0.22), M.dark);
-  glare.position.set(0, 0.72, 0.36);
+  interiorParts.push(tagged(tx(new THREE.BoxGeometry(0.96, 0.5, 0.06), 0, 0.46, 0.37)));
+  // Firewall bulkhead under the panel and a rear bulkhead behind the seat.
+  interiorParts.push(tagged(tx(new THREE.BoxGeometry(1.1, 0.95, 0.03), 0, -0.22, 0.44)));
+  interiorParts.push(tagged(tx(new THREE.BoxGeometry(1.08, 1.2, 0.03), 0, 0.0, -0.94)));
+  const glare = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.04, 0.16), M.dark);
+  glare.position.set(0, 0.72, 0.4);
   cockpit.add(glare);
   // Lightbar (swath guidance LEDs) on the glareshield.
   const lightbar = new THREE.Group();
-  lightbar.position.set(0, 0.76, 0.32);
+  lightbar.position.set(0, 0.76, 0.36);
   const leds = [];
   for (let i = -7; i <= 7; i++) {
     const led = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.018, 0.012), new THREE.MeshBasicMaterial({ color: 0x222222 }));
@@ -665,7 +671,7 @@ export function createAircraftModel(panelTexture) {
     gear: gearGroups,
     stick, pedals, throttle, valve, leds, panelMesh,
     pumpFan, nozzles, pilot, cockpit, glassMesh,
-    eye: new THREE.Vector3(0, 0.98, -0.42),
+    eye: new THREE.Vector3(0, 1.0, -0.5),
     // Service points (body frame) used by the badeco.
     fuelFiller: new THREE.Vector3(2.4, wingY(2.4) + 0.14, -0.4),
     hopperPort: new THREE.Vector3(0.6, -0.35, -1.05),

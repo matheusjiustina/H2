@@ -268,7 +268,12 @@ export class Screens {
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a === 'close') this.close();
       if (a === 'resetKeys') { g.input.resetBindings(); this.settings(); }
-      if (a === 'resetSave') { if (confirm('Reset money and all job progress?')) { g.career.resetAll(); g.job = null; g.setJob(null); this.settings(); } }
+      if (a === 'resetSave') {
+        // Two-step confirmation inside the page (no browser dialogs).
+        const btn = e.target.closest('[data-a]');
+        if (btn.dataset.armed) { g.career.resetAll(); g.job = null; g.setJob(null); this.settings(); g.toast('Career reset.'); }
+        else { btn.dataset.armed = '1'; btn.textContent = 'Click again to reset'; }
+      }
     });
     el.addEventListener('input', (e) => {
       if (e.target.dataset.vol !== undefined) {

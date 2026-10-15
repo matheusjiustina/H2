@@ -22,8 +22,8 @@ async function open(viewport, opts = {}) {
   return page;
 }
 const shot = async (page, name) => {
-  await page.evaluate(() => { const g = window.__agro; g.render(); });
-  await page.waitForTimeout(250);
+  await page.evaluate(() => { const g = window.__agro; g.tick(1 / 60); g.render(); });
+  await page.waitForTimeout(1500);
   await page.screenshot({ path: `${outDir}/${name}.png` });
 };
 

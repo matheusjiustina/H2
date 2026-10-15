@@ -102,6 +102,17 @@ export class Guidance {
   // GPS screen (track-up moving map).
   draw(g, x, y, w, h) {
     const ac = this.game.aircraft;
+    if (!this.job) {
+      g.fillStyle = '#081009';
+      g.fillRect(x, y, w, h);
+      g.fillStyle = '#4c6b52';
+      g.font = 'bold 18px monospace';
+      g.textAlign = 'center';
+      g.fillText('NO JOB', x + w / 2, y + h / 2);
+      g.font = '14px monospace';
+      g.fillText(`HDG ${String(Math.round(ac.headingDeg())).padStart(3, '0')}°`, x + w / 2, y + h / 2 + 24);
+      return;
+    }
     const pos = ac.fm.pos;
     const hdg = Math.atan2(ac.forward().x, ac.forward().z);
     const scale = 0.32; // px per metre

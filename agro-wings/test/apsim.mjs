@@ -85,7 +85,14 @@ export function run(game, seconds, { log = 10, dt = 1 / 60, startPhase = 'lineup
       const fm = ac.fm, o = fm.out, s = game.job.stats();
       console.log(`${t.toFixed(0).padStart(4)} ${String(ap.phase).padEnd(8)} x${fm.pos.x.toFixed(0).padStart(6)} z${fm.pos.z.toFixed(0).padStart(6)} agl ${o.agl.toFixed(1).padStart(5)} hgt ${ac.workHeight().toFixed(1).padStart(5)} ${(o.airspeed * 1.944).toFixed(0)}kt bank ${(ap.att.bank * 57.3).toFixed(0).padStart(4)} spray ${game.sprayer.on ? 'ON ' : 'off'} hop ${fm.hopper.toFixed(0).padStart(4)} cov ${(s.coverage * 100).toFixed(1)}% pass ${ap.pass ? ap.pass.k : '-'} dir ${ap.passDir ?? ''} ${ac.state}`);
     }
-    if (ac.state !== 'ok' || ap.phase === 'done' || ap.phase === 'service') break;
+    if (ap.phase === 'service' && process.env.REFILL && !game.job.complete()) {
+      // Stand-in for the badeco in the Node sim: reload, then carry on.
+      ac.fm.fuel = 160; ac.fm.hopper = game.job.c.recommended.liquid; ac.fm.updateMass();
+      game.job.sorties++;
+      console.log(`---- reload at t=${t.toFixed(0)} (coverage ${(game.job.stats().coverage * 100).toFixed(1)}%)`);
+      ap.set('start');
+    }
+    if (ac.state !== 'ok' || ap.phase === 'done' || (ap.phase === 'service' && !process.env.REFILL) || (ap.phase === 'service' && game.job.complete())) break;
   }
   return ap;
 }

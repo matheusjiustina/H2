@@ -167,9 +167,10 @@ export function createVegetation(terrain, quality) {
     if (fb.kind === 'eucalyptus') {
       for (let x = fb.x0 + 2; x < fb.x1; x += 4.2) for (let z = fb.z0 + 2; z < fb.z1; z += 4.2) {
         const jx = x + (r() - 0.5) * 1.2, jz = z + (r() - 0.5) * 1.2;
-        if (!avoid(jx, jz, 2)) add('euca', jx, jz, 0.9 + r() * 0.25);
+        if (avoid(jx, jz, 2)) continue;
+        add('euca', jx, jz, 0.9 + r() * 0.25);
+        colliders.push({ x: jx, z: jz, r: 2.6, top: terrain.heightAt(jx, jz) + 27 });
       }
-      colliders.push({ box: fb, top: 30 });
       continue;
     }
     const w = fb.x1 - fb.x0, d = fb.z1 - fb.z0;
@@ -213,16 +214,17 @@ export function createVegetation(terrain, quality) {
     for (let s = 0; s < len; s += 9) {
       const t = s / len;
       const px = ax + (bx - ax) * t, pz = az + (bz - az) * t;
-      const nearCotton = Math.abs(pz) < 170 && px > 1500 && px < 1800;
+      // Cleared crossing between the cotton talhões: only low scrub there.
+      const nearCotton = Math.abs(pz) < 150 && px > 1500 && px < 1800;
       for (const side of [-1, 1]) {
         const off = 7 + r() * (nearCotton ? 18 : 40);
         const x = px + nx * off * side, z = pz + nz * off * side;
         if (avoid(x, z, 4)) continue;
         const k = r();
-        if (nearCotton) { if (k < 0.55) add('buriti', x, z, 0.9 + r() * 0.3); else if (k < 0.7) add('bush', x, z, 1 + r()); }
-        else if (k < 0.3) add('buriti', x, z, 0.9 + r() * 0.3);
+        if (nearCotton) { if (k < 0.5) add('bush', x, z, 0.8 + r() * 0.6); continue; }
+        if (k < 0.3) add('buriti', x, z, 0.9 + r() * 0.3);
         else add('mata', x, z, 0.9 + r() * 0.4);
-        colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + (nearCotton ? 15 : 20) });
+        colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + 20 });
       }
     }
   }
