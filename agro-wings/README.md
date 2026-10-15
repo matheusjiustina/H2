@@ -121,15 +121,29 @@ time and scene complexity carry over to real hardware:
 
 | preset | view | logic ms/frame | draw calls | triangles |
 | --- | --- | --- | --- | --- |
-| low | parked on the pad (chase) | 0.60 | 343 | 541k |
-| low | spraying soy at 4 m (chase) | 1.81 | 295 | 406k |
-| low | cockpit over corn | 1.11 | 307 | 800k |
-| low | 400 m AGL | 1.88 | 264 | 365k |
-| medium | spraying soy at 4 m | 4.08 | 305 | 413k |
-| medium | cockpit over corn | 1.54 | 322 | 920k |
-| high | parked on the pad | 0.63 | 344 | 543k |
-| high | spraying soy at 4 m | 2.34 | 307 | 416k |
-| high | cockpit over corn | 1.69 | 322 | 921k |
+| low | parked on the pad (chase) | 0.96 | 395 | 642k |
+| low | spraying soy at 4 m (chase) | 2.94 | 347 | 505k |
+| low | cockpit over corn | 2.21 | 333 | 884k |
+| low | 400 m AGL | 0.95 | 315 | 464k |
+| medium | spraying soy at 4 m | 3.57 | 357 | 511k |
+| medium | cockpit over corn | 2.86 | 348 | 1004k |
+| high | parked on the pad | 1.25 | 396 | 645k |
+| high | spraying soy at 4 m | 2.30 | 359 | 514k |
+| high | cockpit over corn | 2.65 | 348 | 1004k |
+
+The logic column averages only 8 frames and moves by ±1 ms between runs of
+the same build (the soy pass read 1.79 and 2.94 ms in two runs minutes apart); averaged
+over 600 frames a parked tick is 0.2–0.4 ms, of which the aircraft's visual
+update is 0.03 ms. The detailed aircraft costs about 50 draw calls and 100k
+triangles more than the first model (parked on the pad: 343 → 395 calls,
+541k → 642k triangles); it accounts for about half the draw calls of a
+chase view, main and shadow pass together.
+
+SwiftShader stalls for 80–110 s on one frame when the spray mist first
+appears and once in the 400 m view (no new WebGL program is linked; the
+software rasteriser builds its pipelines then). The build before the
+aircraft overhaul stalls on the same frames, so they are not a cost of the
+new model.
 
 FPS on a real GPU was not measured here; the in-game counter (Settings →
 Show FPS) reports fps, draw calls and triangles live.
@@ -143,6 +157,9 @@ Show FPS) reports fps, draw calls and triangles live.
 - `node test/e2e.mjs soy`: full contract in the browser through the player
   inputs — service, taxi, take-off, 12 passes, landing, taxi-in, second
   service, second sortie, 90 % coverage, results and payment.
+- Look-dev renders (`test/planeviews.mjs`): livery, stripes, PR-AGW and the
+  flag unchanged from every angle; ailerons, flaps, elevator and rudder
+  deflect on their hinges; the propeller goes from blades to disc with rpm.
 - `REFILL=1 node test/apsim.mjs soy|corn|cotton 4500`: all three contracts in
   Node with the farm-HQ and base colliders, one reload each (560/520/500 L
   loads within MTOW), 90 % coverage, no hard landing, parked at the pad.
