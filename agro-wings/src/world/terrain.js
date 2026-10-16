@@ -3,6 +3,7 @@
 // analytically from the farm layout (crisp edges at any distance, no huge
 // splat textures).
 import * as THREE from 'three';
+import { ATMO_U } from './atmosphere.js';
 import { GRID_N, CELL } from './terrainData.js';
 import {
   WORLD_HALF, FAR_HALF, RUNWAY, BASE, FIELDS, ROADS, CREEK,
@@ -307,6 +308,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uApron: { value: new THREE.Vector4(BASE.apron.x0, BASE.apron.z0, BASE.apron.x1, BASE.apron.z1) },
     uTaxi: { value: new THREE.Vector4(BASE.taxiway.x0, BASE.taxiway.z0, BASE.taxiway.x1, BASE.taxiway.z1) },
     uWorldHalf: { value: WORLD_HALF },
+    uWet: ATMO_U.wet,
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -314,12 +316,14 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + GLSL_FUNCS)
-      .replace('#include <color_fragment>', '#include <color_fragment>\nfloat tRough;\ndiffuseColor.rgb = terrainColor(vWPos.xz, tRough);')
+      .replace('#include <common>', '#include <common>\nuniform float uWet;\n' + GLSL_FUNCS)
+      .replace('#include <color_fragment>', '#include <color_fragment>\nfloat tRough;\ndiffuseColor.rgb = terrainColor(vWPos.xz, tRough);\n'
+        + '// Rain-soaked ground: darker, glossier (bare soil and roads most).\n'
+        + 'diffuseColor.rgb *= 1.0 - uWet * mix(0.22, 0.4, smoothstep(0.75, 0.95, tRough));\ntRough = mix(tRough, tRough * 0.55, uWet);')
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => 'terrain-v2';
+  mat.customProgramCacheKey = () => 'terrain-v3';
   return mat;
 }
 

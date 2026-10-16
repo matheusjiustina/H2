@@ -2,6 +2,7 @@
 // pause, settings (quality, assist, wind, audio, key bindings), help, map,
 // crash.
 import { h } from './hud.js';
+import { TIMES, WEATHER, TIME_ORDER, WEATHER_ORDER } from '../world/atmosphere.js';
 import { CONTRACTS } from '../game/contracts.js';
 import { ACTIONS, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
@@ -272,6 +273,9 @@ export class Screens {
       <h3>Graphics</h3>
       <div class="field"><label>Quality</label>${seg('quality', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']])}<span></span></div>
       <div class="field"><label>Show FPS</label>${seg('showFps', [[false, 'Off'], [true, 'On']])}<span></span></div>
+      <h3>Environment</h3>
+      <div class="field"><label>Time of day</label>${seg('timeOfDay', TIME_ORDER.map((k) => [k, TIMES[k].label]))}<span></span></div>
+      <div class="field"><label>Weather</label>${seg('weather', WEATHER_ORDER.map((k) => [k, WEATHER[k].label]))}<span></span></div>
       <h3>Flying</h3>
       <div class="field"><label>Flight assist</label>${seg('assist', [['off', 'Off'], ['normal', 'Normal'], ['high', 'High']])}<span></span></div>
       <div class="field"><label>Wind</label>${seg('wind', [[0, 'Calm'], [1, 'Light'], [1.8, 'Moderate']])}<span></span></div>

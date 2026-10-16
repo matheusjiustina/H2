@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { BASE, RUNWAY, HQ, FENCES, POWERLINE, CREEK } from './layout.js';
 import { canvas, canvasTexture, makeLabel } from '../core/textures.js';
 import { rng } from '../core/math.js';
-import { pickup, tanker, tractor, sprayer, harvester, ibc, drumPallet, officeContainer } from './vehicles.js';
+import { pickup, tractor, sprayer, harvester, ibc, drumPallet, officeContainer } from './vehicles.js';
 
 // ---------------------------------------------------------------------------
 // Materials
@@ -122,7 +122,12 @@ class Builder {
   cyl(rt, rb, h, mat, x, y, z, seg = 16, rx = 0, rz = 0, ry = 0) {
     return this.add(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z, ry, rx, rz);
   }
-  collider(x0, x1, z0, z1, top, name) { this.colliders.push({ x0, x1, z0, z1, top, name }); }
+  collider(x0, x1, z0, z1, top, name, bottom) {
+    const c = { x0, x1, z0, z1, top, name };
+    if (bottom !== undefined) c.bottom = bottom;
+    this.colliders.push(c);
+    return c;
+  }
   // Geometry already in world space (vehicle kits).
   addRaw(g, mat) {
     for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
@@ -176,7 +181,7 @@ export function createStructures(terrain, scene) {
   const dyn = { windsocks: [], gates: [] };
   const H = (x, z) => terrain.heightAt(x, z);
 
-  buildHangar(B, M, group);
+  dyn.hangar = buildHangar(B, M, group);
   buildService(B, M, group, H);
   buildVehicles(B, M, H);
   buildStripMarks(B, M, group, H);
@@ -190,8 +195,10 @@ export function createStructures(terrain, scene) {
 
   return {
     group, M, colliders: B.colliders, wires,
-    update(dt, time, wind) {
+    hangar: dyn.hangar,
+    update(dt, time, wind, ctx) {
       for (const ws of dyn.windsocks) ws.update(dt, time, wind);
+      if (ctx) dyn.hangar.update(dt, ctx);
     },
   };
 }
@@ -220,8 +227,23 @@ function signTexture(lines, w = 1024, h = 256, bg = '#f4efe2', fg = '#1f2a1f') {
 function buildHangar(B, M, group) {
   const h = BASE.hangar;
   const x0 = h.x - h.w / 2, x1 = h.x + h.w / 2, z0 = h.z - h.d / 2, z1 = h.z + h.d / 2;
-  // Floor slab
-  B.box(h.w + 1, 0.25, h.d + 1, M.concrete, h.x, 0.05, h.z, 0, 4);
+  // Floor slab (own material: darker the deeper inside, as the roof and
+  // walls cut off the sky light).
+  const shadeIn = (base, k) => {
+    const m = base.clone();
+    m.onBeforeCompile = (s) => {
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vHW;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvHW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vHW;')
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          diffuseColor.rgb *= mix(1.0, ${k.toFixed(2)}, smoothstep(0.0, 7.0, ${z1.toFixed(2)} - vHW.z));`);
+    };
+    m.customProgramCacheKey = () => 'hangar-shade-' + k + base.uuid;
+    return m;
+  };
+  M.hangarFloor = shadeIn(M.concrete, 0.4);
+  M.hangarLining = shadeIn(M.metalWall, 0.45);
+  B.box(h.w + 1, 0.25, h.d + 1, M.hangarFloor, h.x, 0.05, h.z, 0, 4);
   // Columns (open front faces +Z, the apron).
   for (const cx of [x0, h.x - h.w / 6, h.x + h.w / 6, x1]) {
     B.box(0.3, h.h, 0.3, M.steel, cx, h.h / 2, z1);
@@ -267,9 +289,121 @@ function buildHangar(B, M, group) {
   B.box(0.14, 2.3, 0.04, M.black, x0 + 0.15, 2.6, h.z, Math.PI / 2, 0, 0.1);
   B.box(0.7, 0.9, 0.7, M.blue, h.x + 6.5, 0.45, z0 + 2.0);
   B.box(0.6, 0.55, 0.6, M.black, h.x + 6.5, 1.15, z0 + 2.0);
-  // Lamps
-  for (const lx of [-6, 0, 6]) B.box(0.8, 0.08, 0.25, M.dirtyWhite, h.x + lx, h.h - 0.3, h.z);
-  B.collider(x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.2, h.h + rise, 'hangar');
+  // --- Realism 4.0: working hangar ---------------------------------------
+  // Steel portal frames and purlins under the roof (visible from inside).
+  for (const fz of [z0 + 0.2, h.z - h.d / 6, h.z + h.d / 6, z1 - 0.2]) {
+    for (const s of [-1, 1]) {
+      const a = [h.x + s * h.w / 2, h.h, fz], b = [h.x, h.h + rise - 0.25, fz];
+      B.add(rodGeo(a, b, 0.11), M.steel);
+    }
+    B.box(h.w, 0.16, 0.16, M.steel, h.x, h.h - 0.05, fz);
+  }
+  for (let i = -3; i <= 3; i++) {
+    const px = h.x + i * (h.w / 7), py = h.h + rise * (1 - Math.abs(i) / 3.5) - 0.2;
+    B.box(0.1, 0.14, h.d, M.steel, px, py, h.z);
+  }
+  // Inner lining of the walls and roof (shaded like the floor).
+  B.box(h.w - 0.2, h.h, 0.02, M.hangarLining, h.x, h.h / 2, z0 + 0.08, 0, 4);
+  B.box(0.02, h.h, h.d, M.hangarLining, x0 + 0.08, h.h / 2, h.z, 0, 4);
+  B.box(0.02, h.h, h.d, M.hangarLining, x1 - 0.08, h.h / 2, h.z, 0, 4);
+  {
+    const half = h.w / 2, slope = Math.atan2(rise, half), len = Math.hypot(half, rise);
+    for (const s of [-1, 1]) {
+      const g = new THREE.BoxGeometry(len, 0.02, h.d);
+      scaleBoxUV(g, len, 0.02, h.d, 4);
+      B.add(g, M.hangarLining, h.x + s * half / 2, h.h + rise / 2 - 0.1, h.z, 0, 0, -s * slope);
+    }
+  }
+  // Concrete floor markings: yellow safety lines, parking T, oil stain.
+  B.box(h.w - 1.2, 0.012, 0.1, M.yellow, h.x, 0.19, z0 + 2.9);
+  B.box(0.1, 0.012, h.d - 4, M.yellow, x1 - 2.6, 0.19, h.z + 1.4);
+  B.box(0.16, 0.012, 9, M.yellow, h.x - 1, 0.19, h.z + 2.5);
+  B.box(4, 0.012, 0.16, M.yellow, h.x - 1, 0.19, h.z - 2);
+  // Parts and equipment: rolling tool chest, wing trestles, spare hopper,
+  // parts pallet, tow bar, step ladder, oil drums on a spill tray.
+  B.box(0.9, 1.05, 0.55, M.red, x0 + 1.4, 0.68, z0 + 4.2);
+  for (let i = 0; i < 5; i++) B.box(0.92, 0.02, 0.56, M.steel, x0 + 1.4, 0.35 + i * 0.2, z0 + 4.2);
+  for (const tz of [h.z + 1, h.z + 4]) {
+    B.box(0.12, 1.2, 0.12, M.yellow, x0 + 3.0, 0.75, tz); B.box(0.12, 1.2, 0.12, M.yellow, x0 + 4.4, 0.75, tz);
+    B.box(1.6, 0.12, 0.5, M.yellow, x0 + 3.7, 1.36, tz); B.box(1.8, 0.08, 0.6, M.black, x0 + 3.7, 1.46, tz);
+  }
+  B.cyl(0.85, 0.85, 1.5, M.dirtyWhite, x0 + 2.2, 0.95, z0 + 7.2, 18);
+  B.box(1.2, 0.14, 1.0, M.wood, h.x + 3.5, 0.26, z0 + 1.2);
+  for (let i = 0; i < 4; i++) B.box(0.4 + (i % 2) * 0.2, 0.3, 0.35, i % 2 ? M.blue : M.steel, h.x + 3.2 + (i % 2) * 0.55, 0.48 + Math.floor(i / 2) * 0.3, z0 + 1.0 + (i % 2) * 0.3);
+  B.add(rodGeo([x1 - 4.5, 0.25, h.z + 6.5], [x1 - 7.0, 0.25, h.z + 5.6], 0.05), M.yellow);
+  for (const s of [-1, 1]) B.add(rodGeo([x1 - 3.6 + s * 0.35, 0.2, h.z - 5], [x1 - 3.6 + s * 0.2, 2.4, h.z - 5.4], 0.04), M.alu);
+  for (let i = 0; i < 6; i++) B.box(0.45, 0.04, 0.12, M.alu, x1 - 3.6, 0.5 + i * 0.36, h.z - 5.1 - i * 0.06);
+  B.box(2.0, 0.1, 1.4, M.yellow, x1 - 1.6, 0.24, h.z + 5.6);
+  for (let i = 0; i < 4; i++) B.cyl(0.29, 0.29, 0.88, i % 2 ? M.black : M.blue, x1 - 2.2 + (i % 2) * 0.62, 0.72, h.z + 5.3 + Math.floor(i / 2) * 0.62, 14);
+  // Lamps: high-bay fittings that glow; light pools on the floor (no real lights).
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0xf4f1e6, emissive: 0xfff4dc, emissiveIntensity: 0.4, roughness: 0.5 });
+  const poolTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d');
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,240,210,1)'); gr.addColorStop(1, 'rgba(255,240,210,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  const poolMat = new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false });
+  const lampGeo = [], poolGeo = [];
+  for (const lz of [h.z - 4, h.z + 3]) for (const lx of [-7, 0, 7]) {
+    lampGeo.push(new THREE.CylinderGeometry(0.32, 0.42, 0.22, 14).translate(h.x + lx, h.h - 0.35, lz));
+    poolGeo.push(new THREE.PlaneGeometry(7, 7).rotateX(-Math.PI / 2).translate(h.x + lx, 0.2, lz));
+    B.add(rodGeo([h.x + lx, h.h - 0.25, lz], [h.x + lx, h.h + 0.4, lz], 0.015), M.steel);
+  }
+  const lamps = new THREE.Mesh(mergeGeometries(lampGeo), lampMat);
+  const pools = new THREE.Mesh(mergeGeometries(poolGeo), poolMat);
+  pools.renderOrder = 3;
+  group.add(lamps, pools);
+  // Sliding doors: four corrugated leaves on two top tracks; each pair parks
+  // outside its side wall. Open by day, closed at dusk unless an aircraft
+  // is near; while closed they are a collider.
+  const leafW = h.w / 4 + 0.15, leafH = h.h - 0.65;
+  const leafGeo = new THREE.BoxGeometry(leafW, leafH, 0.1);
+  scaleBoxUV(leafGeo, leafW, leafH, 0.1, 4);
+  const leaves = [];
+  for (const side of [-1, 1]) {
+    for (const k of [0, 1]) {
+      const m = new THREE.Mesh(leafGeo, M.metalWall);
+      m.castShadow = true; m.receiveShadow = true;
+      const closed = h.x + side * (h.w / 2 - leafW / 2 - k * (leafW - 0.15));
+      const open = h.x + side * (h.w / 2 + leafW / 2 + 0.3);
+      const track = z1 + 0.28 + k * 0.16;
+      m.position.set(closed, leafH / 2 + 0.12, track);
+      group.add(m);
+      leaves.push({ m, closed, open, delay: k * 0.35 });
+    }
+  }
+  for (const k of [0, 1]) B.box(h.w * 1.5 + 1, 0.12, 0.1, M.steel, h.x, h.h - 0.45, z1 + 0.28 + k * 0.16); // top tracks
+  B.box(0.2, h.h - 0.3, 0.2, M.steel, x0 - leafW - 0.5, (h.h - 0.3) / 2, z1 + 0.35);
+  B.box(0.2, h.h - 0.3, 0.2, M.steel, x1 + leafW + 0.5, (h.h - 0.3) / 2, z1 + 0.35);
+  // Colliders: walls, roof (from its eaves up), interior clutter, doors.
+  B.collider(x0 - 0.5, x1 + 0.5, z0 - 0.5, z0 + 3.2, h.h + rise, 'hangar wall'); // back wall + bench + drums
+  B.collider(x0 - 0.5, x0 + 0.5, z0 - 0.5, z1 + 0.2, h.h + rise, 'hangar wall');
+  B.collider(x1 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.2, h.h + rise, 'hangar wall');
+  B.collider(x0 + 0.5, x0 + 5.2, z0, z1 - 4, 2.2, 'hangar equipment'); // tool chest, trestles, spare hopper
+  B.collider(x1 - 4.0, x1 - 0.5, h.z - 6, z1 - 1.5, 2.6, 'hangar equipment'); // compressor, ladder, drums
+  B.collider(x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.6, h.h + rise + 0.2, 'hangar roof', h.h - 0.6);
+  const doorCol = B.collider(x0 - 0.5, x1 + 0.5, z1 + 0.1, z1 + 0.6, h.h, 'hangar door');
+  const state = { open: 1, target: 1 };
+  return {
+    leaves,
+    get open() { return state.open; },
+    update(dt, ctx) {
+      const near = ctx.acPos && Math.hypot(ctx.acPos.x - h.x, ctx.acPos.z - z1) < 70;
+      state.target = (ctx.light ?? 1) > 0.55 || near ? 1 : 0;
+      state.open += Math.sign(state.target - state.open) * Math.min(Math.abs(state.target - state.open), dt / 12);
+      for (const l of leaves) {
+        const f = Math.min(1, Math.max(0, (state.open - l.delay * (1 - state.target)) / (1 - l.delay * 0.5)));
+        l.m.position.x = l.closed + (l.open - l.closed) * f;
+      }
+      doorCol.top = state.open > 0.92 ? -1e9 : h.h;
+      const dark = 1 - Math.min(1, Math.max(0, ((ctx.light ?? 1) - 0.4) / 0.6));
+      lampMat.emissiveIntensity = 0.35 + 2.2 * dark;
+      poolMat.opacity = 0.05 + 0.3 * dark;
+    },
+  };
 }
 
 function buildService(B, M, group, H) {
@@ -344,10 +478,8 @@ function buildVehicles(B, M, H) {
   const pk = BASE.pickup;
   pickup(B, M, pk.x, 0, pk.z, pk.heading);
   B.collider(pk.x - 2.6, pk.x + 2.6, pk.z - 2.6, pk.z + 2.6, 2.1, 'pickup');
-  // Tanker truck (caminhão de apoio).
-  const tk = BASE.truck;
-  tanker(B, M, tk.x, 0, tk.z, tk.heading);
-  B.collider(tk.x - 1.4, tk.x + 1.4, tk.z - 4.5, tk.z + 4.6, 3.3, 'truck');
+  // The tanker truck (caminhão de apoio) is the driving service truck now
+  // (crew/truck.js), no longer part of the static geometry.
   // Chemical stock behind the mixing station: IBC totes and drum pallets.
   const mt = BASE.mixTank;
   ibc(B, M, mt.x - 3.2, 0, mt.z - 16.5, 0.05);

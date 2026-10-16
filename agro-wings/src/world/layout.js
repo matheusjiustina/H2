@@ -22,7 +22,8 @@ export const BASE = {
   reservoirs: [{ x: -378, z: -80 }, { x: -378, z: -70 }],
   crewPost: { x: -350, z: -90 }, // shaded bench where the badeco waits
   pickup: { x: -326, z: -76, heading: -0.4 },
-  truck: { x: -420, z: -86, heading: 0.0 },
+  // Bay of the driving service truck (rear-axle position), by the crew post.
+  truck: { x: -331, z: -98, heading: -Math.PI / 2 },
   windsocks: [{ x: -330, z: 26 }, { x: 360, z: -26 }],
 };
 

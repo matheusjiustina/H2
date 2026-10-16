@@ -1,5 +1,7 @@
 // Assembles the static world: terrain, sky, crops, vegetation, structures, water.
 import * as THREE from 'three';
+// Must load before any material compiles: it extends the stock fog chunks.
+import { Atmosphere } from './atmosphere.js';
 import { TerrainData } from './terrainData.js';
 import { createTerrain } from './terrain.js';
 import { createSky } from './sky.js';
@@ -8,6 +10,7 @@ import { makeNoiseTexture } from '../core/textures.js';
 import { createVegetation, makeTreeCollider } from './vegetation.js';
 import { createStructures } from './structures.js';
 import { createGrass } from './grass.js';
+import { createFarmLife } from './farmlife.js';
 
 export class World {
   constructor(renderer, scene, quality) {
@@ -28,6 +31,8 @@ export class World {
     this.terrainMesh = await step('Ground', () => createTerrain(this.terrain, this.noise));
     this.scene.add(this.terrainMesh.group);
     this.sky = await step('Sky', () => createSky(this.renderer, this.scene, this.quality));
+    this.atmo = new Atmosphere({ renderer: this.renderer, scene: this.scene, sky: this.sky, terrain: this.terrain, quality: this.quality });
+    this.visualWind = new THREE.Vector3(0, 0, 3);
     this.crops = await step('Crops', () => createCrops(this.terrain, this.quality));
     this.scene.add(this.crops.group);
     this.vegetation = await step('Forest', () => createVegetation(this.terrain, this.quality));
@@ -36,6 +41,7 @@ export class World {
     this.scene.add(this.grass.group);
     this.structures = await step('Base', () => createStructures(this.terrain, this.scene));
     this.treeHit = makeTreeCollider(this.vegetation);
+    this.farm = createFarmLife(this.scene, this.structures.M, this.terrain);
   }
 
   // Obstacle query for the aircraft: trees, buildings, wires. Returns a name or null.
@@ -45,7 +51,7 @@ export class World {
     const t = this.treeHit(x, y, z, th);
     if (t) return t;
     for (const c of this.structures.colliders) {
-      if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y < c.top) return c.name;
+      if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y < c.top && !(y < c.bottom)) return c.name;
     }
     return this.extraObstacle?.(x, y, z) ?? null;
   }
@@ -68,17 +74,20 @@ export class World {
   setQuality(q) {
     this.quality = q;
     this.sky.setQuality(q);
+    this.atmo.setQuality(q);
     this.crops.setQuality(q);
     this.grass.setQuality(q);
     for (const u of this.updaters) u.setQuality?.(q);
   }
 
   update(camera, focus, dt, time) {
+    this.atmo.update(dt, camera, this.visualWind, time);
     this.sky.update(camera, focus, dt, time);
     this.crops.update(camera.position);
     this.vegetation.update(camera);
     this.grass.update(camera, time);
     for (const u of this.updaters) u.update?.(camera, focus, dt, time);
+    this.farm.update(dt, time, camera, this.dust);
   }
 }
 

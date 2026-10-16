@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { FIELDS, CROPS, cropHeight } from './layout.js';
 import { makeCropCard, makeCanopyTop } from '../core/textures.js';
 import { fbm } from '../core/math.js';
+import { ATMO_U } from './atmosphere.js';
 
 const CANOPY = 0.78; // canopy surface relative to crop height
 const FIN_LO = 0.42, FIN_HI = 1.04;
@@ -24,18 +25,25 @@ function finMaterial(tex, radiusU) {
   });
   m.onBeforeCompile = (s) => {
     s.uniforms.uRadius = radiusU;
+    s.uniforms.uTime = ATMO_U.time;
+    s.uniforms.uWind = ATMO_U.wind;
     s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uRadius;\nattribute float aBase;')
+      .replace('#include <common>', '#include <common>\nuniform float uRadius;\nuniform float uTime;\nuniform vec4 uWind;\nattribute float aBase;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wpF = modelMatrix * vec4(transformed, 1.0);
         float dF = distance(wpF.xz, cameraPosition.xz);
         float k = 1.0 - smoothstep(uRadius * 0.62, uRadius, dF);
-        transformed.y = aBase + (transformed.y - aBase) * k;`);
+        transformed.y = aBase + (transformed.y - aBase) * k;
+        // Plants lean and wave with the shared wind; gusts sweep down the rows.
+        float hC = max(transformed.y - aBase, 0.0);
+        float phC = dot(wpF.xz, uWind.xy) * 0.09 - uTime * (1.4 + uWind.z * 0.2);
+        float gC = 0.55 + 0.45 * sin(phC) * (0.6 + 0.4 * sin(phC * 0.41 + 2.0));
+        transformed.xz += uWind.xy * (0.025 + 0.012 * uWind.z) * (0.4 + 0.8 * uWind.w) * gC * hC;`);
     // Self-shadowing inside the crop: darker toward the base of each row.
     s.fragmentShader = s.fragmentShader.replace('#include <color_fragment>',
       '#include <color_fragment>\n diffuseColor.rgb *= mix(0.38, 1.05, smoothstep(0.0, 0.95, vMapUv.y));');
   };
-  m.customProgramCacheKey = () => 'fin';
+  m.customProgramCacheKey = () => 'fin-v2';
   return m;
 }
 
@@ -47,11 +55,13 @@ function canopyMaterial(tex, kind) {
   const m = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.88, metalness: 0 });
   const tramK = kind === 'corn' ? 0.45 : 0.8;
   m.onBeforeCompile = (s) => {
+    s.uniforms.uTime = ATMO_U.time;
+    s.uniforms.uWind = ATMO_U.wind;
     s.vertexShader = s.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aField;\nattribute vec4 aInfo;\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvField = aField; vInfo = aInfo; vCWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     s.fragmentShader = s.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;\nuniform float uTime;\nuniform vec4 uWind;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         {
           vec2 p = vCWP.xz;
@@ -71,9 +81,13 @@ function canopyMaterial(tex, kind) {
           float turn = 1.0 - smoothstep(0.16, 0.42 + fwE, abs(abs(e - 5.2) - 0.9));
           float t = max(tr, turn * head) * vis * ${tramK.toFixed(2)};
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.4, 0.32) + vec3(0.035, 0.022, 0.012), t);
+          // Wind waves rolling over the canopy (leaf undersides catch the light).
+          float wph = dot(p, uWind.xy) * 0.055 - uTime * (1.1 + uWind.z * 0.16);
+          float wv = sin(wph) * (0.55 + 0.45 * sin(wph * 0.31 + dot(p, vec2(-uWind.y, uWind.x)) * 0.02));
+          diffuseColor.rgb *= 1.0 + wv * min(uWind.z, 7.0) * 0.009 * (0.5 + uWind.w);
         }`);
   };
-  m.customProgramCacheKey = () => 'canopy-' + kind;
+  m.customProgramCacheKey = () => 'canopy2-' + kind;
   return m;
 }
 

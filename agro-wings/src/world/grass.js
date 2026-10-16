@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { rng, fbm } from '../core/math.js';
 import { grassTuft, TILES } from './foliage.js';
 import { BASE } from './layout.js';
+import { ATMO_U } from './atmosphere.js';
 
 const CELL = 16;
 
@@ -15,16 +16,22 @@ function grassMaterial(atlas, U) {
     roughness: 0.9, metalness: 0, alphaToCoverage: true,
   });
   m.onBeforeCompile = (s) => {
-    s.uniforms.uTime = U.time;
+    s.uniforms.uTime = ATMO_U.time;
+    s.uniforms.uWind = ATMO_U.wind;
     s.uniforms.uRadius = U.radius;
     s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uRadius;')
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uRadius;\nuniform vec4 uWind;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
         float gd = distance(ip.xz, cameraPosition.xz);
         float gk = 1.0 - smoothstep(uRadius * 0.6, uRadius, gd);
-        float sway = sin(uTime * 1.9 + ip.x * 0.35 + ip.z * 0.21) + 0.5 * sin(uTime * 3.7 + ip.z * 0.5);
-        transformed.xz += vec2(0.07, 0.04) * sway * transformed.y;
+        // Shared visual wind: lean downwind, gust waves travelling with the
+        // wind across the pasture, plus a little flutter.
+        vec2 wdl = normalize((transpose(mat3(instanceMatrix)) * vec3(uWind.x, 0.0, uWind.y)).xz + 1e-5);
+        float gph = dot(ip.xz, uWind.xy) * 0.12 - uTime * (1.3 + uWind.z * 0.22);
+        float gust = 0.55 + 0.45 * sin(gph) * (0.6 + 0.4 * sin(gph * 0.37 + 1.7));
+        float flut = 0.3 * sin(uTime * 3.7 + ip.z * 0.5 + ip.x * 0.31);
+        transformed.xz += wdl * (0.03 + 0.014 * uWind.z) * (gust * (0.6 + 0.6 * uWind.w) + flut) * transformed.y;
         transformed.y *= gk;`);
     s.fragmentShader = s.fragmentShader
       .replace('#include <normal_fragment_begin>',
@@ -36,7 +43,7 @@ function grassMaterial(atlas, U) {
         diffuseColor.rgb *= mix(0.55, 1.0, smoothstep(0.0, 0.7, fract(vMapUv.y * 4.0)));
         #include <alphatest_fragment>`);
   };
-  m.customProgramCacheKey = () => 'grass-v1';
+  m.customProgramCacheKey = () => 'grass-v2';
   return m;
 }
 
@@ -64,6 +71,9 @@ export function createGrass(terrain, quality, atlas) {
   const blocked = (x, z) => {
     const a = BASE.apron;
     if (x > a.x0 - 4 && x < a.x1 + 4 && z > a.z0 - 4 && z < a.z1 + 4) return true;
+    // Hangar slab and the parked door leaves either side of it.
+    const hg = BASE.hangar;
+    if (x > hg.x - hg.w / 2 - 8.5 && x < hg.x + hg.w / 2 + 8.5 && z > hg.z - hg.d / 2 - 1 && z < hg.z + hg.d / 2 + 1.5) return true;
     if (terrain.surfaceAt(x, z) !== 'grass') return true;
     if (terrain.waterLevel(x, z) > -1e8) return true;
     return false;

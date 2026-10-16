@@ -4,6 +4,7 @@
 // Everything (leaves, flowers, fronds, bark, grass) lives in one 4x4 atlas so
 // every plant variant is one geometry / one material / one instanced draw.
 import * as THREE from 'three';
+import { ATMO_U } from './atmosphere.js';
 import { canvas, canvasTexture } from '../core/textures.js';
 import { rng } from '../core/math.js';
 
@@ -285,6 +286,26 @@ export function foliageMaterial(atlas) {
     roughness: 0.82, metalness: 0, alphaToCoverage: true,
   });
   m.onBeforeCompile = (s) => {
+    s.uniforms.uTime = ATMO_U.time;
+    s.uniforms.uWind = ATMO_U.wind;
+    // Wind sway (instanced plants only): the crown bends downwind with gusts
+    // that travel across the stand, leaves flutter a little.
+    s.vertexShader = s.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec4 uWind;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+        {
+          vec3 ipF = instanceMatrix[3].xyz;
+          vec2 wdF = normalize((transpose(mat3(instanceMatrix)) * vec3(uWind.x, 0.0, uWind.y)).xz + 1e-5);
+          float hF = max(transformed.y - 1.0, 0.0);
+          float phF = dot(ipF.xz, uWind.xy) * 0.03 - uTime * (0.9 + uWind.z * 0.12);
+          float gF = 0.6 + 0.4 * sin(phF) + 0.15 * sin(uTime * 1.7 + ipF.x * 0.2);
+          float aF = (0.002 + 0.0012 * uWind.z) * (0.5 + 0.7 * uWind.w);
+          transformed.xz += wdF * aF * hF * hF * gF / (1.0 + hF * 0.08);
+          transformed += 0.012 * (0.3 + 0.1 * uWind.z) * step(1.5, transformed.y)
+            * sin(uTime * 5.3 + dot(position, vec3(2.1, 1.7, 2.9))) * vec3(1.0, 0.4, 1.0);
+        }
+        #endif`);
     s.fragmentShader = s.fragmentShader
       .replace('#include <normal_fragment_begin>',
         THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''))
@@ -296,7 +317,7 @@ export function foliageMaterial(atlas) {
         diffuseColor.a *= 1.0 + clamp(mlod, 0.0, 6.0) * 0.32;
         #include <alphatest_fragment>`);
   };
-  m.customProgramCacheKey = () => 'foliage-v2';
+  m.customProgramCacheKey = () => 'foliage-v3';
   return m;
 }
 

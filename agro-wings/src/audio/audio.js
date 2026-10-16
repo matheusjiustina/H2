@@ -169,6 +169,7 @@ export class GameAudio {
     const bLP = ctx.createBiquadFilter();
     bLP.type = 'lowpass'; bLP.frequency.value = 500;
     const bG = ctx.createGain(); bG.gain.value = 0.12;
+    this.breezeGain = bG;
     breeze.connect(bLP).connect(bG).connect(this.amb);
     const cic = this._noise(this.white);
     const cBP = ctx.createBiquadFilter();
@@ -183,7 +184,28 @@ export class GameAudio {
     this.cicGain = ctx.createGain();
     this.cicGain.gain.value = 0;
     cic.connect(cBP).connect(this.cicAM).connect(this.cicGain).connect(this.amb);
-    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum]) o.start();
+    // Rain: fine hiss + softer patter; through a low-pass that closes in the cabin.
+    this.rainLP = ctx.createBiquadFilter();
+    this.rainLP.type = 'lowpass'; this.rainLP.frequency.value = 9000;
+    this.rainGain = ctx.createGain(); this.rainGain.gain.value = 0;
+    this.rainLP.connect(this.rainGain).connect(this.master);
+    const rh = this._noise(this.white);
+    const rhHP = ctx.createBiquadFilter(); rhHP.type = 'highpass'; rhHP.frequency.value = 2400;
+    const rhG = ctx.createGain(); rhG.gain.value = 0.5;
+    rh.connect(rhHP).connect(rhG).connect(this.rainLP);
+    const rp = this._noise(this.pink);
+    const rpBP = ctx.createBiquadFilter(); rpBP.type = 'bandpass'; rpBP.frequency.value = 1100; rpBP.Q.value = 0.7;
+    rp.connect(rpBP).connect(this.rainLP);
+    // Service truck diesel: firing pulse train + rumble, low-passed, spatialised by distance.
+    this.truckOsc = ctx.createOscillator(); this.truckOsc.type = 'sawtooth'; this.truckOsc.frequency.value = 38;
+    this.truckSub = ctx.createOscillator(); this.truckSub.type = 'square'; this.truckSub.frequency.value = 19;
+    this.truckLP = ctx.createBiquadFilter(); this.truckLP.type = 'lowpass'; this.truckLP.frequency.value = 320; this.truckLP.Q.value = 1.2;
+    this.truckGain = ctx.createGain(); this.truckGain.gain.value = 0;
+    const tsG = ctx.createGain(); tsG.gain.value = 0.5;
+    this.truckOsc.connect(this.truckLP);
+    this.truckSub.connect(tsG).connect(this.truckLP);
+    this.truckLP.connect(this.truckGain).connect(this.master);
+    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum, this.truckOsc, this.truckSub]) o.start();
     this.birdT = 2;
     this.cicT = 0;
     this.cicOn = false;
@@ -258,6 +280,20 @@ export class GameAudio {
     // Service pump
     this.pumpGain.gain.setTargetAtTime(s.pumpOn ? 0.05 * s.serviceAtt : 0, t, 0.3);
     this.flowGain.gain.setTargetAtTime(s.pumpOn ? 0.06 * s.serviceAtt : 0, t, 0.3);
+    // Service truck (diesel): revs with its throttle, fades with distance.
+    const tk = s.truck;
+    if (tk) {
+      const f = 34 + 46 * tk.rev;
+      this.truckOsc.frequency.setTargetAtTime(f, t, 0.15);
+      this.truckSub.frequency.setTargetAtTime(f / 2, t, 0.15);
+      this.truckLP.frequency.setTargetAtTime(240 + 520 * tk.load, t, 0.2);
+      this.truckGain.gain.setTargetAtTime(tk.on ? (0.035 + 0.05 * tk.load) * tk.att * (s.inside ? 0.45 : 1) : 0, t, 0.25);
+    }
+    // Weather (visual-only settings): rain bed, fewer birds, more breeze in gusty weather.
+    const W = s.weather ?? { rain: 0, birds: 1, insects: 1, gust: 1 };
+    this.rainLP.frequency.setTargetAtTime(s.inside ? 1600 : 9000, t, 0.3);
+    this.rainGain.gain.setTargetAtTime(W.rain * (s.inside ? 0.05 : 0.075), t, 1.0);
+    this.breezeGain.gain.setTargetAtTime(0.12 * (0.5 + 0.6 * W.gust), t, 1.0);
     // Ambience near the base, ducked by the engine.
     const ambT = s.ambience * (1 - 0.7 * on);
     this.amb.gain.setTargetAtTime(ambT * 0.9, t, 0.6);
@@ -265,12 +301,12 @@ export class GameAudio {
     if (this.cicT <= 0) {
       this.cicOn = !this.cicOn;
       this.cicT = this.cicOn ? 3 + Math.random() * 5 : 4 + Math.random() * 9;
-      this.cicGain.gain.setTargetAtTime(this.cicOn ? 0.05 : 0, t, this.cicOn ? 1.2 : 0.6);
+      this.cicGain.gain.setTargetAtTime(this.cicOn ? 0.05 * W.insects : 0, t, this.cicOn ? 1.2 : 0.6);
     }
     this.birdT -= dt;
     if (this.birdT <= 0 && ambT > 0.15) {
-      this.birdT = 1.5 + Math.random() * 6;
-      this._bird(ambT);
+      this.birdT = (1.5 + Math.random() * 6) / Math.max(0.05, W.birds);
+      if (Math.random() < W.birds) this._bird(ambT);
     }
   }
 

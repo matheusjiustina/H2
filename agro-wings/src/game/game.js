@@ -20,6 +20,7 @@ import { Tutorial } from './tutorial.js';
 import { BASE, POWERLINE, CONTRACT_FIELDS } from '../world/layout.js';
 import { smoothstep } from '../core/math.js';
 import { Autopilot } from './autopilot.js';
+import { windAt } from '../flight/env.js';
 
 const SETTINGS = 'agrowings.settings.v1';
 
@@ -34,7 +35,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema' };
+    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', timeOfDay: 'morning', weather: 'partly' };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     const q = new URLSearchParams(location.search).get('q');
     if (q && QUALITY[q]) this.settings.quality = q;
@@ -69,6 +70,7 @@ export class Game {
       si = Math.max(si, steps.indexOf(label) + 1);
       this.screens.setLoading(si / (steps.length + 2), label);
     });
+    this.world.atmo.set(this.settings.timeOfDay, this.settings.weather, true);
     this.screens.setLoading(0.85, 'Aircraft');
     await new Promise((r) => setTimeout(r, 0));
     // Both aircraft live in the world; the one not selected waits parked.
@@ -86,6 +88,7 @@ export class Game {
     this.mist = new ParticlePool(SPRAY.maxParticles[this.settings.quality], { renderOrder: 22 });
     this.dust = new ParticlePool(1500, { renderOrder: 21 });
     this.scene.add(this.mist.points, this.dust.points);
+    this.world.dust = this.dust;
     this.mist.limit = SPRAY.maxParticles[this.settings.quality];
     this.audio = new GameAudio();
     this.audio.setVolume(this.settings.volume);
@@ -134,6 +137,8 @@ export class Game {
       this.resize();
     }
     if (k === 'volume') this.audio.setVolume(v);
+    // Visual/audio only: the flight model's wind is not touched by weather.
+    if (k === 'timeOfDay' || k === 'weather') this.world.atmo.set(this.settings.timeOfDay, this.settings.weather);
   }
 
   // Debug/validation: fly the current job hands-off through the normal inputs.
@@ -162,6 +167,7 @@ export class Game {
     this._parked = Object.values(this.fleet).filter((ac) => ac !== next);
     this.world.extraObstacle = (x, y, z) => {
       for (const ac of Object.values(this.fleet)) if (ac !== this.aircraft && ac.hitTest(x, y, z)) return `parked ${ac.type.reg}`;
+      if (this.service?.truck.hitTest(x, y, z)) return 'service truck';
       return null;
     };
   }
@@ -381,7 +387,7 @@ export class Game {
       this.guidance.update(dt);
       this.overlay.update(this.job ? this.job.coverages : []);
       this.service.update(dt);
-      this.world.structures.update(dt, this.time, ac.windVec);
+      this.world.structures.update(dt, this.time, ac.windVec, { acPos: ac.fm.pos, light: this.world.atmo.cur.light ?? 1 });
       if (this.job && !ac.fm.out.onGround) this.job.flightTime += dt;
       this.statT -= dt;
       if (this.job && this.statT <= 0) {
@@ -406,6 +412,10 @@ export class Game {
         p.model.root.visible = d < 1200;
         if (p.contactShadow) p.contactShadow.visible = d < 400;
       }
+      this.service.truck.cull(this.camera.position);
+      // Visual wind for vegetation/rain = the aircraft's mean wind (no turbulence).
+      windAt(this.world.visualWind, ac.simTime ?? this.time, null, 10, this.settings.wind);
+      this.world.atmo.cameraInside = this.rig.mode === 'cockpit';
       this.world.update(this.camera, ac.rPos, pdt, this.time);
       if (!headless) this._audio(rawDt);
       if (this.playing) this._prompts();
@@ -551,6 +561,8 @@ export class Game {
       rough: ac.damage > 55, pumpOn: this.service.pumpOn, serviceAtt: 1 / (1 + svcD / 15),
       profile: ac.type.audio.profile, blades: ac.type.audio.blades, ng: fm.ng, power: ac.A.turbine ? fm.shaftPower / ac.A.maxPower : fm.throttle, itt: fm.itt,
       ambience: (1 - smoothstep(150, 700, baseD)) * (this.camera.position.y < 80 ? 1 : 0.3),
+      weather: this.world.atmo.audioLevels(),
+      truck: this.service.truck?.audioState(this.camera.position),
     });
   }
 

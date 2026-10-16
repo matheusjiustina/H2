@@ -1,12 +1,16 @@
 // Ground service routine run by the badeco when the aircraft is parked on the
-// pad with the engine off: walk to the reel, carry the hose along a safe path
-// (behind the wing, never in front of the prop), connect, transfer the fluid
-// gradually, disconnect, reel the hose back in and return to the post.
-// Separate fuel (ethanol, wing filler) and application liquid (hopper
-// quick-fill coupler) circuits. Any attempt to move the aircraft aborts.
+// pad with the engine off: the service truck drives up to a stand off the
+// wingtip; the badeco walks to its reels, carries the hose along a safe path
+// (behind the wing, never in front of the prop), connects, transfers the
+// fluid gradually, disconnects, reels the hose back in and returns to the
+// post; the truck backs out and returns to its bay before the all-clear.
+// Separate fuel (wing filler) and application liquid (hopper quick-fill
+// coupler) circuits. Any attempt to move the aircraft aborts. If the truck
+// cannot reach the aircraft (odd parking), the fixed station hoses are used.
 import * as THREE from 'three';
 import { Badeco } from './badeco.js';
 import { Hose } from './hose.js';
+import { ServiceTruck } from './truck.js';
 import { BASE } from '../world/layout.js';
 
 export const SERVICE = { fuelRate: 4.5, liquidRate: 14, walk: 1.35, carry: 1.1, run: 3.0 };
@@ -25,8 +29,12 @@ export class GroundService {
     this.fuelHose = new Hose(game.scene, 0x161616, 0.03);
     this.mixHose = new Hose(game.scene, 0x2a63b8, 0.035);
     const ft = BASE.fuelTank, mt = BASE.mixTank;
-    this.fuelReel = new THREE.Vector3(ft.x + 3.3, 1.0, ft.z + 1.85);
-    this.mixReel = new THREE.Vector3(mt.x + 1.6, 1.0, mt.z + 1.3);
+    this.stationFuel = new THREE.Vector3(ft.x + 3.3, 1.0, ft.z + 1.85);
+    this.stationMix = new THREE.Vector3(mt.x + 1.6, 1.0, mt.z + 1.3);
+    this.fuelReel = this.stationFuel.clone();
+    this.mixReel = this.stationMix.clone();
+    this.truck = new ServiceTruck(game);
+    this.useTruck = false;
     this.post = new THREE.Vector3(BASE.crewPost.x, 0, BASE.crewPost.z + 0.3);
     this.fuelHose.reset(this.fuelReel);
     this.mixHose.reset(this.mixReel);
@@ -65,6 +73,7 @@ export class GroundService {
     }
     if (this.state === 'aborting') return 'Ground crew is still clearing the aircraft.';
     const ac = this.game.aircraft;
+    if (!this.truck.atHome && Math.hypot(this.truck.x - ac.fm.pos.x, this.truck.z - ac.fm.pos.z) < ac.type.service.veto + 9) return 'Service truck is still beside the aircraft.';
     if (this.badeco.pos.distanceTo(_v.set(ac.fm.pos.x, this.badeco.pos.y, ac.fm.pos.z)) < ac.type.service.veto) return 'Ground crew is too close to the propeller.';
     return null;
   }
@@ -85,6 +94,18 @@ export class GroundService {
     if (!needFuel && !needLiq) { this.game.toast('Tanks already at the requested levels.'); return false; }
     this.queue = [];
     const Lp = (k) => this._local(k);
+    // Truck to the loading stand (hybrid A* around the aircraft and the
+    // equipment); fixed station hoses if no drivable path exists.
+    const used = this.truck.atHome ? this.truck.dispatch(ac, this.side) : 0;
+    this.useTruck = !!used;
+    if (this.useTruck) {
+      this.side = used;
+      this.queue.push({ a: 'truckIn', t: 120, msg: 'Service truck on its way to the aircraft.' });
+    } else if (!this.truck.atHome) {
+      this.useTruck = this.truck.parkedAtStand;
+    } else {
+      this.game.toast('Service truck cannot reach the aircraft here — using the station hoses.');
+    }
     // A turboprop's prop takes many seconds to run down after shutdown: the
     // badeco stays at his post until it has stopped.
     if (ac.A.turbine && fm.rpm > 60) {
@@ -92,35 +113,36 @@ export class GroundService {
     }
     if (needFuel) {
       this.queue.push(
-        { a: 'walk', to: () => [this._near(this.fuelReel)], speed: SERVICE.walk, msg: 'Badeco is heading to the fuel pump.' },
+        { a: 'walk', to: () => this._walkTo(this._reelAccess('fuel')), speed: SERVICE.walk, msg: this.useTruck ? 'Badeco is heading to the truck (fuel reel).' : 'Badeco is heading to the fuel pump.' },
         { a: 'pickup', hose: 'fuel', t: 1.0 },
-        { a: 'walk', to: () => [Lp('A'), Lp('B'), Lp('F')], speed: SERVICE.carry, pose: 'carry', msg: 'Carrying the fuel hose (behind the wing).' },
+        { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), Lp('F')], speed: SERVICE.carry, pose: 'carry', msg: 'Carrying the fuel hose (behind the wing).' },
         { a: 'face', at: () => this._world(this._port(this.game.aircraft.model.fuelFiller)) },
         { a: 'connect', hose: 'fuel', t: 1.6, pose: 'reach', msg: 'Connecting to the wing tank.' },
         { a: 'transfer', kind: 'fuel', pose: 'hold' },
         { a: 'disconnect', hose: 'fuel', t: 1.2, pose: 'reach' },
-        { a: 'walk', to: () => [Lp('B'), Lp('A'), this._near(this.fuelReel)], speed: SERVICE.carry, pose: 'carry' },
+        { a: 'walk', to: () => [Lp('B'), Lp('A'), ...this._walkTo(this._reelAccess('fuel'), Lp('A'))], speed: SERVICE.carry, pose: 'carry' },
         { a: 'stow', hose: 'fuel', t: 1.4 },
       );
     }
     if (needLiq) {
       this.queue.push(
-        { a: 'walk', to: () => [this._near(this.mixReel)], speed: SERVICE.walk, msg: 'Badeco is heading to the mixing station.' },
+        { a: 'walk', to: () => this._walkTo(this._reelAccess('mix')), speed: SERVICE.walk, msg: this.useTruck ? 'Badeco is heading to the truck (calda reel).' : 'Badeco is heading to the mixing station.' },
         { a: 'pickup', hose: 'mix', t: 1.0 },
-        { a: 'walk', to: () => [Lp('A'), Lp('B'), Lp('P')], speed: SERVICE.carry, pose: 'carry', msg: 'Carrying the loading hose.' },
+        { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), Lp('P')], speed: SERVICE.carry, pose: 'carry', msg: 'Carrying the loading hose.' },
         { a: 'face', at: () => this._world(this._port(this.game.aircraft.model.hopperPort)) },
         { a: 'connect', hose: 'mix', t: 1.8, pose: 'reachLow', msg: 'Coupling the hopper quick-fill.' },
         { a: 'transfer', kind: 'liquid', pose: 'crouch' },
         { a: 'disconnect', hose: 'mix', t: 1.3, pose: 'reachLow' },
-        { a: 'walk', to: () => [Lp('B'), Lp('A'), this._near(this.mixReel)], speed: SERVICE.carry, pose: 'carry' },
+        { a: 'walk', to: () => [Lp('B'), Lp('A'), ...this._walkTo(this._reelAccess('mix'), Lp('A'))], speed: SERVICE.carry, pose: 'carry' },
         { a: 'stow', hose: 'mix', t: 1.4 },
       );
     }
     this.queue.push(
-      { a: 'walk', to: () => [this.post.clone()], speed: SERVICE.walk },
+      { a: 'walk', to: () => this._walkTo(this.post.clone()), speed: SERVICE.walk },
       { a: 'face', at: () => this.game.aircraft.fm.pos.clone() },
-      { a: 'signal', t: 2.2, pose: 'thumbs', msg: 'All clear — aircraft released.' },
     );
+    if (this.useTruck) this.queue.push({ a: 'truckOut', t: 90, msg: 'Service truck backing out to its bay.' });
+    this.queue.push({ a: 'signal', t: 2.2, pose: 'thumbs', msg: 'All clear — aircraft released.' });
     this.state = 'working';
     this.step = null;
     this.game.onServiceStart?.();
@@ -136,7 +158,8 @@ export class GroundService {
       this.queue.push({ a: 'disconnect', hose: this.connected || this.carry, t: 0.5, pose: 'reach', drop: true });
     }
     const behind = this._isNearAircraft();
-    const path = behind ? () => [this._local('A'), this.post.clone()] : () => [this.post.clone()];
+    const path = behind ? () => [this._local('A'), ...this._walkTo(this.post.clone(), this._local('A'))] : () => this._walkTo(this.post.clone());
+    if (!this.truck.atHome) this.truck.recall();
     this.queue.push({ a: 'walk', to: path, speed: SERVICE.run });
     this.queue.push({ a: 'face', at: () => this.game.aircraft.fm.pos.clone() });
     this.step = null;
@@ -152,7 +175,7 @@ export class GroundService {
   _side() {
     const ac = this.game.aircraft;
     const yaw = ac.fm.heading();
-    const dx = this.fuelReel.x - ac.fm.pos.x, dz = this.fuelReel.z - ac.fm.pos.z;
+    const dx = this.stationFuel.x - ac.fm.pos.x, dz = this.stationFuel.z - ac.fm.pos.z;
     // Body +X (left) in world: (cos yaw, -sin yaw).
     return dx * Math.cos(yaw) - dz * Math.sin(yaw) >= 0 ? 1 : -1;
   }
@@ -173,6 +196,19 @@ export class GroundService {
     return new THREE.Vector3(ac.fm.pos.x + x * c + z * s, 0, ac.fm.pos.z - x * s + z * c);
   }
   _world(local) { return this.game.aircraft.toWorld(local, new THREE.Vector3()); }
+  // Where the badeco picks up / stows a hose: behind the truck, or by the station reel.
+  _reelAccess(kind) {
+    if (this.useTruck) return this.truck.reelAccess(kind);
+    return this._near(kind === 'fuel' ? this.stationFuel : this.stationMix);
+  }
+  // Walking route around the truck, the aircraft and the equipment.
+  _walkTo(target, from = this.badeco.pos) {
+    const pl = this.truck.planner;
+    pl.build(this.truck._aircraftRects(0.25));
+    const truck = this.truck;
+    const path = pl.planWalk({ x: from.x, z: from.z }, { x: target.x, z: target.z }, 0.42, (x, z) => truck.rectDistance(x, z));
+    return (path || [target]).map((p) => new THREE.Vector3(p.x, 0, p.z));
+  }
   _near(reel) {
     const ac = this.game.aircraft;
     const d = _v.set(ac.fm.pos.x - reel.x, 0, ac.fm.pos.z - reel.z).normalize();
@@ -192,6 +228,14 @@ export class GroundService {
       }
     }
     this.pumpOn = false;
+    this.truck.update(sdt);
+    if (this.useTruck || this.state === 'idle') {
+      this.truck.reelWorld('fuel', this.fuelReel);
+      this.truck.reelWorld('mix', this.mixReel);
+    } else {
+      this.fuelReel.copy(this.stationFuel);
+      this.mixReel.copy(this.stationMix);
+    }
     if (this.state === 'working' || this.state === 'aborting') {
       if (!this.step && this.queue.length) this._begin(this.queue.shift());
       if (this.step) this._run(this.step, sdt);
@@ -317,6 +361,27 @@ export class GroundService {
         b.speed = 0;
         if (st.time >= st.t || st.until?.()) this.step = null;
         break;
+      case 'truckIn':
+        // Wait at the post for the truck to park at the stand.
+        b.speed = 0;
+        if (this.truck.parkedAtStand) this.step = null;
+        else if (st.time >= st.t || this.truck.state === 'blocked') {
+          // Could not get there: back to the bay, use the station hoses.
+          this.truck.recall();
+          this.useTruck = false;
+          this.game.toast('Service truck could not reach the stand — using the station hoses.');
+          this.step = null;
+        }
+        break;
+      case 'truckOut': {
+        b.speed = 0;
+        if (!st.sent) { st.sent = true; this.truck.recall(); }
+        // Released once the truck is well clear of the aircraft.
+        const ac = this.game.aircraft;
+        const d = Math.hypot(this.truck.x - ac.fm.pos.x, this.truck.z - ac.fm.pos.z);
+        if (this.truck.atHome || d > ac.type.service.veto + 12 || st.time >= st.t) this.step = null;
+        break;
+      }
       default:
         this.step = null;
     }

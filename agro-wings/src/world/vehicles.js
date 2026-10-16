@@ -114,7 +114,9 @@ export function pickup(B, M, x, y, z, ry) {
 
 // Cab-over support tanker (caminhão de apoio): white cab, aluminium tank with
 // walkway, rail, domes, ladder and rear valve cabinet; tandem rear axle.
-export function tanker(B, M, x, y, z, ry) {
+// With { dynamic: true } the wheels and the rear reel are left out (the
+// driving service truck animates its own) and the wheel layout is returned.
+export function tanker(B, M, x, y, z, ry, { dynamic = false } = {}) {
   const K = new Kit(B, x, y, z, ry);
   const L = 4.1; // cab front at +L
   // Chassis rails, fuel tank, battery box, air tanks.
@@ -158,20 +160,80 @@ export function tanker(B, M, x, y, z, ry) {
   for (const s of [-1, 1]) K.rod([s * 0.22, 0.9, tz - tl / 2 - 0.15], [s * 0.22, 3.15, tz - tl / 2 - 0.15], 0.025, M.galv);
   for (let i = 0; i < 6; i++) K.rod([-0.22, 1.1 + i * 0.36, tz - tl / 2 - 0.15], [0.22, 1.1 + i * 0.36, tz - tl / 2 - 0.15], 0.018, M.galv);
   K.rbox(1.6, 0.7, 0.5, 0.05, M.alu, -0.4, 1.1, tz - tl / 2 - 0.05);
-  K.add(new THREE.TorusGeometry(0.3, 0.07, 8, 18), M.hoseBlack, 0.85, 1.25, tz - tl / 2 - 0.1, 0, Math.PI / 2, 0);
+  if (!dynamic) K.add(new THREE.TorusGeometry(0.3, 0.07, 8, 18), M.hoseBlack, 0.85, 1.25, tz - tl / 2 - 0.1, 0, Math.PI / 2, 0);
   K.rbox(2.4, 0.14, 0.14, 0.04, M.plasticBlack, 0, 0.6, tz - tl / 2 - 0.42);
   for (const s of [-1, 1]) K.box(0.2, 0.12, 0.05, M.tailLens, s * 0.95, 0.62, tz - tl / 2 - 0.5);
   // Wheels: steer axle single, tandem rear axle dual.
+  const wheels = [];
   for (const s of [-1, 1]) {
-    wheel(K, M, s * 1.02, 0.5, L - 1.0, 0.5, 0.3, M.paintWhite);
-    for (const wz of [tz - 0.5, tz - 1.85]) wheel(K, M, s * 0.88, 0.5, wz, 0.5, 0.28, M.paintWhite, true);
+    if (dynamic) wheels.push({ x: s * 1.02, y: 0.5, z: L - 1.0, R: 0.5, steer: true });
+    else wheel(K, M, s * 1.02, 0.5, L - 1.0, 0.5, 0.3, M.paintWhite);
+    for (const wz of [tz - 0.5, tz - 1.85]) {
+      if (dynamic) wheels.push({ x: s * 0.88, y: 0.5, z: wz, R: 0.5, steer: false });
+      else wheel(K, M, s * 0.88, 0.5, wz, 0.5, 0.28, M.paintWhite, true);
+    }
     K.rbox(0.62, 0.08, 2.4, 0.03, M.plasticBlack, s * 0.9, 1.08, tz - 1.18); // rear mudguards
   }
+  return { wheels, rearZ: tz - tl / 2 - 0.5, frontZ: L + 0.25, cabTop: 3.45 };
+}
+
+// One wheel (tyre + rim + hub caps on both faces) as a single vertex-coloured
+// geometry centred on its axle (axis along X), for animated vehicles.
+export function wheelGeometry(R, W, dual = false) {
+  const parts = [];
+  const col = (g, c) => {
+    const n = g.attributes.position.count;
+    const a = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) a.set(c, i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'color'].includes(k)) g.deleteAttribute(k);
+    parts.push(g.index ? g.toNonIndexed() : g);
+  };
+  const rimR = R * 0.62;
+  const pts = [new THREE.Vector2(rimR, -W / 2)];
+  for (let i = 0; i <= 6; i++) {
+    const a = -Math.PI / 2 + (i / 6) * Math.PI;
+    pts.push(new THREE.Vector2(R - W * 0.18 + Math.cos(a) * W * 0.18, Math.sin(a) * W * 0.5));
+  }
+  pts.push(new THREE.Vector2(rimR, W / 2));
+  for (const o of dual ? [-W * 0.52, W * 0.52] : [0]) {
+    const t = new THREE.LatheGeometry(pts, 18).rotateZ(Math.PI / 2).translate(o, 0, 0);
+    col(t, [0.05, 0.05, 0.05]);
+    col(new THREE.CylinderGeometry(rimR, rimR, W * 0.9, 14).rotateZ(Math.PI / 2).translate(o, 0, 0), [0.8, 0.8, 0.78]);
+  }
+  const hw = W * (dual ? 1.0 : 0.47);
+  for (const s of [-1, 1]) col(new THREE.CylinderGeometry(rimR * 0.4, rimR * 0.45, 0.06, 10).rotateZ(Math.PI / 2).translate(s * hw, 0, 0), [0.62, 0.63, 0.64]);
+  // Wheel nuts: a ring of small studs so the spin reads.
+  for (const s of [-1, 1]) for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    col(new THREE.BoxGeometry(0.03, 0.04, 0.04).translate(s * (hw + 0.035), Math.cos(a) * rimR * 0.55, Math.sin(a) * rimR * 0.55), [0.25, 0.25, 0.26]);
+  }
+  return mergeParts(parts);
+}
+
+function mergeParts(list) {
+  let n = 0;
+  for (const g of list) n += g.attributes.position.count;
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  let o = 0;
+  for (const g of list) {
+    pos.set(g.attributes.position.array, o * 3);
+    nor.set(g.attributes.normal.array, o * 3);
+    col.set(g.attributes.color.array, o * 3);
+    o += g.attributes.position.count;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeBoundingSphere();
+  return g;
 }
 
 // Farm tractor (generic, red), 4WD, cab.
-export function tractor(B, M, x, y, z, ry) {
+export function tractor(B, M, x, y, z, ry, { dynamic = false } = {}) {
   const K = new Kit(B, x, y, z, ry);
+  const wheels = [];
   K.rbox(0.95, 0.95, 2.4, 0.12, M.tractorRed, 0, 1.45, 1.0); // hood
   K.box(0.85, 0.6, 0.1, M.plasticBlack, 0, 1.4, 2.21); // grille
   K.box(1.1, 0.5, 0.5, M.plasticBlack, 0, 0.95, 2.45); // front weights
@@ -182,12 +244,34 @@ export function tractor(B, M, x, y, z, ry) {
   K.rbox(1.6, 0.14, 1.7, 0.05, M.tractorRed, 0, 2.75, -0.65);
   K.cylY(0.06, 1.3, M.plasticBlack, 0.38, 2.4, 1.6, 10); // exhaust
   for (const s of [-1, 1]) {
-    wheel(K, M, s * 0.98, 0.9, -0.75, 0.9, 0.5, M.rimGrey);
-    wheel(K, M, s * 0.85, 0.55, 1.75, 0.55, 0.36, M.rimGrey);
+    if (dynamic) {
+      wheels.push({ x: s * 0.98, y: 0.9, z: -0.75, R: 0.9, W: 0.5, steer: false }, { x: s * 0.85, y: 0.55, z: 1.75, R: 0.55, W: 0.36, steer: true });
+    } else {
+      wheel(K, M, s * 0.98, 0.9, -0.75, 0.9, 0.5, M.rimGrey);
+      wheel(K, M, s * 0.85, 0.55, 1.75, 0.55, 0.36, M.rimGrey);
+    }
     K.rbox(0.62, 0.08, 1.4, 0.04, M.tractorRed, s * 0.98, 1.9, -0.75); // fenders
     K.box(0.3, 0.05, 0.25, M.plasticBlack, s * 0.7, 0.6, -0.1); // step
   }
   K.box(0.5, 0.25, 0.35, M.plasticBlack, 0, 0.8, -1.6); // hitch
+  return { wheels };
+}
+
+// Trailed disc harrow (grade aradora) for a working tractor; local +Z toward the hitch.
+export function discHarrow(B, M, x, y, z, ry) {
+  const K = new Kit(B, x, y, z, ry);
+  K.box(0.12, 0.12, 2.2, M.tractorRed, 0, 0.75, 0.9); // drawbar
+  K.box(3.6, 0.16, 0.16, M.tractorRed, 0, 0.75, -0.2); // frame
+  K.box(3.6, 0.16, 0.16, M.tractorRed, 0, 0.75, -1.5);
+  for (const s of [-1, 1]) K.box(0.16, 0.16, 1.5, M.tractorRed, s * 1.7, 0.75, -0.85);
+  // Two gangs of concave discs on angled axles.
+  for (const [gz, ang] of [[-0.45, 0.32], [-1.3, -0.32]]) {
+    for (let i = 0; i < 9; i++) {
+      const gx = -1.6 + i * 0.4;
+      K.add(new THREE.CylinderGeometry(0.33, 0.33, 0.03, 16), M.steel, gx, 0.33, gz + Math.sin(ang) * gx * 0.3, 0, ang, Math.PI / 2);
+    }
+  }
+  for (const s of [-1, 1]) K.add(new THREE.CylinderGeometry(0.3, 0.3, 0.18, 12), M.rubber, s * 1.95, 0.3, -0.85, 0, 0, Math.PI / 2);
 }
 
 // Self-propelled sprayer (autopropelido): high clearance, central tank, cab
@@ -276,4 +360,28 @@ export function officeContainer(B, M, x, y, z, ry) {
   K.box(0.6, 0.45, 0.35, M.dirtyWhite, 1.42, 2.1, -0.2); // AC unit
   K.box(0.9, 0.18, 0.6, M.concrete, 1.6, 0.09, 1.4); // step
   K.box(0.02, 0.8, 1.6, M.steel, 1.4, 2.95, 0.0); // sign frame
+}
+
+// Animated wheels as two instanced meshes (steered / fixed axles), so a
+// vehicle's wheels cost two draws. Returns set(distanceOver0.5m, steerAngle).
+export function wheelSet(root, lay, gFront, gRear, mat) {
+  const sets = [];
+  for (const [geo, steer] of [[gFront, true], [gRear, false]]) {
+    const list = lay.filter((w) => !!w.steer === steer);
+    const im = new THREE.InstancedMesh(geo, mat, list.length);
+    im.castShadow = true;
+    im.frustumCulled = false;
+    root.add(im);
+    sets.push({ im, list });
+  }
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+  return (spin, steerAngle) => {
+    for (const { im, list } of sets) {
+      list.forEach((w, i) => {
+        e.set(spin * (0.5 / w.R), w.steer ? steerAngle : 0, 0, 'YXZ');
+        im.setMatrixAt(i, m.compose(p.set(w.x, w.y, w.z), q.setFromEuler(e), one));
+      });
+      im.instanceMatrix.needsUpdate = true;
+    }
+  };
 }
