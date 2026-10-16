@@ -48,6 +48,9 @@ export class HUD {
     };
     this.$.tut.querySelector('.skip').addEventListener('click', () => game.tutorial?.skip());
     this.$.prompt.addEventListener('click', () => this.promptAction?.());
+    // Click the minimap to switch it between the farm map and the GPS page.
+    this.$.mini.parentElement.classList.add('interactive');
+    this.$.mini.addEventListener('click', () => this.toggleGps());
     this.base = buildBaseMap(1024);
     this.miniT = 0;
     this.warnState = '';
@@ -55,6 +58,13 @@ export class HUD {
   }
 
   show(v) { this.el.classList.toggle('show', v); }
+
+  toggleGps() {
+    const g = this.game;
+    g.setSetting('hudGps', !g.settings.hudGps);
+    this.miniT = 0;
+    if (g.settings.hudGps && !g.job) this.toast('GPS guidance shows passes once a job is active.');
+  }
 
   toast(msg, dur = 4.5) {
     const t = document.createElement('div');
@@ -149,6 +159,15 @@ export class HUD {
       const c = $.mini;
       const gctx = c.getContext('2d');
       const yaw = ac.fm.heading();
+      $.mini.parentElement.classList.toggle('gps', !!(g.settings.hudGps && g.job));
+      if (g.settings.hudGps && g.job) {
+        // GPS guidance page (same as the cockpit unit, larger text).
+        gctx.save();
+        g.guidance.draw(gctx, 0, 0, c.width, c.height, { big: true, scale: 0.3 });
+        gctx.restore();
+        this._fps(dt);
+        return;
+      }
       drawMap(gctx, c.width, c.height, this.base, g, { cx: ac.fm.pos.x, cz: ac.fm.pos.z, range: 650, rot: yaw - Math.PI });
       // North tick
       gctx.save();
@@ -160,12 +179,19 @@ export class HUD {
       gctx.fillText('N', 0, -c.height / 2 + 26);
       gctx.restore();
     }
-    // FPS
+    this._fps(dt);
+  }
+
+  _fps(dt) {
+    const g = this.game, $ = this.$;
     const f = this.fpsAcc;
     f.t += dt; f.n++;
     if (f.t >= 0.5) { f.v = f.n / f.t; f.t = 0; f.n = 0; }
     $.fps.classList.toggle('show', !!g.settings.showFps);
-    if (g.settings.showFps) $.fps.textContent = `${f.v.toFixed(0)} fps · ${g.renderer.info.render.calls} calls · ${(g.renderer.info.render.triangles / 1000).toFixed(0)}k tris`;
+    if (g.settings.showFps) {
+      const st = g.frameStats?.(120) ?? { avg: 0, p95: 0 };
+      $.fps.textContent = `${f.v.toFixed(0)} fps · ${st.avg.toFixed(1)} ms avg / ${st.p95.toFixed(1)} p95 · ${g.renderer.info.render.calls} calls · ${(g.renderer.info.render.triangles / 1000).toFixed(0)}k tris · ${g.settings.quality}`;
+    }
   }
 }
 

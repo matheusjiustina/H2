@@ -21,7 +21,9 @@ export class ApronPlanner {
 
   // Rebuild the clearance field. rects: oriented ground rectangles
   // {cx, cz, hx, hz, yaw} (yaw: local +z = (sin yaw, cos yaw)).
-  build(rects = []) {
+  build(rects = [], key = null) {
+    if (key !== null && key === this.key) return; // same obstacles as last time
+    this.key = key;
     const { nx, nz, occ } = this;
     occ.fill(0);
     for (const b of this.staticBoxes) this._fillAABB(b.x0, b.x1, b.z0, b.z1);
@@ -92,10 +94,20 @@ export class ApronPlanner {
 
   // Hybrid A*. start/goal: {x, z, yaw}; goalYaws: accepted goal headings.
   // Returns [{x, z, yaw, dir}] sampled every 0.5 m, or null.
-  planVehicle(start, goal, veh, { goalYaws = [goal.yaw], posTol = 0.6, yawTol = 0.21, maxNodes = 60000, reverse = true } = {}) {
+  planVehicle(start, goal, veh, opts = {}) {
+    const it = this.vehicleSearch(start, goal, veh, opts);
+    let r;
+    while (!(r = it.step(Infinity)).done);
+    return r.path;
+  }
+
+  // Same search, resumable: step(budgetMs) runs until the budget is spent
+  // and returns { done, path } (path null while running or on failure), so
+  // the game can spread a search over several frames without a hitch.
+  vehicleSearch(start, goal, veh, { goalYaws = [goal.yaw], posTol = 0.6, yawTol = 0.21, maxNodes = 60000, reverse = true } = {}) {
     const R = veh.turnRadius, circles = veh.circles, rad = veh.radius;
     const HB = 36, CELL = 0.75, STEP = 2.0, SUB = 4;
-    const kappas = [-1 / R, -0.5 / R, 0, 0.5 / R, 1 / R];
+    const kappas = [-1 / R, 0, 1 / R];
     const dirs = reverse ? [1, -1] : [1];
     const nodes = [];
     const best = new Map();
@@ -112,46 +124,56 @@ export class ApronPlanner {
       for (const gy of goalYaws) ya = Math.min(ya, angDiff(yaw, gy));
       return d + ya * R * 0.5;
     };
-    if (!this.poseFree(start.x, start.z, start.yaw, circles, rad * 0.85)) return null;
+    const finish = (found) => {
+      if (found < 0) return { done: true, path: null };
+      const chain = [];
+      for (let i = found; i > 0; i = nodes[i].parent) chain.push(nodes[i]);
+      chain.reverse();
+      const out = [{ x: start.x, z: start.z, yaw: start.yaw, dir: chain[0]?.dir ?? 1 }];
+      for (const n of chain) out.push(...n.samples);
+      return { done: true, path: out };
+    };
+    let result = null;
+    if (!this.poseFree(start.x, start.z, start.yaw, circles, rad * 0.85)) result = { done: true, path: null };
     nodes.push({ x: start.x, z: start.z, yaw: start.yaw, g: 0, parent: -1, dir: 1, k: 0, samples: null });
     heap.push(0, h(start.x, start.z, start.yaw));
-    let found = -1;
-    while (heap.size && nodes.length < maxNodes) {
-      const ni = heap.pop();
-      const n = nodes[ni];
-      if (n.closed) continue;
-      n.closed = true;
-      if (Math.hypot(n.x - goal.x, n.z - goal.z) < posTol && goalYaws.some((gy) => angDiff(n.yaw, gy) < yawTol)) { found = ni; break; }
-      for (const dir of dirs) for (const k of kappas) {
-        let x = n.x, z = n.z, yaw = n.yaw, ok = true;
-        const samples = [];
-        const ds = STEP / SUB;
-        for (let s = 0; s < SUB; s++) {
-          const ym = yaw + dir * k * ds * 0.5;
-          x += dir * Math.sin(ym) * ds;
-          z += dir * Math.cos(ym) * ds;
-          yaw += dir * k * ds;
-          if (!this.poseFree(x, z, yaw, circles, rad)) { ok = false; break; }
-          samples.push({ x, z, yaw, dir });
+    const step = (budgetMs) => {
+      if (result) return result;
+      const t0 = performance.now();
+      let n2 = 0;
+      while (heap.size && nodes.length < maxNodes) {
+        if ((++n2 & 63) === 0 && performance.now() - t0 > budgetMs) return { done: false, path: null };
+        const ni = heap.pop();
+        const n = nodes[ni];
+        if (n.closed) continue;
+        n.closed = true;
+        if (Math.hypot(n.x - goal.x, n.z - goal.z) < posTol && goalYaws.some((gy) => angDiff(n.yaw, gy) < yawTol)) return (result = finish(ni));
+        for (const dir of dirs) for (const k of kappas) {
+          let x = n.x, z = n.z, yaw = n.yaw, ok = true;
+          const samples = [];
+          const ds = STEP / SUB;
+          for (let s = 0; s < SUB; s++) {
+            const ym = yaw + dir * k * ds * 0.5;
+            x += dir * Math.sin(ym) * ds;
+            z += dir * Math.cos(ym) * ds;
+            yaw += dir * k * ds;
+            if (!this.poseFree(x, z, yaw, circles, rad)) { ok = false; break; }
+            samples.push({ x, z, yaw, dir });
+          }
+          if (!ok) continue;
+          const g = n.g + STEP * (dir < 0 ? 2.2 : 1) * (1 + 0.12 * Math.abs(k) * R) + (dir !== n.dir && n.parent >= 0 ? 7 : 0) + Math.abs(k - n.k) * R * 0.4;
+          const key = keyOf(x, z, yaw);
+          const prev = best.get(key);
+          if (prev !== undefined && nodes[prev].g <= g) continue;
+          const id = nodes.length;
+          nodes.push({ x, z, yaw, g, parent: ni, dir, k, samples });
+          best.set(key, id);
+          heap.push(id, g + h(x, z, yaw) * 1.4);
         }
-        if (!ok) continue;
-        let g = n.g + STEP * (dir < 0 ? 2.2 : 1) * (1 + 0.12 * Math.abs(k) * R) + (dir !== n.dir && n.parent >= 0 ? 7 : 0) + Math.abs(k - n.k) * R * 0.4;
-        const key = keyOf(x, z, yaw);
-        const prev = best.get(key);
-        if (prev !== undefined && nodes[prev].g <= g) continue;
-        const id = nodes.length;
-        nodes.push({ x, z, yaw, g, parent: ni, dir, k, samples });
-        best.set(key, id);
-        heap.push(id, g + h(x, z, yaw) * 1.4);
       }
-    }
-    if (found < 0) return null;
-    const chain = [];
-    for (let i = found; i > 0; i = nodes[i].parent) chain.push(nodes[i]);
-    chain.reverse();
-    const out = [{ x: start.x, z: start.z, yaw: start.yaw, dir: chain[0]?.dir ?? 1 }];
-    for (const n of chain) out.push(...n.samples);
-    return out;
+      return (result = finish(-1));
+    };
+    return { step, get expanded() { return nodes.length; } };
   }
 
   // Walking path between two points (grid A*, 8-connected, then pruned to

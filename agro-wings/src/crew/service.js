@@ -34,6 +34,7 @@ export class GroundService {
     this.fuelReel = this.stationFuel.clone();
     this.mixReel = this.stationMix.clone();
     this.truck = new ServiceTruck(game);
+    this.walkPlanner = this.truck.makeWalkPlanner();
     this.useTruck = false;
     this.post = new THREE.Vector3(BASE.crewPost.x, 0, BASE.crewPost.z + 0.3);
     this.fuelHose.reset(this.fuelReel);
@@ -96,10 +97,8 @@ export class GroundService {
     const Lp = (k) => this._local(k);
     // Truck to the loading stand (hybrid A* around the aircraft and the
     // equipment); fixed station hoses if no drivable path exists.
-    const used = this.truck.atHome ? this.truck.dispatch(ac, this.side) : 0;
-    this.useTruck = !!used;
+    this.useTruck = this.truck.atHome && this.truck.dispatch(ac, this.side);
     if (this.useTruck) {
-      this.side = used;
       this.queue.push({ a: 'truckIn', t: 120, msg: 'Service truck on its way to the aircraft.' });
     } else if (!this.truck.atHome) {
       this.useTruck = this.truck.parkedAtStand;
@@ -203,8 +202,8 @@ export class GroundService {
   }
   // Walking route around the truck, the aircraft and the equipment.
   _walkTo(target, from = this.badeco.pos) {
-    const pl = this.truck.planner;
-    pl.build(this.truck._aircraftRects(0.25));
+    const pl = this.walkPlanner;
+    pl.build(this.truck._aircraftRects(0.25), this.truck._rectKey(0.25));
     const truck = this.truck;
     const path = pl.planWalk({ x: from.x, z: from.z }, { x: target.x, z: target.z }, 0.42, (x, z) => truck.rectDistance(x, z));
     return (path || [target]).map((p) => new THREE.Vector3(p.x, 0, p.z));
@@ -364,8 +363,8 @@ export class GroundService {
       case 'truckIn':
         // Wait at the post for the truck to park at the stand.
         b.speed = 0;
-        if (this.truck.parkedAtStand) this.step = null;
-        else if (st.time >= st.t || this.truck.state === 'blocked') {
+        if (this.truck.parkedAtStand) { this.side = this.truck.standSide; this.step = null; }
+        else if (st.time >= st.t || this.truck.state === 'blocked' || this.truck.planFailed) {
           // Could not get there: back to the bay, use the station hoses.
           this.truck.recall();
           this.useTruck = false;

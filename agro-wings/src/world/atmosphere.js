@@ -74,25 +74,25 @@ export const TIMES = {
     cTop: c3(1.0, 0.98, 0.95), cBase: c3(0.5, 0.55, 0.64),
   },
   noon: {
-    label: 'Midday', el: 66, az: 12, sun: c3(1.0, 0.98, 0.94), sunI: 3.5,
-    hemiSky: c3(0.62, 0.74, 0.95), hemiGnd: c3(0.22, 0.19, 0.1), hemiI: 0.32,
-    fog: c3(0.58, 0.68, 0.82), fogD: 0.00011, expo: 0.9, env: 0.36,
+    label: 'Midday', el: 66, az: 12, sun: c3(1.0, 0.98, 0.94), sunI: 2.6,
+    hemiSky: c3(0.62, 0.74, 0.95), hemiGnd: c3(0.22, 0.19, 0.1), hemiI: 0.28,
+    fog: c3(0.55, 0.65, 0.8), fogD: 0.0001, expo: 0.8, env: 0.32,
     turb: 2.8, ray: 1.2, mie: 0.0035, mieG: 0.8, light: 1.05,
     cTop: c3(1.0, 1.0, 0.98), cBase: c3(0.52, 0.57, 0.66),
   },
   golden: {
     label: 'Golden hour', el: 9, az: 286, sun: c3(1.0, 0.7, 0.44), sunI: 2.4, shadow: 0.9,
     hemiSky: c3(0.56, 0.6, 0.78), hemiGnd: c3(0.2, 0.15, 0.08), hemiI: 0.32,
-    fog: c3(0.72, 0.67, 0.64), fogD: 0.00012, expo: 1.02, env: 0.4,
+    fog: c3(0.6, 0.57, 0.58), fogD: 0.00012, expo: 1.0, env: 0.4,
     turb: 4.6, ray: 1.6, mie: 0.006, mieG: 0.86, light: 0.85,
     cTop: c3(1.0, 0.82, 0.62), cBase: c3(0.5, 0.48, 0.56),
   },
   dusk: {
     label: 'Dusk', el: 2.5, az: 290, sun: c3(1.0, 0.46, 0.25), sunI: 0.5, shadow: 0.55,
     hemiSky: c3(0.34, 0.38, 0.6), hemiGnd: c3(0.08, 0.065, 0.05), hemiI: 0.42,
-    fog: c3(0.34, 0.34, 0.43), fogD: 0.00014, expo: 1.05, env: 0.44,
+    fog: c3(0.23, 0.23, 0.3), fogD: 0.00014, expo: 1.05, env: 0.44,
     turb: 5.0, ray: 2.2, mie: 0.008, mieG: 0.88, light: 0.45,
-    cTop: c3(0.95, 0.58, 0.45), cBase: c3(0.3, 0.3, 0.4),
+    cTop: c3(0.72, 0.45, 0.37), cBase: c3(0.22, 0.22, 0.3),
   },
 };
 
@@ -162,7 +162,8 @@ function lerpParams(cur, tgt, k) {
       let d = t - cur[key];
       if (key === 'az') d = ((d + 540) % 360) - 180;
       cur[key] += d * k;
-      diff = Math.max(diff, Math.abs(d) / (key === 'el' || key === 'az' ? 30 : key === 'fogD' || key === 'mist' ? Math.max(1e-6, Math.abs(t)) : 1));
+      const scale = key === 'el' || key === 'az' ? 30 : key === 'fogD' ? 1e-4 : key === 'mist' ? MIST_DENSITY : 1;
+      diff = Math.max(diff, Math.abs(d) / scale);
     }
   }
   return diff;
@@ -336,11 +337,14 @@ export class Atmosphere {
       this.cur = cloneParams(this.target);
       this.wet = this.target.wet;
       this.apply();
-      this.sky.bakeEnv();
+      // The sky module already baked the default (morning, partly cloudy).
+      if (this.baked || this.timeId !== 'morning' || this.weatherId !== 'partly') this.sky.bakeEnv();
+      this.baked = true;
       this.bakePending = false;
     } else {
       this.bakePending = true;
       this.settleT = 0;
+      this.sinceSet = 0;
     }
   }
 
@@ -356,9 +360,12 @@ export class Atmosphere {
     const diff = lerpParams(this.cur, this.target, 1 - Math.exp(-dt / 5));
     const wetRate = this.target.wet > this.wet ? 1 / 40 : 1 / 120;
     this.wet = damp(this.wet, this.target.wet, wetRate * 3, dt);
-    if (this.bakePending && diff < 0.02) {
-      this.settleT += dt;
-      if (this.settleT > 0.3) { this.sky.bakeEnv(); this.bakePending = false; }
+    // Re-bake the sky lighting once the blend has (nearly) settled, or after
+    // 15 s at the latest; the env intensity carries the change until then.
+    if (this.bakePending) {
+      this.sinceSet += dt;
+      if (diff < 0.03) this.settleT += dt;
+      if (this.settleT > 0.3 || this.sinceSet > 15) { this.sky.bakeEnv(); this.bakePending = false; }
     }
     // Visual wind = the aircraft's mean wind (same function, same scale), with
     // the weather's gustiness for vegetation sway.

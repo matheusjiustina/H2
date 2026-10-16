@@ -205,7 +205,13 @@ export class GameAudio {
     this.truckOsc.connect(this.truckLP);
     this.truckSub.connect(tsG).connect(this.truckLP);
     this.truckLP.connect(this.truckGain).connect(this.master);
-    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum, this.truckOsc, this.truckSub]) o.start();
+    // Distant farm tractor: a lower, steadier diesel drone.
+    this.tracOsc = ctx.createOscillator(); this.tracOsc.type = 'sawtooth'; this.tracOsc.frequency.value = 29;
+    this.tracLP = ctx.createBiquadFilter(); this.tracLP.type = 'lowpass'; this.tracLP.frequency.value = 220;
+    this.tracGain = ctx.createGain(); this.tracGain.gain.value = 0;
+    this.tracOsc.connect(this.tracLP).connect(this.tracGain).connect(this.master);
+    this.hangarT = 3;
+    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum, this.truckOsc, this.truckSub, this.tracOsc]) o.start();
     this.birdT = 2;
     this.cicT = 0;
     this.cicOn = false;
@@ -289,6 +295,18 @@ export class GameAudio {
       this.truckLP.frequency.setTargetAtTime(240 + 520 * tk.load, t, 0.2);
       this.truckGain.gain.setTargetAtTime(tk.on ? (0.035 + 0.05 * tk.load) * tk.att * (s.inside ? 0.45 : 1) : 0, t, 0.25);
     }
+    // Tractor working the fallow field, heard from the ground nearby.
+    const trac = s.tractor ?? 0;
+    this.tracOsc.frequency.setTargetAtTime(29 + 2.5 * Math.sin(t * 0.7), t, 0.3);
+    this.tracGain.gain.setTargetAtTime(0.05 * trac * (s.inside ? 0.4 : 1), t, 0.5);
+    // Hangar: now and then a tool, a ratchet, a dropped part.
+    if ((s.hangar ?? 0) > 0.05) {
+      this.hangarT -= dt;
+      if (this.hangarT <= 0) {
+        this.hangarT = 2.5 + Math.random() * 6;
+        this.play(Math.random() < 0.55 ? 'ratchet' : 'clank', { volume: 0.5 * s.hangar });
+      }
+    }
     // Weather (visual-only settings): rain bed, fewer birds, more breeze in gusty weather.
     const W = s.weather ?? { rain: 0, birds: 1, insects: 1, gust: 1 };
     this.rainLP.frequency.setTargetAtTime(s.inside ? 1600 : 9000, t, 0.3);
@@ -366,6 +384,7 @@ export class GameAudio {
       case 'thump': tone(0.25, 90, 40, 0.35); burst(0.15, 200, 1, 0.2, 'lowpass', this.brown); break;
       case 'clank': for (const f of [820, 1370, 2210]) tone(0.25, f, f * 0.98, 0.05, 'triangle'); break;
       case 'reel': for (let i = 0; i < 8; i++) tone(0.03, 1800, 1500, 0.03, 'square', i * 0.06); break;
+      case 'ratchet': for (let i = 0; i < 5 + Math.floor(Math.random() * 4); i++) tone(0.018, 2600, 2300, 0.03, 'square', i * 0.085); break;
       case 'starter': break;
       case 'lightoff': {
         // Fuel lights in the combustor: a soft rising whoosh.

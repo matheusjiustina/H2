@@ -16,7 +16,14 @@ npm run build      # dist/index.html (single file)
 npm test           # flight (both aircraft) + spray validation (Node)
 ```
 
-URL option: `?q=low|medium|high` forces a graphics preset.
+URL option: `?q=low|medium|high` forces a graphics preset (otherwise the
+first run measures the frame time on the title screen and steps the preset
+down or up once; a manual choice in Settings turns that off).
+
+Settings → Environment: time of day (dawn, morning, midday, golden hour,
+dusk) and weather (clear, partly cloudy, overcast, light rain, morning mist).
+Weather and time of day are visual and audio only — the flight model's wind
+is the Wind setting, as before. Settings → Cockpit shake: off / low / normal.
 
 ## Gameplay loop
 
@@ -56,6 +63,7 @@ over-application) and aircraft condition (repairs).
 | Free external camera | O |
 | Service / interact | E |
 | Map / coverage overlay / contracts | M / K / J |
+| Minimap: farm map ↔ GPS guidance page | N (or click the minimap) |
 | Reset aircraft | Backspace |
 | Speed up ground service | hold T |
 
@@ -127,7 +135,14 @@ Browser checks (need `npm run build && npx vite preview --port 4173`):
   (`src/game/autopilot.js`) through the normal player inputs only;
 - `node test/e2e_ui.mjs out/` — service interruption, crash + recovery,
   stuck reset, key rebinding, tutorial, mobile layout;
-- `node test/perf.mjs` — per-view tick/render time, draw calls, triangles.
+- `node test/perf.mjs` — per-view tick/render time, draw calls, triangles;
+- `node test/profile.mjs <low|medium|high> <ipanema|at502>` — load time,
+  GPU object counts, JS heap, tick and frame avg/p95/p99 per view;
+- `node test/envviews.mjs out/ [times] [weathers] [views]` — renders per
+  time of day × weather; `node test/atmo_transition.mjs` — gradual blends;
+- `node test/truck.mjs out/ [dx dz headingDeg]` — service truck cycle with
+  timings, closest approach to the aircraft and loads;
+- `node test/gpsview.mjs out/` — HUD GPS page and the cockpit unit.
 
 ### Measured in this container (Chromium + SwiftShader, 1280×720)
 
@@ -408,3 +423,146 @@ swath spacing, chase/orbit cameras, cockpit vibration, overspeed and
 low-fuel warnings, and audio (`profile: 'turboprop'`: compressor whine and
 gas-generator hum from Ng, exhaust roar with power, prop buzz from Np,
 light-off whoosh). Key bindings are unchanged.
+
+## Realism 4.0 (atmosphere, farm operations, GPS)
+
+Added on top of the existing game without touching the flight model, the
+assist, the aircraft configurations, liveries, controls, save data,
+missions, map coordinates or runway (`git diff checkpoint-before-realism-4
+-- src/flight` is empty; `src/config.js` only gained `rainDrops` per preset).
+
+**Atmosphere** (`src/world/atmosphere.js`, `sky.js`). Five times of day
+(dawn, morning, midday, golden hour, dusk) × five weather presets (clear,
+partly cloudy, overcast, light rain, morning mist), chosen in Settings and
+saved. Each preset drives the Preetham sky, the sun's direction, colour,
+intensity and shadow strength, the hemisphere light, the haze colour and
+density, exposure, the cumulus cover (whole clouds fade in/out), an
+overcast deck with horizon haze (one sky-dome draw), exponential height
+mist that settles in the low ground (added to three's stock fog chunks
+once, so no extra shader programs), GPU rain streaks (one instanced draw,
+motion-blurred along the drop's speed relative to the eye, faded near the
+eye so no drops appear inside the cabin), wet ground (darker, glossier
+soil and roads; soaks in ~40 s, dries in ~2 min) and the ambience (rain,
+breeze, birds, insects). Changes blend over ~5 s; the sky lighting (PMREM)
+is re-baked once when the blend settles. Morning + partly cloudy reproduces
+the previous look (mean pixel difference 0.2–1.8/255 in the same views; the
+rest is the truck's new bay and the wind sway).
+
+Weather is visual and audio only. The *visual* wind is the flight model's
+own mean wind (`windAt`, same scale setting) mirrored into one shared
+uniform that sways grass, trees (crowns bend downwind with travelling
+gusts, leaves flutter), crop rows and canopy (wind waves), and slants the
+rain. No aerodynamic wind solver was added and the physics never reads it.
+
+**Service truck** (`src/crew/truck.js`, `planner.js`). The support tanker
+(calda + fuel, rear reels, pump, amber beacon, brake/reverse lights,
+headlights in low light, "BADECO · APOIO AGRÍCOLA") waits in a bay by the
+crew post. On a service request it drives to a stand off the service-side
+wingtip, facing aft with its reels level with the wing leading edge:
+hybrid A* over (x, z, heading) with forward and reverse arcs at a 9.2 m
+turning radius (the truck's lock is 0.6 rad on a 5.3 m wheelbase), around
+the static colliders and every aircraft's footprint (+0.8 m), the truck
+checked as a chain of circles. The search is spread over frames (3 ms each,
+no hitch). Driving: kinematic bicycle model, rate-limited steering, pure
+pursuit, accel/brake limits, corner and stop-distance speed limits, a
+straight lead-in to the stand, live look-ahead braking for aircraft and
+the badeco; wheels spin and steer, the body pitches and rolls. The badeco
+walks to its reels along grid-A* paths around the truck and the aircraft,
+runs the hoses as before, the truck backs out and returns to its bay
+(either heading), and the aircraft is released once it is clear. If no
+stand is reachable the station hoses are used, as before. The truck is an
+obstacle for the aircraft and vetoes engine start while beside it.
+Measured (`test/truck.mjs`): arrives in 24–32 s, parks within 0.25 m / 1°
+of the stand, closest approach to an aircraft 0.88–1.35 m, standard and
+off-centre parking (4 m, 60°; −5 m, 120° on the other side) for both
+aircraft.
+
+**Hangar.** Portal frames and purlins, corrugated inner lining, concrete
+floor that darkens with depth (sky light cut by the roof), safety lines,
+tool chest, wing trestles, spare hopper, parts pallet, ladder, drums on a
+spill tray; four corrugated sliding door leaves on two top tracks (one
+instanced draw) that close at dusk and open when an aircraft comes near;
+high-bay lamps with light pools on the floor (no real lights). Colliders
+are now the walls, roof and equipment, so an aircraft can taxi in when
+the doors are open. Grass no longer grows through the slab.
+
+**Farm activity.** A tractor with a disc harrow works the fallow T-08 lane
+by lane with headland turns, raising dust; its pose is a function of time,
+so updates are throttled with distance (every frame < 500 m, 8 Hz to
+1.2 km, hidden beyond 800 m) and it costs nothing far away.
+
+**Vehicles.** Shared materials; wheels are two instanced meshes per
+vehicle; only the big parts cast shadows; small parts (lenses, reels,
+decals, beacon) are hidden beyond 220 m and the whole vehicle beyond
+800–900 m.
+
+**GPS and scoring.** The guidance unit records the flight track (where the
+boom was spraying in yellow) and shows heading, ground speed, cross-track
+error, spray state and flow, progress, remaining area and overlap, all from
+live state. The same page is available on the HUD minimap (N or a click).
+Results add flight time, sorties and work rate (ha/h) to coverage, gaps,
+overlap, uniformity and waste. The spray plume is finer and more
+translucent (smaller growth, lower opacity, lit by the scene light).
+
+**Cockpit and pilot.** Settings → Cockpit shake (off / low / normal) scales
+the engine/ground vibration and the g head-sink. The pilot's head (exterior
+views) looks into turns, along the boom on spray passes and out of the side
+while taxiing, and dips under g.
+
+**Audio.** Rain (muffled in the cabin), the truck's diesel with distance,
+the tractor drone near T-08, tools and ratchets near the hangar, gustier
+breeze, fewer birds in rain; aircraft audio unchanged.
+
+**Performance manager.** First run only: the title screen's frame time
+picks the preset (steps down under ~33 fps, up over ~80 fps); a manual
+choice turns it off; `?q=` forces a preset. Settings → Show FPS now shows
+frame-time average and p95, draw calls, triangles and the preset.
+
+**Measured** (`test/profile.mjs`, SwiftShader, 960×540; tick = game logic
+ms/frame over 120 ticks; "before" is the build tagged
+`checkpoint-before-realism-4`, default morning / partly cloudy):
+
+| preset · aircraft | view | tick avg (p95) before → after | draw calls | triangles |
+| --- | --- | --- | --- | --- |
+| low · PR-AGW | pad (chase) | 0.36 (0.5) → 0.57 (0.8) | 463 → 486 | 738k → 737k |
+| low · PR-AGW | spraying soy, 4 m | 1.22 (2.7) → 0.84 (1.6) | 370 → 378 | 550k → 545k |
+| low · PR-AGW | cockpit over corn | 0.82 (1.9) → 0.76 (1.5) | 362 → 362 | 912k → 912k |
+| low · PR-AGW | 400 m AGL | 0.50 (0.6) → 0.66 (1.1) | 323 → 329 | 478k → 478k |
+| high · PR-AGW | pad | 0.57 (0.7) → 0.52 (0.7) | 464 → 487 | 766k → 764k |
+| high · PR-AGW | spraying soy | 1.74 (5.8) → 1.17 (2.3) | 398 → 408 | 572k → 569k |
+| high · PR-AGW | cockpit over corn | 1.09 (2.0) → 1.49 (5.0) | 389 → 389 | 924k → 924k |
+| high · AT-502B | pad | 0.53 (0.9) → 0.86 (1.8) | 476 → 504 | 784k → 785k |
+| high · AT-502B | spraying soy | 1.99 (4.7) → 1.15 (1.9) | 400 → 410 | 568k → 573k |
+| high · AT-502B | cockpit over corn | 1.40 (3.9) → 1.08 (2.2) | 392 → 392 | 952k → 952k |
+
+Tick differences of a few tenths of a millisecond either way are run-to-run
+noise in this container. Load to first frame: 19.5 → 19.3 s (low),
+23.0 → 23.5 s (high), 22.2 → 21.7 s (AT). GPU objects: +17–28 geometries,
++1–2 textures, +6–8 shader programs (cloud deck, rain, hangar shading,
+instanced wheels, sprites); JS heap 124–145 → 138–156 MB. The extra draw
+calls on the pad are the truck and the hangar seen up close; in flight
+they are the far tractor and the hangar slab (+6 to +10); the cockpit view
+is unchanged. Sky-light re-bake on a weather/time change: ~40 ms in
+SwiftShader, once per change. Truck route search: ~120–370 ms of CPU in
+total in this container, spread at 3 ms per frame.
+
+**Validation (this build).** `npm test` 35/35. `node test/e2e.mjs soy`
+(PR-AGW): two sorties with the truck servicing, 90 %, 2★ (as before).
+`AC=at502 node test/e2e.mjs soy`: one sortie, 90 %, 1★ / Cr$ 5,093 (the
+pre-change build gave 2★ / Cr$ 4,993 on the same run: the AT sits at the
+2★ uniformity/waste threshold and the truck's drive shifts when the passes
+are flown, i.e. the gust phase; deposition, contracts and autopilot code
+are unchanged). `node test/e2e_ui.mjs` 16/16 (one check now waits for the
+truck to arrive; one new check: truck parked at its stand).
+`node test/atmo_transition.mjs`: rain, dusk and back to morning blend over
+~5–20 s, one sky re-bake each, no errors. Renders of all five times of day
+and five weathers from the apron, the air and the chase camera; the
+default look compared pixel-by-pixel with the previous build.
+
+**Known limits.** Time of day is a preset, not a running clock; there is
+no night (dusk is the darkest). Rain has no splashes or drops on the
+windscreen; puddles are not modelled (the ground just gets wet). The
+overcast deck is a sky-dome layer, not volumetric. The truck cannot reach
+every possible parking pose inside the pad circle; then the fixed station
+hoses are used as before. Only one farm vehicle works the fields. Real-GPU
+frame times were not measured (no GPU here); use Settings → Show FPS.

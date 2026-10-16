@@ -3,6 +3,7 @@
 // meshes (no extra draw calls per vehicle). Local frame: +Z forward, +Y up.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -370,12 +371,11 @@ export function wheelSet(root, lay, gFront, gRear, mat) {
     const list = lay.filter((w) => !!w.steer === steer);
     const im = new THREE.InstancedMesh(geo, mat, list.length);
     im.castShadow = true;
-    im.frustumCulled = false;
     root.add(im);
     sets.push({ im, list });
   }
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
-  return (spin, steerAngle) => {
+  const set = (spin, steerAngle) => {
     for (const { im, list } of sets) {
       list.forEach((w, i) => {
         e.set(spin * (0.5 / w.R), w.steer ? steerAngle : 0, 0, 'YXZ');
@@ -384,4 +384,48 @@ export function wheelSet(root, lay, gFront, gRear, mat) {
       im.instanceMatrix.needsUpdate = true;
     }
   };
+  set.meshes = sets.map((x) => x.im);
+  // Bounds once: spinning/steering about each axle keeps them (culling works).
+  set(0, 0);
+  for (const { im } of sets) im.computeBoundingSphere();
+  return set;
+}
+
+// Collects Kit output per material in a vehicle's local frame and merges it
+// into one mesh per material (animated vehicles: truck, working tractor).
+export class PartCollector {
+  constructor() { this.parts = new Map(); }
+  addRaw(g, mat) {
+    if (g.index) g = g.toNonIndexed();
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    if (!this.parts.has(mat)) this.parts.set(mat, []);
+    this.parts.get(mat).push(g);
+  }
+  // Only materials listed in casters cast shadows (all when omitted); the
+  // other meshes are small parts, listed in .detail for distance LOD.
+  build(group, casters = null) {
+    this.detail = [];
+    for (const [mat, list] of this.parts) {
+      const mesh = new THREE.Mesh(mergeGeometries(list), mat);
+      mesh.castShadow = !casters || casters.includes(mat);
+      mesh.receiveShadow = true;
+      group.add(mesh);
+      if (!mesh.castShadow) this.detail.push(mesh);
+    }
+    return this.detail;
+  }
+}
+
+// Distance LOD for an animated vehicle: small parts go beyond `near`, the
+// wheels beyond `mid` (a pixel or two by then), the whole vehicle beyond
+// `far`. Returns the distance.
+export function vehicleLod(root, detail, cam, near = 220, far = 900, wheels = null, mid = 400) {
+  const d = Math.hypot(cam.x - root.position.x, cam.z - root.position.z);
+  root.visible = d < far;
+  const show = d < near;
+  if (detail.lodShown !== show) { for (const m of detail) m.visible = show; detail.lodShown = show; }
+  if (wheels) for (const w of wheels) w.visible = d < mid;
+  return d;
 }

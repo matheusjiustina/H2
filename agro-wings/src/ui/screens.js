@@ -10,6 +10,7 @@ import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { drawMap } from './maps.js';
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const pct = (v) => `${Math.round(v * 100)}%`;
 
 export class Screens {
@@ -211,6 +212,8 @@ export class Screens {
         <div class="stat"><b>${pct(r.overlap)}</b><span>Overlap</span></div>
         <div class="stat"><b>${pct(r.waste)}</b><span>Waste</span></div>
         <div class="stat"><b>${Math.round(100 - r.damage)}%</b><span>Aircraft condition</span></div>
+        <div class="stat"><b>${mmss(job.flightTime)}</b><span>Flight time · ${Math.max(1, job.sorties)} sortie${job.sorties > 1 ? 's' : ''}</span></div>
+        <div class="stat"><b>${job.flightTime > 30 ? ((job.ha * Math.min(1, r.coverage)) / (job.flightTime / 3600)).toFixed(0) : '—'}</b><span>Work rate (ha/h)</span></div>
       </div>
       <h3>Liquid</h3>
       <table class="ledger">
@@ -273,6 +276,7 @@ export class Screens {
       <h3>Graphics</h3>
       <div class="field"><label>Quality</label>${seg('quality', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']])}<span></span></div>
       <div class="field"><label>Show FPS</label>${seg('showFps', [[false, 'Off'], [true, 'On']])}<span></span></div>
+      <div class="field"><label>Cockpit shake</label>${seg('shake', [[0, 'Off'], [0.5, 'Low'], [1, 'Normal']])}<span></span></div>
       <h3>Environment</h3>
       <div class="field"><label>Time of day</label>${seg('timeOfDay', TIME_ORDER.map((k) => [k, TIMES[k].label]))}<span></span></div>
       <div class="field"><label>Weather</label>${seg('weather', WEATHER_ORDER.map((k) => [k, WEATHER[k].label]))}<span></span></div>
@@ -291,7 +295,7 @@ export class Screens {
         const key = b.parentElement.dataset.key;
         let v = b.dataset.v;
         if (v === 'true' || v === 'false') v = v === 'true';
-        else if (!Number.isNaN(+v) && key === 'wind') v = +v;
+        else if (!Number.isNaN(+v) && (key === 'wind' || key === 'shake')) v = +v;
         g.setSetting(key, v);
         b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
         return;

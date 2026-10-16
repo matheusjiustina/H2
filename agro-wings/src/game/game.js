@@ -35,10 +35,13 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', timeOfDay: 'morning', weather: 'partly' };
+    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     const q = new URLSearchParams(location.search).get('q');
-    if (q && QUALITY[q]) this.settings.quality = q;
+    if (q && QUALITY[q]) { this.settings.quality = q; this.qualityForced = true; }
+    // Frame-time history (ms) for the FPS overlay and the auto quality check.
+    this.frameMs = new Float32Array(240);
+    this.frameN = 0;
   }
 
   createRenderer() {
@@ -81,6 +84,7 @@ export class Game {
       this.fleet[id] = ac;
     }
     this.rig = new CameraRig(this.camera);
+    this.rig.shakeScale = this.settings.shake;
     this.sprayer = new Sprayer(this);
     this.guidance = new Guidance(this);
     this.overlay = new CoverageOverlay(this);
@@ -126,8 +130,9 @@ export class Game {
   }
 
   // ------------------------------------------------------------------ settings
-  setSetting(k, v) {
+  setSetting(k, v, auto = false) {
     this.settings[k] = v;
+    if (k === 'quality' && !auto) this.settings.qualityAuto = false;
     try { localStorage.setItem(SETTINGS, JSON.stringify(this.settings)); } catch { /* ignore */ }
     if (k === 'quality') {
       this.quality = QUALITY[v];
@@ -137,6 +142,7 @@ export class Game {
       this.resize();
     }
     if (k === 'volume') this.audio.setVolume(v);
+    if (k === 'shake') this.rig.shakeScale = v;
     // Visual/audio only: the flight model's wind is not touched by weather.
     if (k === 'timeOfDay' || k === 'weather') this.world.atmo.set(this.settings.timeOfDay, this.settings.weather);
   }
@@ -329,11 +335,46 @@ export class Game {
   // ------------------------------------------------------------------ frame
   frame() {
     const now = performance.now();
+    this.frameMs[this.frameN++ % this.frameMs.length] = now - this.last;
     const rawDt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
+    this._autoQuality(now);
     if (this.frozen) { if (!this.noRender) this.render(); return; }
     this.tick(rawDt);
     this.render();
+  }
+
+  // Frame-time statistics over the last n frames: { avg, p95 } in ms.
+  frameStats(n = 120) {
+    const k = Math.min(n, this.frameN, this.frameMs.length);
+    if (!k) return { avg: 0, p95: 0 };
+    const a = [];
+    for (let i = 1; i <= k; i++) a.push(this.frameMs[(this.frameN - i + this.frameMs.length * 4) % this.frameMs.length]);
+    a.sort((x, y) => x - y);
+    return { avg: a.reduce((s, v) => s + v, 0) / k, p95: a[Math.min(k - 1, Math.floor(k * 0.95))] };
+  }
+
+  // First run only: measure the frame time on the title screen and pick the
+  // preset that keeps the game smooth on this machine (the player can change
+  // it in Settings; a manual choice turns this off for good).
+  _autoQuality(now) {
+    const s = this.settings;
+    if (!s.qualityAuto || s.autoChecked || this.qualityForced) return;
+    this._aqT0 ??= now;
+    const el = now - this._aqT0;
+    if (el < 2500) { this._aqN0 = this.frameN; return; }
+    if (el < 8000) return;
+    const st = this.frameStats(Math.max(30, this.frameN - this._aqN0));
+    const order = ['low', 'medium', 'high'];
+    let i = order.indexOf(s.quality);
+    if (st.avg > 30 && i > 0) i--; // under ~33 fps: step down
+    else if (st.avg < 12 && st.p95 < 18 && i < 2) i++; // comfortably over 80 fps: step up
+    s.autoChecked = true;
+    this.autoQualityResult = { ...st, from: s.quality, to: order[i] };
+    if (order[i] !== s.quality) {
+      this.setSetting('quality', order[i], true);
+      this.toast(`Graphics set to ${order[i]} for this device (change it in Settings).`);
+    } else this.setSetting('autoChecked', true);
   }
 
   // Run the game logic without rendering (automated validation / fast-forward).
@@ -387,7 +428,7 @@ export class Game {
       this.guidance.update(dt);
       this.overlay.update(this.job ? this.job.coverages : []);
       this.service.update(dt);
-      this.world.structures.update(dt, this.time, ac.windVec, { acPos: ac.fm.pos, light: this.world.atmo.cur.light ?? 1 });
+      this.world.structures.update(dt, this.time, ac.windVec, { acPos: ac.fm.pos, light: this.world.atmo.cur.light ?? 1, cam: this.camera.position });
       if (this.job && !ac.fm.out.onGround) this.job.flightTime += dt;
       this.statT -= dt;
       if (this.job && this.statT <= 0) {
@@ -448,6 +489,7 @@ export class Game {
       if (this.job) this.toast(v ? 'Coverage overlay on (red = not covered, green = good, purple = overlap).' : 'Coverage overlay off.');
     }
     if (input.wasPressed('interact')) this._interact();
+    if (input.wasPressed('gps')) this.hud.toggleGps();
     if (input.wasPressed('reset')) {
       if (ac.state === 'crashed') return;
       this.resetAircraft('pad');
@@ -562,6 +604,8 @@ export class Game {
       profile: ac.type.audio.profile, blades: ac.type.audio.blades, ng: fm.ng, power: ac.A.turbine ? fm.shaftPower / ac.A.maxPower : fm.throttle, itt: fm.itt,
       ambience: (1 - smoothstep(150, 700, baseD)) * (this.camera.position.y < 80 ? 1 : 0.3),
       weather: this.world.atmo.audioLevels(),
+      tractor: this.world.farm.root.visible ? 1 / (1 + this.camera.position.distanceTo(this.world.farm.root.position) / 25) * (this.camera.position.distanceTo(this.world.farm.root.position) < 500 ? 1 : 0) : 0,
+      hangar: Math.max(0, 1 - Math.hypot(this.camera.position.x - BASE.hangar.x, this.camera.position.z - BASE.hangar.z) / 45) * (this.cameraMode === 'cockpit' && ac.fm.engine === 'running' ? 0.3 : 1),
       truck: this.service.truck?.audioState(this.camera.position),
     });
   }

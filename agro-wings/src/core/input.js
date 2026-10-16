@@ -22,6 +22,7 @@ export const ACTIONS = {
   interact: { label: 'Interact / service', keys: ['KeyE'] },
   map: { label: 'Map', keys: ['KeyM'] },
   coverage: { label: 'Coverage overlay', keys: ['KeyK'] },
+  gps: { label: 'Minimap: map / GPS guidance', keys: ['KeyN'] },
   jobs: { label: 'Contracts', keys: ['KeyJ'] },
   reset: { label: 'Reset aircraft', keys: ['Backspace'] },
   help: { label: 'Controls help', keys: ['KeyH'] },

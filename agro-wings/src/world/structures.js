@@ -362,19 +362,20 @@ function buildHangar(B, M, group) {
   const leafW = h.w / 4 + 0.15, leafH = h.h - 0.65;
   const leafGeo = new THREE.BoxGeometry(leafW, leafH, 0.1);
   scaleBoxUV(leafGeo, leafW, leafH, 0.1, 4);
+  // One instanced mesh for the four leaves (one draw).
+  const doorIM = new THREE.InstancedMesh(leafGeo, M.metalWall, 4);
+  doorIM.castShadow = true; doorIM.receiveShadow = true;
+  group.add(doorIM);
   const leaves = [];
   for (const side of [-1, 1]) {
     for (const k of [0, 1]) {
-      const m = new THREE.Mesh(leafGeo, M.metalWall);
-      m.castShadow = true; m.receiveShadow = true;
       const closed = h.x + side * (h.w / 2 - leafW / 2 - k * (leafW - 0.15));
       const open = h.x + side * (h.w / 2 + leafW / 2 + 0.3);
       const track = z1 + 0.28 + k * 0.16;
-      m.position.set(closed, leafH / 2 + 0.12, track);
-      group.add(m);
-      leaves.push({ m, closed, open, delay: k * 0.35 });
+      leaves.push({ closed, open, y: leafH / 2 + 0.12, z: track, delay: k * 0.35, x: NaN });
     }
   }
+  const _lm = new THREE.Matrix4();
   for (const k of [0, 1]) B.box(h.w * 1.5 + 1, 0.12, 0.1, M.steel, h.x, h.h - 0.45, z1 + 0.28 + k * 0.16); // top tracks
   B.box(0.2, h.h - 0.3, 0.2, M.steel, x0 - leafW - 0.5, (h.h - 0.3) / 2, z1 + 0.35);
   B.box(0.2, h.h - 0.3, 0.2, M.steel, x1 + leafW + 0.5, (h.h - 0.3) / 2, z1 + 0.35);
@@ -387,6 +388,9 @@ function buildHangar(B, M, group) {
   B.collider(x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.6, h.h + rise + 0.2, 'hangar roof', h.h - 0.6);
   const doorCol = B.collider(x0 - 0.5, x1 + 0.5, z1 + 0.1, z1 + 0.6, h.h, 'hangar door');
   const state = { open: 1, target: 1 };
+  leaves.forEach((l, i) => { l.x = l.open; doorIM.setMatrixAt(i, _lm.makeTranslation(l.open, l.y, l.z)); });
+  doorIM.instanceMatrix.needsUpdate = true;
+  doorIM.computeBoundingSphere();
   return {
     leaves,
     get open() { return state.open; },
@@ -394,10 +398,16 @@ function buildHangar(B, M, group) {
       const near = ctx.acPos && Math.hypot(ctx.acPos.x - h.x, ctx.acPos.z - z1) < 70;
       state.target = (ctx.light ?? 1) > 0.55 || near ? 1 : 0;
       state.open += Math.sign(state.target - state.open) * Math.min(Math.abs(state.target - state.open), dt / 12);
-      for (const l of leaves) {
+      let moved = false;
+      leaves.forEach((l, i) => {
         const f = Math.min(1, Math.max(0, (state.open - l.delay * (1 - state.target)) / (1 - l.delay * 0.5)));
-        l.m.position.x = l.closed + (l.open - l.closed) * f;
-      }
+        const x = l.closed + (l.open - l.closed) * f;
+        if (x !== l.x) { l.x = x; doorIM.setMatrixAt(i, _lm.makeTranslation(x, l.y, l.z)); moved = true; }
+      });
+      if (moved) { doorIM.instanceMatrix.needsUpdate = true; doorIM.computeBoundingSphere(); }
+      // Lamps and light pools only matter up close.
+      const far = ctx.cam ? Math.hypot(ctx.cam.x - h.x, ctx.cam.z - h.z) > 320 : false;
+      lamps.visible = pools.visible = !far;
       doorCol.top = state.open > 0.92 ? -1e9 : h.h;
       const dark = 1 - Math.min(1, Math.max(0, ((ctx.light ?? 1) - 0.4) / 0.6));
       lampMat.emissiveIntensity = 0.35 + 2.2 * dark;

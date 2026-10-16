@@ -50,9 +50,12 @@ export class CameraRig {
       // Vibration: engine (rpm) + ground roughness; g-load sinks the head.
       const eng = fm.rpm > 300 ? 0.0009 + 0.0008 * smoothstep(vib[0], vib[1], fm.rpm) * (ac.A?.turbine ? 0.5 : 1) : 0;
       const ground = o.onGround ? 0.004 * smoothstep(1, 25, o.groundSpeed) * (o.surface === 'runway' ? 0.6 : 1) : 0;
-      const amp = eng + ground + this.shake * 0.02;
+      // Engine/ground vibration and the g head-sink scale with the player's
+      // "Cockpit shake" setting (0 = off); the crash jolt always plays.
+      const ks = this.shakeScale ?? 1;
+      const amp = (eng + ground) * ks + this.shake * 0.02;
       _v.copy(ac.model.eye);
-      _v.y -= clamp((o.gLoad - 1) * 0.02, -0.04, 0.05);
+      _v.y -= clamp((o.gLoad - 1) * 0.02, -0.04, 0.05) * Math.min(1, ks * 1.5);
       _v.x += (Math.random() - 0.5) * amp;
       _v.y += (Math.random() - 0.5) * amp;
       cam.position.copy(_v.applyQuaternion(quat).add(pos));

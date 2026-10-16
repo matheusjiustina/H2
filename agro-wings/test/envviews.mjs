@@ -32,6 +32,7 @@ const VIEWS = {
   sunward: { cam: [-150, 60, 300], target: [600, 40, -500], fov: 60 },
   chase: { plane: { x: 300, z: -280, hdg: Math.PI / 2, agl: 4, mode: 'chase' } },
   cockpit: { plane: { x: -200, z: 470, hdg: Math.PI / 2, agl: 6, mode: 'cockpit' } },
+  spray: { plane: { x: 300, z: -280, hdg: Math.PI / 2, agl: 3.5, mode: 'orbit', spray: true } },
 };
 const combos = [];
 if (times || weathers) {
@@ -72,7 +73,11 @@ for (const [t, w] of combos) {
       } else if (v.plane) {
         g.aircraft.placeAirborne(v.plane.x, v.plane.z, v.plane.hdg, v.plane.agl, 46 * (g.aircraft.A.assistSpeedScale ?? 1));
         g.cameraMode = v.plane.mode; g.rig.setMode(v.plane.mode, g.aircraft);
-        for (let i = 0; i < 40; i++) g.tick(1 / 60);
+        if (v.plane.spray) {
+          g.sprayer.on = true; g.aircraft.fm.hopper = 600;
+          g.rig.orbit.yaw = -2.2; g.rig.orbit.pitch = 0.12; g.rig.orbit.dist = 26;
+        }
+        for (let i = 0; i < (v.plane.spray ? 150 : 40); i++) g.tick(1 / 60);
       } else {
         g.aircraft.placeAtPad();
         for (let i = 0; i < 3; i++) g.tick(1 / 60);

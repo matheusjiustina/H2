@@ -8,7 +8,7 @@ import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
 import { FLIGHT, UNITS } from '../config.js';
 import { BASE, RUNWAY, POWERLINE } from '../world/layout.js';
-import { approach, clamp, smoothstep, KT, FT } from '../core/math.js';
+import { approach, clamp, smoothstep, damp, KT, FT } from '../core/math.js';
 
 const FLAP_NOTCHES = [0, 1 / 3, 2 / 3, 1];
 
@@ -424,6 +424,23 @@ export class Aircraft {
   }
 
   // ------------------------------------------------------------------ visuals
+  // Pilot's head (exterior views only, a few small rotations): looks into
+  // the turn, glances along the boom on spray passes, looks out of the side
+  // while taxiing a taildragger (no view over the nose), dips under g.
+  _pilotHead(dt, spraying) {
+    const head = this.model.pilot?.head;
+    if (!head || !this.model.pilot.visible) return;
+    const fm = this.fm, o = fm.out;
+    const t = this.simTime;
+    const bank = _v.set(1, 0, 0).applyQuaternion(fm.quat).y; // > 0: banked right
+    let yaw = -clamp(bank * 0.9, -0.55, 0.55);
+    if (o.onGround && o.groundSpeed > 1.5) yaw += 0.42 * Math.sin(t * 0.45);
+    else if (spraying) yaw += 0.12 * Math.sin(t * 0.7) + (Math.sin(t * 0.23) > 0.92 ? 0.35 : 0);
+    const pitch = clamp((o.gLoad - 1) * 0.05, -0.05, 0.12) + (spraying ? 0.06 : 0);
+    head.rotation.y = damp(head.rotation.y, yaw, 2.5, dt);
+    head.rotation.x = damp(head.rotation.x, pitch, 3, dt);
+  }
+
   _animate(dt) {
     const m = this.model, fm = this.fm;
     if (this.state === 'crashed') {
@@ -463,6 +480,7 @@ export class Aircraft {
     m.pedals[1].position.z = an.pedalZ + fm.rudder * 0.05;
     m.throttle.rotation.x = -0.5 + fm.throttle * 0.95;
     const spraying = this.game.sprayer?.on;
+    this._pilotHead(dt, spraying);
     m.valve.rotation.x = spraying ? 0.6 : -0.3;
     m.pumpFan.rotation.z += (spraying ? fm.out.airspeed * 1.6 : fm.out.airspeed * 0.3) * dt;
     // Instrument panel at 15 Hz while visible.

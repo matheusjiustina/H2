@@ -1,8 +1,12 @@
 // Swath guidance (lightbar + GPS screen): parallel pass lines over the
 // contract fields, completion of each pass from real coverage, the next pass
-// to fly and the cross-track error to it.
-import { SPRAY } from '../config.js';
-import { clamp } from '../core/math.js';
+// to fly and the cross-track error to it. Also records the flight track
+// (with where the boom was spraying) and draws the GPS page used by the
+// cockpit unit and by the HUD's GPS mode. Every readout comes from live
+// state: position, heading, ground speed, coverage grid, sprayer flow.
+import { clamp, KT } from '../core/math.js';
+
+const TRACK_MAX = 2400; // points (~16 min at 0.4 s)
 
 export class Guidance {
   constructor(game) {
@@ -13,9 +17,27 @@ export class Guidance {
     this.xte = 0;
     this.aligned = false;
     this.t = 0;
+    // Flight track ring buffer: x, z, spraying flag.
+    this.track = new Float32Array(TRACK_MAX * 3);
+    this.trackN = 0; this.trackHead = 0; this.trackT = 0;
+  }
+
+  clearTrack() { this.trackN = 0; this.trackHead = 0; }
+
+  _record(dt) {
+    const ac = this.game.aircraft, o = ac.fm.out;
+    this.trackT -= dt;
+    if (this.trackT > 0 || o.onGround) return;
+    this.trackT = 0.4;
+    const sp = this.game.sprayer;
+    const i = this.trackHead * 3;
+    this.track[i] = ac.fm.pos.x; this.track[i + 1] = ac.fm.pos.z; this.track[i + 2] = sp.on && sp.flowNow > 0 ? 1 : 0;
+    this.trackHead = (this.trackHead + 1) % TRACK_MAX;
+    this.trackN = Math.min(TRACK_MAX, this.trackN + 1);
   }
 
   setJob(job) {
+    if (job !== this.job) this.clearTrack();
     this.job = job;
     this.passes = [];
     this.next = null;
@@ -56,6 +78,7 @@ export class Guidance {
   }
 
   update(dt) {
+    this._record(dt);
     if (!this.job) { this.next = null; return; }
     this.t -= dt;
     if (this.t <= 0) { this.t = 0.5; this.refresh(); }
@@ -99,9 +122,10 @@ export class Guidance {
     }
   }
 
-  // GPS screen (track-up moving map).
-  draw(g, x, y, w, h) {
+  // GPS screen (track-up moving map). opts.big: HUD version (larger text).
+  draw(g, x, y, w, h, opts = {}) {
     const ac = this.game.aircraft;
+    const fs = opts.big ? 1.35 : 1;
     if (!this.job) {
       g.fillStyle = '#081009';
       g.fillRect(x, y, w, h);
@@ -115,8 +139,8 @@ export class Guidance {
     }
     const pos = ac.fm.pos;
     const hdg = Math.atan2(ac.forward().x, ac.forward().z);
-    const scale = 0.32; // px per metre
-    const cx = x + w / 2, cy = y + h * 0.72;
+    const scale = (opts.scale ?? 0.32) * (w / 294); // px per metre
+    const cx = x + w / 2, cy = y + h * 0.66;
     g.fillStyle = '#081009';
     g.fillRect(x, y, w, h);
     g.save();
@@ -139,6 +163,31 @@ export class Guidance {
       g.lineWidth = 2 / scale;
       g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
     }
+    // Flight track: thin grey where the boom was off, bright where spraying.
+    if (this.trackN > 1) {
+      const T = this.track, n = this.trackN, start = (this.trackHead - n + TRACK_MAX) % TRACK_MAX;
+      for (const pass of [0, 1]) {
+        g.strokeStyle = pass ? 'rgba(255,214,64,0.9)' : 'rgba(210,220,210,0.45)';
+        g.lineWidth = (pass ? 2.2 : 1.2) / scale;
+        g.beginPath();
+        let pen = false;
+        for (let k = 0; k < n; k++) {
+          const i = ((start + k) % TRACK_MAX) * 3;
+          const on = T[i + 2] > 0.5;
+          if ((pass ? on : true) && k > 0) {
+            const j = ((start + k - 1) % TRACK_MAX) * 3;
+            if (Math.hypot(T[i] - T[j], T[i + 1] - T[j + 1]) < 60) {
+              if (!pen) g.moveTo(T[j], T[j + 1]);
+              g.lineTo(T[i], T[i + 1]);
+              pen = true;
+              continue;
+            }
+          }
+          pen = false;
+        }
+        g.stroke();
+      }
+    }
     // Pass lines
     for (const p of this.passes) {
       const nxt = p === this.next;
@@ -157,15 +206,35 @@ export class Guidance {
     g.fill();
     // Readouts
     g.fillStyle = '#9ff0a4';
-    g.font = 'bold 16px monospace';
+    g.font = `bold ${Math.round(16 * fs)}px monospace`;
     g.textAlign = 'left';
     const done = this.passes.filter((p) => p.done > 0.85).length;
-    g.fillText(`PASS ${this.next ? this.next.k + 1 : '-'} / ${this.passes.length}`, x + 8, y + 20);
-    g.fillText(`DONE ${done}`, x + 8, y + 40);
+    g.fillText(`PASS ${this.next ? this.next.k + 1 : '-'} / ${this.passes.length}`, x + 8, y + 20 * fs);
+    g.fillText(`DONE ${done}`, x + 8, y + 40 * fs);
     if (this.next && this.aligned) {
       const e = this.xte;
       g.textAlign = 'right';
-      g.fillText(`${Math.abs(e) < 0.75 ? 'ON LINE' : (e > 0 ? 'R ' : 'L ') + Math.abs(e).toFixed(1) + 'm'}`, x + w - 8, y + 20);
+      g.fillStyle = Math.abs(e) < 0.75 ? '#7dff8a' : Math.abs(e) > 4 ? '#ff8a6a' : '#ffd25a';
+      g.fillText(`${Math.abs(e) < 0.75 ? 'ON LINE' : (e > 0 ? 'R ' : 'L ') + Math.abs(e).toFixed(1) + 'm'}`, x + w - 8, y + 20 * fs);
     }
+    // Bottom strip: heading, ground speed, application state, progress, remaining area.
+    const s = this.game.jobStats || this.job.stats();
+    const sp = this.game.sprayer;
+    const lh = Math.round(14 * fs);
+    g.fillStyle = 'rgba(4,10,6,0.82)';
+    g.fillRect(x, y + h - lh * 2 - 10, w, lh * 2 + 10);
+    g.font = `bold ${lh - 1}px monospace`;
+    g.textAlign = 'left';
+    g.fillStyle = '#cfe9d2';
+    const gs = Math.hypot(ac.fm.vel.x, ac.fm.vel.z) * KT;
+    g.fillText(`HDG ${String(Math.round(ac.headingDeg())).padStart(3, '0')}°  GS ${Math.round(gs)}kt`, x + 6, y + h - lh - 8);
+    const remHa = Math.max(0, (1 - s.coverage) * this.job.ha);
+    g.fillText(`PROG ${Math.round(s.coverage * 100)}%  REM ${remHa.toFixed(1)}ha`, x + 6, y + h - 4);
+    g.textAlign = 'right';
+    const on = sp.on && sp.flowNow > 0;
+    g.fillStyle = on ? '#ffd640' : sp.on ? '#ff8a6a' : '#7d8f80';
+    g.fillText(on ? `SPRAY ${(sp.flowNow * 60).toFixed(0)}L/m` : sp.on ? 'NO FLOW' : 'SPRAY OFF', x + w - 6, y + h - lh - 8);
+    g.fillStyle = '#cfe9d2';
+    g.fillText(`OVL ${Math.round(s.overlap * 100)}%`, x + w - 6, y + h - 4);
   }
 }

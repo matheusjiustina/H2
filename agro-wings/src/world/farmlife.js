@@ -4,29 +4,8 @@
 // throttled with distance: every frame when near, a few times a second at
 // mid range, not at all (hidden) beyond 2 km.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { tractor, discHarrow, wheelGeometry, wheelSet } from './vehicles.js';
+import { tractor, discHarrow, wheelGeometry, wheelSet, PartCollector, vehicleLod } from './vehicles.js';
 import { FIELDS } from './layout.js';
-
-class Collector {
-  constructor() { this.parts = new Map(); }
-  addRaw(g, mat) {
-    if (g.index) g = g.toNonIndexed();
-    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
-    if (!g.attributes.normal) g.computeVertexNormals();
-    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
-    if (!this.parts.has(mat)) this.parts.set(mat, []);
-    this.parts.get(mat).push(g);
-  }
-  build(group, shadow = true) {
-    for (const [mat, list] of this.parts) {
-      const mesh = new THREE.Mesh(mergeGeometries(list), mat);
-      mesh.castShadow = shadow;
-      mesh.receiveShadow = true;
-      group.add(mesh);
-    }
-  }
-}
 
 const SPEED = 2.6; // m/s (~9.5 km/h, harrowing)
 // Lanes 12 m apart (works in lands, skipping between passes) so the
@@ -38,11 +17,10 @@ export function createFarmLife(scene, M, terrain) {
   const field = FIELDS.find((f) => f.name === 'T-08') || FIELDS.find((f) => f.crop === 'fallow');
   const root = new THREE.Group();
   root.name = 'workingTractor';
-  const C = new Collector();
+  const C = new PartCollector();
   const lay = tractor(C, M, 0, 0, 0, 0, { dynamic: true });
   discHarrow(C, M, 0, 0, -4.1, 0);
-  C.build(root);
-  for (const ch of root.children) ch.castShadow = ch.material === M.tractorRed || ch.material === M.steel;
+  const detail = C.build(root, [M.tractorRed, M.steel]);
   const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.1 });
   const front = lay.wheels.find((w) => w.steer), rear = lay.wheels.find((w) => !w.steer);
   const setWheels = wheelSet(root, lay.wheels, wheelGeometry(front.R, front.W), wheelGeometry(rear.R, rear.W), wheelMat);
@@ -90,8 +68,8 @@ export function createFarmLife(scene, M, terrain) {
     root,
     update(dt, time, camera, dust) {
       const d = Math.hypot(camera.position.x - (x0 + x1) / 2, camera.position.z - (field.z0 + field.z1) / 2) - L / 2;
-      root.visible = d < 2000;
-      if (!root.visible) return;
+      if (d > 800) { root.visible = false; return; }
+      vehicleLod(root, detail, camera.position, 220, 800, setWheels.meshes);
       // Distance-throttled pose updates.
       acc += dt;
       const every = d < 500 ? 0 : d < 1200 ? 0.12 : 0.4;

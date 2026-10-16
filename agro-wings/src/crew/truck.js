@@ -11,7 +11,7 @@
 // look-ahead check brakes it if anything is in the way anyway.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { tanker, wheelGeometry, wheelSet } from '../world/vehicles.js';
+import { tanker, wheelGeometry, wheelSet, PartCollector, vehicleLod } from '../world/vehicles.js';
 import { makeSoftDot, makeLabel } from '../core/textures.js';
 import { ApronPlanner } from './planner.js';
 import { BASE } from '../world/layout.js';
@@ -36,28 +36,6 @@ export const TRUCK = {
 const PLAN_BOUNDS = { x0: -402, x1: -300, z0: -110, z1: -36 };
 const _e = new THREE.Euler();
 
-// Merge Kit output per material into a few meshes (local frame).
-class Collector {
-  constructor() { this.parts = new Map(); }
-  addRaw(g, mat) {
-    if (g.index) g = g.toNonIndexed();
-    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
-    if (!g.attributes.normal) g.computeVertexNormals();
-    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
-    if (!this.parts.has(mat)) this.parts.set(mat, []);
-    this.parts.get(mat).push(g);
-  }
-  // Only the big parts cast shadows (fewer shadow-pass draws).
-  build(group, casters = null) {
-    for (const [mat, list] of this.parts) {
-      const mesh = new THREE.Mesh(mergeGeometries(list), mat);
-      mesh.castShadow = !casters || casters.includes(mat);
-      mesh.receiveShadow = true;
-      group.add(mesh);
-    }
-  }
-}
-
 function buildTruckModel(Mworld) {
   // Own light materials (the world's lens/amber/tail materials are shared by
   // every static vehicle and must not light up with this one).
@@ -69,7 +47,7 @@ function buildTruckModel(Mworld) {
   root.name = 'serviceTruck';
   const body = new THREE.Group();
   root.add(body);
-  const C = new Collector();
+  const C = new PartCollector();
   const lay = tanker(C, M, 0, 0, 0, 0, { dynamic: true });
   // Rear reels: fuel (black hose, left) and calda (blue hose, right), pump.
   const reelGeo = new THREE.TorusGeometry(0.3, 0.075, 8, 18);
@@ -81,7 +59,7 @@ function buildTruckModel(Mworld) {
   C.addRaw(new THREE.BoxGeometry(0.42, 0.38, 0.32).translate(0, 0.88, reelZ - 0.05), M.red); // pump
   // Beacon on the cab roof, side decals.
   C.addRaw(new THREE.CylinderGeometry(0.08, 0.1, 0.08, 10).translate(0, lay.cabTop + 0.02, 3.6), M.plasticBlack);
-  C.build(body, [M.paintWhite, M.alu, M.plasticBlack]);
+  const detail = C.build(body, [M.paintWhite, M.alu, M.plasticBlack]);
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.13, 12), M.amber);
   beacon.position.set(0, lay.cabTop + 0.13, 3.6);
   body.add(beacon);
@@ -92,11 +70,12 @@ function buildTruckModel(Mworld) {
   const decal = new THREE.MeshStandardMaterial({ map: makeLabel('BADECO · APOIO AGRÍCOLA', { w: 1024, h: 128, bg: '#c9cdd0', fg: '#1f4f2a', font: 'bold 64px Arial' }), roughness: 0.35, metalness: 0.4 });
   const decals = new THREE.Mesh(mergeGeometries([-1, 1].map((s) => new THREE.PlaneGeometry(3.4, 0.42).rotateY(s * Math.PI / 2).translate(s * 1.185, 2.42, -1.0))), decal);
   body.add(decals);
+  detail.push(decals, beacon, glow);
   // Wheels: one vertex-coloured geometry per axle type, one mesh each.
   const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.15 });
   const setWheels = wheelSet(root, lay.wheels, wheelGeometry(0.5, 0.3, false), wheelGeometry(0.5, 0.28, true), wheelMat);
   setWheels(0, 0);
-  return { root, body, setWheels, beacon, glow, reels, M, reelZ };
+  return { root, body, setWheels, beacon, glow, reels, M, reelZ, detail };
 }
 
 export class ServiceTruck {
@@ -161,52 +140,86 @@ export class ServiceTruck {
     return { x: ac.fm.pos.x + lx * c + az * s, z: ac.fm.pos.z - lx * s + az * c, yaw: Math.atan2(Math.sin(tyaw), Math.cos(tyaw)) };
   }
 
-  // Plan to a loading stand; tries the preferred side first, then the other
-  // side and stands a little further aft/forward. Returns the side used
-  // (+1 / -1) or 0 if the truck cannot get there.
+  _rectKey(margin) {
+    return margin + ':' + Object.values(this.game.fleet || {}).map((ac) => `${ac.fm.pos.x.toFixed(1)},${ac.fm.pos.z.toFixed(1)},${ac.fm.heading().toFixed(2)}`).join(';');
+  }
+
+  // A second clearance grid over the same area for the badeco's walks.
+  makeWalkPlanner() { return new ApronPlanner(PLAN_BOUNDS, this.planner.staticBoxes); }
+
+  // Look for a loading stand: preferred side first, then the other side and
+  // stands a little further aft/forward. The search runs over the next frames
+  // (a few ms each); returns false at once if no stand is even clear.
   dispatch(ac, side) {
-    this.planner.build(this._aircraftRects());
-    let tries = 0;
+    this.planner.build(this._aircraftRects(), this._rectKey(0.8));
+    const cands = [];
     for (const sd of [side, -side]) {
       for (const lzRear of [0.6, -2.0, 2.4]) {
         const S = this.standFor(ac, sd, lzRear);
         const fx = Math.sin(S.yaw), fz = Math.cos(S.yaw);
-        const Q = { x: S.x - fx * TRUCK.lead, z: S.z - fz * TRUCK.lead, yaw: S.yaw };
-        // Stand, lead-in and its midpoint must be clear before searching.
         let ok = true;
+        // Stand, lead-in and its midpoint must be clear before searching.
         for (const t of [0, 0.5, 1]) if (!this.planner.poseFree(S.x - fx * TRUCK.lead * t, S.z - fz * TRUCK.lead * t, S.yaw, TRUCK.circles, TRUCK.radius)) ok = false;
-        if (!ok) continue;
-        if (++tries > 3) return 0;
-        const p = this.planner.planVehicle(this._pose(), Q, TRUCK, { maxNodes: 40000 });
-        if (!p) continue;
-        appendStraight(p, S); // forward lead-in Q -> S
-        this.stand = S;
-        this._start(p, 'stand');
-        return sd;
+        if (ok) cands.push({ S, Q: { x: S.x - fx * TRUCK.lead, z: S.z - fz * TRUCK.lead, yaw: S.yaw }, side: sd });
       }
     }
-    return 0;
+    if (!cands.length) return false;
+    this.planFailed = false;
+    this.job = { purpose: 'stand', cands: cands.slice(0, 3), i: 0, it: null, best: null, maxNodes: 40000 };
+    this.state = 'planning';
+    this.engineOn = true;
+    this.beaconOn = true;
+    return true;
   }
 
-  // Back out and return to the bay (either heading).
+  // Back out and return to the bay, entered facing either way (both straight
+  // lead-ins are searched, the shorter drive wins).
   recall() {
-    if (this.state === 'home') return true;
-    this.planner.build(this._aircraftRects());
-    // The bay can be entered facing either way: plan both straight lead-ins
-    // and keep the shorter drive.
+    if (this.state === 'home' || this.job?.purpose === 'home') return;
     const h = TRUCK.home;
-    let best = null;
-    for (const yaw of [h.yaw, h.yaw + Math.PI]) {
-      const fx = Math.sin(yaw), fz = Math.cos(yaw);
-      const Q = { x: h.x - fx * 7, z: h.z - fz * 7, yaw };
-      const p = this.planner.planVehicle(this._pose(), Q, TRUCK, { maxNodes: 50000 });
-      if (!p) continue;
-      appendStraight(p, { x: h.x, z: h.z, yaw });
-      if (!best || p[p.length - 1].s < best[best.length - 1].s) best = p;
+    // Still in the bay (e.g. aborted while planning): just stay.
+    if (Math.hypot(this.x - h.x, this.z - h.z) < 1 && Math.abs(Math.sin(this.yaw - h.yaw)) < 0.2) {
+      this.job = null; this.state = 'home'; this.purpose = 'home'; this.v = 0;
+      return;
     }
-    if (!best) { this.state = 'blocked'; this.purpose = 'home'; this.blockedT = 0; return false; }
-    this._start(best, 'home');
-    return true;
+    this.planner.build(this._aircraftRects(), this._rectKey(0.8));
+    const cands = [h.yaw, h.yaw + Math.PI].map((yaw) => {
+      const fx = Math.sin(yaw), fz = Math.cos(yaw);
+      return { S: { x: h.x, z: h.z, yaw }, Q: { x: h.x - fx * 7, z: h.z - fz * 7, yaw } };
+    });
+    this.job = { purpose: 'home', cands, i: 0, it: null, best: null, all: true, maxNodes: 30000 };
+    this.state = 'planning';
+    this.engineOn = true;
+    this.beaconOn = true;
+  }
+
+  _plan(budgetMs) {
+    const J = this.job;
+    // Come to a stop before planning from here.
+    if (Math.abs(this.v) > 0.05) return;
+    while (budgetMs > 0 && J.i < J.cands.length) {
+      const c = J.cands[J.i];
+      J.it ??= this.planner.vehicleSearch(this._pose(), c.Q, TRUCK, { maxNodes: J.maxNodes });
+      const t0 = performance.now();
+      const r = J.it.step(budgetMs);
+      budgetMs -= performance.now() - t0;
+      if (!r.done) return;
+      J.it = null;
+      J.i++;
+      if (r.path) {
+        appendStraight(r.path, c.S);
+        if (!J.best || r.path[r.path.length - 1].s < J.best.path[J.best.path.length - 1].s) J.best = { path: r.path, c };
+        if (!J.all) break; // stands are in order of preference
+      }
+    }
+    if (J.best && (!J.all || J.i >= J.cands.length)) {
+      this.job = null;
+      if (J.purpose === 'stand') { this.stand = J.best.c.S; this.standSide = J.best.c.side; }
+      this._start(J.best.path, J.purpose);
+    } else if (J.i >= J.cands.length) {
+      this.job = null;
+      if (J.purpose === 'stand') { this.planFailed = true; this.state = 'home'; } else { this.state = 'blocked'; this.purpose = 'home'; this.blockedT = 0; }
+    }
   }
 
   _pose() { return { x: this.x, z: this.z, yaw: this.yaw }; }
@@ -266,6 +279,7 @@ export class ServiceTruck {
   update(dt) {
     if (this.state === 'driving') this._drive(dt);
     else {
+      if (this.state === 'planning') this._plan(this.planBudget ?? 3);
       this.v = damp(this.v, 0, 6, dt);
       this.acc = 0;
       if (this.state === 'blocked') {
@@ -397,7 +411,7 @@ export class ServiceTruck {
 
   // Far away: skip drawing (it is a few pixels beyond ~900 m).
   cull(cam) {
-    this.model.root.visible = Math.hypot(cam.x - this.x, cam.z - this.z) < 900;
+    vehicleLod(this.model.root, this.model.detail, cam, 220, 900, this.model.setWheels.meshes);
   }
 }
 

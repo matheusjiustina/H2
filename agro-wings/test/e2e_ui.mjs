@@ -39,9 +39,11 @@ await shot(page, '02-loadsheet');
 check('load sheet opens at the pad', await page.evaluate(() => window.__agro.screens.open === 'load'));
 
 // --- Service + interruption --------------------------------------------------
-await page.evaluate(() => { const g = window.__agro; g.screens.close(); g.requestService(200, 650); g.simulate(9, 1 / 30); });
+// The service truck drives to its stand first; then the badeco takes the hose.
+await page.evaluate(() => { const g = window.__agro; g.screens.close(); g.requestService(200, 650); g.simulate(90, 1 / 30, () => !(g.service.carry || g.service.connected)); g.simulate(2, 1 / 30); });
 const mid = await page.evaluate(() => { const g = window.__agro; return { st: g.service.state, step: g.service.step?.a, carry: g.service.carry, hoseVisible: g.service.fuelHose.mesh.visible }; });
 check('badeco working with hose out', mid.st === 'working' && mid.hoseVisible, JSON.stringify(mid));
+check('service truck parked at its stand', await page.evaluate(() => window.__agro.service.truck.parkedAtStand && window.__agro.service.useTruck));
 await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'orbit'; g.rig.setMode('orbit', g.aircraft); g.rig.orbit.yaw = 1.2; g.rig.orbit.dist = 16; g.rig.orbit.pitch = 0.3; g.simulate(0.5, 1 / 30); });
 await shot(page, '03-service-hose');
 // Try to start the engine: hold Q.

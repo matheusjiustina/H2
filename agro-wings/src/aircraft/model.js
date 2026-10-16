@@ -1289,8 +1289,10 @@ export function buildPilot(M, stick, throttle, { throttleAt = [0.415, 0.5, 0.05]
   };
   // Static body parts are collected per material and merged (one mesh per
   // material instead of one per part).
-  const PB = new Map();
-  const pput = (mat, g) => { if (!PB.has(mat)) PB.set(mat, []); PB.get(mat).push(g.index ? g.toNonIndexed() : g); };
+  // The head (helmet, visor, mic) goes to its own map so it can turn.
+  const PB = new Map(), HB = new Map();
+  let PT = PB;
+  const pput = (mat, g) => { if (!PT.has(mat)) PT.set(mat, []); PT.get(mat).push(g.index ? g.toNonIndexed() : g); };
   const place = (g, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => g.applyMatrix4(new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz)));
   const limb = (a, b, r, mat) => {
@@ -1334,6 +1336,7 @@ export function buildPilot(M, stick, throttle, { throttleAt = [0.415, 0.5, 0.05]
   // Neck, head, flight helmet (shell + rubber edge + visor housing + navy
   // stripe), tinted visor down, boom mic, filtered-air hose to the seat.
   limb([0, 0.77, -0.68], [0, 0.86, -0.67], 0.045, M.skin);
+  PT = HB;
   pput(M.skin, place(new THREE.SphereGeometry(0.095, 20, 14), 0, 0.95, -0.64));
   pput(M.helmet, place(new THREE.SphereGeometry(0.128, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.64), 0, 0.97, -0.665, 0.12, 0, 0, 1, 1.05, 1.12));
   pput(M.dark, place(new THREE.TorusGeometry(0.1235, 0.008, 6, 28), 0, 0.97 - 0.056, -0.665 - 0.017, Math.PI / 2 + 0.12, 0, 0, 1, 1.12, 1));
@@ -1343,6 +1346,7 @@ export function buildPilot(M, stick, throttle, { throttleAt = [0.415, 0.5, 0.05]
   pput(M.visor, place(new THREE.SphereGeometry(0.133, 20, 10, -Math.PI * 0.32, Math.PI * 0.64, Math.PI * 0.32, Math.PI * 0.2), 0, 0.97, -0.66, 0, 0, 0, 1, 1.04, 1.12));
   limb([0.124, 0.93, -0.63], [0.06, 0.89, -0.535], 0.0055, M.gloss);
   pput(M.gloss, place(new THREE.SphereGeometry(0.014, 10, 8), 0.05, 0.885, -0.53));
+  PT = PB;
   {
     const c = new THREE.CatmullRomCurve3([[0, 0.94, -0.8], [0.06, 0.82, -0.86], [0.17, 0.6, -0.87], [0.24, 0.36, -0.86]].map((v) => new THREE.Vector3(...v)));
     pput(M.rubber, new THREE.TubeGeometry(c, 20, 0.02, 8, false));
@@ -1369,6 +1373,15 @@ export function buildPilot(M, stick, throttle, { throttleAt = [0.415, 0.5, 0.05]
     const m = new THREE.Mesh(mergeGeometries(list.map((g) => tagged(g))), mat);
     pilot.add(m);
   }
+  // Head on a neck pivot (looks into turns, along the boom; see Aircraft._animate).
+  const head = new THREE.Group();
+  head.position.set(0, 0.86, -0.67);
+  for (const [mat, list] of HB) {
+    const m = new THREE.Mesh(mergeGeometries(list.map((g) => tagged(g).translate(0, -0.86, 0.67))), mat);
+    head.add(m);
+  }
+  pilot.add(head);
+  pilot.head = head;
   const S0 = new THREE.Vector3(0, -0.22, -0.12), T0 = new THREE.Vector3(0.415, 0.5, 0.05);
   const rel = (p, o) => [p[0] - o.x, p[1] - o.y, p[2] - o.z];
   const handR = new THREE.Group(), handL = new THREE.Group();
