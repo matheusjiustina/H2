@@ -237,3 +237,60 @@ export const QUALITY = {
 };
 
 export const UNITS = { altOffsetM: 320 }; // field elevation above MSL for the altimeter
+
+// ---------------------------------------------------------------------------
+// Robinson R44 Raven II, agricultural configuration (rotary wing; flown by
+// src/flight/heliModel.js — the fixed-wing FLIGHT/FLIGHT_AT502 are untouched).
+// Published figures (Robinson spec sheet / POH as quoted by AOPA, Aensa,
+// Vertipedia and POH study material): 2 main blades, 33 ft (10.06 m) rotor,
+// counter-clockwise seen from above; 58 in (1.47 m) 2-blade tail rotor with
+// the advancing blade at the bottom; 100 % = 400 main-rotor rpm / 2665 engine
+// rpm, power-on limits 101–102 %, green 90–108 %; MTOW 2,500 lb (1,134 kg);
+// empty ~1,505 lb (683 kg); Lycoming IO-540-AE1A5 derated to 245 hp take-off
+// (5 min) / 205 hp continuous; fuel 29.5 + 17.0 US gal usable (176 L);
+// overall length 38 ft 3 in, height 10 ft 9 in.
+// Estimates (not published; chosen to match the published performance and
+// flagged as such): blade chord, rotor inertia, Lock number, airframe
+// inertias, equivalent flat-plate drag area, tail-rotor arm and chord, skid
+// tread, the ag kit's weight and the 250 L virtual tank (what fits under the
+// MTOW with pilot and ~80 L of fuel — not a certified Robinson option).
+export const FLIGHT_R44 = {
+  kind: 'heli',
+  sim: { dt: 1 / 120, maxSubsteps: 12 },
+  emptyMass: 683, // standard empty weight incl. oil and avionics
+  agKitMass: 42, // estimate: belly tank, pump, booms, plumbing
+  pilotMass: 85,
+  mtow: 1134,
+  inertia: [1650, 1450, 620], // pitch (X), yaw (Y), roll (Z), kg·m² — estimates
+  cgLateral: -0.05, // pilot flies from the right seat (m, + = left)
+  // Main rotor.
+  rotor: {
+    blades: 2, radius: 5.03, chord: 0.254, liftSlope: 5.73, cd0: 0.011,
+    rpm100: 400, govPct: 101.5, inertia: 520, lock: 4.5,
+    hubHeight: 1.67, hubZ: 0, // above / ahead of the CG (m)
+    pitchMin: 0.0, pitchMax: 0.245, // collective blade pitch at 75 % R (rad)
+    cyclicLon: 0.17, cyclicLat: 0.14, // disc tilt authority (rad)
+    precone: 0.04,
+  },
+  tailRotor: {
+    radius: 0.737, chord: 0.13, gear: 6.065, arm: 6.0, height: 0.45,
+    pitchMin: -0.14, pitchMax: 0.3, // full right .. full left pedal (rad)
+  },
+  // Engine (piston, governed).
+  engine: { ratedKW: 182.7, mcpKW: 152.9, idlePct: 62, rpm100: 2665, lagS: 0.18, crankS: 2.6, transEff: 0.94 },
+  fuelCapacity: 176, // L usable (main 112 + aux 64)
+  fuelDensity: 0.72, // avgas
+  fuelPerKWh: 0.4, // L per kWh (≈ 60 L/h at 150 kW, ~16 US gal/h)
+  fuelBurnScale: 2.5, // same gameplay compression as the airplanes
+  hopperCapacity: 250, // L, virtual ag tank (see note above)
+  liquidDensity: 1.0,
+  // Airframe aerodynamics (equivalent areas, m²).
+  dragArea: [5.5, 3.2, 0.6], // side (X), vertical (Y), frontal (Z) — frontal tuned to ~110 kt at MCP
+  finYaw: 0.9, stabPitch: 0.55, // weathercock / pitch-stability coefficients (m³)
+  // Skids: four contact points (body frame, m), spring/damper per point.
+  skids: [[1.09, -1.38, 1.22], [1.09, -1.38, -1.12], [-1.09, -1.38, 1.22], [-1.09, -1.38, -1.12]],
+  skidK: 110000, skidC: 7000, skidMu: 0.45,
+  hardLandingVs: 1.8, crashVs: 3.6,
+  // Never-touch points: main-rotor tips (disc edge), tail rotor, stinger, nose, belly.
+  vne: 130, // kt (published Vne at low altitude)
+};
