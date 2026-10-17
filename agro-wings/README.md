@@ -748,8 +748,8 @@ Chromium + SwiftShader in this container.
 
 | # | check | evidence |
 | --- | --- | --- |
-| 1 | PR-AGW behaves exactly as before | seeded trajectory fingerprint (take-off, pull-up, turn, wind on) identical, byte for byte, to the commit before the R44 work; `flightModel.js`, `assist.js`, `aircraft.js` and `FLIGHT` untouched; `node test/e2e.mjs soy`: full contract, two sorties, 90 %, 2★, Cr$ 5,386 |
-| 2 | Air Tractor functional | same fingerprint test with `FLIGHT_AT`: identical; `AC=at502 node test/e2e.mjs soy`: 90 % in one sortie, 1★, Cr$ 5,013 |
+| 1 | PR-AGW behaves exactly as before | seeded trajectory fingerprint (take-off, pull-up, turn, wind on) identical, byte for byte, to the commit before the R44 work; `flightModel.js`, `assist.js`, `aircraft.js` and `FLIGHT` untouched; `node test/e2e.mjs soy`: full contract, two sorties, 90 %, 2★, Cr$ 5,396 |
+| 2 | Air Tractor functional | same fingerprint test with `FLIGHT_AT`: identical; `AC=at502 node test/e2e.mjs soy`: 90 % in one sortie, 2★, Cr$ 4,967 |
 | 3 | R44 spawns correctly | `test/r44flight.mjs`: card 03 selects it; parked on the helipad at (-323, -48), heading 090, four skids on the ground, rotor STOPPED |
 | 4 | main and tail rotors | counter-clockwise main rotor seen from above, advancing tail blade at the bottom, measured in the browser; solid blades at rest, short blur at ~25 %, blur disc with the blades faded at 100 %, solid again after the run-down |
 | 5 | vertical take-off | off the skids 2.1 s after raising the collective, 3 m 0.9 s later, 0.5 m drift |
