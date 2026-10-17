@@ -465,19 +465,22 @@ export function createR44Model(panel, opts = {}) {
     if (z < -0.3) a *= 0.9;
     return clamp(a, 0.55, 1);
   };
-  let rest = soupOf(loft(cabSt, 128, cabAO));
-  const glassTris = [];
-  for (const sx of [1, -1]) {
-    for (const region of [WS_REGION(sx), polyRegion(FRONT_WIN, sx), polyRegion(REAR_WIN, sx)]) {
-      const sp = splitSoup(rest, region);
-      glassTris.push(...sp.inn);
-      rest = sp.out;
+  // The bubble (skin, glass, inner skin) is built twice: full resolution for
+  // the near LOD, coarse beyond 40 m (same exact window cuts).
+  const cabinShell = (st, around) => {
+    let rest = soupOf(loft(st, around, cabAO));
+    const glassTris = [];
+    for (const sx of [1, -1]) {
+      for (const region of [WS_REGION(sx), polyRegion(FRONT_WIN, sx), polyRegion(REAR_WIN, sx)]) {
+        const sp = splitSoup(rest, region);
+        glassTris.push(...sp.inn);
+        rest = sp.out;
+      }
     }
-  }
-  const cabPaint = soupGeo(rest);
-  add('livery', liveryUV(cabPaint));
-  const glassG = [soupGeo(glassTris)];
-  const cabInner = innerShell(cabPaint, 0.014);
+    const paint = liveryUV(soupGeo(rest));
+    return { paint, glass: soupGeo(glassTris), inner: innerShell(paint, 0.014) };
+  };
+  const cabHi = cabinShell(cabSt, 128), cabLo = cabinShell(sampleStations(CAB_KEYS, 12), 36);
   // Rear bulkhead cap (cabin back wall).
   const capShape = (st, n = 40) => {
     const pts = ring(st, n).map(([x, y]) => new THREE.Vector2(x, y));
@@ -548,9 +551,11 @@ export function createR44Model(panel, opts = {}) {
   const aftSt = sampleStations(AFT_KEYS, 26);
   const aftAO = (x, y, z) => clamp(1 - Math.max(0, 0.4 - y) * 0.35, 0.6, 1);
   // Open engine bay: the skin below y 0.18 between z -0.6 and -1.95 is cut away.
-  const aftPaint = soupGeo(splitSoup(soupOf(loft(aftSt, 64, aftAO)), [[0, -1, 0, 0.18], [0, 0, -1, -0.6], [0, 0, 1, 1.95]]).out);
-  add('livery', liveryUV(aftPaint));
-  const aftInner = innerShell(aftPaint, 0.012);
+  const aftShell = (st, around) => {
+    const paint = liveryUV(soupGeo(splitSoup(soupOf(loft(st, around, aftAO)), [[0, -1, 0, 0.18], [0, 0, -1, -0.6], [0, 0, 1, 1.95]]).out));
+    return { paint, inner: innerShell(paint, 0.012) };
+  };
+  const aftHi = aftShell(aftSt, 64), aftLo = aftShell(sampleStations(AFT_KEYS, 8), 24);
   for (const sx of [1, -1]) {
     const rail = [];
     for (let z = -0.6; z >= -1.95; z -= 0.05) rail.push(surf(aftSt, z, 0.18, sx, 0.004));
@@ -967,15 +972,22 @@ export function createR44Model(panel, opts = {}) {
   root.add(pilot);
 
   // ---------------- glass, static merge, LOD ----------------
-  // Inner skin of the cabin and the aft body (always drawn: it is what is
-  // seen through the windows and the open engine bay).
-  const inner = new THREE.Mesh(mergeGeometries([cabInner, aftInner].map((g) => tagged(g))), M.interior);
-  inner.receiveShadow = true;
-  root.add(inner);
+  // Cabin and aft-body skins with their inner skin (what is seen through the
+  // windows and the open engine bay) and the glass, near and far versions.
+  const shell = (geos, mat, cast, order = 0) => {
+    const m = new THREE.Mesh(mergeGeometries(geos.map((g) => tagged(g))), mat);
+    m.castShadow = cast; m.receiveShadow = mat !== M.glass; m.renderOrder = order;
+    return m;
+  };
   const glassMesh = new THREE.Group();
-  const gm = new THREE.Mesh(mergeGeometries(glassG.map((g) => tagged(g))), M.glass);
-  gm.renderOrder = 10;
-  glassMesh.add(gm);
+  glassMesh.add(shell([cabHi.glass], M.glass, false, 10));
+  const near = new THREE.Group(), far = new THREE.Group();
+  near.add(shell([cabHi.paint, aftHi.paint], M.livery, true), shell([cabHi.inner, aftHi.inner], M.interior, false), glassMesh);
+  far.add(shell([cabLo.paint, aftLo.paint], M.livery, true), shell([cabLo.inner, aftLo.inner], M.interior, false), shell([cabLo.glass], M.glass, false, 10));
+  const shellLod = new THREE.LOD();
+  shellLod.addLevel(near, 0);
+  shellLod.addLevel(far, 40);
+  root.add(shellLod);
   const fine = new THREE.Group();
   for (const [k, parts] of Object.entries(B)) {
     const isFine = k.startsWith('fine:');
@@ -988,9 +1000,8 @@ export function createR44Model(panel, opts = {}) {
   }
   const lod = new THREE.LOD();
   lod.addLevel(fine, 0);
-  lod.addLevel(new THREE.Group(), 90);
+  lod.addLevel(new THREE.Group(), 40);
   root.add(lod);
-  root.add(glassMesh);
 
   // ---------------- animation ----------------
   const EXPOSURE = 1 / 50; // s of rotor travel smeared per frame
