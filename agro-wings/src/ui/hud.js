@@ -109,9 +109,17 @@ export class HUD {
     const sprayingNow = g.sprayer.on;
     $.hgt.className = 'ro r-hgt' + (sprayingNow ? (t.hgt < 1.5 ? ' bad' : t.hgt > 6 ? ' warn' : t.hgt >= SPRAY.idealHeight[0] && t.hgt <= SPRAY.idealHeight[1] ? ' good' : '') : '');
     // Load factor (smoothed): what the pull-up and the balão cost the wing.
-    this.gs = (this.gs ?? 1) + (t.g - (this.gs ?? 1)) * Math.min(1, dt * 6);
-    $.gl.querySelector('.v').firstChild.nodeValue = t.onGround ? '1.0' : this.gs.toFixed(1);
-    $.gl.className = 'ro r-g' + (t.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
+    if (t.heli) {
+      // Helicopter: main-rotor speed (%) in place of the load factor.
+      if (!this._heliRo) { $.gl.querySelector('.l').textContent = 'Rotor'; $.gl.querySelector('.u').textContent = '%'; this._heliRo = true; }
+      $.gl.querySelector('.v').firstChild.nodeValue = String(Math.round(t.rotorPct));
+      $.gl.className = 'ro r-g' + (t.rotorPct < 1 ? ' dim' : t.lowRotor ? ' bad' : t.rotorPct < 97 || t.rotorPct > 108 ? ' warn' : '');
+    } else {
+      if (this._heliRo) { $.gl.querySelector('.l').textContent = 'Load'; $.gl.querySelector('.u').textContent = 'G'; this._heliRo = false; }
+      this.gs = (this.gs ?? 1) + (t.g - (this.gs ?? 1)) * Math.min(1, dt * 6);
+      $.gl.querySelector('.v').firstChild.nodeValue = t.onGround ? '1.0' : this.gs.toFixed(1);
+      $.gl.className = 'ro r-g' + (t.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
+    }
     $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round(t.power * 100));
     $.fuel.querySelector('.v').firstChild.nodeValue = String(Math.round(t.fuel));
     $.fuel.querySelector('.bar span').style.width = `${(t.fuel / t.fuelCap) * 100}%`;

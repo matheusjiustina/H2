@@ -1,6 +1,6 @@
 // End-to-end validation in Chromium: full contract flown by the test
 // autopilot through the normal player inputs. Usage:
-//   [AC=at502] node test/e2e.mjs [contractId] [outDir]
+//   [AC=at502|r44] node test/e2e.mjs [contractId] [outDir]
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -58,20 +58,20 @@ const state = () => page.evaluate(() => {
 const shots = { service1: false, svcConnect: false, takeoff: false, spraying: false, cockpit: false, landing: false };
 let last = null;
 const t0 = Date.now();
-for (let i = 0; i < 900; i++) {
+for (let i = 0; i < (+process.env.MAXI || 900); i++) {
   await page.evaluate(() => window.__agro.simulate(4, 1 / 30));
   const s = await state();
   if (!last || s.phase !== last.phase || i % 5 === 0) console.log(JSON.stringify(s));
   if (!shots.service1 && s.step === 'walk' && s.svc === 'working' && s.t > 6) { shots.service1 = true; await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'orbit'; g.rig.setMode('orbit', g.aircraft); g.rig.orbit.yaw = 0.9; g.rig.orbit.dist = 20; }); await snap('01-service-walk'); }
   if (!shots.svcConnect && (s.step === 'transfer')) { shots.svcConnect = true; await snap('02-service-transfer'); await page.evaluate(() => { const g = window.__agro; g.rig.orbit.yaw = 2.2; g.rig.orbit.dist = 9; g.rig.orbit.pitch = 0.3; }); await snap('02b-service-close'); }
-  if (!shots.takeoff && s.phase === 'takeoff' && s.kt > 40) { shots.takeoff = true; await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'chase'; g.rig.setMode('chase', g.aircraft); }); await page.evaluate(() => window.__agro.simulate(0.5)); await snap('03-takeoff'); }
+  if (!shots.takeoff && ((s.phase === 'takeoff' && s.kt > 40) || (s.phase === 'liftoff' && s.agl > 4))) { shots.takeoff = true; await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'chase'; g.rig.setMode('chase', g.aircraft); }); await page.evaluate(() => window.__agro.simulate(0.5)); await snap('03-takeoff'); }
   if (!shots.spraying && s.spray && s.cov > 3) { shots.spraying = true; await snap('04-spraying-chase');
     await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'orbit'; g.rig.setMode('orbit', g.aircraft); const f = g.aircraft.forward(); g.rig.orbit.yaw = Math.atan2(f.x, f.z) + 0.6; g.rig.orbit.dist = 17; g.rig.orbit.pitch = 0.1; g.simulate(0.4); });
     await snap('04b-spraying-side');
     await page.evaluate(() => { const g = window.__agro; g.overlay.setVisible(true, g.job.coverages); g.rig.orbit.pitch = 0.9; g.rig.orbit.dist = 140; g.simulate(0.2); });
     await snap('04c-coverage-overlay');
     await page.evaluate(() => { const g = window.__agro; g.overlay.setVisible(false, g.job.coverages); }); await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'cockpit'; g.rig.setMode('cockpit', g.aircraft); }); await page.evaluate(() => window.__agro.simulate(0.3)); await snap('05-cockpit'); await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'chase'; g.rig.setMode('chase', g.aircraft); }); }
-  if (!shots.landing && s.phase === 'approach' && s.agl < 30 && s.agl > 5) { shots.landing = true; await snap('06-approach'); }
+  if (!shots.landing && ((s.phase === 'approach' && s.agl < 30 && s.agl > 5) || (s.phase === 'land' && s.agl > 1.5))) { shots.landing = true; await snap('06-approach'); }
   if (s.state !== 'ok' || s.phase === 'done' || s.phase === 'crashed' || s.results === 'results') { last = s; break; }
   last = s;
 }

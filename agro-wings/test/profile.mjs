@@ -25,9 +25,9 @@ await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null
 const loadMs = Date.now() - t0;
 const views = {
   pad: `g.aircraft.placeAtPad(); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
-  spraySoy: `g.aircraft.placeAirborne(300, -280, Math.PI/2, 4, 46 * (g.aircraft.A.assistSpeedScale ?? 1)); g.sprayer.on = true; g.aircraft.fm.hopper = 500; g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
-  cockpitCorn: `g.aircraft.placeAirborne(-200, 470, Math.PI/2, 6, 46 * (g.aircraft.A.assistSpeedScale ?? 1)); g.cameraMode='cockpit'; g.rig.setMode('cockpit', g.aircraft);`,
-  high: `g.aircraft.placeAirborne(500, 0, Math.PI/2, 400, 50 * (g.aircraft.A.assistSpeedScale ?? 1)); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
+  spraySoy: `g.aircraft.placeAirborne(300, -280, Math.PI/2, 4, (g.aircraft.type.kind === 'heli' ? 23 : 46 * (g.aircraft.A.assistSpeedScale ?? 1))); g.sprayer.on = true; g.aircraft.fm.hopper = 500; g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
+  cockpitCorn: `g.aircraft.placeAirborne(-200, 470, Math.PI/2, 6, (g.aircraft.type.kind === 'heli' ? 23 : 46 * (g.aircraft.A.assistSpeedScale ?? 1))); g.cameraMode='cockpit'; g.rig.setMode('cockpit', g.aircraft);`,
+  high: `g.aircraft.placeAirborne(500, 0, Math.PI/2, 400, (g.aircraft.type.kind === 'heli' ? 30 : 50 * (g.aircraft.A.assistSpeedScale ?? 1))); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
 };
 const res = await page.evaluate(async ({ views, N, R, aircraft }) => {
   const g = window.__agro;

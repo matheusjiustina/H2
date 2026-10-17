@@ -53,8 +53,11 @@ export class Sprayer {
     const ac = this.game.aircraft;
     const fm = ac.fm;
     const o = fm.out;
-    // Wind-driven pump: needs airflow.
-    const pump = smoothstep(10, 28, o.airspeed);
+    // Wind-driven pump (airplanes) needs airflow; the helicopter's pump is
+    // driven from the engine/rotor and works in the hover too.
+    const pump = ac.type.spray.pump === 'engine'
+      ? (fm.engine === 'running' ? smoothstep(80, 95, o.rotorPct ?? 0) : 0)
+      : smoothstep(10, 28, o.airspeed);
     this.flowNow = this.on && fm.hopper > 0 ? ac.type.spray.flow * pump : 0;
     if (!this.on) return;
     if (fm.hopper <= 0) {
@@ -76,6 +79,8 @@ export class Sprayer {
     const hMid = mid.y - top;
     const wind = ac.windVec;
     const W = this.swathFor(Math.max(0, hMid));
+    // Rotor downwash (helicopter, low speed) drives the droplets down faster.
+    const fall = SPRAY.fallSpeed + (ac.downwash?.() ?? 0);
     // Losses: evaporation/fine drift above the ideal window, worse with wind.
     const windSp = Math.hypot(wind.x, wind.z);
     let loss = smoothstep(4.5, 14, hMid) * 0.55 + windSp * 0.012 + smoothstep(55, 70, o.airspeed) * 0.1;
@@ -111,7 +116,7 @@ export class Sprayer {
       const nx = _b.x + (_a.x - _b.x) * t, ny = _b.y + (_a.y - _b.y) * t, nz = _b.z + (_a.z - _b.z) * t;
       const ground = ac.env.top(nx, nz);
       const hh = Math.max(0, ny - ground);
-      const tf = hh / SPRAY.fallSpeed + 0.25;
+      const tf = hh / fall + 0.25;
       const dx = wind.x * tf * SPRAY.driftFactor + fm.vel.x * 0.12;
       const dz = wind.z * tf * SPRAY.driftFactor + fm.vel.z * 0.12;
       const cx = mid.x + _side.x * u + dx;
@@ -139,6 +144,7 @@ export class Sprayer {
     const rate = 1400 * (this.flowNow / SPRAY.flow); // particles per second (more for a bigger pump)
     this.emitAcc += rate * dt;
     const wind = ac.windVec;
+    const wash = (ac.downwash?.() ?? 0) * 0.8;
     // Mist takes the scene light (no glowing white plume at dusk / overcast).
     const L = this.game.world.atmo?.cur.light ?? 1;
     const lk = 0.5 + 0.5 * Math.min(1, L);
@@ -152,7 +158,7 @@ export class Sprayer {
       pool.spawn(
         _p.x + (Math.random() - 0.5) * 0.3, _p.y - Math.random() * 0.3, _p.z + (Math.random() - 0.5) * 0.3,
         fm.vel.x * 0.32 + _side.x + (Math.random() - 0.5) * 0.8,
-        fm.vel.y * 0.3 - 1.2 - Math.random() * 0.8,
+        fm.vel.y * 0.3 - 1.2 - wash - Math.random() * 0.8,
         fm.vel.z * 0.32 + _side.z + (Math.random() - 0.5) * 0.8,
         // Fine droplets: a translucent sheet that settles and drifts, not a
         // billowing white cloud (smaller growth, lower opacity).
@@ -168,7 +174,7 @@ export class Sprayer {
       _p.copy(n).applyQuaternion(ac.rQuat).add(ac.rPos);
       pool.spawn(
         _p.x, _p.y - 0.05, _p.z,
-        fm.vel.x * 0.55 + (Math.random() - 0.5) * 0.5, fm.vel.y * 0.5 - 1.6, fm.vel.z * 0.55 + (Math.random() - 0.5) * 0.5,
+        fm.vel.x * 0.55 + (Math.random() - 0.5) * 0.5, fm.vel.y * 0.5 - 1.6 - wash, fm.vel.z * 0.55 + (Math.random() - 0.5) * 0.5,
         { life: 0.55 + Math.random() * 0.35, size: 0.35 + Math.random() * 0.2, grow: 4.5, alpha: 0.27 + Math.random() * 0.1, drag: 1.6, gravity: SPRAY.fallSpeed * 0.4, color: mc, kind: 1 },
       );
     }

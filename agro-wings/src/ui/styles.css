@@ -42,7 +42,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .btn:disabled { opacity: .4; cursor: default; }
 .title-keys { color: var(--ink-faint); font-size: 12px; margin-top: 14px; max-width: 720px; line-height: 1.7; padding: 0 16px; }
 .ac-select { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; padding: 0 16px; }
-.ac-card { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: min(300px, calc(50vw - 26px)); min-width: 0; text-align: left; font-family: var(--sans); color: var(--ink); background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.22); border-left: 3px solid rgba(255,255,255,.22); border-radius: 6px; padding: 11px 14px 12px; cursor: pointer; transition: background .15s, border-color .15s; }
+.ac-card { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: min(280px, calc(33vw - 22px)); min-width: 0; text-align: left; font-family: var(--sans); color: var(--ink); background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.22); border-left: 3px solid rgba(255,255,255,.22); border-radius: 6px; padding: 11px 14px 12px; cursor: pointer; transition: background .15s, border-color .15s; }
 .ac-card:hover, .ac-card:focus-visible { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.5); outline: none; }
 .ac-card.sel { background: rgba(242,179,27,.14); border-color: var(--accent); }
 .ac-slot { font: 600 10px var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-faint); }
@@ -50,6 +50,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .ac-label { font-weight: 800; font-size: 17px; letter-spacing: .12em; text-transform: uppercase; }
 .ac-reg { font: 600 12px var(--mono); color: var(--ink-dim); }
 .ac-spec { font-size: 11px; line-height: 1.5; color: var(--ink-faint); margin-top: 2px; }
+.ac-role { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+@media (max-width: 900px) { .ac-card { width: min(300px, calc(50vw - 26px)); } }
 @media (max-width: 560px) { .ac-card { width: calc(100vw - 32px); } .ac-spec { display: none; } }
 
 /* ---------- HUD ---------- */

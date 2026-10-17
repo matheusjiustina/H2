@@ -16,6 +16,12 @@ export const BASE = {
   // Where the aircraft not in use waits, on the west apron clear of the taxi
   // route from the pad to the strip.
   parking: { x: -424, z: -52, heading: Math.PI / 2 },
+  // Second apron spot (south-west) for when the helicopter is flown and both
+  // airplanes wait parked.
+  parking2: { x: -424, z: -88, heading: Math.PI / 2 },
+  // Helicopter pad (R44): gravel pad with a painted H at the east end of the
+  // apron, clear of the taxi route, the service pad and the fuel slab.
+  helipad: { x: -323, z: -48, heading: Math.PI / 2, radius: 6 },
   // Service equipment sits behind/left of the parked aircraft, clear of the prop.
   fuelTank: { x: -358, z: -84 },
   mixTank: { x: -366, z: -74 },

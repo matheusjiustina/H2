@@ -55,6 +55,17 @@ export class CameraRig {
       const ks = this.shakeScale ?? 1;
       const amp = (eng + ground) * ks + this.shake * 0.02;
       _v.copy(ac.model.eye);
+      if (ac.kind === 'heli') {
+        // Two-per-rev shake of the teetering rotor: strongest through
+        // translational lift (~15–25 kt), rising again at high speed and in
+        // settling with power; follows the real rotor phase.
+        const pct = o.rotorPct / 100, kt = o.airspeed * 1.943844;
+        const etl = Math.exp(-((kt - 20) ** 2) / 50);
+        const hv = pct > 0.2 ? (0.0005 + 0.0018 * etl + 0.0014 * smoothstep(85, 125, kt) + 0.0012 * (o.vrs ?? 0)) * Math.min(1, pct) * (o.onGround ? 0.5 : 1) : 0;
+        const ph = fm.rotorAngle * 2;
+        _v.y += Math.sin(ph) * hv * ks;
+        _v.x += Math.sin(ph + 1.3) * hv * 0.6 * ks;
+      }
       _v.y -= clamp((o.gLoad - 1) * 0.02, -0.04, 0.05) * Math.min(1, ks * 1.5);
       _v.x += (Math.random() - 0.5) * amp;
       _v.y += (Math.random() - 0.5) * amp;
@@ -69,7 +80,8 @@ export class CameraRig {
       // the nose when slow/on the ground.
       const vel = fm.vel;
       const sp = vel.length();
-      const w = smoothstep(8, 25, sp) * (o.onGround ? 0.3 : 1);
+      // A helicopter flies sideways and backwards: follow the nose.
+      const w = C.noseOnly ? 0 : smoothstep(8, 25, sp) * (o.onGround ? 0.3 : 1);
       _v2.copy(fwd);
       if (sp > 1) _v2.lerp(_v.copy(vel).divideScalar(sp), w * 0.7);
       _v2.y *= 0.55;

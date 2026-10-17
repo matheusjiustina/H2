@@ -2,7 +2,7 @@
 // pad and follow the truck (drive in, park, hoses, back out, return to bay).
 // Reports timings, the closest the truck footprint came to the aircraft and
 // whether the fuel/hopper were loaded; saves top-down snapshots.
-// Usage: AGRO_URL=... AC=ipanema|at502 node test/truck.mjs <outDir> [padOffsetX] [padOffsetZ] [headingDeg]
+// Usage: AGRO_URL=... AC=ipanema|at502|r44 node test/truck.mjs <outDir> [padOffsetX] [padOffsetZ] [headingDeg]
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -33,7 +33,8 @@ const setup = await page.evaluate(({ AC, off }) => {
   ac.fm.fuel = 40; ac.fm.hopper = 0; ac.fm.updateMass();
   if (off[0] || off[1] || off[2] !== null) {
     // Park somewhere else inside the pad zone (heading in radians, game convention).
-    ac.placeParked(-352 + off[0], -64 + off[1], off[2] !== null ? (off[2] * Math.PI) / 180 : Math.PI / 2);
+    const pad = ac.type.servicePad ?? { x: -352, z: -64 };
+    ac.placeParked(pad.x + off[0], pad.z + off[1], off[2] !== null ? (off[2] * Math.PI) / 180 : Math.PI / 2);
   }
   for (let i = 0; i < 60; i++) g.tick(1 / 60);
   return { ready: g.service.ready(), pos: [ac.fm.pos.x, ac.fm.pos.z], hdg: ac.fm.heading() };

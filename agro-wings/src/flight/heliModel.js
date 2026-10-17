@@ -38,15 +38,52 @@ const _nrm = { x: 0, y: 1, z: 0 };
 export function solveRotor(theta, lamC, mu, sigma, a, kGE, lam0) {
   let lam = lam0;
   let CT = 0, lamI = 0;
+  const k = Math.max(0.3, kGE);
   for (let i = 0; i < 10; i++) {
     CT = (sigma * a / 2) * ((theta / 3) * (1 + 1.5 * mu * mu) - lam / 2);
-    const den = 2 * Math.max(0.02, Math.sqrt(mu * mu + lam * lam));
-    lamI = (CT / den) * kGE;
+    // Momentum inflow out of ground effect, then scaled by the ground effect
+    // (Cheeseman–Bennett: induced velocity IGE = kGE x OGE at equal thrust).
+    const lamO = lamC + (lam - lamC) / k;
+    const den = 2 * Math.max(0.02, Math.sqrt(mu * mu + lamO * lamO));
+    lamI = (CT / den) * k;
     const next = lamC + lamI;
     lam += 0.55 * (next - lam);
   }
   CT = (sigma * a / 2) * ((theta / 3) * (1 + 1.5 * mu * mu) - lam / 2);
   return { CT, lam, lamI };
+}
+
+// Engine power (W) needed to hover at a given mass from the same rotor
+// model (trimmed, no wind): main rotor at governed speed, tail rotor
+// balancing its torque, drive friction and transmission losses. skidAGL:
+// skid height above the ground (ground effect), Infinity = out of ground
+// effect. Used by the load sheet; checked against the simulation in tests.
+export function hoverPower(A, mass, skidAGL = Infinity, alt = UNITS.altOffsetM) {
+  const R = A.rotor, TR = A.tailRotor;
+  const rho = 1.225 * Math.pow(Math.max(0.3, 1 - 2.25577e-5 * alt), 4.2559);
+  const Om = ((R.rpm100 * R.govPct) / 100) * TAU / 60;
+  const trim = (target, theta0, theta1, sigma, a, kGE, Vt, area) => {
+    let lo = theta0, hi = theta1, lam = 0.05, sol = null;
+    for (let i = 0; i < 40; i++) {
+      const th = (lo + hi) / 2;
+      for (let k = 0; k < 4; k++) { sol = solveRotor(th, 0, 0, sigma, a, kGE, lam); lam = sol.lam; }
+      if (sol.CT * rho * area * Vt * Vt > target) hi = th; else lo = th;
+    }
+    return sol;
+  };
+  const Vt = Om * R.radius, area = Math.PI * R.radius * R.radius;
+  const sigma = (R.blades * R.chord) / (Math.PI * R.radius);
+  const zg = Math.max(0.5 * R.radius, skidAGL - A.skids[0][1] + R.hubHeight);
+  const kGE = Number.isFinite(zg) ? 1 - (R.radius / (4 * zg)) ** 2 : 1;
+  const T = mass * G;
+  const sm = trim(T, 0, 0.5, sigma, R.liftSlope, kGE, Vt, area);
+  const pMain = T * sm.lam * Vt + (sigma * R.cd0 / 8) * rho * area * Vt ** 3;
+  const OmT = Om * TR.gear, VtT = OmT * TR.radius, areaT = Math.PI * TR.radius * TR.radius;
+  const sigmaT = (2 * TR.chord) / (Math.PI * TR.radius);
+  const TT = pMain / Om / TR.arm;
+  const st = trim(TT, -0.3, 0.5, sigmaT, 5.73, 1, VtT, areaT);
+  const pTail = TT * st.lam * VtT + (sigmaT * 0.012 / 8) * rho * areaT * VtT ** 3;
+  return (pMain + pTail + 900 + 4.5 * Om * Om) / A.engine.transEff;
 }
 
 export class HeliModel {
@@ -78,11 +115,11 @@ export class HeliModel {
     // Never-touch points except the rotor tips (those follow the disc).
     this.hard = [
       { name: 'tailRotor', p: [0.32, A.tailRotor.height - A.tailRotor.radius, -A.tailRotor.arm] },
-      { name: 'stinger', p: [0, -0.05, -5.75] },
+      { name: 'stinger', p: [0, -0.34, -5.98] },
       { name: 'nose', p: [0, -0.62, 2.2] },
       { name: 'tank', p: [0, -1.07, 0.15] },
-      { name: 'boomL', p: [4.3, -1.16, 0.55] },
-      { name: 'boomR', p: [-4.3, -1.16, 0.55] },
+      { name: 'boomL', p: [4.0, -1.16, 0.6] },
+      { name: 'boomR', p: [-4.0, -1.16, 0.6] },
     ].map((h) => ({ ...h, pv: new Vector3(...h.p), prev: -1 }));
     this.out = {
       airspeed: 0, groundSpeed: 0, alpha: 0, beta: 0, stall: 0, stallWarn: 0, agl: 100, onGround: false,
@@ -120,8 +157,11 @@ export class HeliModel {
     this.a1 = this.b1 = 0;
     const R = this.A.rotor;
     if (engineOn) {
-      this.engine = 'running'; this.phase = 'flight'; this.clutch = 1;
+      // Already flying: governor settled (its start-up ramp done), engine
+      // at the power for the hover, rotor and inflow at their trim.
+      this.engine = 'running'; this.phase = 'flight'; this.clutch = 1; this.phaseT = 60;
       this.rotorOmega = (R.rpm100 * R.govPct / 100) * TAU / 60;
+      this.rpm = (R.govPct / 100) * this.A.engine.rpm100;
       this.collective = 0.5; this.cht = 180; this.oilT = 80;
     } else {
       this.engine = 'off'; this.phase = 'off'; this.clutch = 0; this.rotorOmega = 0; this.collective = 0;
@@ -130,6 +170,10 @@ export class HeliModel {
     for (const s of this.skid) { s.prevPen = -1; s.onGround = false; }
     for (const h of this.hard) h.prev = -1;
     this.updateMass();
+    if (engineOn) {
+      this.power = this.powerCmd = hoverPower(this.A, this.mass);
+      this.lam = 0.06;
+    } else { this.power = this.powerCmd = 0; this.rpm = 0; }
     this._instruments(0, 1.2);
   }
 
@@ -329,6 +373,9 @@ export class HeliModel {
     // Airframe rate damping (fin, stabiliser, cabin), grows with speed.
     mom.x -= (120 + 9 * V) * this.omega.x;
     mom.y -= (160 + 14 * V) * this.omega.y;
+    // Tail cone, fins and cabin swept sideways in a yaw (quadratic): the
+    // integral of 1/2 rho Cd h r^3 along the airframe, ≈ 110 m^5.
+    mom.y -= 110 * rho * this.omega.y * Math.abs(this.omega.y);
     mom.z -= (90 + 4 * V) * this.omega.z;
 
     // --- skids --------------------------------------------------------------

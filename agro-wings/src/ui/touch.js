@@ -85,7 +85,10 @@ export class TouchControls {
     if (!this.active) return;
     const fm = this.game.aircraft?.fm;
     const v = this.game.input.virtual;
-    if (fm && (v.throttle === null || v.throttle === undefined)) this.el.querySelector('.t-thr span').style.height = `${fm.throttle * 100}%`;
+    // The right slider is the throttle in the airplanes, the collective in the helicopter.
+    const ac = this.game.aircraft;
+    const lev = ac?.kind === 'heli' ? ac.lever : fm?.throttle;
+    if (fm && (v.throttle === null || v.throttle === undefined)) this.el.querySelector('.t-thr span').style.height = `${lev * 100}%`;
     this.el.querySelector('[data-tap=spray]').classList.toggle('on', !!this.game.sprayer?.on);
     this.el.classList.toggle('hidden', !this.game.playing);
     this.el.style.display = this.game.playing ? '' : 'none';

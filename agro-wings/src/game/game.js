@@ -2,10 +2,11 @@
 import * as THREE from 'three';
 import { World } from '../world/world.js';
 import { QUALITY, GAME, SPRAY } from '../config.js';
-import { AIRCRAFT_ORDER } from '../aircraft/types.js';
+import { AIRCRAFT_ORDER, aircraftType } from '../aircraft/types.js';
 import { Input } from '../core/input.js';
 import { ParticlePool } from '../core/particles.js';
 import { Aircraft } from '../aircraft/aircraft.js';
+import { Helicopter } from '../aircraft/helicopter.js';
 import { CameraRig } from '../aircraft/cameras.js';
 import { Sprayer } from '../spray/sprayer.js';
 import { Guidance } from '../spray/guidance.js';
@@ -20,6 +21,7 @@ import { Tutorial } from './tutorial.js';
 import { BASE, POWERLINE, CONTRACT_FIELDS } from '../world/layout.js';
 import { smoothstep } from '../core/math.js';
 import { Autopilot } from './autopilot.js';
+import { HeliAutopilot } from './heliAutopilot.js';
 import { windAt } from '../flight/env.js';
 
 const SETTINGS = 'agrowings.settings.v1';
@@ -79,7 +81,8 @@ export class Game {
     // Both aircraft live in the world; the one not selected waits parked.
     this.fleet = {};
     for (const id of AIRCRAFT_ORDER) {
-      const ac = new Aircraft(this, { type: id });
+      // Each aircraft gets its own controller and physics by kind.
+      const ac = aircraftType(id).kind === 'heli' ? new Helicopter(this, { type: id }) : new Aircraft(this, { type: id });
       ac.fm.fuel = ac.type.loads.boot; ac.fm.hopper = 0; ac.fm.updateMass();
       this.fleet[id] = ac;
     }
@@ -149,7 +152,7 @@ export class Game {
 
   // Debug/validation: fly the current job hands-off through the normal inputs.
   startAutopilot(plan = 'contract') {
-    this.autopilot = new Autopilot(this);
+    this.autopilot = this.aircraft.kind === 'heli' ? new HeliAutopilot(this) : new Autopilot(this);
     this.autopilot.engage(plan);
     return this.autopilot;
   }
@@ -158,10 +161,13 @@ export class Game {
   // up); every other aircraft is parked and becomes an obstacle.
   _activate(id) {
     const next = this.fleet[id];
+    // Parked spots: the helicopter waits on its pad; the airplanes take the
+    // west apron spots in order.
+    const spots = [BASE.parking, BASE.parking2];
     for (const ac of Object.values(this.fleet)) {
       if (ac === next) continue;
       ac.onSimStep = null; ac.onEvent = null;
-      ac.park(BASE.parking);
+      ac.park(ac.kind === 'heli' ? ac.type.servicePad : spots.shift());
     }
     this.aircraft = next;
     this.aircraftId = id;
@@ -217,7 +223,7 @@ export class Game {
         this.setJob(null);
         this.aircraft.repair();
         { const L = this.aircraft.type.loads.free; this.aircraft.fm.fuel = L.fuel; this.aircraft.fm.hopper = L.hopper; }
-        this.aircraft.placeAirborne(-200, -280, Math.PI / 2, 120, 48 * (this.aircraft.A.assistSpeedScale ?? 1));
+        this.aircraft.placeAirborne(-200, -280, Math.PI / 2, 120, this.aircraft.kind === 'heli' ? 30 : 48 * (this.aircraft.A.assistSpeedScale ?? 1));
         this.rig.setMode('chase', this.aircraft);
         this.cameraMode = 'chase';
         break;
@@ -497,8 +503,14 @@ export class Game {
   }
 
   _atPadStopped() {
-    const fm = this.aircraft.fm;
-    return this.service.inZone() && fm.engine === 'off' && fm.out.groundSpeed < 0.3 && this.aircraft.state === 'ok';
+    const ac = this.aircraft, fm = ac.fm;
+    return this.service.inZone() && fm.engine === 'off' && fm.out.groundSpeed < 0.3 && ac.state === 'ok' && !this._rotorTurning();
+  }
+
+  // Helicopter: the crew does not approach until the main rotor has stopped.
+  _rotorTurning() {
+    const ac = this.aircraft;
+    return ac.kind === 'heli' && ac.fm.out.rotorPct > 0.5;
   }
 
   _interact() {
@@ -543,9 +555,10 @@ export class Game {
       }
       return this.hud.setPrompt(`${k('interact')} Service (fuel &amp; liquid)`, () => this._interact());
     }
-    if (fm.engine === 'off' && fm.out.onGround && !this.service.busy()) return this.hud.setPrompt(`Hold ${k('engine')} to start the engine`);
+    if (fm.engine === 'off' && this._rotorTurning() && fm.out.onGround) return this.hud.setPrompt(`Rotor running down (${Math.round(fm.out.rotorPct)} %) — crew waits for it to stop`);
+    if (fm.engine === 'off' && fm.out.onGround && !this.service.busy()) return this.hud.setPrompt(ac.kind === 'heli' ? `Collective down, hold ${k('engine')} to start` : `Hold ${k('engine')} to start the engine`);
     if (fm.engine === 'running' && fm.out.onGround && this.service.inZone() && fm.out.groundSpeed < 0.3 && (this.job || this.mode === 'free')) {
-      return this.hud.setPrompt(`Tap ${k('engine')} to shut down for service`);
+      return this.hud.setPrompt(ac.kind === 'heli' ? `Collective down — tap ${k('engine')} to shut down for service` : `Tap ${k('engine')} to shut down for service`);
     }
     this.hud.setPrompt(null);
   }
@@ -557,7 +570,13 @@ export class Game {
     const t = ac.telemetry();
     const fm = ac.fm, o = fm.out;
     if (t.stall > 0.5 && !o.onGround) out.push({ text: 'Stall', cls: 'blink' });
-    if (!o.onGround && o.agl < 6 && o.vs < -3.5) out.push({ text: 'Sink rate — pull up', cls: 'blink' });
+    if (ac.kind === 'heli') {
+      if (o.lowRotor) out.push({ text: `Low rotor RPM ${Math.round(o.rotorPct)} % — lower collective`, cls: 'blink' });
+      else if (fm.engine === 'running' && o.rotorPct > 108) out.push({ text: `Rotor overspeed ${Math.round(o.rotorPct)} %`, cls: 'amber' });
+      if (fm.engine !== 'running' && !o.onGround && o.rotorPct > 5) out.push({ text: 'Engine out — autorotate', cls: 'blink' });
+      if (o.vrs > 0.3) out.push({ text: 'Settling with power — forward speed', cls: 'amber blink' });
+    }
+    if (!o.onGround && o.agl < 6 && o.vs < -3.5) out.push({ text: ac.kind === 'heli' ? 'Sink rate — collective' : 'Sink rate — pull up', cls: 'blink' });
     if (t.ias > ac.type.vspeeds.vne) out.push({ text: 'Overspeed', cls: 'amber' });
     if (!o.onGround && o.agl < 30) {
       // Power line ahead?
@@ -602,6 +621,7 @@ export class Game {
       inside: this.cameraMode === 'cockpit' && this.playing, attached: this.cameraMode !== 'orbit', listenerDist: this.cameraMode === 'cockpit' ? 0 : Math.max(0, camD - 12),
       rough: ac.damage > 55, pumpOn: this.service.pumpOn, serviceAtt: 1 / (1 + svcD / 15),
       profile: ac.type.audio.profile, blades: ac.type.audio.blades, ng: fm.ng, power: ac.A.turbine ? fm.shaftPower / ac.A.maxPower : fm.throttle, itt: fm.itt,
+      rotorPct: fm.out.rotorPct ?? 0, rotorRpm: fm.rotorRpm ?? 0, tailGear: ac.A.tailRotor?.gear ?? 0, vs: o.vs, collective: fm.collective ?? 0, vrs: o.vrs ?? 0,
       ambience: (1 - smoothstep(150, 700, baseD)) * (this.camera.position.y < 80 ? 1 : 0.3),
       weather: this.world.atmo.audioLevels(),
       tractor: this.world.farm.root.visible ? 1 / (1 + this.camera.position.distanceTo(this.world.farm.root.position) / 25) * (this.camera.position.distanceTo(this.world.farm.root.position) < 500 ? 1 : 0) : 0,

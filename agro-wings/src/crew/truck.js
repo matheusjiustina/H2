@@ -33,7 +33,8 @@ export const TRUCK = {
   lead: 10, // straight lead-in to the loading stand, m
 };
 
-const PLAN_BOUNDS = { x0: -402, x1: -300, z0: -110, z1: -36 };
+// Apron plus the grass east and north of it (room to turn at the helipad).
+const PLAN_BOUNDS = { x0: -402, x1: -280, z0: -110, z1: -28 };
 const _e = new THREE.Euler();
 
 function buildTruckModel(Mworld) {
@@ -113,12 +114,14 @@ export class ServiceTruck {
   get parkedAtStand() { return this.state === 'parked' && this.purpose === 'stand'; }
 
   // Ground rectangles of the aircraft (yaw only) for planning.
-  _aircraftRects(margin = 0.8) {
+  // walk: the badeco walks under overhead boxes (a stopped rotor disc).
+  _aircraftRects(margin = 0.8, walk = false) {
     const out = [];
     for (const ac of Object.values(this.game.fleet || {})) {
       const yaw = ac.fm.heading();
       const c = Math.cos(yaw), s = Math.sin(yaw);
-      for (const [x0, x1, , , z0, z1] of ac.type.bounds) {
+      for (const [x0, x1, y0, , z0, z1] of ac.type.bounds) {
+        if (walk && y0 > (ac.type.overhead ?? 1e9)) continue;
         const lx = (x0 + x1) / 2, lz = (z0 + z1) / 2;
         // Body +X -> (cos yaw, -sin yaw); +Z -> (sin yaw, cos yaw).
         out.push({ cx: ac.fm.pos.x + lx * c + lz * s, cz: ac.fm.pos.z - lx * s + lz * c, hx: (x1 - x0) / 2 + margin, hz: (z1 - z0) / 2 + margin, yaw });
@@ -132,7 +135,8 @@ export class ServiceTruck {
   standFor(ac, side, lzRear = 0.6) {
     const yaw = ac.fm.heading();
     const half = Math.max(...ac.type.bounds.map((b) => Math.max(Math.abs(b[0]), Math.abs(b[1]))));
-    const lx = side * (half + TRUCK.halfWidth + 1.45);
+    // Gap from the widest part (wing tip, or the rotor disc of a helicopter).
+    const lx = side * (half + TRUCK.halfWidth + (ac.type.service.standGap ?? 1.45));
     // lzRear: truck rear bumper, aircraft frame (+Z forward).
     const az = lzRear + TRUCK.rear; // its rear axle is 1.55 m further aft
     const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -165,7 +169,12 @@ export class ServiceTruck {
     }
     if (!cands.length) return false;
     this.planFailed = false;
-    this.job = { purpose: 'stand', cands: cands.slice(0, 3), i: 0, it: null, best: null, maxNodes: 40000 };
+    // Helicopter: the stands are well off the rotor disc on either side;
+    // try the other side early (one side can need a long three-point turn).
+    const pick = ac.kind === 'heli'
+      ? [cands.find((c) => c.side === side), cands.find((c) => c.side !== side), cands.filter((c) => c.side === side)[1]].filter(Boolean)
+      : cands.slice(0, 3);
+    this.job = { purpose: 'stand', cands: pick, i: 0, it: null, best: null, maxNodes: ac.kind === 'heli' ? 90000 : 40000 };
     this.state = 'planning';
     this.engineOn = true;
     this.beaconOn = true;

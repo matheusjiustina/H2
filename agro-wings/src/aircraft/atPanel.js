@@ -302,3 +302,6 @@ function flowMonitor(g, x, y, d) {
   g.fillText('FLOW', x + 84, y + 76);
   void needle;
 }
+
+// Flight-instrument drawers shared with the R44 panel.
+export { attitude, heading, turn };

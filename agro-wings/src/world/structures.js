@@ -183,6 +183,7 @@ export function createStructures(terrain, scene) {
 
   dyn.hangar = buildHangar(B, M, group);
   buildService(B, M, group, H);
+  buildHelipad(B, M, group, H);
   buildVehicles(B, M, H);
   buildStripMarks(B, M, group, H);
   buildHQ(B, M, group, H);
@@ -481,6 +482,59 @@ function buildService(B, M, group, H) {
   B.box(0.06, 0.6, 1.2, M.yellow, pad.x + 9, 1.3, pad.z);
   B.collider(ft.x - 3.2, ft.x + 3.6, ft.z - 1.2, ft.z + 1.8, 2.6, 'fuel tank');
   B.collider(mt.x - 1.2, mt.x + 2.0, mt.z - 1.2, mt.z + 1.4, 3.6, 'mix tank');
+}
+
+// Helicopter pad: square of compacted gravel with a painted H and a
+// touchdown circle, white-edged; low edge markers at the corners.
+function buildHelipad(B, M, group, H) {
+  const hp = BASE.helipad;
+  const S = 15, px = 1024;
+  const c = canvas(px, px);
+  const g = c.getContext('2d');
+  g.fillStyle = '#9b958a';
+  g.fillRect(0, 0, px, px);
+  const r = rng(29);
+  for (let i = 0; i < 26000; i++) {
+    const v = 90 + Math.floor(r() * 120);
+    g.fillStyle = `rgba(${v},${v - 4},${v - 12},${0.25 + r() * 0.4})`;
+    const s = 1 + r() * 3.5;
+    g.fillRect(r() * px, r() * px, s, s * (0.6 + r() * 0.6));
+  }
+  // Red-earth wash at the edges, tyre/skid scuffs.
+  const edge = g.createRadialGradient(px / 2, px / 2, px * 0.38, px / 2, px / 2, px * 0.75);
+  edge.addColorStop(0, 'rgba(140,70,40,0)');
+  edge.addColorStop(1, 'rgba(140,70,40,0.35)');
+  g.fillStyle = edge; g.fillRect(0, 0, px, px);
+  const k = px / S;
+  g.fillStyle = 'rgba(236,233,224,0.88)';
+  // H (letter 6 m tall), bars 0.9 m wide.
+  const hw = 3.6 * k, hh = 6 * k, bw = 0.9 * k;
+  g.fillRect(px / 2 - hw / 2, px / 2 - hh / 2, bw, hh);
+  g.fillRect(px / 2 + hw / 2 - bw, px / 2 - hh / 2, bw, hh);
+  g.fillRect(px / 2 - hw / 2, px / 2 - bw / 2, hw, bw);
+  // Touchdown circle and edge line.
+  g.strokeStyle = 'rgba(236,233,224,0.7)'; g.lineWidth = 0.35 * k;
+  g.beginPath(); g.arc(px / 2, px / 2, 5.2 * k, 0, Math.PI * 2); g.stroke();
+  g.lineWidth = 0.25 * k;
+  g.strokeRect(0.4 * k, 0.4 * k, px - 0.8 * k, px - 0.8 * k);
+  // Worn paint and skid marks.
+  for (let i = 0; i < 2600; i++) {
+    g.fillStyle = `rgba(120,112,100,${0.2 + r() * 0.4})`;
+    g.fillRect(r() * px, r() * px, 1 + r() * 4, 1 + r() * 2);
+  }
+  g.strokeStyle = 'rgba(40,36,32,0.18)'; g.lineWidth = 0.08 * k;
+  for (const sx of [-1.09, 1.09]) { g.beginPath(); g.moveTo(px / 2 + sx * k - 1.4 * k, px / 2 - sx * 0.1 * k); g.lineTo(px / 2 + sx * k + 1.4 * k, px / 2 + sx * 0.05 * k); g.stroke(); }
+  const mat = new THREE.MeshStandardMaterial({ map: canvasTexture(c, { aniso: 8 }), roughness: 0.96 });
+  const y = H(hp.x, hp.z);
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(S, 0.05, S), mat);
+  // Rotated so the H reads along the approach (east-west).
+  slab.position.set(hp.x, y - 0.012, hp.z);
+  slab.rotation.y = hp.heading;
+  slab.receiveShadow = true;
+  group.add(slab);
+  // Corner markers (low white-painted tyres) and a small red/white post.
+  const tyre = new THREE.TorusGeometry(0.36, 0.13, 10, 20);
+  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.add(tyre, M.white, hp.x + dx * (S / 2 + 3), y + 0.1, hp.z + dz * (S / 2 + 3), 0, Math.PI / 2);
 }
 
 function buildVehicles(B, M, H) {

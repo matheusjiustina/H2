@@ -9,6 +9,7 @@ import { Vector3 } from 'three';
 import { makeHeli, DT, pitchOf } from './heliharness.mjs';
 import { HeliAssist } from '../src/flight/heliAssist.js';
 import { FLIGHT_R44 as A } from '../src/config.js';
+import { hoverPower } from '../src/flight/heliModel.js';
 
 const HP = 745.7, KT = 1.943844, FPM = 196.85;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -39,18 +40,27 @@ test('start-up: crank, clutch, warm-up, governor holds 101–102 % with the skid
 
 test('hover power: OGE at MTOW within take-off power, IGE needs less', (t) => {
   const as = new HeliAssist();
-  const run = (alt) => {
+  const run = (alt, coll) => {
     const { fm, env } = makeHeli({ engineOn: true, alt, fuel: 140, hopper: 250 });
     fm.hopper = (A.mtow - (A.emptyMass + A.agKitMass + A.pilotMass + fm.fuel * A.fuelDensity)) / A.liquidDensity; fm.updateMass();
+    if (coll) fm.collective = coll; // start trimmed so a low hover does not sink onto the skids
     as.reset();
     fly(fm, env, as, 'high', 40, { pitch: 0, roll: 0, yaw: 0, lever: 0.5, leverRate: 0 });
-    return { hp: avgPower(fm, env, as, 'high', { pitch: 0, roll: 0, yaw: 0, lever: 0.5, leverRate: 0 }, 5), mass: fm.mass, drift: speedKt(fm) };
+    const hp = avgPower(fm, env, as, 'high', { pitch: 0, roll: 0, yaw: 0, lever: 0.5, leverRate: 0 }, 5);
+    return { hp, mass: fm.mass, drift: speedKt(fm), coll: fm.collective, skid: fm.pos.y + A.skids[0][1], ground: fm.out.onGround };
   };
-  const oge = run(60), ige = run(1.45 + 1.0);
+  // IGE at a 2 ft skid height, the POH's in-ground-effect reference.
+  const oge = run(60), ige = run(-A.skids[0][1] + 0.61, oge.coll * 0.97);
   assert.ok(Math.abs(oge.mass - A.mtow) < 1);
+  assert.ok(!ige.ground && Math.abs(ige.skid - 0.61) < 0.15, `IGE hover held at ${ige.skid.toFixed(2)} m skid height`);
   assert.ok(oge.hp < 245 && oge.hp > 170, `OGE ${oge.hp.toFixed(0)} hp`);
-  assert.ok(ige.hp < oge.hp * 0.95, `IGE ${ige.hp.toFixed(0)} vs OGE ${oge.hp.toFixed(0)} hp`);
-  t.diagnostic(`hover at ${oge.mass.toFixed(0)} kg: OGE ${oge.hp.toFixed(0)} hp, IGE (skids 1 m) ${ige.hp.toFixed(0)} hp`);
+  assert.ok(ige.hp < oge.hp * 0.96, `IGE ${ige.hp.toFixed(0)} vs OGE ${oge.hp.toFixed(0)} hp`);
+  t.diagnostic(`hover at ${oge.mass.toFixed(0)} kg: OGE ${oge.hp.toFixed(0)} hp, IGE (skids 2 ft) ${ige.hp.toFixed(0)} hp`);
+  // The load sheet's trimmed estimate agrees with the flown hover.
+  const eO = hoverPower(A, oge.mass) / HP, eI = hoverPower(A, ige.mass, ige.skid) / HP;
+  assert.ok(Math.abs(eO - oge.hp) / oge.hp < 0.05, `load-sheet OGE ${eO.toFixed(0)} vs flown ${oge.hp.toFixed(0)} hp`);
+  assert.ok(Math.abs(eI - ige.hp) / ige.hp < 0.05, `load-sheet IGE ${eI.toFixed(0)} vs flown ${ige.hp.toFixed(0)} hp`);
+  t.diagnostic(`load-sheet estimate: OGE ${eO.toFixed(0)} hp, IGE ${eI.toFixed(0)} hp`);
 });
 
 test('level speed at 205 hp continuous is 100–125 kt (published cruise 109–117 kt)', (t) => {

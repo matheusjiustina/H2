@@ -273,8 +273,8 @@ export const FLIGHT_R44 = {
     precone: 0.04,
   },
   tailRotor: {
-    radius: 0.737, chord: 0.13, gear: 6.065, arm: 6.0, height: 0.45,
-    pitchMin: -0.14, pitchMax: 0.3, // full right .. full left pedal (rad)
+    radius: 0.737, chord: 0.13, gear: 6.065, arm: 6.0, height: 0.6,
+    pitchMin: -0.11, pitchMax: 0.26, // full right .. full left pedal (rad) — estimate
   },
   // Engine (piston, governed).
   engine: { ratedKW: 182.7, mcpKW: 152.9, idlePct: 62, rpm100: 2665, lagS: 0.18, crankS: 2.6, transEff: 0.94 },

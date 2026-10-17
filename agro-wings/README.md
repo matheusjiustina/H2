@@ -4,16 +4,19 @@ Agricultural aviation on a Mato Grosso farm (Fazenda Boa Esperança, fictional).
 Three.js + Vite, everything procedural (no external assets), built into a
 single self-contained `dist/index.html`.
 
-Two aircraft share the world and are chosen on the title screen:
-**AIRCRAFT 01 · Original** — the EMB-202A Ipanema (PR-AGW), and
-**AIRCRAFT 02 · Air Tractor** — an AT-502B turboprop (PR-AWT). The one not
-selected waits parked on the west apron.
+Three aircraft share the world and are chosen on the title screen:
+**AIRCRAFT 01 · Original** — the EMB-202A Ipanema (PR-AGW),
+**AIRCRAFT 02 · Air Tractor** — an AT-502B turboprop (PR-AWT), and
+**AIRCRAFT 03 · Robinson R44** — an R44 Raven II helicopter in an
+agricultural configuration (PR-AGH, "Rotary-Wing Agricultural Aircraft").
+The airplanes not selected wait parked on the west apron; the helicopter
+waits on its own pad at the east end of the apron.
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # dist/index.html (single file)
-npm test           # flight (both aircraft) + spray validation (Node)
+npm test           # flight (all three aircraft) + spray validation (Node)
 ```
 
 URL option: `?q=low|medium|high` forces a graphics preset (otherwise the
@@ -128,7 +131,7 @@ out ~29 m above the pass and ends above it, never stalling.
 ## Tests
 
 `npm test` runs `test/flight.test.mjs` (PR-AGW), `test/at502.test.mjs`
-(AT-502B) and `test/spray.test.mjs` (Node).
+(AT-502B), `test/r44.test.mjs` (R44) and `test/spray.test.mjs` (Node).
 Browser checks (need `npm run build && npx vite preview --port 4173`):
 
 - `node test/e2e.mjs soy out/` — full contract flown by the test autopilot
@@ -136,13 +139,19 @@ Browser checks (need `npm run build && npx vite preview --port 4173`):
 - `node test/e2e_ui.mjs out/` — service interruption, crash + recovery,
   stuck reset, key rebinding, tutorial, mobile layout;
 - `node test/perf.mjs` — per-view tick/render time, draw calls, triangles;
-- `node test/profile.mjs <low|medium|high> <ipanema|at502>` — load time,
+- `node test/profile.mjs <low|medium|high> <ipanema|at502|r44>` — load time,
   GPU object counts, JS heap, tick and frame avg/p95/p99 per view;
 - `node test/envviews.mjs out/ [times] [weathers] [views]` — renders per
   time of day × weather; `node test/atmo_transition.mjs` — gradual blends;
 - `node test/truck.mjs out/ [dx dz headingDeg]` — service truck cycle with
   timings, closest approach to the aircraft and loads;
-- `node test/gpsview.mjs out/` — HUD GPS page and the cockpit unit.
+- `node test/gpsview.mjs out/` — HUD GPS page and the cockpit unit;
+- `AC=r44 node test/e2e.mjs soy out/` — the contract flown by the
+  helicopter test autopilot (`src/game/heliAutopilot.js`);
+  `node test/r44flight.mjs out/` — the R44 picked on the title screen and
+  flown with the keyboard (start, spool-up, lift-off, hover, pedal turn,
+  forward flight) with screenshots; `AC=r44 node test/truck.mjs out/ dx dz
+  hdg` — service at the helipad.
 
 ### Measured in this container (Chromium + SwiftShader, 1280×720)
 
@@ -566,3 +575,204 @@ overcast deck is a sky-dome layer, not volumetric. The truck cannot reach
 every possible parking pose inside the pad circle; then the fixed station
 hoses are used as before. Only one farm vehicle works the fields. Real-GPU
 frame times were not measured (no GPU here); use Settings → Show FPS.
+
+## Aircraft 03 — Robinson R44 Raven II, agricultural (PR-AGH)
+
+The third aircraft and the first rotary-wing one, added as a separate
+aircraft: the airplanes keep their models, configurations and flight
+solver (`src/flight/flightModel.js`, `src/flight/assist.js` and
+`src/aircraft/aircraft.js` are not modified). The game creates a
+`Helicopter` (`src/aircraft/helicopter.js`) for types with `kind: 'heli'`
+and an `Aircraft` for the others; both expose the same interface, so the
+crew, truck, sprayer, GPS, HUD, cameras, missions and save data work with
+either. Title screen: AIRCRAFT 03 · ROBINSON R44 — "Rotary-Wing
+Agricultural Aircraft".
+
+**Tropical Island source.** The request was to reuse the Tropical Island
+helicopter simulation where its source is accessible. It is not: this
+environment can reach only the H2 repository, which has no Tropical Island
+code. Nothing was imported from it. The helicopter model below was written
+for this game from standard rotorcraft theory.
+
+**References.** The two uploaded videos are game footage of a red R44 mod
+on a gravel H pad (walk-around, start-up, hover, cockpit). They were used
+for the overall look (red paint, gravel pad with a painted H, pedestal
+console, T-bar cyclic). The mod's 800 L tank is not used.
+
+**Published figures used** (R44 Raven II): two-blade main rotor, 33 ft
+(10.06 m) diameter, turning counter-clockwise seen from above; two-blade
+58 in (1.47 m) tail rotor with the advancing blade at the bottom; 100 % =
+400 rotor rpm / 2,665 engine rpm, power-on limits 101–102 %, green 90–108 %,
+low-rpm horn at 97 %; MTOW 2,500 lb (1,134 kg), empty ~1,505 lb (683 kg);
+Lycoming IO-540-AE1A5 derated to 245 hp take-off (5 min) and 205 hp
+continuous; fuel 29.5 + 17.0 US gal usable (176 L); length 38 ft 3 in,
+height 10 ft 9 in; cruise 109–117 kt, Vne 130 kt; hover ceilings IGE /
+OGE ~8,950 / ~7,500 ft. Sources: Robinson's R44 Raven II page and POH
+(as quoted by POH study cards), Wikipedia, Vertipedia, AOPA, Aensa, Plane
+& Pilot. Robinson's own site and Wikipedia could not be fetched from this
+container; the figures were cross-checked in search results.
+**Estimates** (marked as such in `FLIGHT_R44`, chosen to reproduce the
+published performance): blade chord, rotor inertia, Lock number, airframe
+inertias and drag areas, tail-rotor arm, chord and pitch range, skid tread
+and spring rates, the ag kit's mass.
+
+**Agricultural kit.** No crewed R44 ag kit with a published capacity was
+found (the 110 US gal figure that turns up belongs to the unmanned R44
+Sprayhawk). The game uses a 250 L virtual tank — what fits under the MTOW
+with an 85 kg pilot, the ag kit (42 kg, estimate) and ~80 L of fuel; full
+fuel and a full tank is over the MTOW and the load sheet says so. Belly
+tank between the cross tubes, engine-driven pump (it works in the hover,
+unlike the airplanes' wind-driven pumps), 8 m boom under the nose (80 % of
+the rotor diameter, kept inside the rotor wake) with 28 nozzles on drops,
+13 m swath and 1.3 L/s (the contracts' 40 L/ha at ~50 kt). The rotor
+downwash pushes the droplets down at low speed (shorter fall time, less
+drift); at working speed the wake trails behind the boom.
+
+**Flight model** (`src/flight/heliModel.js`, 120 Hz):
+- main rotor: blade-element thrust with momentum inflow solved each step
+  (translational lift, climb and descent), ground effect after Cheeseman
+  and Bennett (induced velocity × (1 − (R/4z)²), canopy counts half),
+  vortex-ring thrust loss with buffet when descending into the wake at low
+  speed, profile + induced power, H-force;
+- teetering rotor: no hub moment; the tip-path plane follows the cyclic
+  with a first-order flapping lag (τ = 16/(γΩ)), flaps back with speed
+  and lags the body rates (damping), so control is only the tilt of the
+  thrust vector;
+- rotor speed from the rotor inertia: a governed, density-limited piston
+  engine drives it through a belt clutch and a sprag clutch; over-pitching
+  droops it (LOW RPM horn below 97 %), with the collective down in a
+  descent it autorotates; the engine response has a lag;
+- start-up as on the R44 (compressed): crank, catch, clutch engagement
+  with the rotor spinning up from rest, warm-up, then the governor brings
+  the rotor to 101.5 % and holds it; shut-down: the rotor runs down on its
+  own inertia, the rotor brake is applied below 40 %;
+- tail rotor on the gear train (6.065:1), its own inflow, thrust and
+  power; shaft-torque reaction on the cabin (hover needs left pedal, the
+  reaction reverses in autorotation);
+- fuselage drag per axis, fin and stabiliser terms, quadratic yaw damping
+  of the tail cone and fins;
+- four skid contacts with spring/damper and stick/slip friction (no wheels:
+  it does not roll), hard landing and skid collapse limits;
+- never-touch points: rotor tips (tilted disc, coning or droop), tail rotor,
+  stinger, nose, tank, boom ends; rotor tips against trees, buildings,
+  parked aircraft, the truck and the wires.
+
+**Controls.** W/S/A/D cyclic, Z/X anti-torque pedals, R/F (or Shift/Ctrl,
+the wheel, gamepad triggers, the touch slider) raise and lower the
+collective, Q start (hold, collective down) / stop (tap). The governor
+replaces a twist-grip throttle. Settings → Assist: **off** — raw controls
+(unstable in the hover, as the real aircraft); **normal** — attitude
+command / hold, heading hold (kept on the skids while the collective is
+up, so the anti-torque pedal isn't dropped at touchdown), turn
+coordination above ~35 kt; **high** — plus vertical-speed command / height
+hold on the collective (never drooping the rotor below the green, and
+easing the descent to ~0.5 m/s at touchdown), a hover hold with the stick
+centred below ~55 kt and a speed hold above. The assists only move the
+controls; the physics is the same.
+
+**Checked against the published figures** (`test/r44.test.mjs`): hover at
+1,134 kg OGE 204 hp (≤ 245 hp take-off), IGE at a 2 ft skid height
+189 hp — the gap matches the published IGE/OGE ceilings; the load sheet's
+trimmed estimate matches both flown values; level flight 109 kt at 195 hp
+(published cruise 109–117 kt); climb at MTOW with 205 hp 1,153 ft/min
+(published max ~1,000 ft/min); autorotation with the rotor at 105–109 %;
+over-pitch at MTOW droops below 97 %; start to governed rpm with the skids
+still; pedal turns and heading hold; forward, backward and sideways
+translations; vertical lift-off, hover hold, landing on the skids.
+
+**Model** (`src/aircraft/r44Model.js`, visual only). One lofted cabin
+bubble cut exactly along the window outlines (two-piece windshield with a
+centre post and the compass, four door windows with the swept rear upper
+corner), rubber seals along every outline, a dark inner skin, door seams,
+hinges and handles, landing lights; mast fairing; aft body with the open
+engine bay (flat-six with finned cylinders, cooling scroll, exhaust,
+muffler and tailpipe, steel tube frame); riveted tail cone; swept upper
+fin, lower fin with the stinger, horizontal stabiliser, tail-rotor guard;
+skid tubes on arched cross tubes with wear shoes; side-projected livery
+(red, graphite belly, pinstripes, AGRO WINGS, PR-AGH, flag, placards) with
+a bump map. Main rotor: mast, swashplate, teetering hub, pitch links, two
+blades with twist and root doublers; coning at speed, droop at rest,
+collective pitch, tip-path-plane tilt from the simulation. Tail rotor on
+the left with red-tipped blades.
+
+**Rotor blur.** Each rotor has a ring in its tip-path plane drawn with the
+lit standard material, whose alpha is the blade coverage smeared over one
+frame's exposure behind each blade (rotor speed × exposure, in radians),
+plus a faint persistence of the swept disc. Stopped or slow, the solid
+blades carry the look; as the rotor speeds up they fade and the smeared
+sectors take over — never a permanently opaque disc. The tail rotor blurs
+to a light disc at its higher speed.
+
+**Cockpit** (`src/aircraft/r44Panel.js`): pedestal console with a live
+pod — caution/warning lights (CLUTCH, ALT, OIL, MR/TR CHIP, LOW FUEL,
+LOW RPM, STARTER, GOV OFF, ROTOR BRK, SPRAY), airspeed, attitude,
+altimeter, the dual tachometer (rotor "R" and engine "E" needles),
+manifold pressure, heading, VSI, turn/slip, oil pressure and temperature,
+CHT, ammeter, fuel, ag tank, flow/height/rotor readout — and the lower
+pedestal (guidance GPS, COM/XPDR, switch row). Guidance lightbar on the
+pod. T-bar cyclic, collective with twist grip and the pedals move with the
+simulation; the seated pilot (right seat, helmet) has the right hand on
+the cyclic grip and the left on the collective (the forearm turns at the
+elbow, the lever follows the hand), and looks down and out near the
+ground and along the boom when spraying. The exact R44 instrument
+arrangement varies between aircraft and is not claimed.
+
+**Cameras and sound.** The chase camera follows the nose (a helicopter
+flies sideways and backwards); the cockpit view adds a two-per-rev shake
+in phase with the rotor, strongest through translational lift, at high
+speed and in settling with power (Settings → Cockpit shake scales or
+removes it). Audio profile `heli`: piston engine from engine rpm, the
+starter and the engine catching, main-rotor blade passage as noise pulses
+at 2/rev (chop and a low "whop", blade slap in descents), tail-rotor buzz
+and main-gearbox whine — all from the rotor speed, so they spin up through
+the clutch and run down after shut-down — with the cabin muffling and the
+low-rpm horn.
+
+**Farm integration.** Helipad at the east end of the apron (gravel, H and
+touchdown circle; the runway, service pad and taxi route are unchanged).
+The helicopter is serviced there: the crew waits until the rotor has
+stopped; the truck parks ≥ 3 m clear of the stopped disc on either side
+(its route search now also covers the grass east and north of the apron,
+and tries both sides). When the helicopter is flown, both airplanes wait
+on the west apron. Warnings: low rotor rpm, rotor overspeed, engine out
+(autorotate), settling with power. HUD: rotor % in place of G. The test
+autopilot (`src/game/heliAutopilot.js`) flies through the player's inputs
+with the high assist: service, start, lift-off, transit, passes with
+hover turnarounds at the field ends, return over obstacles, landing on
+the H, shut-down, rotor run-down and the next service.
+
+### Validation (R44 build)
+
+All runs below are on the final build (`npm run build`, `vite preview`),
+Chromium + SwiftShader in this container.
+
+| # | check | evidence |
+| --- | --- | --- |
+| 1 | PR-AGW behaves exactly as before | seeded trajectory fingerprint (take-off, pull-up, turn, wind on) identical, byte for byte, to the commit before the R44 work; `flightModel.js`, `assist.js`, `aircraft.js` and `FLIGHT` untouched; `node test/e2e.mjs soy`: full contract, two sorties, 90 %, 2★, Cr$ 5,386 |
+| 2 | Air Tractor functional | same fingerprint test with `FLIGHT_AT`: identical; `AC=at502 node test/e2e.mjs soy`: 90 % in one sortie, 1★, Cr$ 5,013 |
+| 3 | R44 spawns correctly | `test/r44flight.mjs`: card 03 selects it; parked on the helipad at (-323, -48), heading 090, four skids on the ground, rotor STOPPED |
+| 4 | main and tail rotors | counter-clockwise main rotor seen from above, advancing tail blade at the bottom, measured in the browser; solid blades at rest, short blur at ~25 %, blur disc with the blades faded at 100 %, solid again after the run-down |
+| 5 | vertical take-off | off the skids 2.1 s after raising the collective, 3 m 0.9 s later, 0.5 m drift |
+| 6 | stable hover | 20 s hands-off hover (high assist): 0.6 m drift, height within 0.04 m, rotor 101.5 % |
+| 7 | translations | 10 m/s forward and backward, 14.6 / 11.0 m/s sideways left / right, climb +7 m and descent −7.6 m on the collective |
+| 8 | yaw | left pedal −75° in 2 s then heading held (0.0° in 6 s); right pedal +91° |
+| 9 | skids on the ground | landing from 52 kt: four skids, 0.82 m/s touchdown, no damage, skid heights −0.02 m; the test autopilot's seven landings in the contract run all ended on the H |
+| 10 | cameras | chase behind the nose, cockpit at the pilot's eye (pilot hidden), orbit around |
+| 11 | instruments read the simulation | panel data equals the model's rotor %, engine %, MAP, fuel, tank, altitude and heading; rotor state STOPPED / STARTING / NORMAL / SHUTDOWN shown on the pod |
+| 12 | virtual ag application | `AC=r44 node test/e2e.mjs soy`: the whole soybean contract flown through the player inputs with the high assist — seven sorties (service, start, spool-up, lift-off, passes with hover turnarounds, return, landing on the H, shut-down, run-down), 90 % coverage, 2★, Cr$ 5,293, no damage |
+| 13 | ag GPS with the helicopter | the same run: passes flown on the guidance lines, with the lightbar, the HUD and cockpit GPS and the coverage map driven by the helicopter's 13 m swath |
+| 14 | ground servicing | 7 services at the helipad in that run, all by the truck (no "could not reach the stand"); `AC=r44 node test/truck.mjs` at four headings: truck at the stand in ~35 s, 1.0–1.7 m clear of the stopped rotor disc, crew walks around the boom |
+| 15 | aircraft selection | title screen 01 / 02 / 03, choice saved; `node test/e2e_ui.mjs`: 16/16 |
+| 16 | no critical regressions | `npm test`: 44/44 (PR-AGW and AT suites unchanged, 9 R44 checks); no page errors in any browser run (the only console error is the preview server's missing favicon, also present before) |
+| 17 | browser performance | `test/profile.mjs` (figures in the next commit) |
+
+**Known limits.** No mast bumping or dynamic rollover beyond what the
+four skid contacts produce; the governor is always on (no twist-grip
+throttle or governor-off flying); the rotor brake is applied automatically
+below 40 % during the run-down; the 250 L tank is a game figure (no crewed
+R44 ag kit with a published capacity was found); the instrument layout is
+representative, not a copy of a particular aircraft; the lone tree east of
+the helipad stands in the departure path — the test autopilot routes
+around it, players must too. Browser end-to-end runs are not bit-for-bit
+repeatable because the truck's route search has a per-frame time budget.
+FPS on a real GPU was not measured.

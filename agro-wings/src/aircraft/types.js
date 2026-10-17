@@ -2,11 +2,16 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, SPRAY, SPRAY_AT502, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, SPRAY, SPRAY_AT502, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createAirTractorModel, AT_SHADOW, atWingY } from './atModel.js';
 import { createTurbinePanel } from './atPanel.js';
+import { createR44Model, R44_SHADOW } from './r44Model.js';
+import { createR44Panel } from './r44Panel.js';
+import { BASE } from '../world/layout.js';
+
+const R44_ROTOR = FLIGHT_R44.rotor.radius;
 
 export const AIRCRAFT_TYPES = {
   ipanema: {
@@ -88,7 +93,73 @@ export const AIRCRAFT_TYPES = {
     createPanel: () => createTurbinePanel(),
     createShadow: () => createContactShadow(AT_SHADOW),
   },
+
+  // Rotary wing: flown by Helicopter (src/aircraft/helicopter.js) with its
+  // own physics (HeliModel); everything the game, crew, sprayer, GPS and
+  // cameras need comes from the same fields as the airplanes.
+  r44: {
+    id: 'r44',
+    kind: 'heli',
+    slot: '03',
+    label: 'Robinson R44',
+    reg: 'PR-AGH',
+    name: 'Robinson R44 Raven II · Agricultural',
+    role: 'Rotary-Wing Agricultural Aircraft',
+    engineName: 'Lycoming IO-540-AE1A5 · 245 hp take-off / 205 hp MCP',
+    summary: '250 L spray tank · 176 L fuel · 1,134 kg MTOW',
+    flight: FLIGHT_R44,
+    // 8 m boom under the nose (80 % of the rotor diameter), engine-driven
+    // pump: 1.3 L/s gives the contracts' 40 L/ha at 13 m × 25 m/s (≈ 50 kt).
+    spray: { swath: 13, flow: 1.3, boom: [4.0, -1.16, 0.6], pump: 'engine' },
+    work: [[1.09, -1.38, 0], [-1.09, -1.38, 0], [4.0, -1.2, 0.6], [-4.0, -1.2, 0.6]],
+    collide: [[0, -0.2, 2.5], [0, 0.8, 0.4], [0, 1.9, 0], [0, 1.25, -6.35], [0.32, 0.6, -6.0], [0, -0.34, -5.98], [4.0, -1.16, 0.6], [-4.0, -1.16, 0.6], [0, -0.9, 0]],
+    wire: [[0, -0.2, 2.5], [0, 1.9, 0], [0, 1.25, -6.35], [0.32, 0.6, -6.0], [4.0, -1.16, 0.6], [-4.0, -1.16, 0.6], [1.09, -1.38, 1.2], [-1.09, -1.38, 1.2]],
+    smoke: [0, 0.0, -1.3],
+    wash: [0, -1.2, -1],
+    anim: { vib: [1500, 2700] },
+    vspeeds: { vne: 130 },
+    camera: { dist: 14, height: 3.9, orbit: 17, noseOnly: true },
+    // Control layer: helicopter controls -> the game's (rebindable) actions,
+    // and the labels the Controls screen shows for them (null: not used).
+    controls: {
+      cyclicForward: 'pitchDown', cyclicAft: 'pitchUp', cyclicLeft: 'rollLeft', cyclicRight: 'rollRight',
+      pedalLeft: 'yawLeft', pedalRight: 'yawRight', collectiveUp: 'throttleUp', collectiveDown: 'throttleDown',
+      trimAft: 'trimUp', trimForward: 'trimDown', engine: 'engine',
+      labels: {
+        pitchDown: 'Cyclic forward', pitchUp: 'Cyclic aft', rollLeft: 'Cyclic left', rollRight: 'Cyclic right',
+        yawLeft: 'Pedal left (nose left)', yawRight: 'Pedal right (nose right)', throttleUp: 'Collective up', throttleDown: 'Collective down',
+        trimUp: 'Cyclic trim aft', trimDown: 'Cyclic trim forward', engine: 'Engine (hold start, collective down / tap stop)',
+        brakes: null, flapsUp: null, flapsDown: null,
+      },
+    },
+    audio: { profile: 'heli', blades: 2 },
+    fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
+    loads: { free: { fuel: 110, hopper: 150 }, boot: 70 },
+    loadSheet: { heli: true },
+    service: {
+      rates: { fuel: 2.5, liquid: 6 },
+      // Walk in from outside the boom tip, aft of it; fuel filler on the
+      // upper aft body, tank coupler on the tank side by the skid.
+      local: { A: [5.4, -1.9], B: [2.0, -1.5], F: [1.05, -0.95], P: [1.4, -0.55] },
+      keepOut: { wing: [4.1, 0.5, 0.7], wingY: () => -1.16, fus: [0.7, -0.9, 1.15, -2.2, 2.55], stab: [0.65, 0.45, 0.6, -5.25, -4.75] },
+      veto: 7.5,
+      standGap: 3.0, // truck parks well clear of the (stopped) rotor disc
+    },
+    servicePad: BASE.helipad,
+    stub: { eye: [-0.29, 0.44, 1.18], fuelFiller: [0.44, 0.56, -0.86], hopperPort: [0.53, -1.0, -0.42] },
+    // Airframe boxes plus the rotor disc (the disc is overhead: people walk
+    // under it, vehicles do not).
+    bounds: [
+      [-0.7, 0.7, -0.9, 1.15, -2.2, 2.55], [-0.22, 0.22, 0.2, 0.8, -6.15, -2.2], [-0.05, 0.4, -0.35, 1.35, -6.75, -5.25],
+      [-0.65, 0.65, 0.45, 0.6, -5.25, -4.75], [-1.15, 1.15, -1.38, -0.85, -1.4, 1.7], [-4.05, 4.05, -1.24, -1.08, 0.5, 0.7],
+      [-R44_ROTOR, R44_ROTOR, 1.45, 1.9, -R44_ROTOR, R44_ROTOR],
+    ],
+    overhead: 1.2, // boxes starting above this body height are walked under
+    createModel: (panel, opts) => createR44Model(panel, opts),
+    createPanel: () => createR44Panel(),
+    createShadow: () => createContactShadow(R44_SHADOW),
+  },
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502'];
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
