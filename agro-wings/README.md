@@ -764,7 +764,35 @@ Chromium + SwiftShader in this container.
 | 14 | ground servicing | 7 services at the helipad in that run, all by the truck (no "could not reach the stand"); `AC=r44 node test/truck.mjs` at four headings: truck at the stand in ~35 s, 1.0–1.7 m clear of the stopped rotor disc, crew walks around the boom |
 | 15 | aircraft selection | title screen 01 / 02 / 03, choice saved; `node test/e2e_ui.mjs`: 16/16 |
 | 16 | no critical regressions | `npm test`: 44/44 (PR-AGW and AT suites unchanged, 9 R44 checks); no page errors in any browser run (the only console error is the preview server's missing favicon, also present before) |
-| 17 | browser performance | `test/profile.mjs` (figures in the next commit) |
+| 17 | browser performance | `test/profile.mjs` against the build before the R44 work, below |
+
+**Performance** (`test/profile.mjs low`, 600 ticks per view; build before
+the R44 work → this build; SwiftShader, so render times are only the CPU
+cost of a software rasteriser):
+
+| flying | view | logic ms/tick (avg / p95) | draw calls | triangles |
+| --- | --- | --- | --- | --- |
+| PR-AGW | parked on the pad (R44 parked in view) | 0.39 / 0.6 → 0.39 / 0.7 | 486 → 540 | 737k → 835k |
+| PR-AGW | spraying soy at 4 m | 0.70 / 1.5 → 0.72 / 1.5 | 342 → 352 | 509k → 517k |
+| PR-AGW | cockpit over corn | 0.57 / 1.2 → 0.58 / 1.1 | 331 → 330 | 868k → 870k |
+| PR-AGW | 400 m AGL | 0.57 / 0.9 → 0.49 / 0.6 | 318 → 318 | 471k → 471k |
+| R44 | on the helipad | 0.37 / 0.7 | 473 | 865k |
+| R44 | spraying soy at 4 m | 0.54 / 1.2 | 340 | 670k |
+| R44 | cockpit over corn | 0.62 / 1.8 | 314 | 1047k |
+| R44 | 400 m AGL | 0.23 / 0.4 | 304 | 603k |
+
+On average the helicopter's simulation (120 Hz rotor, inflow, skids)
+costs no more per tick than the airplanes'. In the airplanes' views the
+additions are the parked R44 and the helipad: beyond 40 m the R44's cabin,
+glass and inner skin switch to a coarse version (same window cuts) and the
+fine detail is dropped, so it costs 51k triangles there (125k at full
+resolution). The rotor blur is one ring mesh per rotor (a standard
+material with a small shader patch), not a particle system. Sustained
+software-raster time per frame on the pad (once the frame queue has
+filled): 1.50–1.57 s before, 1.61–1.63 s flying the PR-AGW now,
+1.66–1.71 s flying the R44. Start-up in this container 18.7 → 21.1 s, JS
+heap 142 → 173 MB, GPU geometries 525 → 554, textures 37 → 41. FPS on a
+real GPU was not measured.
 
 **Known limits.** No mast bumping or dynamic rollover beyond what the
 four skid contacts produce; the governor is always on (no twist-grip
