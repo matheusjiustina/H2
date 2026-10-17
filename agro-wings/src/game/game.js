@@ -37,7 +37,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'high', timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     const q = new URLSearchParams(location.search).get('q');
     if (q && QUALITY[q]) { this.settings.quality = q; this.qualityForced = true; }
@@ -431,7 +431,7 @@ export class Game {
 
     if (dt > 0) {
       if (this.playing) {
-        ac.update(dt, input, { mouse, assist: this.settings.assist, windScale: this.settings.wind, cameraMode: this.cameraMode });
+        ac.update(dt, input, { mouse, assist: ac.kind === 'heli' ? this.settings.heliAssist : this.settings.assist, windScale: this.settings.wind, cameraMode: this.cameraMode });
       } else {
         ac.update(dt, { ...input, isDown: () => false, wasPressed: () => false, virtual: { active: false } }, { mouse: { buttons: 0, dx: 0, dy: 0, wheel: 0 }, assist: 'normal', windScale: this.settings.wind, cameraMode: 'orbit' });
       }

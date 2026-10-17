@@ -277,7 +277,7 @@ export const FLIGHT_R44 = {
     pitchMin: -0.11, pitchMax: 0.26, // full right .. full left pedal (rad) — estimate
   },
   // Engine (piston, governed).
-  engine: { ratedKW: 182.7, mcpKW: 152.9, idlePct: 62, rpm100: 2665, lagS: 0.18, crankS: 2.6, transEff: 0.94 },
+  engine: { ratedKW: 182.7, mcpKW: 152.9, idlePct: 62, rpm100: 2665, lagS: 0.08, crankS: 1.2, transEff: 0.94 },
   fuelCapacity: 176, // L usable (main 112 + aux 64)
   fuelDensity: 0.72, // avgas
   fuelPerKWh: 0.4, // L per kWh (≈ 60 L/h at 150 kW, ~16 US gal/h)

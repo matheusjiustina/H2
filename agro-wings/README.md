@@ -60,11 +60,11 @@ scheme). Everything else is the same in both.
 | Stick forward / back (R44: cyclic) | Num 8 / Num 5 | W / S (↑ ↓) |
 | Roll left / right (R44: cyclic) | Num 4 / Num 6 | A / D (← →) — also steer on the ground |
 | Rudder left / right (R44: pedals) | Q / E | Z / X |
-| Engine | hold I to start, tap I to stop | hold Q to start, tap Q to stop |
 
 | Action | Keys (both schemes) |
 | --- | --- |
-| Power (R44: collective) | Shift / Ctrl (R / F), mouse wheel |
+| Engine | hold F to start, tap F to stop |
+| Power (R44: collective) | Shift / Ctrl (R raises too), mouse wheel |
 | Brakes (differential with rudder) | Space |
 | Flaps | G (up) / B (down) |
 | Trim | [ / ] (Page Up / Page Down) |
@@ -77,12 +77,12 @@ scheme). Everything else is the same in both.
 | Reset aircraft | Backspace |
 | Speed up ground service | hold T |
 
-In the numpad scheme Q and E are the rudder, so the engine moves to I (a
-tap on Q, a rudder input, must not shut the engine down). E is also the
-service key: it only acts at the pad with the engine off, where the rudder
-does nothing. The two schemes are separate sets of bindings, so rebinding a
+In the numpad scheme Q and E are the rudder; E is also the service key,
+which only acts at the pad with the engine off, where the rudder does
+nothing. The two schemes are separate sets of bindings, so rebinding a
 numpad key never takes a key away from the classic ones, and the other way
-round.
+round. (Bindings saved earlier with the engine on Q and power-down on F are
+moved to the new defaults.)
 
 All bindings are rebindable in Settings. Mouse: left-drag looks, right-drag
 is a virtual stick. Gamepad: left stick, triggers = power, bumpers = rudder,
@@ -659,9 +659,10 @@ drift); at working speed the wake trails behind the boom.
   engine drives it through a belt clutch and a sprag clutch; over-pitching
   droops it (LOW RPM horn below 97 %), with the collective down in a
   descent it autorotates; the engine response has a lag;
-- start-up as on the R44 (compressed): crank, catch, clutch engagement
-  with the rotor spinning up from rest, warm-up, then the governor brings
-  the rotor to 101.5 % and holds it; shut-down: the rotor runs down on its
+- start-up as on the R44 (compressed to ~13 s): crank, catch, clutch
+  engagement with the rotor spinning up from rest, warm-up, then the
+  governor brings the rotor to 101.5 % and holds it; the engine's power
+  response lag is 0.08 s; shut-down: the rotor runs down on its
   own inertia, the rotor brake is applied below 40 %;
 - tail rotor on the gear train (6.065:1), its own inflow, thrust and
   power; shaft-torque reaction on the cabin (hover needs left pedal, the
@@ -676,18 +677,23 @@ drift); at working speed the wake trails behind the boom.
 
 **Controls.** Numpad 8 / 5 / 4 / 6 move the cyclic forward / aft / left /
 right, Q / E are the anti-torque pedals, Shift / Ctrl (or R / F, the wheel,
-the gamepad triggers, the touch slider) raise and lower the collective, I
+the gamepad triggers, the touch slider) raise and lower the collective, F
 starts (hold, collective down) and stops (tap) the engine; Settings → Flying
-→ Flight keys switches to the classic keys (W/S/A/D, Z/X, Q). The governor
+→ Flight keys switches to the classic keys (W/S/A/D, Z/X). The governor
 replaces a twist-grip throttle. Settings → Assist: **off** — raw controls
 (unstable in the hover, as the real aircraft); **normal** — attitude
-command / hold, heading hold (kept on the skids while the collective is
+command / hold, a landing cushion (below ~15 m the sink rate the height can
+still arrest is allowed, beyond that collective is added), heading hold (kept on the skids while the collective is
 up, so the anti-torque pedal isn't dropped at touchdown), turn
 coordination above ~35 kt; **high** — plus vertical-speed command / height
 hold on the collective (never drooping the rotor below the green, and
 easing the descent to ~0.5 m/s at touchdown), a hover hold with the stick
 centred below ~55 kt and a speed hold above. The assists only move the
-controls; the physics is the same.
+controls; the physics is the same. The helicopter has its own assist setting
+(Settings → Flying → Helicopter assist, default **high**); the airplanes keep
+theirs. With **high** the collective keys command the climb rate (a slewed
+demand and a quick velocity loop: no dead time, no overshoot) and a held
+lever-down lands at ~0.3 m/s; the law stays on down to the skids.
 
 **Checked against the published figures** (`test/r44.test.mjs`): hover at
 1,134 kg OGE 204 hp (≤ 245 hp take-off), IGE at a 2 ft skid height

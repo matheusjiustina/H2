@@ -3,17 +3,17 @@
 
 // Flight keys come in two schemes (Settings → Flying → Flight keys), for
 // every aircraft: 'numpad' (the default: Num 8 / 5 stick forward / back,
-// Num 4 / 6 roll left / right, Q / E rudder or pedals, I engine) and
-// 'classic' (the Tidemark layout: W/S/A/D, Z/X, Q engine). The code asks
+// Num 4 / 6 roll left / right, Q / E rudder or pedals) and 'classic' (the
+// Tidemark layout: W/S/A/D, Z/X). The engine is F in both. The code asks
 // for the generic actions (pitchDown, yawLeft, engine…); the scheme says
-// which bound action each one reads. Power (Shift / Ctrl, R / F), brakes,
+// which bound action each one reads. Power (Shift / Ctrl, R), engine (F), brakes,
 // flaps, trim, camera… are the same in both.
 //
 // `scope` keeps key conflicts apart: a 'classic' action and a 'num' action
 // may share a key (only one of the two is live at a time); actions without a
 // scope are used by both schemes and conflict with everything. `shares`
-// names an intended overlap: Q / E are the rudder in the numpad scheme and
-// still the engine / service keys, which only act with the engine off.
+// names an intended overlap: E is the right rudder in the numpad scheme and
+// still the service key, which only acts with the engine off.
 export const ACTIONS = {
   pitchDown: { label: 'Pitch down (stick forward)', keys: ['KeyW', 'ArrowUp'], scope: 'classic' },
   pitchUp: { label: 'Pitch up (stick back)', keys: ['KeyS', 'ArrowDown'], scope: 'classic' },
@@ -22,14 +22,14 @@ export const ACTIONS = {
   yawLeft: { label: 'Rudder left / steer', keys: ['KeyZ'], scope: 'classic' },
   yawRight: { label: 'Rudder right / steer', keys: ['KeyX'], scope: 'classic' },
   throttleUp: { label: 'Power up', keys: ['KeyR', 'ShiftLeft'] },
-  throttleDown: { label: 'Power down', keys: ['KeyF', 'ControlLeft'] },
+  throttleDown: { label: 'Power down', keys: ['ControlLeft'] },
   brakes: { label: 'Brakes (hold)', keys: ['Space'] },
   flapsUp: { label: 'Flaps up', keys: ['KeyG'] },
   flapsDown: { label: 'Flaps down', keys: ['KeyB'] },
   trimUp: { label: 'Trim nose up', keys: ['BracketRight', 'PageUp'] },
   trimDown: { label: 'Trim nose down', keys: ['BracketLeft', 'PageDown'] },
   spray: { label: 'Spray on / off', keys: ['KeyC', 'Enter'] },
-  engine: { label: 'Engine (hold start / tap stop)', keys: ['KeyQ'], scope: 'classic' },
+  engine: { label: 'Engine (hold start / tap stop)', keys: ['KeyF'] },
   camera: { label: 'Cockpit / chase camera', keys: ['KeyV'] },
   orbit: { label: 'Free external camera', keys: ['KeyO'] },
   interact: { label: 'Interact / service', keys: ['KeyE'], shares: ['nYawRight'] },
@@ -47,11 +47,10 @@ export const ACTIONS = {
   nRollRight: { label: 'Roll / cyclic right', keys: ['Numpad6'], scope: 'num' },
   nYawLeft: { label: 'Rudder / pedal left', keys: ['KeyQ'], scope: 'num' },
   nYawRight: { label: 'Rudder / pedal right', keys: ['KeyE'], scope: 'num', shares: ['interact'] },
-  nEngine: { label: 'Engine (hold start / tap stop)', keys: ['KeyI'], scope: 'num' },
 };
 
 export const KEY_SCHEMES = {
-  numpad: { pitchDown: 'nPitchDown', pitchUp: 'nPitchUp', rollLeft: 'nRollLeft', rollRight: 'nRollRight', yawLeft: 'nYawLeft', yawRight: 'nYawRight', engine: 'nEngine' },
+  numpad: { pitchDown: 'nPitchDown', pitchUp: 'nPitchUp', rollLeft: 'nRollLeft', rollRight: 'nRollRight', yawLeft: 'nYawLeft', yawRight: 'nYawRight' },
   classic: {},
 };
 export const DEFAULT_KEY_SCHEME = 'numpad';
@@ -119,7 +118,12 @@ export class Input {
   load() {
     try {
       const s = JSON.parse(localStorage.getItem(STORE) || 'null');
-      if (s) for (const k of Object.keys(this.bindings)) if (Array.isArray(s[k])) this.bindings[k] = s[k];
+      if (s) {
+        // Bindings saved while the engine was on Q and power down on F.
+        if (JSON.stringify(s.engine) === '["KeyQ"]') delete s.engine;
+        if (JSON.stringify(s.throttleDown) === '["KeyF","ControlLeft"]') delete s.throttleDown;
+        for (const k of Object.keys(this.bindings)) if (Array.isArray(s[k])) this.bindings[k] = s[k];
+      }
     } catch { /* storage unavailable */ }
   }
   save() {

@@ -27,14 +27,14 @@ export class HeliAssist {
   reset() {
     this.iLon = 0; this.iLat = -0.3; this.iYaw = 0; this.iCol = null;
     this.holdPitch = 0; this.holdHdg = null; this.holdAlt = null;
-    this.pHeld = false; this.pRef = 0; this.vHold = null; this.iSpd = null;
+    this.pHeld = false; this.pRef = 0; this.vHold = null; this.iSpd = null; this.vsCmd = null; this.cush = 0;
   }
 
   // cmd: { pitch (+ aft stick), roll (+ right), yaw (+ right pedal), lever 0..1 }
   update(fm, cmd, mode, h) {
     const o = fm.out;
     const att = FlightModel.attitude(fm, this._att); // pitch + nose up, bank + right
-    const airborne = !o.onGround && o.agl > 0.25;
+    const airborne = !o.onGround && o.agl > 0.03; // the laws stay on down to the skids
     if (mode === 'off' || !airborne) {
       fm.cyclicLon = clamp(-cmd.pitch * 0.85, -1, 1);
       fm.cyclicLat = clamp(cmd.roll * 0.85 + (mode === 'off' ? 0 : -0.2 * (fm.collective > 0.3 ? 1 : 0)), -1, 1);
@@ -53,7 +53,7 @@ export class HeliAssist {
       // Hand the trims to the hold laws for a smooth lift-off.
       this.iLon = -fm.cyclicLon; this.iLat = fm.cyclicLat;
       this.holdPitch = att.pitch; this.holdAlt = fm.pos.y; this.iCol = cmd.lever;
-      this.pHeld = false;
+      this.pHeld = false; this.vsCmd = null;
       return;
     }
     const V = Math.hypot(fm.vel.x, fm.vel.z);
@@ -97,21 +97,30 @@ export class HeliAssist {
       const leverRate = cmd.leverRate ?? 0; // -1..1 from the power keys
       if (Math.abs(leverRate) > 0.02 || this.holdAlt === null) this.holdAlt = fm.pos.y;
       let vsT = Math.abs(leverRate) > 0.02 ? leverRate * 2.5 : clamp((this.holdAlt - fm.pos.y) * 0.7, -2, 2);
-      // Close to the ground the commanded descent eases off (≈ 0.5 m/s at
+      // Close to the ground the commanded descent eases off (≈ 0.35 m/s at
       // touchdown), so a held lever-down still lands gently.
-      vsT = Math.max(vsT, -clamp(0.45 + fm.out.agl * 0.35, 0.45, 2.5));
+      vsT = Math.max(vsT, -clamp(0.35 + fm.out.agl * 0.3, 0.35, 2.2));
+      // The demand slews (no steps), then a quick velocity loop follows it.
+      this.vsCmd ??= fm.vel.y;
+      this.vsCmd += clamp(vsT - this.vsCmd, -5 * h, 5 * h);
       if (this.iCol === null) this.iCol = fm.collective;
       // Rotor-speed protection: the law never pulls the rotor below the
       // green (it gives up height instead).
       const droop = Math.max(0, 99.5 - fm.out.rotorPct);
-      let dI = (vsT - fm.vel.y) * h * 0.09, kP = (vsT - fm.vel.y) * 0.05;
+      const ev = this.vsCmd - fm.vel.y;
+      let dI = ev * h * 0.25, kP = ev * 0.11;
       if (droop > 0) { dI = Math.min(dI, 0) - droop * h * 0.05; kP = Math.min(kP, 0) - droop * 0.02; }
       this.iCol = clamp(this.iCol + dI, 0, 1);
       fm.collective = clamp(this.iCol + kP, 0, 1);
       cmd.leverOut = fm.collective; // the lever follows the law
     } else {
-      fm.collective = cmd.lever;
-      this.holdAlt = fm.pos.y; this.iCol = cmd.lever;
+      // Normal: the lever is the pilot's, plus a landing cushion — the sink
+      // rate the height can still arrest (≈ 2.5 m/s² of braking) is allowed,
+      // beyond that collective is added (fading out as the descent eases).
+      const sink = -fm.vel.y, allow = 1.2 + Math.sqrt(5 * Math.max(0, o.agl - 0.5));
+      this.cush = sink > allow ? Math.min(0.65, this.cush + (sink - allow) * h * 1.5) : Math.max(0, this.cush - h * 0.25);
+      fm.collective = clamp(cmd.lever + this.cush, 0, 1);
+      this.holdAlt = fm.pos.y; this.iCol = cmd.lever; this.vsCmd = null;
     }
   }
 

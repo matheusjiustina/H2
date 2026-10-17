@@ -192,7 +192,7 @@ export class Helicopter {
     if (gp) rate += gp.throttleUp - gp.throttleDown;
     if (v.active && v.leverRate) rate += v.leverRate;
     this.target.leverRate = clamp(rate, -1, 1);
-    let lv = this.lever + rate * dt * 0.32;
+    let lv = this.lever + rate * dt * (opts.assist === 'off' ? 0.32 : 0.55); // quicker lever with the assist (also lifts off sooner)
     if (v.throttle !== null && v.throttle !== undefined) lv = v.throttle;
     if (m.wheel && opts.cameraMode !== 'orbit') lv -= m.wheel * 0.03;
     this.lever = clamp(lv, 0, 1);

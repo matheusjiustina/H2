@@ -32,7 +32,7 @@ const sel = await page.evaluate(() => ({ id: window.__agro.aircraftId, kind: win
 check('selection: card 03 selects the R44', sel.id === 'r44' && sel.kind === 'heli' && sel.checked === 'true', JSON.stringify(sel));
 await page.screenshot({ path: `${outDir}/00_title.png` });
 await page.click('[data-a="free"]');
-await page.evaluate(() => { const g = window.__agro; g.frozen = true; g.noRender = true; g.setSetting('assist', 'normal'); });
+await page.evaluate(() => { const g = window.__agro; g.frozen = true; g.noRender = true; g.setSetting('heliAssist', 'normal'); });
 
 const st = () => page.evaluate(() => {
   const g = window.__agro, ac = g.aircraft, fm = ac.fm, o = fm.out;
@@ -156,7 +156,7 @@ await snap('05_liftoff');
 await until('g.aircraft.fm.out.vs < 0.2', 8, ['throttleDown']);
 
 // --- hover (high assist: height and hover hold) -------------------------------
-await page.evaluate(() => window.__agro.setSetting('assist', 'high'));
+await page.evaluate(() => window.__agro.setSetting('heliAssist', 'high'));
 await run(8);
 const h0 = await st();
 await run(20);

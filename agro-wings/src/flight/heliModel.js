@@ -211,15 +211,15 @@ export class HeliModel {
       const idle = E.idlePct / 100;
       let setPct;
       if (this.phase === 'clutch') {
-        this.clutch = Math.min(1, this.clutch + h / 16);
+        this.clutch = Math.min(1, this.clutch + h / 7.6);
         setPct = idle;
         if (this.clutch >= 1 && nr > idle - 0.02) { this.phase = 'warm'; this.phaseT = 0; this.govI = 0; }
       } else if (this.phase === 'warm') {
         setPct = 0.75;
-        if (this.phaseT > 6 && nr > 0.72) { this.phase = 'flight'; this.phaseT = 0; this.govI = 0; }
+        if (this.phaseT > 1.5 && nr > 0.72) { this.phase = 'flight'; this.phaseT = 0; this.govI = 0; }
       } else {
         // Governor ramps the setpoint up, then holds 101.5 %.
-        setPct = Math.min(R.govPct / 100, 0.75 + this.phaseT * 0.05);
+        setPct = Math.min(R.govPct / 100, 0.75 + this.phaseT * 0.16);
       }
       const engRpmFrac = this.phase === 'clutch' ? Math.max(idle, nr) : nr;
       engPct = engRpmFrac * 100;
@@ -228,7 +228,7 @@ export class HeliModel {
       this.govI = clamp(this.govI + err * h, -0.5, 0.5);
       const ff = Math.max(0, pReq) / Math.max(pAvail, 1);
       let frac = clamp(ff + 9 * err + 4 * this.govI, 0, 1);
-      if (this.phase === 'clutch') { frac = clamp(0.12 + 2 * err, 0, 0.3); this.govI = 0; }
+      if (this.phase === 'clutch') { frac = clamp(0.2 + 2 * err, 0, 0.5); this.govI = 0; }
       this.powerCmd = frac * pAvail;
       // Engine response lag.
       this.power += (this.powerCmd - this.power) * Math.min(1, h / E.lagS);
@@ -476,7 +476,7 @@ export class HeliModel {
     o.gLoad = _v1.copy(this._accel).add(_v2.set(0, G, 0)).applyQuaternion(_qInv).y / G;
     o.rotorPct = (this.rotorOmega / om100) * 100;
     o.enginePct = (this.rpm / A.engine.rpm100) * 100;
-    o.lowRotor = this.engine === 'running' && this.phase === 'flight' && this.phaseT > 6 && o.rotorPct < 97 ? 1 : 0;
+    o.lowRotor = this.engine === 'running' && this.phase === 'flight' && this.phaseT > 3 && o.rotorPct < 97 ? 1 : 0;
     o.stall = 0; o.stallWarn = o.lowRotor;
     o.mu = mu; o.inGE = 1 - kGE; o.vrs = vrs;
   }
