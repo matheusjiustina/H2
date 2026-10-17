@@ -4,7 +4,7 @@
 import { h } from './hud.js';
 import { TIMES, WEATHER, TIME_ORDER, WEATHER_ORDER } from '../world/atmosphere.js';
 import { CONTRACTS } from '../game/contracts.js';
-import { ACTIONS, keyLabel } from '../core/input.js';
+import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { hoverPower } from '../flight/heliModel.js';
@@ -73,13 +73,13 @@ export class Screens {
     this.title.classList.toggle('show', v);
     if (v) {
       this._markAircraft();
-      const k = (a) => keyLabel(this.game.input.bindings[a][0]);
+      const k = (a) => keyLabel(this.game.input.keysOf(a)[0]);
       const heli = this.game.aircraft?.kind === 'heli';
       this.title.querySelector('.title-keys').innerHTML = this.game.touch?.active
         ? (heli ? 'Touch: left stick is the cyclic, right slider the collective. Buttons for spray, camera and engine.' : 'Touch: left stick flies, right slider sets power. Buttons for spray, brakes, camera and engine.')
         : heli
-          ? `W/S/A/D cyclic · ${k('yawLeft')}/${k('yawRight')} pedals · ${k('throttleUp')}/${k('throttleDown')} collective · ${k('spray')} spray · hold ${k('engine')} engine · ${k('camera')} camera · ${k('map')} map · Esc menu`
-          : `W/S pitch · A/D roll · ${k('yawLeft')}/${k('yawRight')} rudder · ${k('throttleUp')}/${k('throttleDown')} power · ${k('brakes')} brakes · ${k('spray')} spray · hold ${k('engine')} engine · ${k('camera')} camera · ${k('map')} map · Esc menu`;
+          ? `${k('pitchDown')}/${k('pitchUp')}/${k('rollLeft')}/${k('rollRight')} cyclic · ${k('yawLeft')}/${k('yawRight')} pedals · ${k('throttleUp')}/${k('throttleDown')} collective · ${k('spray')} spray · hold ${k('engine')} engine · ${k('camera')} camera · ${k('map')} map · Esc menu`
+          : `${k('pitchDown')}/${k('pitchUp')} pitch · ${k('rollLeft')}/${k('rollRight')} roll · ${k('yawLeft')}/${k('yawRight')} rudder · ${k('throttleUp')}/${k('throttleDown')} power · ${k('brakes')} brakes · ${k('spray')} spray · hold ${k('engine')} engine · ${k('camera')} camera · ${k('map')} map · Esc menu`;
     }
   }
 
@@ -287,7 +287,9 @@ export class Screens {
     const g = this.game;
     const s = g.settings;
     const seg = (key, opts) => `<div class="seg" data-key="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(s[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-    const keys = Object.entries(ACTIONS).map(([a, d]) => `<div class="kr"><span>${d.label}</span><button class="keybtn" data-bind="${a}">${g.input.bindings[a].map(keyLabel).join(' / ')}</button></div>`).join('');
+    const keyRow = ([a, d]) => `<div class="kr"><span>${d.label}</span><button class="keybtn" data-bind="${a}">${g.input.bindings[a].map(keyLabel).join(' / ')}</button></div>`;
+    const keyGroup = (scope) => Object.entries(ACTIONS).filter(([, d]) => d.scope === scope).map(keyRow).join('');
+    const keys = keyGroup(undefined), numKeys = keyGroup('num'), classicKeys = keyGroup('classic');
     const el = h(`<div class="panel"><h2>Settings</h2>
       <h3>Graphics</h3>
       <div class="field"><label>Quality</label>${seg('quality', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']])}<span></span></div>
@@ -299,10 +301,15 @@ export class Screens {
       <h3>Flying</h3>
       <div class="field"><label>Flight assist</label>${seg('assist', [['off', 'Off'], ['normal', 'Normal'], ['high', 'High']])}<span></span></div>
       <div class="field"><label>Wind</label>${seg('wind', [[0, 'Calm'], [1, 'Light'], [1.8, 'Moderate']])}<span></span></div>
+      <div class="field"><label>Flight keys</label>${seg('keyScheme', [['numpad', 'Numpad + Q/E'], ['classic', 'W/S/A/D + Z/X']])}<span></span></div>
       <h3>Audio</h3>
       <div class="field"><label>Volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-vol><span class="val">${Math.round(s.volume * 100)}%</span></div>
       <h3>Keys <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">— click a key, then press the new one (Esc cancels)</span></h3>
       <div class="keys">${keys}</div>
+      <h3>Flight keys — numpad scheme <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">(default; Flying → Flight keys picks the scheme, all aircraft)</span></h3>
+      <div class="keys">${numKeys}</div>
+      <h3>Flight keys — classic scheme</h3>
+      <div class="keys">${classicKeys}</div>
       <div class="note">Assist Normal keeps attitude when the stick is centred, coordinates turns and protects against stalls; High also limits bank and pitch. Off gives raw control surfaces. On the ground, assist adds a light yaw damper against ground loops.</div>
       <div class="row2"><button class="btn small" data-a="resetKeys">Reset keys</button><button class="btn small" data-a="resetSave">Reset career</button><button class="btn primary small" data-a="close">Done</button></div></div>`);
     el.addEventListener('click', (e) => {
@@ -346,14 +353,18 @@ export class Screens {
     const g = this.game;
     // The helicopter relabels the shared actions (cyclic, pedals, collective).
     const L = g.aircraft?.type.controls?.labels ?? {};
-    const rows = Object.entries(ACTIONS).filter(([a]) => L[a] !== null).map(([a, d]) => `<div><span>${L[a] ?? d.label}</span><b>${g.input.bindings[a].map(keyLabel).join(' / ')}</b></div>`).join('');
+    const rows = Object.entries(ACTIONS).filter(([a, d]) => d.scope !== 'num' && L[a] !== null).map(([a, d]) => `<div><span>${L[a] ?? d.label}</span><b>${g.input.keysOf(a).map(keyLabel).join(' / ')}</b></div>`).join('');
+    const kk = (a) => keyLabel(g.input.keysOf(a)[0]);
+    // The scheme not in use, for the notes.
+    const other = g.settings.keyScheme === 'classic' ? 'numpad' : 'classic';
+    const ko = (a) => keyLabel(g.input.bindings[KEY_SCHEMES[other][a] ?? a][0]);
     const el = h(`<div class="panel"><h2>Controls</h2>
-      <div class="sub">Same layout as Tidemark’s aircraft. Mouse: left-drag looks around, right-drag is a virtual stick, wheel sets power (zoom in the free camera). Gamepad: left stick flies, triggers set power, bumpers rudder, A spray, B brakes.</div>
+      <div class="sub">Flight keys: ${kk('pitchDown')} / ${kk('pitchUp')} stick forward / back, ${kk('rollLeft')} / ${kk('rollRight')} roll, ${kk('yawLeft')} / ${kk('yawRight')} rudder, ${kk('engine')} engine — Settings → Flying → Flight keys switches to ${other === 'classic' ? 'the Tidemark layout' : 'the numpad layout'} (${ko('pitchDown')} / ${ko('pitchUp')} / ${ko('rollLeft')} / ${ko('rollRight')}, ${ko('yawLeft')} / ${ko('yawRight')}, ${ko('engine')}). Mouse: left-drag looks around, right-drag is a virtual stick, wheel sets power (zoom in the free camera). Gamepad: left stick flies, triggers set power, bumpers rudder, A spray, B brakes.</div>
       <div class="helpgrid">${rows}<div><span>Speed up ground service</span><b>T (hold)</b></div></div>
       ${g.aircraft?.kind === 'heli' ? `<h3>Robinson R44</h3>
-      <div class="note" style="color:var(--ink-dim)">W/S/A/D move the cyclic, ${keyLabel(g.input.bindings.yawLeft[0])}/${keyLabel(g.input.bindings.yawRight[0])} the anti-torque pedals, ${keyLabel(g.input.bindings.throttleUp[0])}/${keyLabel(g.input.bindings.throttleDown[0])} (or the wheel / triggers) raise and lower the collective; the governor holds the rotor at 101–102 %. Start with the collective full down (hold Q): the clutch engages and the rotor spins up — wait for the green before lifting. Pull the collective slowly to a hover at about 1 m, then ease the cyclic forward; the aircraft shudders through translational lift. Settings → Assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> also holds height and the hover. Watch LOW RPM (horn): lower the collective. Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.</div>` : ''}
+      <div class="note" style="color:var(--ink-dim)">${kk('pitchDown')} / ${kk('pitchUp')} / ${kk('rollLeft')} / ${kk('rollRight')} tilt the cyclic forward / aft / left / right, ${kk('yawLeft')} / ${kk('yawRight')} are the anti-torque pedals, ${keyLabel(g.input.bindings.throttleUp[0])}/${keyLabel(g.input.bindings.throttleDown[0])} (or Shift / Ctrl, the wheel, the triggers) raise and lower the collective; the governor holds the rotor at 101–102 %. Start with the collective full down (hold ${kk('engine')}): the clutch engages and the rotor spins up — wait for the green before lifting. Pull the collective slowly to a hover at about 1 m, then ease the cyclic forward; the aircraft shudders through translational lift. Settings → Assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> also holds height and the hover. Watch LOW RPM (horn): lower the collective. Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.</div>` : ''}
       <h3>Agricultural flying</h3>
-      <div class="note" style="color:var(--ink-dim)">Work at 2.5–4.5 m over the crop canopy (the HGT readout turns green), around 85–105 kt. Too low narrows the swath and risks a crop strike; too high widens it but liquid drifts and evaporates. Fly along the yellow pass line — the lightbar on the glareshield shows which way to steer. Switch the spray off at the field edge and over gaps. Land back on the strip, taxi to the pad and tap Q to shut down: the badeco reloads and your coverage is kept.</div>
+      <div class="note" style="color:var(--ink-dim)">Work at 2.5–4.5 m over the crop canopy (the HGT readout turns green), around 85–105 kt. Too low narrows the swath and risks a crop strike; too high widens it but liquid drifts and evaporates. Fly along the yellow pass line — the lightbar on the glareshield shows which way to steer. Switch the spray off at the field edge and over gaps. Land back on the strip, taxi to the pad and tap ${kk('engine')} to shut down: the badeco reloads and your coverage is kept.</div>
       <div class="row2"><span></span><button class="btn primary small" data-a="close">Close</button></div></div>`);
     el.addEventListener('click', (e) => { if (e.target.closest('[data-a]')) this.close(); });
     this._show('help', el);

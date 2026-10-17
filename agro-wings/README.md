@@ -49,18 +49,25 @@ Evaluation: useful coverage (dose ≥ 0.7 of target), uniformity (1 − CV of
 dose), gaps, overlap (dose > 1.5), waste (off-target + drift/evaporation +
 over-application) and aircraft condition (repairs).
 
-## Controls (Tidemark aircraft mapping kept)
+## Controls
 
-| Action | Keys |
+Flight keys come in two schemes for every aircraft — Settings → Flying →
+**Flight keys** picks one (the choice is saved; the default is the numpad
+scheme). Everything else is the same in both.
+
+| Action | Numpad scheme (default) | Classic scheme (Tidemark layout) |
+| --- | --- | --- |
+| Stick forward / back (R44: cyclic) | Num 8 / Num 5 | W / S (↑ ↓) |
+| Roll left / right (R44: cyclic) | Num 4 / Num 6 | A / D (← →) — also steer on the ground |
+| Rudder left / right (R44: pedals) | Q / E | Z / X |
+| Engine | hold I to start, tap I to stop | hold Q to start, tap Q to stop |
+
+| Action | Keys (both schemes) |
 | --- | --- |
-| Pitch | W / S (↑ ↓) |
-| Roll | A / D (← →) — also steer on the ground |
-| Rudder / tailwheel | Z / X |
-| Power | R / F (Shift / Ctrl), mouse wheel |
+| Power (R44: collective) | Shift / Ctrl (R / F), mouse wheel |
 | Brakes (differential with rudder) | Space |
 | Flaps | G (up) / B (down) |
-| Trim | [ / ] |
-| Engine | hold Q to start, tap Q to stop |
+| Trim | [ / ] (Page Up / Page Down) |
 | Spray valve | C (Enter) |
 | Cockpit / chase | V |
 | Free external camera | O |
@@ -69,6 +76,13 @@ over-application) and aircraft condition (repairs).
 | Minimap: farm map ↔ GPS guidance page | N (or click the minimap) |
 | Reset aircraft | Backspace |
 | Speed up ground service | hold T |
+
+In the numpad scheme Q and E are the rudder, so the engine moves to I (a
+tap on Q, a rudder input, must not shut the engine down). E is also the
+service key: it only acts at the pad with the engine off, where the rudder
+does nothing. The two schemes are separate sets of bindings, so rebinding a
+numpad key never takes a key away from the classic ones, and the other way
+round.
 
 All bindings are rebindable in Settings. Mouse: left-drag looks, right-drag
 is a virtual stick. Gamepad: left stick, triggers = power, bumpers = rudder,
@@ -136,6 +150,9 @@ Browser checks (need `npm run build && npx vite preview --port 4173`):
 
 - `node test/e2e.mjs soy out/` — full contract flown by the test autopilot
   (`src/game/autopilot.js`) through the normal player inputs only;
+- `node test/keys.mjs out/` — the numpad and classic key schemes with real
+  key codes on all three aircraft (stick, roll, rudder, power, engine
+  hold/tap), the HUD / Controls / Settings screens and rebinding;
 - `node test/e2e_ui.mjs out/` — service interruption, crash + recovery,
   stuck reset, key rebinding, tutorial, mobile layout;
 - `node test/perf.mjs` — per-view tick/render time, draw calls, triangles;
@@ -657,9 +674,11 @@ drift); at working speed the wake trails behind the boom.
   stinger, nose, tank, boom ends; rotor tips against trees, buildings,
   parked aircraft, the truck and the wires.
 
-**Controls.** W/S/A/D cyclic, Z/X anti-torque pedals, R/F (or Shift/Ctrl,
-the wheel, gamepad triggers, the touch slider) raise and lower the
-collective, Q start (hold, collective down) / stop (tap). The governor
+**Controls.** Numpad 8 / 5 / 4 / 6 move the cyclic forward / aft / left /
+right, Q / E are the anti-torque pedals, Shift / Ctrl (or R / F, the wheel,
+the gamepad triggers, the touch slider) raise and lower the collective, I
+starts (hold, collective down) and stops (tap) the engine; Settings → Flying
+→ Flight keys switches to the classic keys (W/S/A/D, Z/X, Q). The governor
 replaces a twist-grip throttle. Settings → Assist: **off** — raw controls
 (unstable in the hover, as the real aircraft); **normal** — attitude
 command / hold, heading hold (kept on the skids while the collective is
@@ -765,6 +784,17 @@ Chromium + SwiftShader in this container.
 | 15 | aircraft selection | title screen 01 / 02 / 03, choice saved; `node test/e2e_ui.mjs`: 16/16 |
 | 16 | no critical regressions | `npm test`: 44/44 (PR-AGW and AT suites unchanged, 9 R44 checks); no page errors in any browser run (the only console error is the preview server's missing favicon, also present before) |
 | 17 | browser performance | `test/profile.mjs` against the build before the R44 work, below |
+
+**Key schemes** (`node test/keys.mjs`, 22/22): on the PR-AGW, the AT-502B
+and the R44, the numpad scheme is the default and the classic keys are
+dead in it (and the other way round); Q does not start the engine and a
+tap on Q (rudder) does not stop it in the numpad scheme, I does both; Shift
+and Ctrl move the power in both; the HUD, Controls and Settings screens
+name the keys of the scheme in use; the choice is saved; rebinding a
+numpad key leaves the classic keys alone. `node test/r44flight.mjs` (22/22)
+and `node test/e2e_ui.mjs` (16/16) were run again with the numpad default.
+The flight solvers are untouched (the seeded trajectories above are still
+identical).
 
 **Performance** (`test/profile.mjs low`, 600 ticks per view; build before
 the R44 work → this build; SwiftShader, so render times are only the CPU

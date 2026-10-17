@@ -47,7 +47,7 @@ check('service truck parked at its stand', await page.evaluate(() => window.__ag
 await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'orbit'; g.rig.setMode('orbit', g.aircraft); g.rig.orbit.yaw = 1.2; g.rig.orbit.dist = 16; g.rig.orbit.pitch = 0.3; g.simulate(0.5, 1 / 30); });
 await shot(page, '03-service-hose');
 // Try to start the engine: hold Q.
-await page.evaluate(() => { const g = window.__agro; g.input.press('KeyQ'); g.simulate(0.6, 1 / 30); g.input.release('KeyQ'); g.simulate(0.1, 1 / 30); });
+await page.evaluate(() => { const g = window.__agro; const q = g.input.keysOf('engine')[0]; g.input.press(q); g.simulate(0.6, 1 / 30); g.input.release(q); g.simulate(0.1, 1 / 30); });
 const ab = await page.evaluate(() => { const g = window.__agro; return { st: g.service.state, eng: g.aircraft.fm.engine, toasts: (g.toastLog || []).slice(-3) }; });
 check('engine start vetoed while crew is at the aircraft', ab.eng === 'off', JSON.stringify(ab));
 check('service aborted', ab.st === 'aborting' || ab.st === 'idle', ab.st);
@@ -60,10 +60,10 @@ const after = await page.evaluate(() => {
 });
 check('crew cleared and hoses reeled in after abort', after.st === 'idle' && !after.fuelHose && !after.mixHose && after.dist > 9, JSON.stringify(after));
 // Engine can start now.
-await page.evaluate(() => { const g = window.__agro; g.input.press('KeyQ'); g.simulate(0.6, 1 / 30); g.input.release('KeyQ'); g.simulate(2, 1 / 30); });
+await page.evaluate(() => { const g = window.__agro; const q = g.input.keysOf('engine')[0]; g.input.press(q); g.simulate(0.6, 1 / 30); g.input.release(q); g.simulate(2, 1 / 30); });
 check('engine starts once clear', await page.evaluate(() => window.__agro.aircraft.fm.engine === 'running'));
 // Stop engine and redo full service; check levels rise gradually.
-await page.evaluate(() => { const g = window.__agro; g.input.press('KeyQ'); g.simulate(0.1, 1 / 30); g.input.release('KeyQ'); g.simulate(3, 1 / 30); g.requestService(200, 650); });
+await page.evaluate(() => { const g = window.__agro; const q = g.input.keysOf('engine')[0]; g.input.press(q); g.simulate(0.1, 1 / 30); g.input.release(q); g.simulate(3, 1 / 30); g.requestService(200, 650); });
 const levels = [];
 for (let i = 0; i < 40; i++) {
   levels.push(await page.evaluate(() => { const g = window.__agro; g.input.press('KeyT'); g.simulate(3, 1 / 30); return [Math.round(g.aircraft.fm.fuel), Math.round(g.aircraft.fm.hopper), g.service.state, g.service.step?.a || '']; }));

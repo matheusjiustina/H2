@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { World } from '../world/world.js';
 import { QUALITY, GAME, SPRAY } from '../config.js';
 import { AIRCRAFT_ORDER, aircraftType } from '../aircraft/types.js';
-import { Input } from '../core/input.js';
+import { Input, KEY_SCHEMES, DEFAULT_KEY_SCHEME, keyLabel } from '../core/input.js';
 import { ParticlePool } from '../core/particles.js';
 import { Aircraft } from '../aircraft/aircraft.js';
 import { Helicopter } from '../aircraft/helicopter.js';
@@ -37,7 +37,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     const q = new URLSearchParams(location.search).get('q');
     if (q && QUALITY[q]) { this.settings.quality = q; this.qualityForced = true; }
@@ -70,6 +70,7 @@ export class Game {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.3, 30000);
     this.input = new Input(this.canvas);
+    this._applyKeyScheme();
     this.world = new World(this.renderer, this.scene, this.quality);
     await this.world.build((label) => {
       si = Math.max(si, steps.indexOf(label) + 1);
@@ -144,6 +145,7 @@ export class Game {
       this.mist.limit = Math.min(this.mist.max, SPRAY.maxParticles[v]);
       this.resize();
     }
+    if (k === 'keyScheme') this._applyKeyScheme();
     if (k === 'volume') this.audio.setVolume(v);
     if (k === 'shake') this.rig.shakeScale = v;
     // Visual/audio only: the flight model's wind is not touched by weather.
@@ -184,6 +186,11 @@ export class Game {
     };
   }
 
+  // Flight key scheme (numpad / classic) onto the input, for every aircraft.
+  _applyKeyScheme() {
+    this.input?.setAlias(KEY_SCHEMES[this.settings.keyScheme] ?? KEY_SCHEMES[DEFAULT_KEY_SCHEME]);
+  }
+
   // Aircraft selection (title screen). Fuel, hopper and damage stay with
   // each aircraft; the chosen one is towed to the pad.
   selectAircraft(id) {
@@ -216,7 +223,7 @@ export class Game {
         this.aircraft.placeAtPad();
         this.aircraft.repair();
         { const L = this.aircraft.type.loads.free; this.aircraft.fm.fuel = L.fuel; this.aircraft.fm.hopper = L.hopper; this.aircraft.fm.updateMass(); }
-        this.toast(`Free flight in ${this.aircraft.type.reg}: tanks loaded. Hold Q to start the engine.`);
+        this.toast(`Free flight in ${this.aircraft.type.reg}: tanks loaded. Hold ${keyLabel(this.input.keysOf('engine')[0])} to start the engine.`);
         break;
       case 'freeAir':
         this._enterPlay('free');

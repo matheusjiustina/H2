@@ -84,7 +84,7 @@ export class HUD {
     this.$.prompt.classList.add('show');
   }
 
-  key(action) { return `<span class="k">${keyLabel(this.game.input.bindings[action][0])}</span>`; }
+  key(action) { return `<span class="k">${keyLabel(this.game.input.keysOf(action)[0])}</span>`; }
 
   setTutorial(stepLabel, text, foot) {
     if (!text) { this.$.tut.classList.remove('show'); return; }
