@@ -11,8 +11,9 @@
 //             ~35 kt; on the skids while the collective is up, too). The
 //             collective stays the pilot's.
 //  'high'   — beginner: with the power model (the default) the stick tilts
-//             the helicopter to an attitude (centred = level): let go and it
-//             levels out and glides on, slowing down by itself. With the
+//             the helicopter for as long as it is held (up to 45° nose
+//             down), so the speed follows the tilt and the power: let go and
+//             it levels out and glides on, slowing down by itself. With the
 //             detailed rotor model, a centred stick below ~55 kt brings the
 //             aircraft back to a hover over the ground (above that it holds
 //             speed). With the detailed rotor model the lever also
@@ -27,6 +28,8 @@ import { clamp, smoothstep } from '../core/math.js';
 import { FlightModel } from './flightModel.js';
 
 const G = 9.81;
+// 'high' with the power model: tilt rates (rad/s at full stick) and limits (rad).
+const TILT = { pitchRate: 0.3, bankRate: 0.5, lead: 0.12, down: 0.79, up: 0.52, bank: 0.87 };
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class HeliAssist {
@@ -36,7 +39,7 @@ export class HeliAssist {
     this.iLon = 0; this.iLat = null; this.iYaw = 0; this.iCol = null;
     this.holdPitch = 0; this.holdHdg = null; this.holdAlt = null;
     this.pHeld = false; this.pRef = 0; this.vHold = null; this.iSpd = null; this.vsCmd = null; this.cush = 0;
-    this.iHP = 0; this.iHR = 0;
+    this.iHP = 0; this.iHR = 0; this.tP = 0; this.tB = 0; // 'high' (power model): tilt targets
     this.pT = null; this.bT = null; // power model: rate-limited attitude targets
   }
 
@@ -69,7 +72,7 @@ export class HeliAssist {
       this.iLon = -fm.cyclicLon; this.iLat = fm.cyclicLat;
       this.holdPitch = att.pitch; this.holdAlt = fm.pos.y; this.iCol = cmd.lever;
       this.pT = att.pitch; this.bT = att.bank;
-      this.pHeld = false; this.vsCmd = null; this.iHP = 0; this.iHR = 0;
+      this.pHeld = false; this.vsCmd = null; this.iHP = 0; this.iHR = 0; this.tP = 0; this.tB = 0;
       return;
     }
     const V = Math.hypot(fm.vel.x, fm.vel.z);
@@ -87,17 +90,28 @@ export class HeliAssist {
     const hoverP = pm && high && !stickP && V < 28, hoverR = pm && high && !stickR && V < 28;
     if (pm && mode === 'high') {
       // Power model, the default assist (the handling asked for, after the
-      // other game's helicopter): the stick tilts the helicopter (centred =
-      // level, full ≈ 18° pitch / 27° bank). Let go and it levels out and
-      // glides on, slowing down by itself (the rotor's damping in the model),
-      // with no braking flare. Up and down stay with the power. Nearly
-      // stopped (below ~5 kt over the ground) a released axis holds the hover
+      // other game's helicopter): the keys tilt the helicopter for as long as
+      // they are held — the tilt keeps growing (≈ 17°/s nose, 29°/s bank) up
+      // to 45° nose down, 30° up and 50° of bank — so the speed builds with
+      // the tilt and, the thrust acting along the rotor axis, with the power.
+      // Let go and it levels out and glides on, slowing down by itself (the
+      // rotor's damping in the model), with no braking flare. Nearly stopped
+      // (below ~5 kt over the ground) a released axis holds the hover
       // against the wind with a gentle lean (≤ ~2.5°), so it ends up still.
+      // (The target never runs more than ~7° ahead of the attitude, and on
+      // release it levels from where the aircraft is, so nothing runs on.)
+      const tilt = (t, a, held, c, rate, lo, hi, back, max) => {
+        if (held) return clamp(t + c * rate * h, Math.max(lo, a - TILT.lead), Math.min(hi, a + TILT.lead));
+        if (t * a > 0 && Math.abs(t) > Math.abs(a)) t = a;
+        return t - clamp(t * back, -max, max) * h;
+      };
+      this.tP = tilt(this.tP, att.pitch, stickP, cmd.pitch, TILT.pitchRate, -TILT.down, TILT.up, 1.6, 0.35);
+      this.tB = tilt(this.tB, att.bank, stickR, cmd.roll, TILT.bankRate, -TILT.bank, TILT.bank, 2, 0.6);
       const w = 1 - smoothstep(1.5, 3, V);
       this.iHP = !stickP && w > 0 ? clamp(this.iHP + vf * h * 0.01 * w, -0.035, 0.035) : 0;
       this.iHR = !stickR && w > 0 ? clamp(this.iHR + vl * h * 0.012 * w, -0.05, 0.05) : 0;
-      pitchT = stickP ? clamp(cmd.pitch * 0.32, -0.45, 0.35) : w * clamp(vf * 0.02 + this.iHP, -0.045, 0.045);
-      bankT = stickR ? cmd.roll * 0.48 : w * clamp(vl * 0.03 + this.iHR, -0.07, 0.07);
+      pitchT = this.tP + (stickP ? 0 : w * clamp(vf * 0.02 + this.iHP, -0.045, 0.045));
+      bankT = this.tB + (stickR ? 0 : w * clamp(vl * 0.03 + this.iHR, -0.07, 0.07));
       this.holdPitch = pitchT; this.pHeld = stickP; this.pRef = 0; this.vHold = null; this.iSpd = null;
     } else if (pm && (hoverP || hoverR) && !hover) {
       // ('auto', the test autopilot: hover hold per axis.)

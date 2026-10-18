@@ -206,7 +206,9 @@ if (PM) await powerTo(0);
 if (PM) { await powerTo(0.1); await until('g.aircraft.fm.out.agl > 10', 8); await powerTo(0); await run(3); }
 const tr = {};
 for (const [name, act] of [['forward', 'pitchDown'], ['backward', 'pitchUp'], ['left', 'rollLeft'], ['right', 'rollRight']]) {
-  await run(3.5, [act]);
+  // (Power model: a short press — the tilt grows while it is held — and the
+  // speed still builds for a moment while it levels.)
+  if (PM) { await run(1.8, [act]); await run(1); } else await run(3.5, [act]);
   const q = await st();
   tr[name] = { vf: q.vf, vl: q.vl, ...(q.state !== 'ok' ? { crashed: q.why, at: [q.x, q.z, q.agl] } : {}) };
   // Hover hold stops it (power model: it levels, glides on and slows down
@@ -239,7 +241,9 @@ await until('Math.abs(((g.aircraft.headingDeg() - 180 + 540) % 360) - 180) < 4',
 await run(4);
 if (PM) { await powerTo(0.12); await run(5); await powerTo(0.02); } else await run(6, ['throttleUp']);
 await run(3);
-await run(10, ['pitchDown']);
+// (Power model: the tilt grows while the key is held; let go and it levels
+// and glides on.)
+if (PM) { await run(4, ['pitchDown']); await run(3); } else await run(10, ['pitchDown']);
 s = await st();
 check('forward flight from the hover', s.kt > 30 && s.state === 'ok', `${s.kt} kt, NR ${s.nr} %`);
 const cams = await page.evaluate(() => {
@@ -263,9 +267,9 @@ await snap('07b_forward_cockpit', 'cockpit');
 
 // --- back, slow down, land on the skids --------------------------------------
 console.log('before flare', JSON.stringify(await st()));
-await run(12, ['pitchUp']);
+if (PM) await run(2.5, ['pitchUp']); else await run(12, ['pitchUp']);
 console.log('after flare', JSON.stringify(await st()));
-await until('Math.hypot(g.aircraft.fm.vel.x, g.aircraft.fm.vel.z) < 1.5', 30);
+await until('Math.hypot(g.aircraft.fm.vel.x, g.aircraft.fm.vel.z) < 1.5', PM ? 45 : 30);
 let tDown;
 if (PM) {
   // Down to a low hover, then the power a little under the hover figure.

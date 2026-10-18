@@ -384,18 +384,23 @@ export class HeliModel {
         const P = A.power;
         const nr = Om / ((R.rpm100 * R.govPct / 100) * TAU / 60);
         const pw = this.engine === 'running' ? this.power01 : clamp(this.collective, 0, 1) * 0.8;
-        T = pw * P.maxThrust * sigmaRho * nr * nr * Math.pow(1 / Math.max(0.6, kGE), 2 / 3) * (1 + P.etl * smoothstep(5, 15, vHor));
-        // Power is the up/down control: tilting the disc to move does not take
-        // lift away (the extra thrust a tilted rotor needs comes with it), so
-        // the vertical part of the thrust stays what the power sets.
-        const up = _v1.copy(nb).applyQuaternion(q).y;
-        T /= clamp(up, 0.7, 1);
+        // Translational lift from ~8 to ~27 kt; towards Vne the retreating
+        // blade and the profile power eat the thrust, which caps the speed.
+        const fly = (1 + P.etl * smoothstep(4, 14, vHor)) * (1 - P.vLoss * smoothstep(P.vLossFrom, P.vLossTo, vHor));
+        T = pw * P.maxThrust * sigmaRho * nr * nr * Math.pow(1 / Math.max(0.6, kGE), 2 / 3) * fly;
+        // The thrust acts along the rotor axis: tilting the disc turns lift
+        // into push, so the speed comes from the tilt and the power together
+        // (a steep tilt sinks unless the power comes up).
         force.y -= this.mass * P.climbDamp * Math.min(1, nr) * this.vel.y;
         // The rotor's damping of slow horizontal motion (H-force and wake): a
         // level helicopter glides on and slows down by itself; it fades out
-        // towards cruise speed, where the airframe drag takes over.
-        const kh = P.glideDamp * Math.min(1, nr) * (1 - smoothstep(12, 30, vHor));
-        force.x -= this.mass * kh * _air.x; force.z -= this.mass * kh * _air.z;
+        // towards cruise speed, where the airframe drag takes over. It
+        // saturates at ~16 kt and fades out above ~60 kt, so the total drag
+        // still grows smoothly with speed: no wall between hover and cruise.
+        if (vHor > 1e-3) {
+          const kh = P.glideDamp * Math.min(1, nr) * Math.min(vHor, P.glideSat) * (1 - smoothstep(30, 60, vHor)) / vHor;
+          force.x -= this.mass * kh * _air.x; force.z -= this.mass * kh * _air.z;
+        }
       }
     } else if (Om > 2) {
       const sol = solveRotor(theta, vn / Vt, mu, sigma, R.liftSlope, kGE, this.lam);
@@ -472,8 +477,8 @@ export class HeliModel {
     // --- airframe aerodynamics --------------------------------------------
     const V = _vb.length();
     const [fx, fy, fz0] = A.dragArea;
-    // Power model: the top speed is set by the drag at the nose-down limit
-    // (there is no power-required curve), so the frontal area is larger.
+    // Power model: no power-required curve, so the frontal area is larger
+    // (with the thrust lost towards Vne it sets the top speed).
     const fz = pm ? A.power.dragFrontal : fz0;
     const dragB = _v1.set(-0.5 * rho * Math.abs(_vb.x) * _vb.x * fx, -0.5 * rho * Math.abs(_vb.y) * _vb.y * fy, -0.5 * rho * Math.abs(_vb.z) * _vb.z * fz * (1 + this.extraDrag));
     force.add(dragB.applyQuaternion(q));

@@ -692,44 +692,62 @@ both models.
   rotor at constant power, (1/k_GE)^(2/3)). More power climbs and less
   sinks, at a rate that settles in proportion to the difference: ±10 % ≈
   ±2 m/s, ±20 % ≈ ±4 m/s; full power at the MTOW ≈ 870–1,000 ft/min.
-  Tilting the disc to move does not take lift away, so power stays the
-  up/down control and the cyclic the horizontal one.
-- Top speed is about 100–115 kt at the assist's nose-down limit.
+- The thrust acts along the rotor axis, so the speed comes from the tilt
+  and the power together, as in the other game.
+  - Tilting the disc turns lift into push: a steep tilt sinks unless the
+    power comes up, and more power at the same tilt flies faster.
+  - Translational lift (+10 % thrust from ~8 to ~27 kt) means cruise at
+    ~20° needs about the hover power.
+  - Towards the Vne the thrust falls off (`vLoss`, the retreating blade and
+    profile power), which caps the top speed at ~125–130 kt.
+  - The rotor's damping of slow motion (`glideDamp`) saturates at ~16 kt
+    and fades out above ~60 kt, so the total drag rises smoothly with
+    speed. Before this there was a "wall": at 10° the aircraft stuck at
+    ~22 kt, then jumped to 80 kt with a little more power.
+  - Measured with a held tilt (`test/r44power.test.mjs`), at the hover
+    power:
+
+    | Tilt | Speed | Climb |
+    |---|---|---|
+    | 5° | 11 kt | — |
+    | 10° | 40 kt | — |
+    | 20° | 102 kt | +0.2 m/s |
+    | 30° | 121 kt | −2.7 m/s |
+
+    With 20 % more power: 57 kt at 10°, and 128 kt at 30° sinking only
+    1.4 m/s. Full power: 125 kt.
+  - Before this, a tilt compensation kept the lift whatever the tilt, so
+    power only moved the aircraft up and down, and the speed hit the
+    assist's 18° limit at 100–115 kt.
 - On the HUD, POWER shows the lever, with the hover figure for this weight
   and height next to the label. The slot that showed the rotor % shows the
   climb rate. The load sheet gives the hover power in %.
 - Assist: **high** (the default) handles like the other game's helicopter.
-  The stick tilts the aircraft (centred = level, full ≈ 18° pitch / 27°
-  bank).
-  - Let go and it levels out and glides on, slowing down by itself with no
-    braking flare. A light glide drag (`glideDamp`, the rotor's damping
-    below ~25 kt) does the slowing.
+  - The keys tilt the aircraft for as long as they are held: the tilt keeps
+    growing (~17°/s nose, ~29°/s bank), up to 45° nose down, 30° nose up
+    and 50° of bank. There is no fixed 18° stop any more, so the speed
+    follows the tilt and the power.
+  - Let go and it levels out from where it is (it runs on a few degrees at
+    most) and glides
+    on, slowing down by itself with no braking flare (`glideDamp`).
   - Once it is almost stopped (under ~5 kt over the ground), it holds the
     hover against the wind with a lean of at most ~2.5°.
   - The power stays the pilot's, with the landing cushion: below ~15 m only
     a gentle sink is let through.
   - **Normal** holds attitude and heading; **off** is raw.
-  - Measured (`test/r44power.test.mjs`):
-    - released at 23 kt, level in 0.8 s, 6 kt after 10 s, stopped after
-      35 s;
-    - never more than 3° nose up while stopping;
+  - Measured with the keyboard shaping (`test/r44power.test.mjs`):
+    - forward key: −7° after 1 s, −24° after 2 s, −41° after 3 s, held at
+      −45°;
+    - released: level in 3.2 s, at most 1° nose up;
+    - roll key: 12° after 1 s, peak 19° after release, no pitch change;
+    - glide: 38 → 18 kt in 10 s after release, stopped within 50 s;
     - in a 2.5–2.9 m/s breeze the hover drifts 0.2–1.3 m in 20 s.
 - Attitude (both assists).
-  - The cyclic keys command an attitude: in **high** an absolute one
-    (centred = level, full forward ≈ −18°), so the answer never depends on
-    where the nose was when the key went down. Released, it is level again
-    (the earlier hover hold's flare is now only in the test autopilot).
-  - The target moves at a limited rate, and cascaded loops (attitude → rate
-    → cyclic, the integrator only near the target) put the nose there
-    without running past it.
-  - The hover hold's flare is limited to ~7° nose up, and it works per
-    axis: rolling sideways does not move the nose.
-  - Before this, releasing the stick at ~25 kt threw the nose up to +24°
-    and held it 10–20° up for seconds, and the next forward input only
-    reached about −5°.
-  - Measured with the keyboard shaping (`test/r44power.test.mjs`): −16° in
-    0.87 s and at most −18.5°; release flare at most 7.5°; forward again
-    from the flare in 1.05 s; a 27° roll moves the pitch by 0.1°.
+  - The target attitude moves at a limited rate, and cascaded loops
+    (attitude → rate → cyclic, the integrator only near the target) put the
+    nose there without running past it.
+  - Before the cascaded loops, releasing the stick at ~25 kt threw the nose
+    up to +24° and held it 10–20° up for seconds.
 - Measured (`test/r44power.test.mjs`, `test/r44flight.mjs` in the browser):
   - off the skids 1.3–1.9 s after raising the power;
   - 20 s hands-off hover at the hover figure: 0.3 m drift, 0.75 m height
@@ -739,7 +757,10 @@ both models.
     0.3–0.9 m/s, no damage;
   - rotor run-down 10 s after shut-down;
   - `AC=r44 node test/e2e.mjs soy`: the whole contract, 90 %, 2★, no
-    damage.
+    damage. The autopilot's obstacle probe now covers the rotor's width
+    plus a margin, and holds a find for 4 s. Before this, the probe
+    flickered on and off over the lone tree east of the pad, and the
+    descent target there dropped from 18 m to 12 m in one step.
 
 In the detailed rotor model the assists now feed the anti-torque pedal
 forward from the shaft torque (pedal ≈ 0.6 − 0.00034·Q, from the trimmed

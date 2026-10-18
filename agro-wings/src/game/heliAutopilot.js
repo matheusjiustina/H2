@@ -185,10 +185,13 @@ export class HeliAutopilot {
 
   // Something ahead (trees, wires, buildings) within `range` at work height?
   _clearance(range = 160) {
-    // Re-probed every 0.3 s (the probe is ~160 obstacle queries).
+    // Re-probed every 0.3 s (the probe is ~250 obstacle queries). A find is
+    // held for 4 s, so climbing over an obstacle does not lose it again.
     if (this._clrT !== undefined && this.t - this._clrT < 0.3 && this._clrR === range) return this._clr;
     this._clrT = this.t; this._clrR = range;
-    return (this._clr = this._probe(range));
+    const need = this._probe(range);
+    if (need > 0) { this._clrNeed = Math.max(need, this.t < (this._clrUntil ?? -1) ? this._clrNeed : 0); this._clrUntil = this.t + 4; }
+    return (this._clr = this.t < (this._clrUntil ?? -1) ? this._clrNeed : 0);
   }
 
   _probe(range) {
@@ -197,10 +200,10 @@ export class HeliAutopilot {
     const V = Math.max(1, Math.hypot(fm.vel.x, fm.vel.z));
     const ux = fm.vel.x / V, uz = fm.vel.z / V;
     let need = 0;
-    // The rotor disc is 10 m wide: probe the path and both tip tracks, from
-    // the skids up to the rotor.
+    // The rotor disc is 10 m wide: probe the path, both tip tracks and a
+    // margin outside them, from the skids up to the rotor.
     for (let s = -10; s <= range; s += 10) {
-      for (const lat of [-6, 0, 6]) {
+      for (const lat of [-8, -4, 0, 4, 8]) {
         const x = fm.pos.x + ux * s - uz * lat, z = fm.pos.z + uz * s + ux * lat;
         for (const dy of [-3, 0, 2]) if (g.world.obstacleAt(x, fm.pos.y + dy, z)) need = 24;
         if (g.world.wireDistance(x, fm.pos.y - 1.5, z) < 15) need = Math.max(need, 16);
@@ -281,7 +284,7 @@ export class HeliAutopilot {
     const ex = pad.x - fm.pos.x, ez = pad.z - fm.pos.z, d = Math.hypot(ex, ez);
     const sp = clamp(d * 0.09, 0, 30);
     // Stay over obstacles on the way in (a lone tree sits east of the pad).
-    const hgt = Math.max(d > 120 ? this._transit() : Math.max(4, d * 0.1), this._clearance(Math.min(160, Math.round((d - 8) / 10) * 10)));
+    const hgt = Math.max(Math.min(this._transit(), Math.max(4, d * 0.15)), this._clearance(Math.min(160, Math.round((d - 8) / 10) * 10)));
     this._flyVel((ex / Math.max(d, 1)) * sp, (ez / Math.max(d, 1)) * sp, hgt, d < 40 ? pad.heading : null, dt);
     if (d < 2.5 && o.groundSpeed < 1) this.set('land');
   }

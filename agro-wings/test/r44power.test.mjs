@@ -75,7 +75,7 @@ test('climb and sink follow the power: rate in proportion to the difference, no 
   t.diagnostic(`±10 % → ${rates[2].toFixed(1)} / ${rates[1].toFixed(1)} m/s, ±20 % → ${rates[3].toFixed(1)} / ${rates[0].toFixed(1)} m/s; MTOW full power ${fpm.toFixed(0)} ft/min`);
 });
 
-test('cyclic: hands-off hover holds position; forward flight reaches ~100–120 kt', () => {
+test('cyclic: hands-off hover holds position', () => {
   const { fm, env } = heli({ engineOn: true, alt: 30 });
   const as = new HeliAssist();
   const p = hoverPowerFrac(A, fm.mass);
@@ -83,9 +83,35 @@ test('cyclic: hands-off hover holds position; forward flight reaches ~100–120 
   const p0 = fm.pos.clone();
   fly(fm, env, as, 'high', 20, { pitch: 0, roll: 0, yaw: 0, lever: p });
   assert.ok(Math.hypot(fm.pos.x - p0.x, fm.pos.z - p0.z) < 1.5, 'hover drift');
-  fly(fm, env, as, 'high', 40, { pitch: -1, roll: 0, yaw: 0, lever: Math.min(1, p + 0.1) });
-  const kt = Math.hypot(fm.vel.x, fm.vel.z) * KT;
-  assert.ok(kt > 95 && kt < 125, `${kt.toFixed(0)} kt`);
+});
+
+// A held tilt (the normal assist's attitude hold) at a given power: the
+// speed and climb rate it settles at.
+function cruise(tiltDeg, dp, secs = 60) {
+  const { fm, env } = heli({ engineOn: true, alt: 600, hopper: 150 });
+  const as = new HeliAssist();
+  const lever = Math.min(1, hoverPowerFrac(A, fm.mass) + dp);
+  fly(fm, env, as, 'normal', secs, () => { as.holdPitch = -tiltDeg / 57.3; as.pHeld = false; return { pitch: 0, roll: 0, yaw: 0, lever }; });
+  return { kt: Math.hypot(fm.vel.x, fm.vel.z) * KT, vs: fm.vel.y };
+}
+
+test('speed follows the tilt and the power (thrust along the rotor axis), up to ~130 kt', (t) => {
+  const at = [5, 10, 20, 30].map((d) => cruise(d, 0));
+  // More tilt, more speed — smoothly, with no wall between hover and cruise.
+  for (let i = 1; i < at.length; i++) assert.ok(at[i].kt > at[i - 1].kt + 8, at.map((c) => c.kt.toFixed(0)).join(' / '));
+  assert.ok(at[1].kt > 30 && at[1].kt < 55, `10°: ${at[1].kt.toFixed(0)} kt`);
+  // ~20°: cruise at about the hover power (translational lift), level.
+  assert.ok(at[2].kt > 95 && at[2].kt < 120 && Math.abs(at[2].vs) < 1.5, `20°: ${at[2].kt.toFixed(0)} kt, ${at[2].vs.toFixed(1)} m/s`);
+  // ~30° at the hover power sinks: the tilt takes lift away.
+  assert.ok(at[3].vs < -1, `30°: ${at[3].vs.toFixed(1)} m/s`);
+  // More power at the same tilt: faster (and climbing).
+  const p10 = cruise(10, 0.2), p30 = cruise(30, 0.2);
+  assert.ok(p10.kt > at[1].kt + 8 && p10.vs > at[1].vs + 1, `10° +20 %: ${p10.kt.toFixed(0)} kt`);
+  assert.ok(p30.kt > at[3].kt && p30.vs > at[3].vs + 1, `30° +20 %: ${p30.kt.toFixed(0)} kt, ${p30.vs.toFixed(1)} m/s`);
+  // Top speed with full power: about the Vne (130 kt).
+  const top = cruise(30, 1);
+  assert.ok(top.kt > 115 && top.kt < 140, `full power, 30°: ${top.kt.toFixed(0)} kt`);
+  t.diagnostic(`hover power: 5° ${at[0].kt.toFixed(0)} kt, 10° ${at[1].kt.toFixed(0)}, 20° ${at[2].kt.toFixed(0)} (${at[2].vs.toFixed(1)} m/s), 30° ${at[3].kt.toFixed(0)} (${at[3].vs.toFixed(1)} m/s); +20 %: 10° ${p10.kt.toFixed(0)} kt, 30° ${p30.kt.toFixed(0)} kt (${p30.vs.toFixed(1)} m/s); top ${top.kt.toFixed(0)} kt`);
 });
 
 test('pedals turn in a hover; released, the heading is held', () => {
@@ -151,52 +177,59 @@ function keyFlight(fm, env, as) {
   }, each);
 }
 
-test('cyclic keys: the nose goes where the stick puts it — no overshoot, no pitch-up on release', (t) => {
-  const { fm, env } = heli({ engineOn: true, alt: 40, hopper: 150 });
+test('cyclic keys: the tilt grows while the key is held (to 45°), levels on release with no pitch-up', (t) => {
+  const { fm, env } = heli({ engineOn: true, alt: 60, hopper: 150 });
   const keys = keyFlight(fm, env, new HeliAssist());
   const deg = () => pitchOf(fm) * 57.3;
   keys(2, 0, 0);
-  // Forward key: about -18° within 1.5 s, never past -20°.
-  let minP = 0, t18 = null;
-  keys(4, -1, 0, (s) => { minP = Math.min(minP, deg()); if (t18 === null && deg() < -16) t18 = s; });
-  assert.ok(t18 !== null && t18 < 1.5, `-16° after ${t18} s`);
-  assert.ok(minP > -20.5, `forward overshoot ${minP.toFixed(1)}°`);
-  // Released below ~55 kt: a calm flare to stop, never more than ~8° nose up.
-  let maxP = -99;
-  keys(6, 0, 0, () => { maxP = Math.max(maxP, deg()); });
-  assert.ok(maxP < 8.5, `release flare ${maxP.toFixed(1)}° nose up`);
-  // Forward again during the flare: the nose answers at once.
-  let tBack = null;
-  keys(3, -1, 0, (s) => { if (tBack === null && deg() < -16) tBack = s; });
-  assert.ok(tBack !== null && tBack < 1.6, `forward again: -16° after ${tBack} s`);
-  // Sideways keys do not move the nose (from a settled hover).
+  // Forward key: past the old 18° within 1.6 s, still growing, never past 47°.
+  const at = [];
+  let minP = 0;
+  keys(4, -1, 0, (s) => { minP = Math.min(minP, deg()); for (const k of [1, 2, 3]) if (at[k] === undefined && s >= k) at[k] = deg(); });
+  assert.ok(at[1] < -6 && at[1] > -20, `1 s: ${at[1].toFixed(1)}°`);
+  assert.ok(at[2] < -20 && at[3] < at[2] - 8, `2 s: ${at[2].toFixed(1)}°, 3 s: ${at[3].toFixed(1)}°`);
+  assert.ok(minP < -42 && minP > -47, `limit ${minP.toFixed(1)}°`);
+  // Released: back to level within ~4 s, never more than ~3° nose up.
+  let maxP = -99, tLevel = null;
+  keys(8, 0, 0, (s) => { maxP = Math.max(maxP, deg()); if (tLevel === null && deg() > -2) tLevel = s; });
+  assert.ok(tLevel !== null && tLevel < 4, `level after ${tLevel} s`);
+  assert.ok(maxP < 3, `release: ${maxP.toFixed(1)}° nose up`);
+  // A short press is a small tilt: the nose answers at once.
+  let tTen = null;
+  keys(1.2, -1, 0, (s) => { if (tTen === null && deg() < -8) tTen = s; });
+  assert.ok(tTen !== null && tTen < 1.1, `-8° after ${tTen} s`);
+  // Sideways keys: the bank grows the same way and does not move the nose.
   keys(20, 0, 0);
   const p0 = deg();
-  let maxAbsP = 0, maxBank = 0;
-  keys(3, 0, 1, () => { maxAbsP = Math.max(maxAbsP, Math.abs(deg() - p0)); maxBank = Math.max(maxBank, bankOf(fm) * 57.3); });
-  assert.ok(maxAbsP < 4 && maxBank > 22 && maxBank < 30, `roll: pitch ${maxAbsP.toFixed(1)}°, bank ${maxBank.toFixed(1)}°`);
-  t.diagnostic(`-16° in ${t18.toFixed(2)} s (min ${minP.toFixed(1)}°), flare max ${maxP.toFixed(1)}°, forward again in ${tBack.toFixed(2)} s, roll ${maxBank.toFixed(1)}° with pitch ≤ ${maxAbsP.toFixed(1)}°`);
+  let maxAbsP = 0, maxBank = 0, b1 = null;
+  keys(1, 0, 1, (s) => { maxAbsP = Math.max(maxAbsP, Math.abs(deg() - p0)); maxBank = Math.max(maxBank, bankOf(fm) * 57.3); });
+  b1 = bankOf(fm) * 57.3;
+  keys(3, 0, 0, () => { maxAbsP = Math.max(maxAbsP, Math.abs(deg() - p0)); maxBank = Math.max(maxBank, bankOf(fm) * 57.3); });
+  assert.ok(b1 > 10 && b1 < 30, `bank after 1 s: ${b1.toFixed(1)}°`);
+  assert.ok(maxBank < b1 + 9, `bank runs on to ${maxBank.toFixed(1)}° after release at ${b1.toFixed(1)}°`);
+  assert.ok(Math.abs(bankOf(fm) * 57.3) < 3 && maxAbsP < 4, `levels; pitch moved ${maxAbsP.toFixed(1)}°`);
+  t.diagnostic(`forward key: ${at[1].toFixed(0)}° at 1 s, ${at[2].toFixed(0)}° at 2 s, ${at[3].toFixed(0)}° at 3 s, limit ${minP.toFixed(1)}°; level ${tLevel.toFixed(1)} s after release (max ${maxP.toFixed(1)}° up); roll ${b1.toFixed(0)}° after 1 s, peak ${maxBank.toFixed(0)}°`);
 });
 
 test('released stick: levels out and glides on, slowing down gradually (no braking flare)', (t) => {
-  const { fm, env } = heli({ engineOn: true, alt: 40, hopper: 150 });
+  const { fm, env } = heli({ engineOn: true, alt: 60, hopper: 150 });
   const keys = keyFlight(fm, env, new HeliAssist());
   const speed = () => Math.hypot(fm.vel.x, fm.vel.z);
   keys(1, 0, 0);
-  keys(6, -1, 0);
-  const v0 = speed();
-  let tLevel = null, maxUp = -99;
-  keys(2.5, 0, 0, (s) => { const p = pitchOf(fm) * 57.3; maxUp = Math.max(maxUp, p); if (tLevel === null && Math.abs(p) < 2) tLevel = s; });
-  keys(7.5, 0, 0);
+  keys(3.5, -1, 0);
+  // Released: the speed still builds while the nose comes up, then decays.
+  let tLevel = null, maxUp = -99, vMax = 0;
+  keys(4, 0, 0, (s) => { const p = pitchOf(fm) * 57.3; maxUp = Math.max(maxUp, p); vMax = Math.max(vMax, speed()); if (tLevel === null && Math.abs(p) < 2) tLevel = s; });
+  keys(6, 0, 0);
   const v10 = speed();
-  assert.ok(tLevel !== null && tLevel < 2, `level after ${tLevel} s`);
+  assert.ok(tLevel !== null && tLevel < 4, `level after ${tLevel} s`);
   assert.ok(maxUp < 3, `no flare: max ${maxUp.toFixed(1)}° nose up`);
-  assert.ok(v10 < v0 * 0.7 && v10 > v0 * 0.15, `glide: ${v0.toFixed(1)} -> ${v10.toFixed(1)} m/s in 10 s`);
+  assert.ok(v10 < vMax * 0.75 && v10 > vMax * 0.3, `glide: ${vMax.toFixed(1)} -> ${v10.toFixed(1)} m/s in 10 s`);
   // ...and ends up stopped over the ground, still without a flare.
-  keys(25, 0, 0, () => { maxUp = Math.max(maxUp, pitchOf(fm) * 57.3); });
-  assert.ok(speed() < 0.4, `stopped: ${speed().toFixed(2)} m/s after 35 s`);
+  keys(40, 0, 0, () => { maxUp = Math.max(maxUp, pitchOf(fm) * 57.3); });
+  assert.ok(speed() < 0.4, `stopped: ${speed().toFixed(2)} m/s after 50 s`);
   assert.ok(maxUp < 3, `no flare while stopping: max ${maxUp.toFixed(1)}° nose up`);
-  t.diagnostic(`level ${tLevel.toFixed(2)} s after release, ${(v0 * KT).toFixed(0)} -> ${(v10 * KT).toFixed(0)} kt in 10 s, stopped after 35 s`);
+  t.diagnostic(`level ${tLevel.toFixed(2)} s after release, ${(vMax * KT).toFixed(0)} -> ${(v10 * KT).toFixed(0)} kt in 10 s, stopped within 50 s`);
 });
 
 test('released in a breeze: the hover holds over the ground (no drifting off with the wind)', (t) => {
