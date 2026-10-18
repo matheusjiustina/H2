@@ -374,3 +374,19 @@ test('pivot: brake + full rudder turns the aircraft around on the spot', () => {
 });
 
 void FlightModel; void createFlightEnv;
+
+test('trim with the assist on moves the held flight path (and it stays trimmed)', () => {
+  for (const [dir, mode] of [[1, 'normal'], [-1, 'normal'], [1, 'high'], [-1, 'high']]) {
+    const sim = trimmed(300, 46, 0.75);
+    const { fm } = sim;
+    const fly = (s, trim) => { for (let i = 0; i < 120 * s; i++) sim.step(1, { pitch: 0, roll: 0, yaw: 0, trim }, mode); };
+    fly(8, 0);
+    const y0 = fm.pos.y;
+    fly(2, dir); // two seconds on the trim key
+    fly(8, 0);
+    const vs = fm.vel.y, dy = fm.pos.y - y0;
+    console.log(`  ${mode} trim ${dir > 0 ? 'up' : 'down'}: ${vs.toFixed(1)} m/s held, ${dy.toFixed(0)} m in 10 s`);
+    assert.ok(dir * vs > 3, `${mode} ${dir}: vertical speed ${vs}`);
+    assert.ok(dir * dy > 25, `${mode} ${dir}: height change ${dy}`);
+  }
+});

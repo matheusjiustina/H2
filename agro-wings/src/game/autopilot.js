@@ -4,7 +4,7 @@
 // turns, approach, landing, taxi back and shutdown.
 import { clamp, wrapAngle, smoothstep } from '../core/math.js';
 import { FlightModel } from '../flight/flightModel.js';
-import { RUNWAY, BASE } from '../world/layout.js';
+import { RUNWAY, BASE, cropHeight } from '../world/layout.js';
 import { SPRAY } from '../config.js';
 
 const G = 9.81;
@@ -339,7 +339,11 @@ export class Autopilot {
     // (Starts 1300 m out: over sloping ground the run-in needs the room.)
     const lead = dir > 0 ? a - (gd.l0 - 1300) : gd.l1 + 1300 - a;
     const workZone = lead > 0 && (dir > 0 ? a < gd.l1 + 40 : a > gd.l0 - 40);
-    if (workZone && Math.abs(cross) < 12) alt = top + fm.A.aglOffset + 3.6; // CG height for ~3.3 m wheel height over the canopy
+    // CG height for ~3.3 m wheel height over the canopy. On the run-in and
+    // over the gap between stepped talhões the height is already set for the
+    // job's crop, so the canopy edge does not come up under the wheels.
+    const canopy = Math.max(top, ac.env.ground(fm.pos.x, fm.pos.z) + Math.max(...g.job.fields.map(cropHeight)));
+    if (workZone && Math.abs(cross) < 12) alt = canopy + fm.A.aglOffset + 3.6;
     else alt = top + fm.A.aglOffset + Math.max(far ? 35 : 22, this._clearance());
     // Look ahead for terrain/canopy/trees/wires.
     let ahead = top;

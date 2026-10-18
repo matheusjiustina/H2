@@ -10,6 +10,7 @@ import { clamp } from '../core/math.js';
 import { FlightModel } from './flightModel.js';
 
 const G = 9.81;
+const TRIM_RATE = 0.05; // rad/s of held flight path per trim key
 
 export class Assist {
   constructor() { this.reset(); this._att = {}; }
@@ -21,6 +22,7 @@ export class Assist {
     this.holdPitch = null;
     this.holdBank = null;
     this.airborne = false;
+    this.trimmed = false;
   }
 
   update(fm, cmd, mode, dt) {
@@ -40,6 +42,7 @@ export class Assist {
       this.ei = fm.elevator;
       this.holdPitch = null;
       this.holdBank = null;
+      this.trimmed = false;
       this.airborne = flying;
       return;
     }
@@ -77,6 +80,7 @@ export class Assist {
     if (Math.abs(sp) > 0.05) {
       qCmd = (high ? 0.24 * sp + 0.06 * sp ** 3 : 0.24 * sp + 0.22 * sp ** 3) * auth;
       this.holdPitch = null;
+      this.trimmed = false;
       // Keep the turn coordinated underneath the pilot's own pull or push.
       if (cphi > 0.02) qCmd += (G / v) * Math.max(0, nCoord - Math.cos(gamma) * cphi);
     } else {
@@ -84,9 +88,16 @@ export class Assist {
       // Capture the flight path the moment the stick is released (the path
       // lags the nose, so there is no pull-up overshoot to catch).
       if (this.holdPitch === null) this.holdPitch = clamp(gamma, lim[0], lim[1]);
+      // Trim moves the held flight path (~3°/s), as a fly-by-wire trim does:
+      // an elevator offset alone would just be cancelled by the hold loop.
+      if (cmd.trim) {
+        this.holdPitch = clamp(this.holdPitch + cmd.trim * TRIM_RATE * dt, lim[0], lim[1]);
+        this.trimmed = true;
+      }
       if (this.holdPitch !== null) {
-        // Dives level off on their own; slow climbs give the speed back.
-        if (this.holdPitch < -0.03) this.holdPitch = Math.min(-0.03, this.holdPitch + 0.06 * dt);
+        // Dives level off on their own (not a descent the pilot trimmed for);
+        // slow climbs give the speed back.
+        if (this.holdPitch < -0.03 && !this.trimmed) this.holdPitch = Math.min(-0.03, this.holdPitch + 0.06 * dt);
         if (a.agl < 25 && this.holdPitch < -0.02) this.holdPitch = Math.min(-0.02, this.holdPitch + 0.25 * dt);
         const minV = (36 - fm.flaps * 6) * vk;
         if (v < minV) this.holdPitch = Math.max(-0.08, this.holdPitch - (minV - v) * 0.012 * dt);

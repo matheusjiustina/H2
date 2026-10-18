@@ -190,6 +190,7 @@ export class Aircraft {
 
     if (this.game.controlsLocked) {
       this.target.pitch = this.target.roll = this.target.yaw = 0;
+      this.cmd.trim = 0;
       return;
     }
     // Throttle
@@ -205,8 +206,14 @@ export class Aircraft {
     const ni = FLAP_NOTCHES.indexOf(notch);
     if (input.wasPressed('flapsUp')) fm.flapsCmd = FLAP_NOTCHES[Math.max(0, ni - 1)];
     if (input.wasPressed('flapsDown')) fm.flapsCmd = FLAP_NOTCHES[Math.min(3, ni + 1)];
-    if (input.isDown('trimUp')) fm.trim = clamp(fm.trim + dt * 0.3, -1, 1);
-    if (input.isDown('trimDown')) fm.trim = clamp(fm.trim - dt * 0.3, -1, 1);
+    // Trim: with the assist flying, it moves the held flight path (see
+    // Assist); with the assist off or on the ground, the elevator trim tab.
+    const trim = (input.isDown('trimUp') ? 1 : 0) - (input.isDown('trimDown') ? 1 : 0);
+    const assisted = opts.assist !== 'off' && !fm.out.onGround && fm.out.agl > 0.8;
+    this.cmd.trim = assisted ? trim : 0;
+    if (trim && !assisted) fm.trim = clamp(fm.trim + trim * dt * 0.3, -1, 1);
+    if (trim) this.trimShowT = 2.5;
+    else this.trimShowT = Math.max(0, (this.trimShowT ?? 0) - dt);
     // Engine: hold to start, tap to stop (Tidemark Q behaviour).
     const engDown = input.isDown('engine') || v.engine;
     if (engDown) {
@@ -557,6 +564,7 @@ export class Aircraft {
       fuelCap: this.A.fuelCapacity, hopperCap: this.A.hopperCapacity, ng: fm.ng, itt: fm.itt, torque: fm.torque,
       stall: o.stall, onGround: o.onGround, flaps: fm.flaps, brake: fm.brake, parkBrake: fm.parkBrake,
       vs: o.vs, damage: this.damage, mass: fm.mass, hdg: this.headingDeg(), state: this.state, g: o.gLoad,
+      trim: this.trimShowT > 0 ? { path: this.cmd.trim || this.assist.trimmed ? this.assist.holdPitch : null, tab: fm.trim } : null,
     };
   }
 }

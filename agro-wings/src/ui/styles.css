@@ -78,6 +78,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .spraybadge { position: absolute; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); font: 700 12px var(--sans); letter-spacing: .2em; padding: 6px 14px; border-radius: 20px; background: rgba(60,180,90,.85); color: #06200d; display: none; }
 .spraybadge.show { display: block; }
 .spraybadge.off { background: rgba(0,0,0,.55); color: var(--ink-dim); }
+.trimbadge { position: absolute; left: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 36px); transform: translateX(-50%); font: 700 11px var(--sans); letter-spacing: .16em; padding: 5px 12px; border-radius: 20px; background: rgba(0,0,0,.55); color: #f3d36b; display: none; white-space: nowrap; }
+.trimbadge.show { display: block; }
 .warnings { position: absolute; top: 14%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .warning { font: 700 14px var(--sans); letter-spacing: .12em; text-transform: uppercase; padding: 6px 14px; border-radius: 5px; background: rgba(200,40,25,.85); color: #fff; text-shadow: none; }
 .warning.amber { background: rgba(240,160,30,.9); color: #1d1404; }

@@ -56,6 +56,21 @@ export const KEY_SCHEMES = {
 export const DEFAULT_KEY_SCHEME = 'numpad';
 
 const STORE = 'agrowings.keys.v1';
+const BIND_REV = 2; // bumped when saved bindings need a clean-up on load
+
+// Bindings saved by older builds: the engine was on Q (and power down on F),
+// and a rebind kept the old key as the second one, so Q could still start
+// or cut the engine. Q is the left rudder only, F is the engine only.
+export function migrateBindings(b) {
+  for (const k of Object.keys(b)) {
+    if (k !== 'nYawLeft' && k !== 'yawLeft') b[k] = b[k].filter((c) => c !== 'KeyQ');
+    if (k !== 'engine') b[k] = b[k].filter((c) => c !== 'KeyF');
+  }
+  b.engine = ['KeyF', ...b.engine.filter((c) => c !== 'KeyF')].slice(0, 2);
+  // An action left without keys gets its default ones back.
+  for (const k of Object.keys(b)) if (!b[k].length) b[k] = ACTIONS[k].keys.slice();
+  return b;
+}
 
 export class Input {
   constructor(el) {
@@ -119,15 +134,13 @@ export class Input {
     try {
       const s = JSON.parse(localStorage.getItem(STORE) || 'null');
       if (s) {
-        // Bindings saved while the engine was on Q and power down on F.
-        if (JSON.stringify(s.engine) === '["KeyQ"]') delete s.engine;
-        if (JSON.stringify(s.throttleDown) === '["KeyF","ControlLeft"]') delete s.throttleDown;
         for (const k of Object.keys(this.bindings)) if (Array.isArray(s[k])) this.bindings[k] = s[k];
+        if ((s._rev ?? 0) < BIND_REV) { migrateBindings(this.bindings); this.save(); }
       }
     } catch { /* storage unavailable */ }
   }
   save() {
-    try { localStorage.setItem(STORE, JSON.stringify(this.bindings)); } catch { /* ignore */ }
+    try { localStorage.setItem(STORE, JSON.stringify({ ...this.bindings, _rev: BIND_REV })); } catch { /* ignore */ }
   }
   resetBindings() {
     for (const [k, a] of Object.entries(ACTIONS)) this.bindings[k] = a.keys.slice();

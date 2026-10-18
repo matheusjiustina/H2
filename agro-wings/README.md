@@ -79,7 +79,7 @@ scheme). Everything else is the same in both.
 | Power (R44: collective) | Shift / Ctrl (R raises too), mouse wheel |
 | Brakes (differential with rudder) | Space |
 | Flaps | G (up) / B (down) |
-| Trim | [ / ] (Page Up / Page Down) |
+| Trim (nose up / down) | ] / [ (Page Up / Page Down) — with the assist on it sets the climb or descent the aircraft holds hands-off |
 | Spray valve | C (Enter) |
 | Cockpit / chase | V |
 | Free external camera | O |
@@ -144,6 +144,14 @@ interpolation. All tuning values live in `src/config.js`.
   falls and the aircraft descends — the real energy trade of a steep turn.
   A level turn settles at the bank the wing can sustain; a climbing aircraft
   (top of the balão) keeps up to 75°; a held climb flattens as speed bleeds;
+- trim with the assist on moves that held flight path, about 3° per second
+  on the key (a fly-by-wire trim; an elevator offset alone was cancelled by
+  the hold loop within a second, so the trim barely did anything): two
+  seconds of nose-up trim at 90 kt give a 4.4 m/s climb that stays
+  hands-off, two seconds nose-down a 5.9 m/s descent. A HUD badge shows the
+  trimmed path while it is set. The stall, low-speed and near-ground
+  protections still apply. With the assist off (or on the ground) the trim
+  is the elevator tab as before;
 - stall protection anticipates the alpha trend and the path rotation
   (α̇ = q − γ̇), g protection at +3.8 / −1 g.
 
@@ -812,7 +820,9 @@ Chromium + SwiftShader in this container.
 **Key schemes** (`node test/keys.mjs`, 22/22): on the PR-AGW, the AT-502B
 and the R44, the numpad scheme is the default and the classic keys are
 dead in it (and the other way round); Q does not start the engine and a
-tap on Q (rudder) does not stop it in the numpad scheme, I does both; Shift
+tap on Q (rudder) does not stop it, F does both (bindings saved by older
+builds are cleaned up on load: Q is only the left rudder, F only the
+engine — `test/input.test.mjs`); Shift
 and Ctrl move the power in both; the HUD, Controls and Settings screens
 name the keys of the scheme in use; the choice is saved; rebinding a
 numpad key leaves the classic keys alone. `node test/r44flight.mjs` (22/22)

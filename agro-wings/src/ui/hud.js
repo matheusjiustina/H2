@@ -24,6 +24,7 @@ export class HUD {
       <div class="warnings"></div>
       <div class="prompt interactive"></div>
       <div class="spraybadge">SPRAY ON</div>
+      <div class="trimbadge"></div>
       <div class="readouts">
         <div class="ro r-spd"><span class="l">Speed</span><span class="v">0<span class="u">kt</span></span></div>
         <div class="ro r-hgt"><span class="l">Height</span><span class="v">0<span class="u">m</span></span></div>
@@ -41,7 +42,7 @@ export class HUD {
     this.$ = {
       job: q('.jobcard'), jobT: q('.jobcard .t'), jobS1: q('.jobcard .s1'), jobS2: q('.jobcard .s2'), jobBar: q('.jobcard .bar span'),
       crew: q('.crew'), crewMsg: q('.crew .msg'), lf: q('.crew .lf'), lh: q('.crew .lh'), bf: q('.crew .bf'), bh: q('.crew .bh'), crewHint: q('.crew .hint'),
-      toasts: q('.toasts'), warnings: q('.warnings'), prompt: q('.prompt'), spray: q('.spraybadge'),
+      toasts: q('.toasts'), warnings: q('.warnings'), prompt: q('.prompt'), spray: q('.spraybadge'), trim: q('.trimbadge'),
       spd: q('.r-spd'), hgt: q('.r-hgt'), gl: q('.r-g'), pwr: q('.r-pwr'), fuel: q('.r-fuel'), hop: q('.r-hop'),
       mini: q('.minimap canvas'), tut: q('.tut'), tutStep: q('.tut .step'), tutTxt: q('.tut .txt'), tutDim: q('.tut .dim'),
       fps: q('.fps'), vig: q('.vignette'),
@@ -130,6 +131,15 @@ export class HUD {
     $.spray.classList.toggle('show', sprayingNow || (g.job && !t.onGround));
     $.spray.classList.toggle('off', !sprayingNow);
     $.spray.textContent = sprayingNow ? (g.sprayer.flowNow > 0 ? `SPRAY ON · ${(g.sprayer.flowNow * 60).toFixed(0)} L/min` : 'SPRAY ON · NO FLOW') : `SPRAY OFF · ${keyLabel(g.input.bindings.spray[0])}`;
+    // Trim, shown for a moment while it is being set: the held flight path
+    // with the assist flying, the elevator tab otherwise.
+    $.trim.classList.toggle('show', !!t.trim);
+    if (t.trim) {
+      const deg = t.trim.path !== null ? (t.trim.path * 180) / Math.PI : null;
+      $.trim.textContent = deg !== null
+        ? `TRIM · PATH ${deg >= 0.05 ? '+' : ''}${deg.toFixed(1)}° ${deg > 0.3 ? 'CLIMB' : deg < -0.3 ? 'DESCENT' : 'LEVEL'}`
+        : `TRIM · ${Math.round(Math.abs(t.trim.tab) * 100)} % ${t.trim.tab >= 0 ? 'NOSE UP' : 'NOSE DOWN'}`;
+    }
     // Job card
     if (g.job) {
       $.job.classList.add('show');
