@@ -23,6 +23,7 @@ export class Assist {
     this.holdBank = null;
     this.airborne = false;
     this.trimmed = false;
+    this.gamDot = 0;
   }
 
   update(fm, cmd, mode, dt) {
@@ -60,7 +61,7 @@ export class Assist {
     const high = mode === 'high';
 
     // Load factor the wing can give right now at the protected angle of attack.
-    const aProt = A.alphaStall - fm.flaps * 0.035 - (high ? 0.06 : 0.025);
+    const aProt = A.alphaStall - fm.flaps * 0.035 - (high ? 0.06 : 0.018);
     const clProt = A.CL0 + A.CLa * aProt + A.CLflap * fm.flaps;
     const nAvail = clamp((clProt * qd * A.wingArea) / (fm.mass * G), 0.3, 6);
     const nLimit = high ? 3.0 : 3.8; // normal-category structural limit
@@ -77,12 +78,22 @@ export class Assist {
     const nCoord = cphi > 0.02 ? Math.min(Math.cos(gamma) / cphi, nAuto) : 0;
     let qCmd;
     const sp = cmd.pitch;
+    // Rotation rate of the flight path itself (positive in a pull), lightly
+    // filtered (the load factor jitters step to step).
+    this.gamDot += ((G / v) * (a.gLoad - Math.cos(gamma) * cphi) - this.gamDot) * Math.min(1, dt * 20);
+    const gamDot = this.gamDot;
     if (Math.abs(sp) > 0.05) {
       qCmd = (high ? 0.24 * sp + 0.06 * sp ** 3 : 0.24 * sp + 0.22 * sp ** 3) * auth;
       this.holdPitch = null;
       this.trimmed = false;
       // Keep the turn coordinated underneath the pilot's own pull or push.
       if (cphi > 0.02) qCmd += (G / v) * Math.max(0, nCoord - Math.cos(gamma) * cphi);
+      // A hard pull (pull-out from the balão): the nose also follows the
+      // path's own rotation, so the angle of attack — and the g — keeps
+      // building up to the protected limit instead of the path catching up
+      // with a fixed pitch rate (before, a full pull at 100 kt took over a
+      // second to reach ~3 g and the height went meanwhile).
+      if (sp > 0.5) qCmd += Math.max(0, gamDot) * Math.min(1, (sp - 0.5) / 0.4) * (high ? 0.6 : 1);
     } else {
       const lim = high ? [-0.1, 0.26] : [-0.15, 0.45];
       // Capture the flight path the moment the stick is released (the path
@@ -116,13 +127,19 @@ export class Assist {
     const aDot = this.aPrev === undefined ? 0 : (a.alpha - this.aPrev) / Math.max(dt, 1e-3);
     this.aPrev = a.alpha;
     this.aDot = (this.aDot ?? 0) + (aDot - (this.aDot ?? 0)) * Math.min(1, dt * 12);
-    const aPred = a.alpha + Math.max(0, this.aDot) * 0.3;
-    // α̇ = q − γ̇: at low speed gravity bends the path down faster than the
-    // nose falls, so the limit is relative to the path's own rotation rate.
-    const gamDot = (G / v) * (a.gLoad - Math.cos(gamma) * cphi);
-    if (aPred > aProt) qCmd = Math.min(qCmd, Math.min(0, gamDot) - (aPred - aProt) * 5);
+    const aPred = a.alpha + Math.max(0, this.aDot) * 0.12;
+    // α̇ = q − γ̇: the limit is relative to the path's own rotation rate —
+    // at low speed gravity bends the path down faster than the nose falls,
+    // and in a pull-out the nose may keep rotating with the path, holding
+    // the angle of attack at the limit (before, the nose was stopped there:
+    // the alpha fell off, the elevator chattered and the pull lost g).
+    // The ceiling closes in continuously as the margin shrinks (a switch at
+    // the limit made the elevator chatter between full up and half down).
+    qCmd = Math.min(qCmd, gamDot + (aProt - aPred) * 8);
     if (a.alpha < -0.12) qCmd = Math.max(qCmd, (-0.12 - a.alpha) * 5);
-    if (a.gLoad > nLimit) qCmd = Math.min(qCmd, -(a.gLoad - nLimit) * 0.6);
+    // g limit, also closing in continuously (at the limit the nose turns
+    // with the path, holding the g).
+    qCmd = Math.min(qCmd, gamDot + (nLimit - a.gLoad) * (G / v) * 2);
     if (a.gLoad < -1) qCmd = Math.max(qCmd, (-1 - a.gLoad) * 0.6);
     if (high) {
       if (pitch > 0.45) qCmd = Math.min(qCmd, -(pitch - 0.45) * 2);

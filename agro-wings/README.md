@@ -138,6 +138,32 @@ interpolation. All tuning values live in `src/config.js`.
   back stick reaches the commanded rate in ~0.3 s and ~1.9 g in 0.5 s at
   90 kt (before, the loop only reached ~75 % of the rate and the g took over
   a second, which made pull-outs from the balão feel heavy);
+- a hard pull (stick past half, the pull-out from the balão's dive) also
+  turns the nose with the flight path's own rotation, so the angle of
+  attack, and with it the g, keeps building up to the protected limit
+  instead of the path catching up with a fixed pitch rate. On the keyboard
+  a pull now reaches full travel in 0.2 s (0.3 s before; pushes and
+  releases are unchanged).
+  - Measured with the same input ramp before and after, in a 20° dive at
+    ~100 kt:
+
+    | Ipanema load | g after 0.6 s, before | Now |
+    |---|---|---|
+    | Empty | 2.4 g | 2.85 g |
+    | 450 L | 2.1 g | 2.2 g |
+
+    With the faster keyboard pull the empty aircraft reaches 3.3 g after
+    0.6 s.
+- the stall and g limits close in continuously as the margin shrinks, and
+  at the limit the nose turns with the path, holding the angle of attack or
+  the g. Before:
+  - at the angle-of-attack limit the nose was stopped outright, so the
+    alpha fell away and came back, and the elevator chattered between full
+    up and half down (11–24 jumps per pull-out with a load);
+  - the alpha prediction looked 0.3 s ahead, which slowed the last part of
+    every hard pull.
+
+  The protected angle is now 1.0° under the critical one (1.4° before).
 - stick released: flight-path hold. In a bank the assist asks for the load
   factor n = cos γ / cos φ that keeps the climb or descent, but never more
   than the wing can give at that speed and weight. Beyond that the nose
@@ -152,8 +178,8 @@ interpolation. All tuning values live in `src/config.js`.
   trimmed path while it is set. The stall, low-speed and near-ground
   protections still apply. With the assist off (or on the ground) the trim
   is the elevator tab as before;
-- stall protection anticipates the alpha trend and the path rotation
-  (α̇ = q − γ̇), g protection at +3.8 / −1 g.
+- stall protection anticipates the alpha trend (0.12 s ahead) and the path
+  rotation (α̇ = q − γ̇), g protection at +3.8 / −1 g.
 
 The balão at the end of each pass is flown as in the field: valve off, pull
 up (~2.2–2.5 g, +25–40 m), turn ~45° away, bank 60–75° back toward the next
@@ -161,6 +187,44 @@ swath at the slow top, let the nose fall and dive back to 3 m. The HUD's
 LOAD readout shows the g. Measured with the test pilot (`npm test`): 60°
 bank in 1.1 s, 45° turns hold height within ~7 m, a balão with 560 L tops
 out ~29 m above the pass and ends above it, never stalling.
+
+**The whole balão near the ground.** `balaoDive` in `test/harness.mjs` flies
+the balão with keyboard-shaped inputs over the real terrain:
+
+1. a pass at 3 m;
+2. a full pull to 25° nose up;
+3. a 65° bank and ~150° of turn;
+4. a dive back at 14° or 20°;
+5. a full pull once the wheels are 14–20 m up.
+
+Lowest wheel height after the pull-out:
+
+| Aircraft, load | Dive, pull height | Before | Now |
+|---|---|---|---|
+| Ipanema, 560 L (MTOW) | 14°, 14 m | 4.9 m | 6.0 m |
+| Ipanema, 560 L | 20°, 20 m | 1.2 m | 2.4 m |
+| Ipanema, 560 L | 20°, 18 m | hit | 0.4 m |
+| Ipanema, 300 L | 20°, 14 m | hit | 0.7 m |
+| AT-502B, 1,000 L | 14°, 14 m | 1.9 m | 3.5 m |
+| AT-502B, 1,000 L | 20°, 18 m | hit | 2.4 m |
+| AT-502B, 600 L | 20°, 14 m | hit | hit |
+
+The last row is the wing's limit: 20 m/s of sink at 124 kt, 14 m up. With
+the contracts' loads (Ipanema 560 L at its MTOW, AT 1,180 L at ~81 % of
+its MTOW), the AT recovers higher from a 20° dive than the Ipanema: 2.1 m
+against 0.4 m pulled at 18 m. Its power also takes it higher in the
+pull-up. In a 14° dive the slower Ipanema bottoms out higher (6.0 m against
+3.4 m).
+
+The wings were left as published. The Ipanema stalls at ~59 kt at its
+MTOW; the AT at 71 kt flaps up at 8,000 lb (82 mph on Air Tractor's sheet).
+So a loaded pull-out is limited by the wing:
+
+- Ipanema at its MTOW, 100 kt: ~2.7 g.
+- AT with 1,000 L, 120 kt: ~2.9 g.
+
+A stronger elevator on the AT was tried and changed nothing for that
+reason.
 
 ## Tests
 

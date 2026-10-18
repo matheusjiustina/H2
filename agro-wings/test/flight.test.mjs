@@ -1,7 +1,7 @@
 // Flight-model validation (run: node --test test/)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeSim, deg } from './harness.mjs';
+import { makeSim, deg, balaoDive } from './harness.mjs';
 import { FlightModel } from '../src/flight/flightModel.js';
 import { Assist } from '../src/flight/assist.js';
 import { createFlightEnv } from '../src/flight/env.js';
@@ -231,6 +231,41 @@ test('pull-out: loaded, from a 10° descent at spray speed, levels within ~9 m',
   console.log(`  from ${(-vs0).toFixed(1)} m/s sink at ${(v0 * KT).toFixed(0)} kt: levelled after ${(-low).toFixed(1)} m, stall ${stall.toFixed(2)}`);
   assert.ok(-low < 9.3, `lost ${-low} m in the pull-out`);
   assert.ok(stall < 0.2, 'no stall in the pull-out');
+});
+
+test('hard pull: the g builds to the protected limit within ~0.6 s, the elevator does not chatter', () => {
+  for (const hop of [0, 450]) {
+    const sim = trimmed(hop, 50, 1);
+    holdSpeed(sim, 50, 6);
+    const { fm } = sim;
+    // 20° dive at ~100 kt, then a full pull as the keyboard gives it.
+    for (let i = 0; i < 120 * 5; i++) {
+      const a = sim.att(), gam = Math.asin(fm.vel.y / fm.vel.length());
+      sim.step(1, { pitch: Math.max(-1, Math.min(1, (-0.35 - gam) * 4 + (-0.35 - a.pitch) + fm.omega.x * 0.5)), roll: -a.bank * 2, yaw: 0 }, 'normal');
+    }
+    let s = 0, g06 = 0, flips = 0, stall = 0, prev = fm.elevator;
+    for (let i = 0; i < 120 * 1.2; i++) {
+      s = Math.min(1, s + 5 / 120);
+      sim.step(1, { pitch: s, roll: 0, yaw: 0 }, 'normal');
+      if (i === 72) g06 = fm.out.gLoad;
+      if (Math.abs(fm.elevator - prev) > 0.3) flips++;
+      prev = fm.elevator; stall = Math.max(stall, fm.out.stall);
+    }
+    const nProt = sim.assist.nAvail;
+    console.log(`  hopper ${hop} L: ${g06.toFixed(2)} g after 0.6 s (wing gives ${nProt.toFixed(2)} g at the protected angle), ${flips} elevator jumps, stall ${stall.toFixed(2)}`);
+    assert.ok(g06 > Math.min(nProt, 3.8) * 0.72, `only ${g06} g after 0.6 s`);
+    assert.ok(flips <= 3, `elevator chatter: ${flips} jumps`);
+    assert.ok(stall < 0.2, 'no stall');
+  }
+});
+
+test('balão with the dive back: a hard pull near the ground levels out above it (loaded)', () => {
+  for (const [hop, dive, hPull, minLow] of [[300, 14, 14, 4], [560, 14, 14, 4], [560, 20, 20, 1]]) {
+    const r = balaoDive(FLIGHT, hop, { diveDeg: dive, hPull });
+    console.log(`  ${hop} L, ${dive}° dive, pull at ${hPull} m (${r.pullKt?.toFixed(0)} kt): lowest ${typeof r.low === 'number' ? r.low.toFixed(1) + ' m' : r.low}, ${r.maxG.toFixed(2)} g, stall ${r.stall.toFixed(2)}`);
+    assert.ok(typeof r.low === 'number' && r.low > minLow, `hit or too low: ${r.low}`);
+    assert.ok(r.stall < 0.3, `stalled (${r.stall})`);
+  }
 });
 
 test('stall: progressive, recoverable without assist; prevented with assist', () => {

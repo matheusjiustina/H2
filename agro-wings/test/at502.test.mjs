@@ -2,7 +2,7 @@
 // (run: node --test test/). The PR-AGW keeps its own suite in flight.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeSim, deg, Vector3 } from './harness.mjs';
+import { makeSim, deg, Vector3, balaoDive } from './harness.mjs';
 import { FLIGHT, FLIGHT_AT502 as A } from '../src/config.js';
 
 const KT = 1.943844, FPM = 196.85;
@@ -171,7 +171,9 @@ test('pitch and roll response with the assist (loaded, spray speed)', () => {
     if (Math.abs(sim2.att().bank) > 1.05) t60 = i / 120;
   }
   console.log(`  ${deg(q).toFixed(0)}°/s and ${g.toFixed(2)} g after 0.5 s; 60° bank in ${t60?.toFixed(2)} s`);
-  assert.ok(q > 0.33 && g > 1.6);
+  // (With the angle of attack at the protected limit the nose turns with
+  // the path, so the g — not the pitch rate — is what a quick pull shows.)
+  assert.ok(q > 0.25 && g > 1.8, `${deg(q).toFixed(0)}°/s, ${g.toFixed(2)} g`);
   assert.ok(t60 !== null && t60 < 1.5);
 });
 
@@ -200,6 +202,15 @@ test('balão with 1,200 L: pull-up, steep reversal, no stall', () => {
   console.log(`  ${deg(Math.abs(turned)).toFixed(0)}°, top +${top.toFixed(0)} m, bank ≤${deg(maxBank).toFixed(0)}°, stall ${stall.toFixed(2)}`);
   assert.ok(top > 18 && maxBank > 1.2 && stall < 0.2);
   assert.ok(Math.abs(turned) > Math.PI * 0.8);
+});
+
+test('balão with the dive back at working speed: the pull-out clears the ground (loaded)', () => {
+  for (const [hop, dive, hPull, minLow] of [[600, 14, 14, 3], [1000, 14, 14, 3], [1000, 20, 18, 0.8]]) {
+    const r = balaoDive(A, hop, { diveDeg: dive, hPull, fuel: 340, knots: 115 });
+    console.log(`  ${hop} L, ${dive}° dive, pull at ${hPull} m (${r.pullKt?.toFixed(0)} kt): lowest ${typeof r.low === 'number' ? r.low.toFixed(1) + ' m' : r.low}, ${r.maxG.toFixed(2)} g, stall ${r.stall.toFixed(2)}`);
+    assert.ok(typeof r.low === 'number' && r.low > minLow, `hit or too low: ${r.low}`);
+    assert.ok(r.stall < 0.3, `stalled (${r.stall})`);
+  }
 });
 
 test('landing: soft touchdown, beta and brakes stop it on the strip, no prop strike', () => {
