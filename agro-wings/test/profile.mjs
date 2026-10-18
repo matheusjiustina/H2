@@ -28,6 +28,9 @@ const views = {
   spraySoy: `g.aircraft.placeAirborne(300, -280, Math.PI/2, 4, (g.aircraft.type.kind === 'heli' ? 23 : 46 * (g.aircraft.A.assistSpeedScale ?? 1))); g.sprayer.on = true; g.aircraft.fm.hopper = 500; g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
   cockpitCorn: `g.aircraft.placeAirborne(-200, 470, Math.PI/2, 6, (g.aircraft.type.kind === 'heli' ? 23 : 46 * (g.aircraft.A.assistSpeedScale ?? 1))); g.cameraMode='cockpit'; g.rig.setMode('cockpit', g.aircraft);`,
   high: `g.aircraft.placeAirborne(500, 0, Math.PI/2, 400, (g.aircraft.type.kind === 'heli' ? 30 : 50 * (g.aircraft.A.assistSpeedScale ?? 1))); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
+  // Over the relief (north-east hills): low over T-41A, and high toward the ridges.
+  hillsLow: `g.aircraft.placeAirborne(2400, -2610, Math.PI/2, 5, (g.aircraft.type.kind === 'heli' ? 23 : 46 * (g.aircraft.A.assistSpeedScale ?? 1))); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
+  hillsAir: `g.aircraft.placeAirborne(1300, -1500, 2.39, 200, (g.aircraft.type.kind === 'heli' ? 30 : 50 * (g.aircraft.A.assistSpeedScale ?? 1))); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
 };
 const res = await page.evaluate(async ({ views, N, R, aircraft }) => {
   const g = window.__agro;

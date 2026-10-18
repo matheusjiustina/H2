@@ -164,9 +164,11 @@ out ~29 m above the pass and ends above it, never stalling.
 
 ## Tests
 
-`npm test` runs `test/flight.test.mjs` (PR-AGW), `test/at502.test.mjs`
-(AT-502B), `test/r44.test.mjs` (R44), `test/spray.test.mjs` and
-`test/terrain.test.mjs` (relief, flat core, zones, fields, roads) (Node).
+`npm test` runs `test/flight.test.mjs` (PR-AGW, incl. the trim),
+`test/at502.test.mjs` (AT-502B), `test/r44.test.mjs` (R44, detailed rotor
+model), `test/r44power.test.mjs` (R44, power model), `test/spray.test.mjs`,
+`test/terrain.test.mjs` (relief, flat core, zones, fields, roads) and
+`test/input.test.mjs` (key bindings) (Node).
 Browser checks (need `npm run build && npx vite preview --port 4173`):
 
 - `node test/e2e.mjs soy out/` — full contract flown by the test autopilot
@@ -671,7 +673,47 @@ the rotor diameter, kept inside the rotor wake) with 28 nozzles on drops,
 downwash pushes the droplets down at low speed (shorter fall time, less
 drift); at working speed the wake trails behind the boom.
 
-**Flight model** (`src/flight/heliModel.js`, 120 Hz):
+**Power model (the default handling).** Settings → Flying → Helicopter
+model chooses between **Power (one lever)**, the default, and **Detailed
+rotor**, the full simulation described below. The power model is the
+handling asked for, after the Tropical Island helicopter (its code was not
+available; the behaviour was rebuilt from the description). Disc tilt,
+airframe, skids, crash points, crop contact and servicing are shared by
+both models.
+
+- One power lever (Shift / Ctrl, the wheel, the triggers). Rotor and torque
+  act as one: once the engine runs, the rotor comes up to speed in about
+  6 s and stays there. There is no governor to watch, no rotor droop and no
+  low-rpm horn. The drive torque is balanced for the pilot, so a power
+  change never swings the nose, and the pedals only turn the aircraft.
+- The vertical part of the thrust follows the power. The power that holds a
+  hover depends only on the weight: ~55 % light and ~70 % at the MTOW out
+  of ground effect, ~49 % / ~62 % on the skids (the ground cushion of a
+  rotor at constant power, (1/k_GE)^(2/3)). More power climbs and less
+  sinks, at a rate that settles in proportion to the difference: ±10 % ≈
+  ±2 m/s, ±20 % ≈ ±4 m/s; full power at the MTOW ≈ 870–1,000 ft/min.
+  Tilting the disc to move does not take lift away, so power stays the
+  up/down control and the cyclic the horizontal one.
+- Top speed is about 100–115 kt at the assist's nose-down limit.
+- On the HUD, POWER shows the lever, with the hover figure for this weight
+  and height next to the label. The slot that showed the rotor % shows the
+  climb rate. The load sheet gives the hover power in %.
+- Assist: **high** (the default) brings the aircraft back to a hover when
+  the stick is released, leaning up to ~13° against a drift. The power stays
+  the pilot's, with the landing cushion: below ~15 m only a gentle sink is
+  let through. **Normal** holds attitude and heading; **off** is raw.
+- Measured (`test/r44power.test.mjs`, `test/r44flight.mjs` in the browser):
+  - off the skids 1.3–1.9 s after raising the power;
+  - 20 s hands-off hover at the hover figure: 0.3 m drift, 0.75 m height
+    change;
+  - pedal turns ±67° in 2 s, then the heading holds;
+  - landing with the power a few % under the hover figure: touchdown
+    0.3–0.9 m/s, no damage;
+  - rotor run-down 10 s after shut-down;
+  - `AC=r44 node test/e2e.mjs soy`: the whole contract, 90 %, 2★, no
+    damage.
+
+**Flight model** (detailed rotor, `src/flight/heliModel.js`, 120 Hz):
 - main rotor: blade-element thrust with momentum inflow solved each step
   (translational lift, climb and descent), ground effect after Cheeseman
   and Bennett (induced velocity × (1 − (R/4z)²), canopy counts half),
@@ -702,9 +744,10 @@ drift); at working speed the wake trails behind the boom.
   parked aircraft, the truck and the wires.
 
 **Controls.** Numpad 8 / 5 / 4 / 6 move the cyclic forward / aft / left /
-right, Q / E are the anti-torque pedals, Shift / Ctrl (or R / F, the wheel,
-the gamepad triggers, the touch slider) raise and lower the collective, F
-starts (hold, collective down) and stops (tap) the engine; Settings → Flying
+right, Q / E are the anti-torque pedals, Shift / Ctrl (or R to raise, the
+wheel, the gamepad triggers, the touch slider) raise and lower the
+collective — the power in the power model — and F starts (hold, lever down)
+and stops (tap) the engine; Settings → Flying
 → Flight keys switches to the classic keys (W/S/A/D, Z/X). The governor
 replaces a twist-grip throttle. Settings → Assist: **off** — raw controls
 (unstable in the hover, as the real aircraft); **normal** — attitude
@@ -786,7 +829,7 @@ stopped; the truck parks ≥ 3 m clear of the stopped disc on either side
 (its route search now also covers the grass east and north of the apron,
 and tries both sides). When the helicopter is flown, both airplanes wait
 on the west apron. Warnings: low rotor rpm, rotor overspeed, engine out
-(autorotate), settling with power. HUD: rotor % in place of G. The test
+(autorotate), settling with power. HUD: rotor % in place of G (power model: the climb rate). The test
 autopilot (`src/game/heliAutopilot.js`) flies through the player's inputs
 with the high assist: service, start, lift-off, transit, passes with
 hover turnarounds at the field ends, return over obstacles, landing on
@@ -993,7 +1036,93 @@ flies the contracts in the e2e runs. For terrain it now has:
   falling ground fully and rising ground in part;
 - planning of its height over the highest tree top in the corridor ahead
   on run-ins and turns. The north-east fields' run-ins cross the gallery
-  forest along the creek.
+  forest along the creek;
+- a run-in height referenced to the job's crop canopy, also over the gap
+  between stepped talhões, so a canopy edge never comes up under the
+  wheels.
 
 None of this touches the aircraft: the player flies exactly the same
 aircraft through the same inputs.
+
+### Validation (terrain build)
+
+All browser runs were on the final build (`npm run build`, `vite preview`),
+Chromium + SwiftShader in this container. "Before" is the build just
+before the terrain work, served alongside it.
+
+| # | check | evidence |
+| --- | --- | --- |
+| 1 | runway level | `terrain.test`: the strip is exactly 0 m along its length and width; relief is exactly zero over the whole farm core; 12,000 core heights compared with the build before: 0 differ |
+| 2 | buildings in place | base, hangar, HQ, sheds, helipad, spawns: relief 0, slope < 2° (`terrain.test`); fences, apron, windsocks and parked aircraft unchanged in the ground renders |
+| 3 | aircraft physics unchanged | `flightModel.js`, `heliModel.js` (detailed model), engine power, lift, drag and control gains untouched by the terrain work; seeded PR-AGW and AT-502B trajectories identical byte for byte (md5 `9e021182…` / `57deadcb…`) |
+| 4 | smooth hills | sum-of-waves relief with bounded slope: no rise of 4 m or more within 20 m anywhere; rolling ≤ 8°, hills ≤ 12° (measured: rolling p95 5.5°, hills p95 6.5°, max 10.3°) |
+| 5 | only selected regions elevated | 76.5 % flat / 18.0 % rolling / 5.5 % hilly, the core exactly flat as before; relief fades out 3.3–3.9 km from the centre |
+| 6 | crop rows follow the terrain | canopy and row fins sampled from `heightAt`; low and orbit renders over T-41 and T-31 show the rows and tramlines draped on the slopes |
+| 7 | trees and roads placed correctly | every plant stands on `heightAt`; the original trees keep their positions; roads are ribbons on the terrain (+7 cm) with grades ≤ 10.4 %; ground renders show the north road and the pasture fence following the ground |
+| 8 | collision and ground contact | one height source: `env.ground`, `env.top`, crop tops and surfaces equal `heightAt` (`terrain.test`); 9 contracts flown end to end over the relief with take-offs, passes at 3 m over the canopy and landings: no damage, no crop strike |
+| 9 | advanced missions work | `node test/e2e.mjs <id>` for all nine contracts (PR-AGW) — see the table below; `AC=at502 … soy` and `AC=r44 … soy` too |
+| 10 | game stays smooth | `test/profile.mjs low`, below: farm views unchanged, +0.2–0.3 ms logic per tick over the hills, +5–14 % triangles |
+| 11 | before/after from the ground and the air | `test/terrainviews.mjs` against both builds: five aerial views (NE hills, SE swells, NW plateau, SW, the core — identical) and nine low / ground views (ridge and rolling fields, roads, fence, the strip — identical) |
+
+End-to-end, the test autopilot flying through the player's inputs: service,
+start, taxi, take-off, the passes, reloads, landing, taxi-in and payment.
+
+| contract | coverage | ★ | sorties | Cr$ | damage |
+| --- | --- | --- | --- | --- | --- |
+| soy | 90 % | 2 | 2 | 5,576 | 0 |
+| corn | 90 % | 2 | 2 | 6,582 | 0 |
+| cotton | 90 % | 2 | 2 | 7,223 | 0 |
+| roll-soy | 90 % | 2 | 2 | 7,489 | 0 |
+| roll-corn | 90 % | 2 | 3 | 8,979 | 0 |
+| roll-cotton | 90 % | 2 | 3 | 9,884 | 0 |
+| ridge-soy | 90 % | 2 | 2 | 9,020 | 0 |
+| ridge-cotton | 90 % | 1 | 3 | 10,205 | 0 |
+| ridge-corn | 90 % | 1 | 2 | 10,012 | 0 |
+| soy, AT-502B | 90 % | 2 | 1 | 5,540 | 0 |
+| soy, R44 (power model) | 90 % | 2 | 6 | 5,804 | 0 |
+
+The autopilot's stars on the hilly fields reflect its uniformity on the
+slopes, not a scoring change.
+
+Problems these runs found, and fixed:
+
+- the creek's gallery forest on the ridge run-ins (tree-top planning);
+- the turn at the east end of the first ridge-soy layout leaving the farm
+  boundary (fields moved west);
+- a stepped field entered from the gap at ground-referenced height, so the
+  canopy edge came up under the wheels (canopy-referenced run-in);
+- a GPS pass that was never marked done (overlap-weighted coverage).
+
+**Performance** (`test/profile.mjs low ipanema`, 600 ticks per view, two
+runs per build; SwiftShader, so render time says nothing about a real GPU):
+
+| view | logic ms/tick before → after | draw calls | triangles |
+| --- | --- | --- | --- |
+| parked on the pad | 0.37–0.53 → 0.36–0.38 | 540 → 564 | 835k → 888k |
+| spraying soy at 4 m | 0.58–0.79 → 0.86–0.88 | 341 → 354 | 511k → 544k |
+| cockpit over corn | 0.64–0.81 → 0.56 | 330 → 351 | 870k → 925k |
+| 400 m AGL | 0.65–0.68 → 0.60–0.62 | 318 → 323 | 471k → 496k |
+| 5 m over the NE hills | 0.51–0.69 → 0.82–0.93 | 193 → 223 | 365k → 416k |
+| 200 m toward the hills | 0.49–0.69 → 0.70–0.84 | 285 → 322 | 929k → 982k |
+
+The terrain is still one grid sampled once at start-up and drawn as the same
+LOD chunks; nothing is regenerated in flight. The extra calls are the road
+ribbons (chunks of 64 sections, frustum-culled), the new fields' crops and
+the landform vegetation in its existing instanced cells. Start-up 18–19.5 s
+→ 19–21 s (the relief and the extra vegetation are built at load), GPU
+geometries 618 → 687, programs 40 → 42, JS heap 154 → 163–181 MB. Over
+the hills the logic costs ~0.3 ms more per tick (more trees around for the
+obstacle tests, grass cells on the slopes), well inside a 16.7 ms frame.
+
+**Known limits.**
+
+- The hilly share is ~6 %, not 10 % (see *Distribution*).
+- The relief is gentle on purpose: slopes stay workable for an ag
+  aircraft, so from 200 m it reads mainly through shading and the
+  horizon; it is clearest low and from the ground.
+- The far horizon ring outside the 8 km map is flat farmland.
+- Roads were routed once offline (`least-slope A*`) and are stored as
+  data; moving a field means re-routing its road.
+- The hilly contracts are harder for the test autopilot (1★ on two of
+  them); a pilot who anticipates the slopes does better.
+- FPS on a real GPU was not measured.

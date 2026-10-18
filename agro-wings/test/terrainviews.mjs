@@ -3,6 +3,7 @@
 // comparison of the relief (point AGRO_URL at either build).
 // Usage: AGRO_URL=... [Q=low|medium|high] node test/terrainviews.mjs <outDir> '<views json>'
 //   view: [name, x, z, yaw (rad, 0 = south, pi = north, pi/2 = east), agl, camera, speed]
+//   agl <= 0: the aircraft is parked on the terrain there (ground-level views).
 import { chromium } from 'playwright';
 const out = process.argv[2];
 const views = JSON.parse(process.argv[3] || '[]');
@@ -15,7 +16,11 @@ await page.evaluate(() => { localStorage.clear(); const g = window.__agro; g.fro
 for (const [name, x, z, hdg, agl, mode, spd, orbit] of views) {
   await page.evaluate(([x, z, hdg, agl, mode, spd, orbit]) => {
     const g = window.__agro, ac = g.aircraft;
-    ac.placeAirborne(x, z, hdg, agl, spd ?? 45);
+    // Each view starts from an intact aircraft (a previous view may have ended in the crop).
+    if (ac.state !== 'ok') { ac.repair(); ac.state = 'ok'; }
+    g.screens.close?.();
+    if (agl > 0) ac.placeAirborne(x, z, hdg, agl, spd ?? 45);
+    else ac.placeParked(x, z, hdg);
     g.cameraMode = mode; g.rig.setMode(mode, ac);
     if (mode === 'orbit' && orbit) { g.rig.orbit.yaw = orbit[0]; g.rig.orbit.pitch = orbit[1]; g.rig.orbit.dist = orbit[2]; }
     g.rig.initialized = false;
