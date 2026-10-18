@@ -26,7 +26,8 @@ import { canvas, canvasTexture } from '../core/textures.js';
 import { rng, clamp, smoothstep, lerp } from '../core/math.js';
 import { FLIGHT_R44 } from '../config.js';
 import { sampleStations, ring, loft, K, airfoil, wingPanel, tagged, tx, rod, tube, ball, rbox, lathe, orangePeel, ribTexture, buildPilot } from './model.js';
-import { R44_PANEL } from './r44Panel.js';
+import { POD as POD_FACE } from './r44Panel.js';
+import { createR44Instruments } from './r44Cockpit.js';
 
 const A = FLIGHT_R44;
 const R = A.rotor, TR = A.tailRotor;
@@ -408,6 +409,33 @@ function bladeGeo(r0, r1, chord, thick, tw0, tw1, n = 28, prof = airfoil(0, 1, t
   return g;
 }
 
+// Grey cabin carpet: dense random tufts, tiled.
+function carpetTexture() {
+  const c = canvas(256, 256);
+  const g = c.getContext('2d');
+  g.fillStyle = '#3c3f43';
+  g.fillRect(0, 0, 256, 256);
+  const r = rng(23);
+  for (let i = 0; i < 9000; i++) {
+    const v = 38 + Math.floor(r() * 46);
+    g.fillStyle = `rgba(${v},${v + 2},${v + 5},0.55)`;
+    g.fillRect(r() * 256, r() * 256, 1 + r() * 1.6, 1 + r() * 1.6);
+  }
+  return canvasTexture(c, { repeat: true });
+}
+
+// Yellow warning placard on the cyclic pivot.
+function placardTexture() {
+  const c = canvas(192, 64);
+  const g = c.getContext('2d');
+  g.fillStyle = '#f2c400'; g.fillRect(0, 0, 192, 64);
+  g.strokeStyle = '#111'; g.lineWidth = 3; g.strokeRect(3, 3, 186, 58);
+  g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = 'bold 15px Arial, sans-serif';
+  g.fillText('LOW-G PUSHOVERS', 96, 22); g.fillText('PROHIBITED', 96, 43);
+  return canvasTexture(c, { aniso: 4 });
+}
+
 // ==========================================================================
 export function createR44Model(panel, opts = {}) {
   const root = new THREE.Group();
@@ -422,7 +450,8 @@ export function createR44Model(panel, opts = {}) {
     seal: new THREE.MeshStandardMaterial({ color: 0x141516, roughness: 0.75, metalness: 0.05, vertexColors: true }),
     dark: new THREE.MeshStandardMaterial({ color: 0x1d2024, roughness: 0.62, metalness: 0.1, vertexColors: true }),
     interior: new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.85, metalness: 0.05, side: THREE.FrontSide }),
-    floor: new THREE.MeshStandardMaterial({ color: 0xffffff, map: ribTexture('#2e3237', 'rgba(0,0,0,0.5)', 24, 64, 256), roughness: 0.85, metalness: 0.2, vertexColors: true }),
+    floor: new THREE.MeshStandardMaterial({ color: 0xffffff, map: carpetTexture(), roughness: 0.97, metalness: 0, vertexColors: true }),
+    satin: new THREE.MeshStandardMaterial({ color: 0x17181a, roughness: 0.42, metalness: 0.35, vertexColors: true }),
     seat: new THREE.MeshStandardMaterial({ color: 0xffffff, map: ribTexture('#30343a', 'rgba(5,8,12,0.55)'), roughness: 0.88, vertexColors: true }),
     alu: new THREE.MeshStandardMaterial({ color: 0xc6cacd, roughness: 0.3, metalness: 0.9, vertexColors: true }),
     chrome: new THREE.MeshStandardMaterial({ color: 0xe4e7ea, roughness: 0.12, metalness: 1.0, envMap: opts.envMap ?? null, envMapIntensity: 0.9 }),
@@ -844,37 +873,22 @@ export function createR44Model(panel, opts = {}) {
   addC('interior', rbox(1.2, 0.32, 0.5, 0.03, 0, -0.54, -0.22));
   addC('seat', rbox(1.2, 0.08, 0.5, 0.035, 0, -0.35, -0.2));
   addC('seat', rbox(1.2, 0.72, 0.1, 0.04, 0, 0.02, -0.44, -0.08));
-  // Pedestal console with the instrument pod on top.
-  const POD = { c: new THREE.Vector3(0, 0.04, 1.9), tilt: 0.4, w: R44_PANEL.w + 0.04, h: R44_PANEL.h + 0.04, d: 0.18 };
-  const podQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(POD.tilt, 0, 0));
-  const podPt = (x, y, z) => new THREE.Vector3(x, y, z).applyQuaternion(podQ).add(POD.c);
-  addC('dark', rbox(0.23, 0.64, 0.2, 0.03, 0, -0.41, 1.76, 0.12));
-  {
-    const pod = new RoundedBoxGeometry(POD.w, POD.h, POD.d, 3, 0.05);
-    pod.applyQuaternion(podQ); pod.translate(POD.c.x, POD.c.y, POD.c.z);
-    addC('dark', pod);
-    // Glareshield hood over the pod.
-    const hood = new RoundedBoxGeometry(POD.w + 0.02, 0.025, 0.12, 2, 0.01);
-    hood.applyQuaternion(podQ);
-    const hp = podPt(0, POD.h / 2 + 0.005, -0.05);
-    hood.translate(hp.x, hp.y, hp.z);
-    addC('gloss', hood);
-  }
-  const panelMesh = new THREE.Mesh(new THREE.PlaneGeometry(R44_PANEL.w, R44_PANEL.h), new THREE.MeshStandardMaterial({ map: panel.texture, roughness: 0.55, metalness: 0.1, emissive: 0xffffff, emissiveMap: panel.texture, emissiveIntensity: 0.06 }));
-  panelMesh.position.copy(podPt(0, 0, -POD.d / 2 - 0.003));
-  panelMesh.quaternion.copy(podQ).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
-  cockpit.add(panelMesh);
-  const lowerPanel = new THREE.Mesh(new THREE.PlaneGeometry(R44_PANEL.w2, R44_PANEL.h2), new THREE.MeshStandardMaterial({ map: panel.texture2, roughness: 0.55, metalness: 0.1, emissive: 0xffffff, emissiveMap: panel.texture2, emissiveIntensity: 0.07 }));
-  {
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, Math.PI, 0, 'YXZ'));
-    lowerPanel.quaternion.copy(q);
-    lowerPanel.position.set(0, -0.34, 1.655);
-  }
-  cockpit.add(lowerPanel);
-  // Guidance lightbar on top of the pod.
+  // Pedestal console and the instrument pod (r44Cockpit.js): the pod face
+  // tilted toward the pilots, the pedestal face below it sloping back to the
+  // floor. Needles, lamps, the attitude ball and the heading card are 3D and
+  // move every frame (update()).
+  const inst = createR44Instruments(panel);
+  const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+  inst.pod.position.set(0, 0.07, 1.8);
+  inst.pod.quaternion.setFromEuler(new THREE.Euler(0.4, 0, 0)).multiply(flip);
+  inst.con.position.set(0, -0.387, 1.661);
+  inst.con.quaternion.setFromEuler(new THREE.Euler(0.31, 0, 0)).multiply(flip);
+  cockpit.add(inst.group);
+  const panelMesh = inst.pod;
+  // Guidance lightbar on the pod's visor.
   const lightbar = new THREE.Group();
-  lightbar.position.copy(podPt(0, POD.h / 2 + 0.03, -0.02));
-  lightbar.quaternion.copy(podQ);
+  lightbar.position.set(0, POD_FACE.h / 2 + 0.03, -0.035);
+  lightbar.rotation.y = Math.PI;
   const leds = [];
   for (let i = -7; i <= 7; i++) {
     const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.008), new THREE.MeshBasicMaterial({ color: 0x222222 }));
@@ -883,7 +897,7 @@ export function createR44Model(panel, opts = {}) {
     leds.push(led);
   }
   lightbar.add(new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.032, 0.03, 2, 0.006), M.dark));
-  cockpit.add(lightbar);
+  inst.pod.add(lightbar);
   // Overhead: rotor-brake handle (red) and the mixture/carb knobs on the pod.
   const brake = new THREE.Group();
   brake.position.set(0, 0.74, 0.95);
@@ -891,26 +905,38 @@ export function createR44Model(panel, opts = {}) {
   brake.add(new THREE.Mesh(tagged(rbox(0.06, 0.025, 0.03, 0.008, 0, -0.085, 0.035)), M.red));
   cockpit.add(brake);
   addC('dark', rbox(0.14, 0.04, 0.3, 0.015, 0, 0.75, 0.95));
-  // Cyclic: T-bar on a centre post; the pilot's right hand rides on it.
+  // Cyclic: Robinson T-bar, satin black, teetering on a pivot housing at the
+  // top of the centre post (yellow placard on it); the pilot's right hand
+  // rides on the right grip.
   const cyclic = new THREE.Group();
   const CP = new THREE.Vector3(0, -0.7, 1.52);
   cyclic.position.copy(CP);
   {
     const loc = (x, y, z) => [x - CP.x, y - CP.y, z - CP.z];
     const parts = [];
-    parts.push(tagged(rod(loc(0, -0.7, 1.52), loc(0, -0.25, 1.5), 0.019, 10)));
-    parts.push(tagged(ball(loc(0, -0.25, 1.5), 0.03, 10)));
+    parts.push(tagged(rod(loc(0, -0.7, 1.52), loc(0, -0.27, 1.5), 0.019, 10)));
+    parts.push(tagged(rbox(0.07, 0.05, 0.06, 0.012, ...loc(0, -0.25, 1.5))));
     for (const sx of [1, -1]) {
-      parts.push(tagged(rod(loc(0, -0.25, 1.5), loc(sx * 0.3, -0.27, 1.47), 0.016, 8)));
-      parts.push(tagged(rod(loc(sx * 0.3, -0.27, 1.47), loc(sx * 0.3, -0.19, 1.485), 0.016, 8)));
+      parts.push(tagged(rod(loc(sx * 0.03, -0.25, 1.5), loc(sx * 0.3, -0.27, 1.47), 0.015, 8)));
+      parts.push(tagged(rod(loc(sx * 0.3, -0.27, 1.47), loc(sx * 0.3, -0.19, 1.485), 0.015, 8)));
     }
-    cyclic.add(new THREE.Mesh(mergeGeometries(parts), M.steel));
+    cyclic.add(new THREE.Mesh(mergeGeometries(parts), M.satin));
     const grips = [];
     for (const sx of [1, -1]) {
-      grips.push(tagged(tx(new THREE.CapsuleGeometry(0.02, 0.08, 4, 10), ...loc(sx * 0.3, -0.13, 1.49), 0.1)));
-      grips.push(tagged(tx(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 10), ...loc(sx * 0.3, -0.075, 1.5))));
+      grips.push(tagged(tx(new THREE.CapsuleGeometry(0.021, 0.08, 4, 10), ...loc(sx * 0.3, -0.13, 1.49), 0.1)));
     }
-    cyclic.add(new THREE.Mesh(mergeGeometries(grips), M.gloss));
+    cyclic.add(new THREE.Mesh(mergeGeometries(grips), M.rubber));
+    const caps = [], keys = [];
+    for (const sx of [1, -1]) {
+      caps.push(tagged(tx(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 10), ...loc(sx * 0.3, -0.075, 1.5))));
+      keys.push(tagged(rbox(0.012, 0.018, 0.01, 0.003, ...loc(sx * 0.3, -0.115, 1.512))));
+    }
+    cyclic.add(new THREE.Mesh(mergeGeometries(caps), M.gloss));
+    cyclic.add(new THREE.Mesh(mergeGeometries(keys), M.red));
+    const placard = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.022), new THREE.MeshStandardMaterial({ map: placardTexture(), roughness: 0.6 }));
+    placard.position.set(...loc(0, -0.245, 1.469));
+    placard.rotation.y = Math.PI;
+    cyclic.add(placard);
     const boot = new THREE.Mesh(tagged(tx(lathe([[0.07, 0], [0.06, 0.02], [0.04, 0.06], [0.022, 0.1]], 14), 0, 0, 0)), M.rubber);
     cyclic.add(boot);
   }
@@ -1014,8 +1040,10 @@ export function createR44Model(panel, opts = {}) {
     if (mat.transparent !== tr) { mat.transparent = tr; mat.depthWrite = !tr; }
     mat.opacity = a;
   };
-  const update = (dt, fm) => {
+  const update = (dt, fm, ac) => {
     t += dt;
+    // Instruments every frame while flown from the cockpit (smooth needles).
+    if (ac && ac.game?.cameraMode === 'cockpit' && ac.game.aircraft === ac) inst.update(ac.instruments());
     const o = fm.out;
     const om = fm.rotorOmega;
     const pct = o.rotorPct / 100;

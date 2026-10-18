@@ -698,14 +698,27 @@ both models.
 - On the HUD, POWER shows the lever, with the hover figure for this weight
   and height next to the label. The slot that showed the rotor % shows the
   climb rate. The load sheet gives the hover power in %.
-- Assist: **high** (the default) brings the aircraft back to a hover when
-  the stick is released below ~55 kt. The power stays the pilot's, with the
-  landing cushion: below ~15 m only a gentle sink is let through. **Normal**
-  holds attitude and heading; **off** is raw.
+- Assist: **high** (the default) handles like the other game's helicopter.
+  The stick tilts the aircraft (centred = level, full ≈ 18° pitch / 27°
+  bank).
+  - Let go and it levels out and glides on, slowing down by itself with no
+    braking flare. A light glide drag (`glideDamp`, the rotor's damping
+    below ~25 kt) does the slowing.
+  - Once it is almost stopped (under ~5 kt over the ground), it holds the
+    hover against the wind with a lean of at most ~2.5°.
+  - The power stays the pilot's, with the landing cushion: below ~15 m only
+    a gentle sink is let through.
+  - **Normal** holds attitude and heading; **off** is raw.
+  - Measured (`test/r44power.test.mjs`):
+    - released at 23 kt, level in 0.8 s, 6 kt after 10 s, stopped after
+      35 s;
+    - never more than 3° nose up while stopping;
+    - in a 2.5–2.9 m/s breeze the hover drifts 0.2–1.3 m in 20 s.
 - Attitude (both assists).
   - The cyclic keys command an attitude: in **high** an absolute one
     (centred = level, full forward ≈ −18°), so the answer never depends on
-    where the nose was when the key went down.
+    where the nose was when the key went down. Released, it is level again
+    (the earlier hover hold's flare is now only in the test autopilot).
   - The target moves at a limited rate, and cascaded loops (attitude → rate
     → cyclic, the integrator only near the target) put the nose there
     without running past it.
@@ -819,15 +832,39 @@ blades carry the look; as the rotor speeds up they fade and the smeared
 sectors take over — never a permanently opaque disc. The tail rotor blurs
 to a light disc at its higher speed.
 
-**Cockpit** (`src/aircraft/r44Panel.js`): pedestal console with a live
-pod — caution/warning lights (CLUTCH, ALT, OIL, MR/TR CHIP, LOW FUEL,
-LOW RPM, STARTER, GOV OFF, ROTOR BRK, SPRAY), airspeed, attitude,
-altimeter, the dual tachometer (rotor "R" and engine "E" needles),
-manifold pressure, heading, VSI, turn/slip, oil pressure and temperature,
-CHT, ammeter, fuel, ag tank, flow/height/rotor readout — and the lower
-pedestal (guidance GPS, COM/XPDR, switch row). Guidance lightbar on the
-pod. T-bar cyclic, collective with twist grip and the pedals move with the
-simulation; the seated pilot (right seat, helmet) has the right hand on
+**Cockpit** (`src/aircraft/r44Panel.js` faces, `src/aircraft/r44Cockpit.js`
+3D instruments), laid out after the Robinson panel:
+- **Pod**: a tombstone-shaped shell with a visor lip and the guidance
+  lightbar on top. Across the top runs a row of ten domed warning lamps:
+  OIL, MR TEMP, MR CHIP, TR CHIP, STARTER ON, CLUTCH, LOW FUEL, LOW RPM,
+  ROTOR BRAKE and SPRAY.
+- **Upper instrument row**: VSI, attitude, airspeed (with the green/yellow
+  arcs and red line), and the dual tachometer (engine and rotor needles,
+  green band 101–102 %).
+- **Lower row**: altimeter (three needles and a Kollsman window),
+  directional gyro and manifold pressure.
+- **Placards**: "NO ACROBATIC MANEUVERS…" and the registration.
+- **Pedestal**:
+  - clock and carb-air gauges;
+  - the engine cluster: ammeter, oil temperature and pressure, CHT, fuel,
+    ag tank;
+  - the ALT / OIL / GOV OFF lamps;
+  - the switch row (NAV, STROBE, the guarded CLUTCH, ALT, BATT, PUMP,
+    VALVE), with toggles that follow the aircraft's state;
+  - the key, the air-temperature LED, the guidance GPS, COM and XPDR.
+- **Live parts**: the needles, the attitude ball, the heading card, the
+  lamps and the toggles are real 3D parts moved every frame in the cockpit
+  view. The dial faces are textures drawn once, so nothing is repainted
+  per frame; only the GPS screen is redrawn, at 15 Hz.
+  - Cockpit view on SwiftShader: 390 draw calls against 340 before, but
+    5.0 ms per frame against 6.2 ms.
+- **Controls and cabin**:
+  - the Robinson T-bar cyclic in satin black, on a pivot housing with the
+    yellow "LOW-G PUSHOVERS PROHIBITED" placard;
+  - rubber grips with red triggers;
+  - grey carpet on the floor.
+- **Moving controls**: the cyclic, the collective with its twist grip, and
+  the pedals move with the simulation. The seated pilot (right seat, helmet) has the right hand on
 the cyclic grip and the left on the collective (the forearm turns at the
 elbow, the lever follows the hand), and looks down and out near the
 ground and along the boom when spraying. The exact R44 instrument

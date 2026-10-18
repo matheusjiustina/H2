@@ -209,7 +209,9 @@ for (const [name, act] of [['forward', 'pitchDown'], ['backward', 'pitchUp'], ['
   await run(3.5, [act]);
   const q = await st();
   tr[name] = { vf: q.vf, vl: q.vl, ...(q.state !== 'ok' ? { crashed: q.why, at: [q.x, q.z, q.agl] } : {}) };
-  await run(8); // hover hold stops it
+  // Hover hold stops it (power model: it levels, glides on and slows down
+  // by itself, then holds the hover).
+  if (PM) { await until('Math.hypot(g.aircraft.fm.vel.x, g.aircraft.fm.vel.z) < 0.6', 40); await run(2); } else await run(8);
 }
 check('translations: forward, backward, left, right', tr.forward.vf > 3 && tr.backward.vf < -2 && tr.left.vl > 2 && tr.right.vl < -2, JSON.stringify(tr));
 

@@ -177,3 +177,41 @@ test('cyclic keys: the nose goes where the stick puts it — no overshoot, no pi
   assert.ok(maxAbsP < 4 && maxBank > 22 && maxBank < 30, `roll: pitch ${maxAbsP.toFixed(1)}°, bank ${maxBank.toFixed(1)}°`);
   t.diagnostic(`-16° in ${t18.toFixed(2)} s (min ${minP.toFixed(1)}°), flare max ${maxP.toFixed(1)}°, forward again in ${tBack.toFixed(2)} s, roll ${maxBank.toFixed(1)}° with pitch ≤ ${maxAbsP.toFixed(1)}°`);
 });
+
+test('released stick: levels out and glides on, slowing down gradually (no braking flare)', (t) => {
+  const { fm, env } = heli({ engineOn: true, alt: 40, hopper: 150 });
+  const keys = keyFlight(fm, env, new HeliAssist());
+  const speed = () => Math.hypot(fm.vel.x, fm.vel.z);
+  keys(1, 0, 0);
+  keys(6, -1, 0);
+  const v0 = speed();
+  let tLevel = null, maxUp = -99;
+  keys(2.5, 0, 0, (s) => { const p = pitchOf(fm) * 57.3; maxUp = Math.max(maxUp, p); if (tLevel === null && Math.abs(p) < 2) tLevel = s; });
+  keys(7.5, 0, 0);
+  const v10 = speed();
+  assert.ok(tLevel !== null && tLevel < 2, `level after ${tLevel} s`);
+  assert.ok(maxUp < 3, `no flare: max ${maxUp.toFixed(1)}° nose up`);
+  assert.ok(v10 < v0 * 0.7 && v10 > v0 * 0.15, `glide: ${v0.toFixed(1)} -> ${v10.toFixed(1)} m/s in 10 s`);
+  // ...and ends up stopped over the ground, still without a flare.
+  keys(25, 0, 0, () => { maxUp = Math.max(maxUp, pitchOf(fm) * 57.3); });
+  assert.ok(speed() < 0.4, `stopped: ${speed().toFixed(2)} m/s after 35 s`);
+  assert.ok(maxUp < 3, `no flare while stopping: max ${maxUp.toFixed(1)}° nose up`);
+  t.diagnostic(`level ${tLevel.toFixed(2)} s after release, ${(v0 * KT).toFixed(0)} -> ${(v10 * KT).toFixed(0)} kt in 10 s, stopped after 35 s`);
+});
+
+test('released in a breeze: the hover holds over the ground (no drifting off with the wind)', (t) => {
+  for (const wind of [new Vector3(2.5, 0, 0), new Vector3(-1.5, 0, 2.5)]) {
+    const { fm, env } = heli({ engineOn: true, alt: 30, hopper: 150 });
+    env.wind.copy(wind);
+    const as = new HeliAssist();
+    const p = hoverPowerFrac(A, fm.mass);
+    fly(fm, env, as, 'high', 15, { pitch: 0, roll: 0, yaw: 0, lever: p });
+    const x0 = fm.pos.x, z0 = fm.pos.z;
+    let tilt = 0;
+    fly(fm, env, as, 'high', 20, { pitch: 0, roll: 0, yaw: 0, lever: p }, () => { tilt = Math.max(tilt, Math.abs(pitchOf(fm)), Math.abs(bankOf(fm))); });
+    const drift = Math.hypot(fm.pos.x - x0, fm.pos.z - z0);
+    assert.ok(drift < 2, `wind ${wind.x},${wind.z}: drift ${drift.toFixed(2)} m in 20 s`);
+    assert.ok(tilt * 57.3 < 5, `gentle lean: ${(tilt * 57.3).toFixed(1)}°`);
+    t.diagnostic(`wind ${wind.length().toFixed(1)} m/s: drift ${drift.toFixed(2)} m in 20 s, lean ≤ ${(tilt * 57.3).toFixed(1)}°`);
+  }
+});

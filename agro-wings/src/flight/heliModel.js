@@ -391,6 +391,11 @@ export class HeliModel {
         const up = _v1.copy(nb).applyQuaternion(q).y;
         T /= clamp(up, 0.7, 1);
         force.y -= this.mass * P.climbDamp * Math.min(1, nr) * this.vel.y;
+        // The rotor's damping of slow horizontal motion (H-force and wake): a
+        // level helicopter glides on and slows down by itself; it fades out
+        // towards cruise speed, where the airframe drag takes over.
+        const kh = P.glideDamp * Math.min(1, nr) * (1 - smoothstep(12, 30, vHor));
+        force.x -= this.mass * kh * _air.x; force.z -= this.mass * kh * _air.z;
       }
     } else if (Om > 2) {
       const sol = solveRotor(theta, vn / Vt, mu, sigma, R.liftSlope, kGE, this.lam);

@@ -302,6 +302,7 @@ export const FLIGHT_R44 = {
     maxThrust: 15890, // N at 100 % (sea level, out of ground effect)
     lagS: 0.25, // power response to the lever
     climbDamp: 0.8, // 1/s: rotor inflow damping of vertical speed
+    glideDamp: 0.14, // 1/s: rotor damping of slow horizontal motion (fades out by ~60 kt)
     spoolS: 1.4, // rotor run-up time constant once the engine runs (~6 s to speed)
     yawMoment: 4500, yawDamp: 2500, // N·m per unit pedal; N·m per rad/s
     etl: 0.03, // translational lift: small thrust gain from ~10 to 30 kt (power stays the up/down control)
