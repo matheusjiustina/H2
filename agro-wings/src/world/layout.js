@@ -98,13 +98,13 @@ FIELDS.push(
   field('T-35', 'fallow', 1100, 1500, 2400, 2650, 1, 'x', { level: 2 }),
   field('T-36', 'pasture', -3400, -2900, -3300, -3000, 1, 'x', { level: 2 }),
   // LEVEL 3 — Serra do Norte (north-east hills)
-  field('T-41A', 'soy', 2790, 3270, -2740, -2480, 0.9, 'x', { contract: 'ridge-soy', level: 3 }),
-  field('T-41B', 'soy', 2830, 3070, -2480, -2330, 0.9, 'x', { contract: 'ridge-soy', level: 3 }),
+  field('T-41A', 'soy', 2540, 3020, -2740, -2480, 0.9, 'x', { contract: 'ridge-soy', level: 3 }),
+  field('T-41B', 'soy', 2780, 3020, -2890, -2740, 0.9, 'x', { contract: 'ridge-soy', level: 3 }),
   field('T-42A', 'cotton', 2250, 2730, -3220, -2960, 0.9, 'x', { contract: 'ridge-cotton', level: 3 }),
   field('T-42B', 'cotton', 2250, 2490, -2960, -2810, 0.9, 'x', { contract: 'ridge-cotton', level: 3 }),
   field('T-43A', 'corn', 2330, 2810, -2480, -2220, 0.95, 'x', { contract: 'ridge-corn', level: 3 }),
   field('T-43B', 'corn', 2330, 2570, -2220, -2090, 0.95, 'x', { contract: 'ridge-corn', level: 3 }),
-  field('T-44', 'pasture', 2780, 3280, -3300, -2800, 1, 'x', { level: 3 }),
+  field('T-44', 'pasture', 2780, 3280, -3300, -2900, 1, 'x', { level: 3 }),
 );
 for (const f of FIELDS) f.level ??= 1;
 

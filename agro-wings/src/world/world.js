@@ -59,6 +59,11 @@ export class World {
     return this.extraObstacle?.(x, y, z) ?? null;
   }
 
+  // Highest tree top near (x, z), metres (-Infinity where there is none).
+  treeTopNear(x, z, rad) {
+    return this.treeHit.topNear(x, z, rad, this.terrain.heightAt(x, z));
+  }
+
   // Distance from a point to the nearest power-line wire (m).
   wireDistance(x, y, z) {
     let best = 1e9;

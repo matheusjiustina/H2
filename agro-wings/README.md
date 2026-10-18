@@ -145,11 +145,15 @@ out ~29 m above the pass and ends above it, never stalling.
 ## Tests
 
 `npm test` runs `test/flight.test.mjs` (PR-AGW), `test/at502.test.mjs`
-(AT-502B), `test/r44.test.mjs` (R44) and `test/spray.test.mjs` (Node).
+(AT-502B), `test/r44.test.mjs` (R44), `test/spray.test.mjs` and
+`test/terrain.test.mjs` (relief, flat core, zones, fields, roads) (Node).
 Browser checks (need `npm run build && npx vite preview --port 4173`):
 
 - `node test/e2e.mjs soy out/` — full contract flown by the test autopilot
-  (`src/game/autopilot.js`) through the normal player inputs only;
+  (`src/game/autopilot.js`) through the normal player inputs only (any
+  contract id: `roll-soy`, `ridge-soy`, …);
+- `node test/terrainviews.mjs out/ '<views>'` — terrain look-dev renders
+  from the air and the ground (point AGRO_URL at two builds to compare);
 - `node test/keys.mjs out/` — the numpad and classic key schemes with real
   key codes on all three aircraft (stick, roll, rudder, power, engine
   hold/tap), the HUD / Controls / Settings screens and rebinding;

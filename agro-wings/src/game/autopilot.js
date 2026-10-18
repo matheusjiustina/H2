@@ -336,7 +336,8 @@ export class Autopilot {
     const top = ac.env.top(fm.pos.x, fm.pos.z);
     let alt;
     // Descend on the lead-in so the aircraft is at work height at the edge.
-    const lead = dir > 0 ? a - (gd.l0 - 1000) : gd.l1 + 1000 - a;
+    // (Starts 1300 m out: over sloping ground the run-in needs the room.)
+    const lead = dir > 0 ? a - (gd.l0 - 1300) : gd.l1 + 1300 - a;
     const workZone = lead > 0 && (dir > 0 ? a < gd.l1 + 40 : a > gd.l0 - 40);
     if (workZone && Math.abs(cross) < 12) alt = top + fm.A.aglOffset + 3.6; // CG height for ~3.3 m wheel height over the canopy
     else alt = top + fm.A.aglOffset + Math.max(far ? 35 : 22, this._clearance());
@@ -353,6 +354,14 @@ export class Autopilot {
       if (s <= 160 && g.world.wireDistance(x, fm.pos.y, z) < 18) ahead = Math.max(ahead, fm.pos.y + 15);
     }
     if (ahead > top + 2) alt = Math.max(alt, ahead + 4.5 + fm.A.aglOffset);
+    // Woods on the run-in or in the turn (the gallery forest along the creek):
+    // plan the height over the highest tree top in the corridor ahead rather
+    // than letting down to work height into them.
+    if (!inSpan) {
+      let tt = -Infinity;
+      for (let s = 0; s <= 300; s += 15) tt = Math.max(tt, g.world.treeTopNear(fm.pos.x + ux * s, fm.pos.z + uz * s, 12));
+      if (tt > -Infinity) alt = Math.max(alt, tt + 8 + fm.A.aglOffset);
+    }
     // Terrain following: rate of change of the ground height under the track
     // 2 s ahead. Descending ground is followed fully; for rising ground only
     // part of the rate is fed forward (the climb response lags and would
@@ -361,7 +370,7 @@ export class Autopilot {
     const gAhead = ac.env.ground(fm.pos.x + (fm.vel.x / gsNow) * gsNow * 2, fm.pos.z + (fm.vel.z / gsNow) * gsNow * 2);
     const dG = (gAhead - ac.env.ground(fm.pos.x, fm.pos.z)) / 2;
     const ff = dG < 0 ? dG : 0.3 * dG;
-    this._fly(bank, alt, inSpan && established ? 46 : 44, dt, { kh: workZone ? 0.45 : 0.35, maxSink: workZone && alt - fm.pos.y > -8 ? 1.8 : 3.0, ff });
+    this._fly(bank, alt, inSpan && established ? 46 : 44, dt, { kh: workZone ? 0.45 : 0.35, maxSink: workZone && alt - fm.pos.y > -8 ? 1.8 : 3.5, ff });
     // Spray only over a target field, never over gaps.
     const over = g.job.fields.some((f) => fm.pos.x > f.x0 + 2 && fm.pos.x < f.x1 - 2 && fm.pos.z > f.z0 + 2 && fm.pos.z < f.z1 - 2);
     const want = over && established && ac.workHeight() < 8 && fm.hopper > 0.5;

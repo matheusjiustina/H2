@@ -72,15 +72,39 @@ export function createVegetation(terrain, quality) {
   const trees = []; // {kind, v, x, z, s, rot}
   const colliders = []; // {x, z, r, top}
 
+  // The original farm's fields and roads: the placement below draws its random
+  // numbers against these only, so every tree of the original farm stays
+  // exactly where it was. Trees that the outer fields, their pass corridors
+  // and the outer roads now claim are removed afterwards (see `cleared`).
+  const FIELDS0 = FIELDS.filter((f) => f.level === 1), ROADS0 = ROADS.filter((rd) => !rd.mesh);
   const avoid = (x, z, m = 6) => {
     if (Math.abs(z) < 60 && x > RUNWAY.x0 - 250 && x < RUNWAY.x1 + 250) return true; // strip approach
     if (x > BASE.apron.x0 - 30 && x < BASE.apron.x1 + 30 && z > BASE.apron.z0 - 50 && z < 30) return true;
-    for (const f of FIELDS) if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
-    for (const rd of ROADS) for (let i = 0; i < rd.pts.length - 1; i++) {
+    for (const f of FIELDS0) if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
+    for (const rd of ROADS0) for (let i = 0; i < rd.pts.length - 1; i++) {
       if (segDist(x, z, rd.pts[i][0], rd.pts[i][1], rd.pts[i + 1][0], rd.pts[i + 1][1]) < rd.w / 2 + 3) return true;
     }
     return false;
   };
+  // Outer (level 2/3) fields with their run-in corridors along the passes,
+  // and the outer access roads: kept clear of trees (low scrub may stay
+  // outside the fields themselves).
+  const FIELDS2 = FIELDS.filter((f) => f.level > 1), ROADS2 = ROADS.filter((rd) => rd.mesh);
+  const cleared = (x, z, tall = true, m = 6) => {
+    for (const f of FIELDS2) {
+      if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
+      if (!tall || !f.contract) continue;
+      const along = f.rowAxis === 'x';
+      const a = along ? x : z, c = along ? z : x;
+      const a0 = along ? f.x0 : f.z0, a1 = along ? f.x1 : f.z1, c0 = along ? f.z0 : f.x0, c1 = along ? f.z1 : f.x1;
+      if (c > c0 - 35 && c < c1 + 35 && a > a0 - 600 && a < a1 + 600) return true;
+    }
+    for (const rd of ROADS2) for (let i = 0; i < rd.pts.length - 1; i++) {
+      if (segDist(x, z, rd.pts[i][0], rd.pts[i][1], rd.pts[i + 1][0], rd.pts[i + 1][1]) < rd.w / 2 + 3) return true;
+    }
+    return false;
+  };
+  const isTall = (kind) => kind !== 'bush' && kind !== 'mound';
   const add = (kind, x, z, s = 1) => {
     const vs = variants[kind];
     trees.push({ kind, v: Math.floor(r() * vs.length), x, z, s, rot: r() * Math.PI * 2 });
@@ -248,7 +272,7 @@ export function createVegetation(terrain, quality) {
       const w = reliefWeights(x + 30, z + 30);
       if (w.roll < 0.3 && w.hill < 0.1) continue;
       const px = x + r3() * 60, pz = z + r3() * 60;
-      if (avoid(px, pz, 12)) continue;
+      if (avoid(px, pz, 12) || cleared(px, pz, true, 12)) continue;
       const h = terrain.heightAt(px, pz);
       // Valley depth: height against the mean of the surroundings (200 m).
       const around = (terrain.heightAt(px + 200, pz) + terrain.heightAt(px - 200, pz) + terrain.heightAt(px, pz + 200) + terrain.heightAt(px, pz - 200)) / 4;
@@ -261,7 +285,7 @@ export function createVegetation(terrain, quality) {
         const n = 2 + Math.floor(r3() * 3);
         for (let i = 0; i < n; i++) {
           const qx = px + (r3() - 0.5) * 26, qz = pz + (r3() - 0.5) * 26;
-          if (avoid(qx, qz, 8)) continue;
+          if (avoid(qx, qz, 8) || cleared(qx, qz, true, 8)) continue;
           if (r3() < 0.22) add3('buriti', qx, qz, 0.9 + r3() * 0.3); else add3('mata', qx, qz, 0.9 + r3() * 0.5);
         }
       } else if (slope > 0.05 && k < 0.3) {
@@ -270,6 +294,17 @@ export function createVegetation(terrain, quality) {
         add3(r3() < 0.2 ? 'ipe' : 'shade', px, pz, 0.9 + r3() * 0.4);
       }
     }
+  }
+
+  // Clear what the outer fields, their pass corridors and the outer roads
+  // claim (trees placed by the original farm's random streams included).
+  for (let i = trees.length - 1; i >= 0; i--) {
+    const t = trees[i];
+    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2)) trees.splice(i, 1);
+  }
+  for (let i = colliders.length - 1; i >= 0; i--) {
+    const c = colliders[i];
+    if (!c.box && cleared(c.x, c.z, true, 6)) colliders.splice(i, 1);
   }
 
   // --- build instanced cells ----------------------------------------------
@@ -380,7 +415,7 @@ export function makeTreeCollider(veg) {
     if (!grid.has(key)) grid.set(key, []);
     grid.get(key).push(c);
   }
-  return (x, y, z, terrainH) => {
+  const hit = (x, y, z, terrainH) => {
     for (const b of boxes) {
       const f = b.box;
       if (x > f.x0 + 3 && x < f.x1 - 3 && z > f.z0 + 3 && z < f.z1 - 3 && y < terrainH + b.top - 3) return 'trees';
@@ -393,4 +428,21 @@ export function makeTreeCollider(veg) {
     }
     return null;
   };
+  // Highest tree top within rad of (x, z) (-Infinity if none): lets the
+  // autopilot plan its height over a wood before it reaches it.
+  hit.topNear = (x, z, rad, terrainH) => {
+    let top = -Infinity;
+    for (const b of boxes) {
+      const f = b.box;
+      if (x > f.x0 - rad && x < f.x1 + rad && z > f.z0 - rad && z < f.z1 + rad) top = Math.max(top, terrainH + b.top);
+    }
+    const gx = Math.floor(x / 50), gz = Math.floor(z / 50);
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      const l = grid.get(gx + i + ',' + (gz + j));
+      if (!l) continue;
+      for (const c of l) if (c.top > top && Math.hypot(x - c.x, z - c.z) < c.r + rad) top = c.top;
+    }
+    return top;
+  };
+  return hit;
 }

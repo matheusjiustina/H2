@@ -88,7 +88,7 @@ export const CONTRACTS = [
     id: 'ridge-soy',
     title: 'Soybean — Talhões T-41A + T-41B',
     client: 'Fazenda Boa Esperança · Serra do Norte',
-    brief: 'Soybean across a ridge flank in the north-east hills. About 30 m of relief across the talhão, an uneven contour and a stepped boundary. Fly along the slope where you can; the work height over the canopy keeps changing.',
+    brief: 'Soybean across a ridge flank in the north-east hills. About 25 m of relief across the talhão, an uneven contour and a stepped boundary. Fly along the slope where you can; the work height over the canopy keeps changing.',
     difficulty: 'Hilly fields',
     level: 3,
     fields: ['T-41A', 'T-41B'],

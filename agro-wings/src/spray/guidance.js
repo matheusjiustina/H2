@@ -77,13 +77,17 @@ export class Guidance {
   refresh() {
     if (!this.job) return;
     for (const p of this.passes) {
+      // Coverage of the strip, weighted by how much of it each talhão holds
+      // (staggered talhões can share a strip by a sliver only).
       let s = 0, n = 0;
       for (const cov of this.job.coverages) {
         const f = cov.f;
         const lo = this.axis === 'x' ? f.z0 : f.x0, hi = this.axis === 'x' ? f.z1 : f.x1;
-        if (p.c1 < lo || p.c0 > hi) continue;
-        s += cov.stripCoverage(this.axis, Math.max(lo, p.c0 + 1), Math.min(hi, p.c1 - 1));
-        n++;
+        const a = Math.max(lo, p.c0 + 1), b = Math.min(hi, p.c1 - 1);
+        if (b - a < 1) continue;
+        const w = (b - a) * ((this.axis === 'x' ? f.x1 - f.x0 : f.z1 - f.z0));
+        s += cov.stripCoverage(this.axis, a, b) * w;
+        n += w;
       }
       p.done = n ? s / n : 1;
     }

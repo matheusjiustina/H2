@@ -21,6 +21,12 @@ export const ZONES = {
   // LEVEL 2 — rolling fields, south-east and north-west.
   rollSE: { c: [1500, 2800], r: [2600, 1150], rot: 0.12, level: 2, name: 'Campos do Sul' },
   rollNW: { c: [-2450, -2700], r: [1800, 1200], rot: 0.3, level: 2, name: 'Chapada Oeste' },
+  // Scenery only (no contracts): the western ridge country and the south.
+  rollW: { c: [-3150, 700], r: [950, 1900], rot: 0.08, level: 2, name: 'Vale do Oeste' },
+  rollS: { c: [-1050, 3300], r: [1050, 650], rot: -0.1, level: 2, name: 'Baixada Sul' },
+  // (off: where this zone samples the hill waves, so it gets its own hills
+  // rather than whatever the north-east ridges would be at that spot.)
+  hillsSW: { c: [-2600, 2900], r: [850, 700], rot: 0.5, level: 3, name: 'Morro do Sudoeste', off: [1300, 1200] },
 };
 
 // Relief is a sum of a few smooth waves (long wavelengths carry most of the
@@ -82,14 +88,18 @@ function coreFree(x, z) {
 // Class weights at a point: how much rolling and how much hilly relief.
 export function reliefWeights(x, z) {
   const cf = coreFree(x, z);
-  if (cf <= 0) return { roll: 0, hill: 0 };
+  if (cf <= 0) return { roll: 0, hill: 0, sw: 0 };
   const [wx, wz] = warp(x, z);
-  const h = zoneWeight(ZONES.hills, wx, wz, 0.1);
+  const hNE = zoneWeight(ZONES.hills, wx, wz, 0.1), hSW = zoneWeight(ZONES.hillsSW, wx, wz, 0.1);
+  const h = Math.max(hNE, hSW);
   // The hills sit in a wider rolling shoulder: relief grows continuously
   // from flat land through rolling country to hills.
-  const shoulder = zoneWeight({ ...ZONES.hills, r: [ZONES.hills.r[0] * 1.45, ZONES.hills.r[1] * 1.6] }, wx, wz, 0.1);
-  const roll = Math.max(zoneWeight(ZONES.rollSE, wx, wz, 0.1), zoneWeight(ZONES.rollNW, wx, wz, 0.1), shoulder);
-  return { roll: roll * cf, hill: smoothstep(0.05, 0.7, h) * cf };
+  const wide = (z) => ({ ...z, r: [z.r[0] * 1.45, z.r[1] * 1.6] });
+  const shoulder = Math.max(zoneWeight(wide(ZONES.hills), wx, wz, 0.1), zoneWeight(wide(ZONES.hillsSW), wx, wz, 0.1));
+  const roll = Math.max(zoneWeight(ZONES.rollSE, wx, wz, 0.1), zoneWeight(ZONES.rollNW, wx, wz, 0.1),
+    zoneWeight(ZONES.rollW, wx, wz, 0.1), zoneWeight(ZONES.rollS, wx, wz, 0.1), shoulder);
+  // sw: share of the south-west hills (the two hill zones never touch).
+  return { roll: roll * cf, hill: smoothstep(0.05, 0.7, h) * cf, sw: hSW > 0 ? hSW / (hNE + hSW) : 0 };
 }
 
 // Relief height added to the original terrain at (x, z), metres.
@@ -97,7 +107,13 @@ export function reliefAt(x, z) {
   const w = reliefWeights(x, z);
   if (w.roll <= 0 && w.hill <= 0) return 0;
   const r = waves(ROLL_WAVES, x, z) * ROLL_SCALE * w.roll;
-  const h = waves(HILL_WAVES, x, z) * HILL_SCALE * w.hill;
+  let hw = 0;
+  if (w.hill > 0) {
+    const o = ZONES.hillsSW.off;
+    hw = w.sw < 1 ? waves(HILL_WAVES, x, z) : 0;
+    if (w.sw > 0) hw = lerp(hw, waves(HILL_WAVES, x + o[0], z + o[1]), w.sw);
+  }
+  const h = hw * HILL_SCALE * w.hill;
   // The two classes blend: where the hills take over, the swells fade out.
   return lerp(r, h, w.hill);
 }
