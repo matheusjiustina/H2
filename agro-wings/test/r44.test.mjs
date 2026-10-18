@@ -192,3 +192,19 @@ test('vertical lift-off, hover hold, and a gentle landing on the skids', (t) => 
   assert.ok(Math.abs(pitchOf(fm)) < 0.08, 'level on the skids');
   t.diagnostic(`hover drift ${drift.toFixed(2)} m in 20 s; touchdown ${touches.map((e) => e.speed.toFixed(2)).join(', ')} m/s`);
 });
+
+test('torque: collective changes swing the heading only a little (pedal feed-forward)', (t) => {
+  const out = [];
+  for (const mode of ['high', 'normal']) {
+    const { fm, env } = makeHeli({ engineOn: true, alt: 60, fuel: 80, hopper: 150 });
+    const as = new HeliAssist();
+    let lever = 0.5, maxH = 0;
+    const h0 = fm.heading();
+    const seg = (s, rate, to) => fly(fm, env, as, mode, s, () => { lever += clamp(to - lever, -0.55 * DT, 0.55 * DT); return { pitch: 0, roll: 0, yaw: 0, lever, leverRate: rate }; },
+      () => { const d = fm.heading() - h0; maxH = Math.max(maxH, Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))); });
+    seg(5, 0, 0.5); seg(3, 1, 0.75); seg(3, -1, 0.3); seg(5, 0, 0.5);
+    assert.ok(maxH < 0.07, `${mode}: heading swing ${(maxH * 57.3).toFixed(1)}°`);
+    out.push(`${mode} ${(maxH * 57.3).toFixed(1)}°`);
+  }
+  t.diagnostic(`largest heading swing through collective changes: ${out.join(', ')}`);
+});

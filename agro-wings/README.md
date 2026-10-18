@@ -699,9 +699,24 @@ both models.
   and height next to the label. The slot that showed the rotor % shows the
   climb rate. The load sheet gives the hover power in %.
 - Assist: **high** (the default) brings the aircraft back to a hover when
-  the stick is released, leaning up to ~13° against a drift. The power stays
-  the pilot's, with the landing cushion: below ~15 m only a gentle sink is
-  let through. **Normal** holds attitude and heading; **off** is raw.
+  the stick is released below ~55 kt. The power stays the pilot's, with the
+  landing cushion: below ~15 m only a gentle sink is let through. **Normal**
+  holds attitude and heading; **off** is raw.
+- Attitude (both assists).
+  - The cyclic keys command an attitude: in **high** an absolute one
+    (centred = level, full forward ≈ −18°), so the answer never depends on
+    where the nose was when the key went down.
+  - The target moves at a limited rate, and cascaded loops (attitude → rate
+    → cyclic, the integrator only near the target) put the nose there
+    without running past it.
+  - The hover hold's flare is limited to ~7° nose up, and it works per
+    axis: rolling sideways does not move the nose.
+  - Before this, releasing the stick at ~25 kt threw the nose up to +24°
+    and held it 10–20° up for seconds, and the next forward input only
+    reached about −5°.
+  - Measured with the keyboard shaping (`test/r44power.test.mjs`): −16° in
+    0.87 s and at most −18.5°; release flare at most 7.5°; forward again
+    from the flare in 1.05 s; a 27° roll moves the pitch by 0.1°.
 - Measured (`test/r44power.test.mjs`, `test/r44flight.mjs` in the browser):
   - off the skids 1.3–1.9 s after raising the power;
   - 20 s hands-off hover at the hover figure: 0.3 m drift, 0.75 m height
@@ -712,6 +727,13 @@ both models.
   - rotor run-down 10 s after shut-down;
   - `AC=r44 node test/e2e.mjs soy`: the whole contract, 90 %, 2★, no
     damage.
+
+In the detailed rotor model the assists now feed the anti-torque pedal
+forward from the shaft torque (pedal ≈ 0.6 − 0.00034·Q, from the trimmed
+model), so a collective change no longer swings the nose first and waits
+for the heading hold. The largest swing through a full climb-and-descent
+sequence went from 4.6° to 3.4° with the high assist and from 6.0° to 1.7°
+with the normal one (`test/r44.test.mjs`).
 
 **Flight model** (detailed rotor, `src/flight/heliModel.js`, 120 Hz):
 - main rotor: blade-element thrust with momentum inflow solved each step

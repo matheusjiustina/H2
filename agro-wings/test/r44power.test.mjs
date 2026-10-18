@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
-import { makeHeli, DT, pitchOf } from './heliharness.mjs';
+import { makeHeli, DT, pitchOf, bankOf } from './heliharness.mjs';
 import { HeliAssist } from '../src/flight/heliAssist.js';
 import { hoverPowerFrac } from '../src/flight/heliModel.js';
 import { FLIGHT_R44 as A } from '../src/config.js';
@@ -137,4 +137,43 @@ test('lift-off on power, hover, and a gentle landing with the power eased off', 
   assert.ok(events.every((e) => e.kind === 'touch' && e.speed < A.hardLandingVs), JSON.stringify(events));
   assert.ok(Math.abs(pitchOf(fm)) < 0.08, 'level');
   t.diagnostic(`off the skids ${tOff?.toFixed(1)} s after raising power; hover drift ${drift.toFixed(2)} m; down ${tTouch.toFixed(1)} s after easing the power, at ${vTouch.toFixed(2)} m/s`);
+});
+
+// Keyboard stick as the game shapes it (full travel in ~0.45 s, back to
+// centre in ~0.3 s), with the 'high' assist.
+function keyFlight(fm, env, as) {
+  const s = { lon: 0, lat: 0 };
+  const ap = (c, t, r) => c + Math.max(-r * DT, Math.min(r * DT, t - c));
+  const lever = hoverPowerFrac(A, fm.mass);
+  return (sec, tp, tr, each) => fly(fm, env, as, 'high', sec, () => {
+    s.lon = ap(s.lon, tp, tp === 0 ? 3.5 : 2.2); s.lat = ap(s.lat, tr, tr === 0 ? 3.5 : 2.2);
+    return { pitch: s.lon, roll: s.lat, yaw: 0, lever };
+  }, each);
+}
+
+test('cyclic keys: the nose goes where the stick puts it — no overshoot, no pitch-up on release', (t) => {
+  const { fm, env } = heli({ engineOn: true, alt: 40, hopper: 150 });
+  const keys = keyFlight(fm, env, new HeliAssist());
+  const deg = () => pitchOf(fm) * 57.3;
+  keys(2, 0, 0);
+  // Forward key: about -18° within 1.5 s, never past -20°.
+  let minP = 0, t18 = null;
+  keys(4, -1, 0, (s) => { minP = Math.min(minP, deg()); if (t18 === null && deg() < -16) t18 = s; });
+  assert.ok(t18 !== null && t18 < 1.5, `-16° after ${t18} s`);
+  assert.ok(minP > -20.5, `forward overshoot ${minP.toFixed(1)}°`);
+  // Released below ~55 kt: a calm flare to stop, never more than ~8° nose up.
+  let maxP = -99;
+  keys(6, 0, 0, () => { maxP = Math.max(maxP, deg()); });
+  assert.ok(maxP < 8.5, `release flare ${maxP.toFixed(1)}° nose up`);
+  // Forward again during the flare: the nose answers at once.
+  let tBack = null;
+  keys(3, -1, 0, (s) => { if (tBack === null && deg() < -16) tBack = s; });
+  assert.ok(tBack !== null && tBack < 1.6, `forward again: -16° after ${tBack} s`);
+  // Sideways keys do not move the nose (from a settled hover).
+  keys(20, 0, 0);
+  const p0 = deg();
+  let maxAbsP = 0, maxBank = 0;
+  keys(3, 0, 1, () => { maxAbsP = Math.max(maxAbsP, Math.abs(deg() - p0)); maxBank = Math.max(maxBank, bankOf(fm) * 57.3); });
+  assert.ok(maxAbsP < 4 && maxBank > 22 && maxBank < 30, `roll: pitch ${maxAbsP.toFixed(1)}°, bank ${maxBank.toFixed(1)}°`);
+  t.diagnostic(`-16° in ${t18.toFixed(2)} s (min ${minP.toFixed(1)}°), flare max ${maxP.toFixed(1)}°, forward again in ${tBack.toFixed(2)} s, roll ${maxBank.toFixed(1)}° with pitch ≤ ${maxAbsP.toFixed(1)}°`);
 });

@@ -33,6 +33,7 @@ export class HeliAssist {
     this.iLon = 0; this.iLat = null; this.iYaw = 0; this.iCol = null;
     this.holdPitch = 0; this.holdHdg = null; this.holdAlt = null;
     this.pHeld = false; this.pRef = 0; this.vHold = null; this.iSpd = null; this.vsCmd = null; this.cush = 0;
+    this.pT = null; this.bT = null; // power model: rate-limited attitude targets
   }
 
   // cmd: { pitch (+ aft stick), roll (+ right), yaw (+ right pedal), lever 0..1 }
@@ -58,11 +59,12 @@ export class HeliAssist {
         fm.pedal = clamp(cmd.yaw * (1 - w) + this._yaw(fm, cmd, 0, att, h) * w, -1, 1);
       } else {
         fm.pedal = clamp(cmd.yaw, -1, 1);
-        this.iYaw = -fm.pedal; this.holdHdg = fm.heading();
+        this.iYaw = -(fm.pedal - this._torqueFF(fm)); this.holdHdg = fm.heading();
       }
       // Hand the trims to the hold laws for a smooth lift-off.
       this.iLon = -fm.cyclicLon; this.iLat = fm.cyclicLat;
       this.holdPitch = att.pitch; this.holdAlt = fm.pos.y; this.iCol = cmd.lever;
+      this.pT = att.pitch; this.bT = att.bank;
       this.pHeld = false; this.vsCmd = null;
       return;
     }
@@ -74,18 +76,33 @@ export class HeliAssist {
     const fwd = { x: Math.sin(hdg), z: Math.cos(hdg) };
     const vf = fm.vel.x * fwd.x + fm.vel.z * fwd.z, vl = fm.vel.x * fwd.z - fm.vel.z * fwd.x;
     const high = mode === 'high' || mode === 'auto';
+    const pm = fm.powerModel === 'power';
     const hover = high && !stickP && !stickR && V < 28;
-    if (hover) {
+    // Power model, low speed: the hover hold works per axis, so rolling
+    // sideways does not hand the pitch to the speed hold (and the reverse).
+    const hoverP = pm && high && !stickP && V < 28, hoverR = pm && high && !stickR && V < 28;
+    if (pm && (hoverP || hoverR) && !hover) {
+      const k = V < 8 ? 1 : 0.6;
+      if (hoverP) { pitchT = this.holdPitch = clamp(vf * 0.035 * k, -0.1, 0.12); this.vHold = null; this.iSpd = null; this.pHeld = false; }
+      else {
+        if (!this.pHeld) { this.pRef = 0; this.pHeld = true; }
+        pitchT = clamp(cmd.pitch * 0.32, -0.45, 0.35);
+      }
+      bankT = hoverR ? clamp(vl * 0.05 * k, -0.18, 0.18) : cmd.roll * 0.48;
+    } else if (hover) {
       // Hover hold: lean against the drift (gently at speed: decelerate).
-      // The power model leans further (to ~13°), so a released stick stops
-      // a fast sideways or backward drift within about six seconds.
-      const k = V < 8 ? 1 : 0.6, lim = fm.powerModel === 'power' ? 0.23 : 0.14;
-      pitchT = this.holdPitch = clamp(vf * 0.05 * k, -0.12, fm.powerModel === 'power' ? 0.23 : 0.16);
-      bankT = clamp(vl * 0.06 * k, -lim, lim);
+      // Power model: a calm flare, never more than ~7° nose up (a released
+      // stick must not throw the nose up), a little more lean sideways.
+      const k = V < 8 ? 1 : 0.6;
+      pitchT = this.holdPitch = pm ? clamp(vf * 0.035 * k, -0.1, 0.12) : clamp(vf * 0.05 * k, -0.12, 0.16);
+      bankT = pm ? clamp(vl * 0.05 * k, -0.18, 0.18) : clamp(vl * 0.06 * k, -0.14, 0.14);
       this.pHeld = false; this.vHold = null; this.iSpd = null;
     } else {
       if (stickP) {
-        if (!this.pHeld) { this.pRef = this.holdPitch; this.pHeld = true; }
+        // The stick commands an attitude. Beginner modes with the power
+        // model: an absolute one (centred = level, full = ~18°), so the
+        // response never depends on where the nose was when it was pressed.
+        if (!this.pHeld) { this.pRef = pm && high ? 0 : this.holdPitch; this.pHeld = true; }
         pitchT = clamp(this.pRef + cmd.pitch * 0.32, -0.45, 0.35);
       } else {
         if (this.pHeld) { this.holdPitch = clamp(att.pitch, -0.45, 0.35); this.pHeld = false; this.vHold = Math.min(V, 50); this.iSpd = this.holdPitch; }
@@ -98,12 +115,34 @@ export class HeliAssist {
       }
       bankT = stickR ? cmd.roll * 0.48 : 0;
     }
+    // Power model: the targets move at a limited rate (~45°/s pitch,
+    // ~70°/s bank) instead of jumping, so the nose follows the stick
+    // smoothly, without a lurch when it is pressed or released.
+    if (pm) {
+      this.pT ??= att.pitch; this.bT ??= att.bank;
+      this.pT += clamp(pitchT - this.pT, -0.8 * h, 0.8 * h);
+      this.bT += clamp(bankT - this.bT, -1.2 * h, 1.2 * h);
+      pitchT = this.pT; bankT = this.bT;
+    }
     // --- attitude loops -> cyclic ----------------------------------------------
     const ep = pitchT - att.pitch, eb = bankT - att.bank;
-    this.iLon = clamp(this.iLon + ep * h * 0.9, -0.7, 0.7);
-    this.iLat = clamp(this.iLat + eb * h * 0.9, -0.8, 0.8);
-    fm.cyclicLon = clamp(-ep * 2.4 - fm.omega.x * 0.85 - this.iLon, -1, 1);
-    fm.cyclicLat = clamp(eb * 2.8 - fm.omega.z * 0.85 + this.iLat, -1, 1);
+    if (pm) {
+      // Power model: cascaded loops — the attitude error asks for a limited
+      // pitch / roll rate, a fast rate loop sets the cyclic, and the
+      // integrator only trims near the target (no wind-up). The nose goes
+      // where the stick puts it, without running past it.
+      const kA = 3, qMax = 0.8, kQ = 3.2, kI = 0.5;
+      const qCmd = clamp(ep * kA, -qMax, qMax), pCmd = clamp(eb * kA * 1.2, -qMax * 1.4, qMax * 1.4);
+      if (Math.abs(ep) < 0.1) this.iLon = clamp(this.iLon + ep * h * kI, -0.7, 0.7);
+      if (Math.abs(eb) < 0.1) this.iLat = clamp(this.iLat + eb * h * kI, -0.8, 0.8);
+      fm.cyclicLon = clamp(-(qCmd + fm.omega.x) * kQ - this.iLon, -1, 1);
+      fm.cyclicLat = clamp((pCmd - fm.omega.z) * kQ * 0.8 + this.iLat, -1, 1);
+    } else {
+      this.iLon = clamp(this.iLon + ep * h * 0.9, -0.7, 0.7);
+      this.iLat = clamp(this.iLat + eb * h * 0.9, -0.8, 0.8);
+      fm.cyclicLon = clamp(-ep * 2.4 - fm.omega.x * 0.85 - this.iLon, -1, 1);
+      fm.cyclicLat = clamp(eb * 2.8 - fm.omega.z * 0.85 + this.iLat, -1, 1);
+    }
     fm.pedal = this._yaw(fm, cmd, V, att, h);
     // --- collective ------------------------------------------------------------
     if (mode === 'auto' || (mode === 'high' && fm.powerModel !== 'power')) {
@@ -156,6 +195,15 @@ export class HeliAssist {
     }
     const er = rateT - fm.omega.y;
     this.iYaw = clamp(this.iYaw + er * h * 1.2, -0.9, 0.9);
-    return clamp(-er * 1.6 - this.iYaw, -1, 1);
+    return clamp(-er * 1.6 - this.iYaw + this._torqueFF(fm), -1, 1);
+  }
+
+  // Detailed rotor model: the anti-torque pedal the shaft torque needs, fed
+  // forward (measured trim: pedal ≈ 0.6 − 0.00034·Q), so a collective change
+  // does not first swing the nose and wait for the heading hold. The power
+  // model has no torque to hold.
+  _torqueFF(fm) {
+    if (fm.powerModel === 'power' || !fm.shaftTorque) return 0;
+    return clamp(0.6 - 0.00034 * fm.shaftTorque, -1, 1) * 0.85;
   }
 }
