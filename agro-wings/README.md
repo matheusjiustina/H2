@@ -858,3 +858,132 @@ the helipad stands in the departure path — the test autopilot routes
 around it, players must too. Browser end-to-end runs are not bit-for-bit
 repeatable because the truck's route search has a per-frame time budget.
 FPS on a real GPU was not measured.
+
+## Terrain relief and advanced missions
+
+The outer farmland now has real relief: rolling country and a belt of hills
+around the original farm, which stays exactly as it was. It is real
+geometry, not a texture. One height function feeds the rendered ground,
+the aircraft's wheels and skids, the crash and obstacle tests, crops,
+trees, roads, fences, vehicles, cameras, the GPS and the maps.
+
+### How it is built
+
+- **One height source** (`src/world/terrainData.js`). `rawHeight(x, z)` is
+  the original farm terrain plus `reliefAt(x, z)` (`src/world/relief.js`),
+  sampled once at start-up into the 513 × 513 grid (15.6 m cells).
+  `TerrainData.heightAt` interpolates that grid on the same triangles the
+  renderer draws. The flight environment (`env.ground`, `env.top`,
+  `env.normal`), surface types, crops, vegetation, roads, fences, cameras,
+  the truck and the GPS all read `heightAt`, so what you see is what the
+  wheels touch.
+- **Protected core.** The relief weight is exactly zero inside the farm
+  core: the strip, base, hangar, HQ, every original field and their run-in
+  lines (`CORE`, x −1750…2850, z −1500…2050). It rises smoothly over 700 m
+  beyond that, and fades out again between 3.3 and 3.9 km from the centre
+  (the boundary where the game turns aircraft back). Heights in the
+  core are bit-for-bit those of the previous build (12,000 samples compared,
+  0 differ). The creek keeps a calm floodplain through the relief.
+- **Natural landforms, not noise blobs.** Relief is a sum of a few long,
+  smooth waves (wavelengths 560 m–2.6 km) sampled at a domain-warped point,
+  so swells and ridges meander. Because each wave's steepest slope is its
+  amplitude × wavenumber, slopes are bounded by construction: no spikes,
+  cliffs or isolated bumps. The zones are warped ellipses with soft edges;
+  the hills sit inside a wider rolling shoulder, so the land goes from flat
+  to rolling to hilly continuously. The south-west hill zone samples the
+  waves at an offset so it does not stack into one deep trough.
+- **Zones** (`ZONES` in `relief.js`):
+
+  | zone | class | where |
+  | --- | --- | --- |
+  | Serra do Norte | hilly (level 3) | north-east, ridges running SW–NE |
+  | Morro do Sudoeste | hilly (scenery) | south-west corner |
+  | Campos do Sul | rolling (level 2) | south and south-east |
+  | Chapada Oeste | rolling (level 2) | north-west |
+  | Vale do Oeste, Baixada Sul | rolling (scenery) | west side, south |
+
+- **Distribution** (terrain class from the zone weights, 50 m grid over the
+  whole map): **76.5 % flat, 18.0 % rolling, 5.5 % hilly** (target ~70 /
+  20 / 10). The hilly share is lower than the target on purpose. The
+  protected core plus its 700 m blend and the calm 600 m rim leave only a
+  1–1.5 km wide band for relief on the north and west sides, and much less
+  on the south and east. Packing 10 % hills into that band would push slopes
+  past the 12° limit and make walls against the flat core.
+- **Slopes** (8 m central differences, 25 m grid): flat land p95 2.0°
+  (unchanged; its steepest points are the original creek banks); rolling
+  land mean 2.5°, p95 5.5°; hilly land mean 3.5°, p95 6.5°, max 10.3°. The
+  relief spans about −45 m (west valley floor) to +27 m (north-east crest)
+  around the strip level.
+- **Rendering** (`src/world/terrain.js`). Same chunked terrain as before:
+  500 m chunks, `THREE.LOD` at 1/2/4/8× decimation with skirts, built once
+  at load and never regenerated in flight. Shading normals exaggerate the
+  slope ×1.9 so gentle relief reads from the air (`RELIEF_SHADE`; the
+  physical normal is untouched). Steeper flanks blend towards bare soil.
+  The far horizon ring keeps sampling `rawHeight`.
+- **Crops** follow the ground: canopy and row fins are sampled from
+  `heightAt` every 8 m / 12 m, with the same shading normals as the ground.
+- **Access roads** (`src/world/roads.js`): seven new dirt roads (north
+  trunk and branches, south, south-east, west, north-west) routed as
+  least-slope A* paths over the height field, smoothed, with grades up to 10.4 %.
+  Each is drawn as a ribbon draped on the terrain: every vertex, across the
+  whole width, takes `heightAt` + 7 cm, so a road on a slope lies on the
+  slope. Edges fade into the grass; ruts and a grass crown come from a small
+  canvas texture. They are ordinary roads for the surface code (`dirt`). The
+  core roads are still painted by the ground shader.
+- **Vegetation** (`src/world/vegetation.js`). The original trees and their
+  colliders keep their exact positions and random draws. Trees inside the
+  new fields, on their run-in corridors and on the new roads are removed
+  afterwards. A separate random stream adds vegetation that follows the
+  landforms: gallery woods (mata, buriti) on the valley floors, capoeira
+  scrub on steeper flanks, single shade trees and ipês on crests. Every
+  plant stands on `heightAt`.
+- **Fences** around the two outer pastures (T-36, T-44): every post stands
+  on the terrain, so the wires follow the swells.
+
+### Missions by level
+
+The order board (`src/ui/screens.js`) shows three sections. The original
+contracts are **Level 1 · Flat farmland**, unchanged. Each new contract is
+two talhões with a stepped, irregular outline flown as one job; the GPS
+builds its passes over both. Relief and slope on the cards are measured on
+the terrain the aircraft flies over (`src/world/terrainInfo.js`), not typed
+in.
+
+| contract | level | ha | relief | slope mean / max | distance | Cr$/ha + bonus |
+| --- | --- | --- | --- | --- | --- | --- |
+| soy | 1 | 18.4 | 5.7 m | 0.6° / 1.1° | 0.8 km | 260 + 2,500 |
+| corn | 1 | 16.1 | 5.1 m | 0.9° / 1.3° | 0.6 km | 330 + 3,500 |
+| cotton | 1 | 13.8 | 2.0 m | 0.5° / 2.8° | 2.0 km | 380 + 4,500 |
+| roll-soy | 2 | 19.5 | 25.0 m | 2.6° / 4.7° | 3.3 km | 330 + 3,800 |
+| roll-corn | 2 | 19.8 | 18.7 m | 2.0° / 5.0° | 4.2 km | 400 + 4,500 |
+| roll-cotton | 2 | 19.1 | 30.2 m | 2.8° / 5.3° | 3.0 km | 450 + 5,000 |
+| ridge-soy | 3 | 16.1 | 24.8 m | 4.5° / 7.2° | 4.1 km | 420 + 6,000 |
+| ridge-cotton | 3 | 16.1 | 36.5 m | 3.3° / 5.3° | 4.0 km | 560 + 7,000 |
+| ridge-corn | 3 | 15.8 | 29.5 m | 3.8° / 6.8° | 3.2 km | 500 + 8,000 |
+
+Harder levels pay more per hectare and a larger completion bonus, and need
+more fuel for the longer ferry. Scoring is the same as before (coverage,
+uniformity, waste, damage). The new fields sit where the procedure turn at
+each end stays inside the farm boundary (the game turns an aircraft back at
+3.9 km).
+
+**GPS and maps.** The full map and the minimap carry a hillshade and a
+light elevation tint computed from `rawHeight`. Flat land is drawn as
+before; the swells and hills read as relief. On the GPS page of a job with
+relief, the field area is shaded from the real heights under the coverage
+map, and two small lines give the ground elevation under the aircraft
+(`GND`) and the field's elevation range (`FLD`), both MSL. Flat jobs show
+nothing extra, so the HUD stays as it was.
+
+**Test autopilot.** `src/game/autopilot.js` is the validation tool that
+flies the contracts in the e2e runs. For terrain it now has:
+
+- a 1.3 km run-in;
+- a feed-forward of the ground's rate of change 2 s ahead, so it follows
+  falling ground fully and rising ground in part;
+- planning of its height over the highest tree top in the corridor ahead
+  on run-ins and turns. The north-east fields' run-ins cross the gallery
+  forest along the creek.
+
+None of this touches the aircraft: the player flies exactly the same
+aircraft through the same inputs.
