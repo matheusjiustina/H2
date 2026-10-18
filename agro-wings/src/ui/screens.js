@@ -9,7 +9,7 @@ import { BASE } from '../world/layout.js';
 import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
-import { hoverPower } from '../flight/heliModel.js';
+import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap } from './maps.js';
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
@@ -165,13 +165,13 @@ export class Screens {
       <h3>Weight &amp; performance</h3>
       <div class="stats">
         <div class="stat"><b class="m"></b><span>Take-off mass · MTOW ${A.mtow.toLocaleString('en-US')} kg</span></div>
-        ${T.loadSheet.heli ? `<div class="stat"><b class="b"></b><span>Hover power at 1 m (in ground effect) · ${Math.round(A.engine.ratedKW / 0.7457)} hp take-off</span></div>
+        ${T.loadSheet.heli ? `<div class="stat"><b class="b"></b><span>Hover power at 1 m (in ground effect)${g.settings.heliModel === 'rotor' ? ` · ${Math.round(A.engine.ratedKW / 0.7457)} hp take-off` : ''}</span></div>
         <div class="stat"><b class="r"></b><span>Hover power out of ground effect</span></div>` : `<div class="stat"><b class="b"></b><span>Max level bank at ${T.loadSheet.bankKt} kt</span></div>
         <div class="stat"><b class="r"></b><span>Est. ground roll</span></div>`}
         <div class="stat"><b class="c"></b><span>Fuel cost</span></div>
         <div class="stat"><b class="e"></b><span>Spray time at full flow</span></div>
       </div>
-      <div class="note">Fuel is billed to you. The client supplies the application liquid; whatever lands outside the talhão, drifts away or is over-applied counts as waste in the evaluation. ${T.loadSheet.heli ? 'A heavy tank needs more collective for the hover and leaves less power to climb or stop a descent: keep the mass under the MTOW, take off into the wind and transition to forward flight low over the pad.' : 'A heavy hopper means a longer take-off roll, slower climb, a higher stall speed and shallower turns: pull up before the balão, then bank.'}</div>
+      <div class="note">Fuel is billed to you. The client supplies the application liquid; whatever lands outside the talhão, drifts away or is over-applied counts as waste in the evaluation. ${T.loadSheet.heli ? 'A heavy tank needs more power for the hover and leaves less to climb or stop a descent: keep the mass under the MTOW, take off into the wind and transition to forward flight low over the pad.' : 'A heavy hopper means a longer take-off roll, slower climb, a higher stall speed and shallower turns: pull up before the balão, then bank.'}</div>
       <div class="row2"><span class="money">Balance ${money(g.career.money)}</span><div class="btn-row">
         <button class="btn small" data-a="rec">Recommended</button><button class="btn small" data-a="close">Cancel</button><button class="btn primary" data-a="go">Request service</button></div></div></div>`);
     const upd = () => {
@@ -181,7 +181,14 @@ export class Screens {
       const mEl = el.querySelector('.m');
       mEl.textContent = `${Math.round(mass)} kg${mass > A.mtow ? ' · OVER' : ''}`;
       mEl.style.color = mass > A.mtow ? 'var(--bad)' : '';
-      if (T.loadSheet.heli) {
+      if (T.loadSheet.heli && g.settings.heliModel !== 'rotor') {
+        // Power model: the lever power that hovers at this weight.
+        for (const [sel, k] of [['.b', 1], ['.r', Infinity]]) {
+          const p = Math.round(hoverPowerFrac(A, mass, k) * 100), e = el.querySelector(sel);
+          e.textContent = `${p} % power${p > 100 ? ' · NO HOVER' : ''}`;
+          e.style.color = p > 100 ? 'var(--bad)' : p > 92 ? 'var(--warn, #f0c020)' : '';
+        }
+      } else if (T.loadSheet.heli) {
         // Shaft power for the hover from the helicopter's own rotor model.
         const hp = (skid) => Math.round(hoverPower(A, mass, skid) / 745.7);
         const cap = A.engine.ratedKW / 0.7457;
@@ -308,6 +315,7 @@ export class Screens {
       <div class="field"><label>Weather</label>${seg('weather', WEATHER_ORDER.map((k) => [k, WEATHER[k].label]))}<span></span></div>
       <h3>Flying</h3>
       <div class="field"><label>Airplane assist</label>${seg('assist', [['off', 'Off'], ['normal', 'Normal'], ['high', 'High']])}<span></span></div>
+      <div class="field"><label>Helicopter model</label>${seg('heliModel', [['power', 'Power (one lever)'], ['rotor', 'Detailed rotor']])}<span></span></div>
       <div class="field"><label>Helicopter assist</label>${seg('heliAssist', [['off', 'Off'], ['normal', 'Normal'], ['high', 'High']])}<span></span></div>
       <div class="field"><label>Wind</label>${seg('wind', [[0, 'Calm'], [1, 'Light'], [1.8, 'Moderate']])}<span></span></div>
       <div class="field"><label>Flight keys</label>${seg('keyScheme', [['numpad', 'Numpad + Q/E'], ['classic', 'W/S/A/D + Z/X']])}<span></span></div>
@@ -371,7 +379,7 @@ export class Screens {
       <div class="sub">Flight keys: ${kk('pitchDown')} / ${kk('pitchUp')} stick forward / back, ${kk('rollLeft')} / ${kk('rollRight')} roll, ${kk('yawLeft')} / ${kk('yawRight')} rudder, ${kk('engine')} engine — Settings → Flying → Flight keys switches to ${other === 'classic' ? 'the Tidemark layout' : 'the numpad layout'} (${ko('pitchDown')} / ${ko('pitchUp')} / ${ko('rollLeft')} / ${ko('rollRight')}, ${ko('yawLeft')} / ${ko('yawRight')}, ${ko('engine')}). Mouse: left-drag looks around, right-drag is a virtual stick, wheel sets power (zoom in the free camera). Gamepad: left stick flies, triggers set power, bumpers rudder, A spray, B brakes.</div>
       <div class="helpgrid">${rows}<div><span>Speed up ground service</span><b>T (hold)</b></div></div>
       ${g.aircraft?.kind === 'heli' ? `<h3>Robinson R44</h3>
-      <div class="note" style="color:var(--ink-dim)">${kk('pitchDown')} / ${kk('pitchUp')} / ${kk('rollLeft')} / ${kk('rollRight')} tilt the cyclic forward / aft / left / right, ${kk('yawLeft')} / ${kk('yawRight')} are the anti-torque pedals, ${keyLabel(g.input.bindings.throttleUp[0])}/${keyLabel(g.input.bindings.throttleDown[0])} (or Shift / Ctrl, the wheel, the triggers) raise and lower the collective; the governor holds the rotor at 101–102 %. Start with the collective full down (hold ${kk('engine')}): the clutch engages and the rotor spins up — wait for the green before lifting. Pull the collective slowly to a hover at about 1 m, then ease the cyclic forward; the aircraft shudders through translational lift. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> also holds height and the hover. Watch LOW RPM (horn): lower the collective. Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.</div>` : ''}
+      <div class="note" style="color:var(--ink-dim)">${g.settings.heliModel !== 'rotor' ? `${kk('pitchDown')} / ${kk('pitchUp')} / ${kk('rollLeft')} / ${kk('rollRight')} tilt the cyclic forward / aft / left / right, ${kk('yawLeft')} / ${kk('yawRight')} turn the nose. ${keyLabel(g.input.bindings.throttleUp[0])}/${keyLabel(g.input.bindings.throttleDown[0])} (or Shift / Ctrl, the wheel, the triggers) set the <b>power</b> — the one control for up and down: rotor and torque act as one, so the power never swings the nose. The power that hovers is shown next to the POWER readout (about 50–55 % light, 65–70 % with a full tank, less close to the ground); more power climbs, less sinks, and the CLIMB readout shows by how much. Start with the power at zero (hold ${kk('engine')}): the rotor comes up to speed in about 6 s — then raise the power until the skids leave the ground, settle it at the hover figure and ease the cyclic forward. To land, hover low over the spot and take the power a few percent below the hover figure. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> also brings it back to a hover when the stick is released. Settings → Helicopter model → <b>Detailed rotor</b> gives the full rotor simulation (governor, rotor droop, torque, autorotation). Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.</div>` : `${kk('pitchDown')} / ${kk('pitchUp')} / ${kk('rollLeft')} / ${kk('rollRight')} tilt the cyclic forward / aft / left / right, ${kk('yawLeft')} / ${kk('yawRight')} are the anti-torque pedals, ${keyLabel(g.input.bindings.throttleUp[0])}/${keyLabel(g.input.bindings.throttleDown[0])} (or Shift / Ctrl, the wheel, the triggers) raise and lower the collective; the governor holds the rotor at 101–102 %. Start with the collective full down (hold ${kk('engine')}): the clutch engages and the rotor spins up — wait for the green before lifting. Pull the collective slowly to a hover at about 1 m, then ease the cyclic forward; the aircraft shudders through translational lift. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> also holds height and the hover. Watch LOW RPM (horn): lower the collective. Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.</div>`}` : ''}
       <h3>Agricultural flying</h3>
       <div class="note" style="color:var(--ink-dim)">Work at 2.5–4.5 m over the crop canopy (the HGT readout turns green), around 85–105 kt. Too low narrows the swath and risks a crop strike; too high widens it but liquid drifts and evaporates. Fly along the yellow pass line — the lightbar on the glareshield shows which way to steer. Switch the spray off at the field edge and over gaps. Land back on the strip, taxi to the pad and tap ${kk('engine')} to shut down: the badeco reloads and your coverage is kept.</div>
       <div class="row2"><span></span><button class="btn primary small" data-a="close">Close</button></div></div>`);

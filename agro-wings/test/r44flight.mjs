@@ -4,7 +4,11 @@
 // sense of both rotors), start-up, vertical take-off, hover, translations,
 // pedal turns, landing on the skids, shut-down and run-down, camera modes,
 // and the panel against the simulation. Screenshots go to <outDir>.
-// Usage: AGRO_URL=... node test/r44flight.mjs [outDir]
+// The default flies the power model (Settings → Helicopter model → Power, the
+// game's default: the power keys are the only control for up and down, set
+// against the hover figure the HUD shows); MODEL=rotor flies the detailed
+// rotor model with the 'high' assist's climb-rate lever.
+// Usage: AGRO_URL=... [MODEL=rotor] node test/r44flight.mjs [outDir]
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -32,7 +36,8 @@ const sel = await page.evaluate(() => ({ id: window.__agro.aircraftId, kind: win
 check('selection: card 03 selects the R44', sel.id === 'r44' && sel.kind === 'heli' && sel.checked === 'true', JSON.stringify(sel));
 await page.screenshot({ path: `${outDir}/00_title.png` });
 await page.click('[data-a="free"]');
-await page.evaluate(() => { const g = window.__agro; g.frozen = true; g.noRender = true; g.setSetting('heliAssist', 'normal'); });
+const PM = (process.env.MODEL ?? 'power') !== 'rotor';
+await page.evaluate((pm) => { const g = window.__agro; g.frozen = true; g.noRender = true; g.setSetting('heliAssist', 'normal'); g.setSetting('heliModel', pm ? 'power' : 'rotor'); }, PM);
 
 const st = () => page.evaluate(() => {
   const g = window.__agro, ac = g.aircraft, fm = ac.fm, o = fm.out;
@@ -40,7 +45,7 @@ const st = () => page.evaluate(() => {
     t: +ac.simTime.toFixed(1), eng: fm.engine, phase: fm.phase, rs: ac.rotorState, nr: +o.rotorPct.toFixed(1), hp: Math.round(fm.power / 745.7),
     coll: +fm.collective.toFixed(3), agl: +o.agl.toFixed(2), kt: +(o.airspeed * 1.944).toFixed(1), vs: +o.vs.toFixed(2), hdg: +ac.headingDeg().toFixed(1),
     x: +fm.pos.x.toFixed(2), z: +fm.pos.z.toFixed(2), y: +fm.pos.y.toFixed(3), gnd: o.onGround, skids: fm.skid.filter((s) => s.onGround).length,
-    state: ac.state, dmg: +ac.damage.toFixed(1), lastTouch: ac.lastTouch, fwd: 0,
+    state: ac.state, why: ac.crashReason, dmg: +ac.damage.toFixed(1), lastTouch: ac.lastTouch, fwd: 0,
     vf: +(fm.vel.x * Math.sin(fm.heading()) + fm.vel.z * Math.cos(fm.heading())).toFixed(2),
     vl: +(fm.vel.x * Math.cos(fm.heading()) - fm.vel.z * Math.sin(fm.heading())).toFixed(2), // + = left
   };
@@ -61,6 +66,21 @@ const until = (cond, maxSec, actions = []) => page.evaluate(([cond, maxSec, acti
   for (const a of actions) g.input.releaseAction(a);
   return t;
 }, [cond, maxSec, actions]);
+// Power model: work the power keys (as a player watching the HUD) until the
+// power reads the hover figure + d, then let go.
+const powerTo = (d, maxSec = 4) => page.evaluate(([d, maxSec]) => {
+  const g = window.__agro, ac = g.aircraft;
+  let t = 0;
+  for (; t < maxSec; t += 1 / 60) {
+    const tm = ac.telemetry(), want = Math.min(1, Math.max(0, tm.hoverPower + d));
+    const err = want - tm.power;
+    if (Math.abs(err) < 0.012) break;
+    const a = err > 0 ? 'throttleUp' : 'throttleDown';
+    g.input.pressAction(a); g.tick(1 / 60); g.input.releaseAction(a);
+  }
+  g.tick(1 / 60);
+  return t;
+}, [d, maxSec]);
 const snap = async (name, mode = 'chase') => {
   await page.evaluate((mode) => {
     const g = window.__agro;
@@ -144,43 +164,51 @@ check('instruments read the simulation (rotor, engine, MAP, fuel, tank, altitude
   Math.abs(inst.d.fuel - inst.sim.fuel) < 1e-6 && Math.abs(inst.d.hopper - inst.sim.hopper) < 1e-6 && Math.abs(inst.d.altFt - inst.sim.altFt) < 0.5 && Math.abs(inst.d.hdg - inst.sim.hdg) < 1e-6,
   JSON.stringify(inst.d));
 
-// --- vertical take-off (normal assist: the collective is the pilot's) ------
+// --- vertical take-off (normal assist: the lever is the pilot's) ------------
 const p0 = await st();
 const tLift = await until('!g.aircraft.fm.out.onGround && g.aircraft.fm.out.agl > 0.3', 12, ['throttleUp']);
 // Stop raising once light on the skids; the aircraft climbs away vertically.
+if (PM) await powerTo(0.06);
 const tUp = await until('g.aircraft.fm.out.agl > 3', 10);
 s = await st();
 check('vertical take-off: off the skids, climbing, little drift', s.agl > 2.9 && s.vs > 0 && Math.hypot(s.x - p0.x, s.z - p0.z) < 2 && s.state === 'ok',
-  `lift after ${tLift.toFixed(1)} s of collective (lever ${s.coll}), 3 m after ${tUp.toFixed(1)} s more, drift ${Math.hypot(s.x - p0.x, s.z - p0.z).toFixed(2)} m`);
+  `lift after ${tLift.toFixed(1)} s of ${PM ? 'power' : 'collective'} (lever ${s.coll}), 3 m after ${tUp.toFixed(1)} s more, drift ${Math.hypot(s.x - p0.x, s.z - p0.z).toFixed(2)} m`);
 await snap('05_liftoff');
-await until('g.aircraft.fm.out.vs < 0.2', 8, ['throttleDown']);
+if (PM) await powerTo(0);
+else await until('g.aircraft.fm.out.vs < 0.2', 8, ['throttleDown']);
 
-// --- hover (high assist: height and hover hold) -------------------------------
+// --- hover (high assist: hover hold; rotor model: also height hold) ----------
 await page.evaluate(() => window.__agro.setSetting('heliAssist', 'high'));
 await run(8);
+if (PM) await powerTo(0);
 const h0 = await st();
 await run(20);
 const h1 = await st();
-check('hover 20 s (high assist): position and height held', Math.hypot(h1.x - h0.x, h1.z - h0.z) < 3 && Math.abs(h1.y - h0.y) < 0.6 && h1.rs === 'NORMAL',
+check(`hover 20 s (high assist${PM ? ', power at the hover figure' : ''}): position and height held`, Math.hypot(h1.x - h0.x, h1.z - h0.z) < 3 && Math.abs(h1.y - h0.y) < (PM ? 1.2 : 0.6) && h1.rs === 'NORMAL',
   `drift ${Math.hypot(h1.x - h0.x, h1.z - h0.z).toFixed(2)} m, dh ${(h1.y - h0.y).toFixed(2)} m, NR ${h1.nr} %`);
 await snap('06_hover_orbit', 'orbit');
 await snap('06b_hover_cockpit', 'cockpit');
 await snap('06c_hover_chase', 'chase');
-// Climb and descend with the collective (vertical-speed command).
+// Climb and descend: power above / below the hover figure (rotor model: the
+// lever's climb-rate command).
 const c0 = await st();
-await run(3, ['throttleUp']);
+if (PM) { await powerTo(0.15); await run(3); } else await run(3, ['throttleUp']);
 const c1 = await st();
-await run(3, ['throttleDown']);
+if (PM) { await powerTo(-0.15); await run(4); } else await run(3, ['throttleDown']);
 const c2 = await st();
-check('collective climbs and descends', c1.y - c0.y > 3 && c2.y < c1.y - 2, `+${(c1.y - c0.y).toFixed(1)} m, then ${(c2.y - c1.y).toFixed(1)} m`);
+check(PM ? 'power climbs and descends' : 'collective climbs and descends', c1.y - c0.y > 3 && c2.y < c1.y - 2, `+${(c1.y - c0.y).toFixed(1)} m, then ${(c2.y - c1.y).toFixed(1)} m`);
+if (PM) await powerTo(0);
 await run(4);
+if (PM) await powerTo(0);
 
 // --- translations ---------------------------------------------------------------
+// (Power model: up to ~10 m first, clear of the service truck parked north of the pad.)
+if (PM) { await powerTo(0.1); await until('g.aircraft.fm.out.agl > 10', 8); await powerTo(0); await run(3); }
 const tr = {};
 for (const [name, act] of [['forward', 'pitchDown'], ['backward', 'pitchUp'], ['left', 'rollLeft'], ['right', 'rollRight']]) {
   await run(3.5, [act]);
   const q = await st();
-  tr[name] = { vf: q.vf, vl: q.vl };
+  tr[name] = { vf: q.vf, vl: q.vl, ...(q.state !== 'ok' ? { crashed: q.why, at: [q.x, q.z, q.agl] } : {}) };
   await run(8); // hover hold stops it
 }
 check('translations: forward, backward, left, right', tr.forward.vf > 3 && tr.backward.vf < -2 && tr.left.vl > 2 && tr.right.vl < -2, JSON.stringify(tr));
@@ -207,7 +235,7 @@ await run(5);
 const cur = (await st()).hdg;
 await until('Math.abs(((g.aircraft.headingDeg() - 180 + 540) % 360) - 180) < 4', 10, [dHdg(cur, 180) < 0 ? 'yawLeft' : 'yawRight']);
 await run(4);
-await run(6, ['throttleUp']);
+if (PM) { await powerTo(0.12); await run(5); await powerTo(0.02); } else await run(6, ['throttleUp']);
 await run(3);
 await run(10, ['pitchDown']);
 s = await st();
@@ -236,7 +264,14 @@ console.log('before flare', JSON.stringify(await st()));
 await run(12, ['pitchUp']);
 console.log('after flare', JSON.stringify(await st()));
 await until('Math.hypot(g.aircraft.fm.vel.x, g.aircraft.fm.vel.z) < 1.5', 30);
-const tDown = await until('g.aircraft.fm.out.onGround', 60, ['throttleDown']);
+let tDown;
+if (PM) {
+  // Down to a low hover, then the power a little under the hover figure.
+  await powerTo(-0.12);
+  await until('g.aircraft.fm.out.agl < 4', 40);
+  await powerTo(-0.05);
+  tDown = await until('g.aircraft.fm.out.onGround', 60);
+} else tDown = await until('g.aircraft.fm.out.onGround', 60, ['throttleDown']);
 await run(3, ['throttleDown']);
 s = await st();
 const ground = await page.evaluate(() => { const g = window.__agro, fm = g.aircraft.fm; return fm.skid.map((k) => { const p = k.pv.clone().applyQuaternion(fm.quat).add(fm.pos); return +(p.y - g.aircraft.env.ground(p.x, p.z)).toFixed(3); }); });

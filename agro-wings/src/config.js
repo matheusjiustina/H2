@@ -293,4 +293,18 @@ export const FLIGHT_R44 = {
   hardLandingVs: 1.8, crashVs: 3.6,
   // Never-touch points: main-rotor tips (disc edge), tail rotor, stinger, nose, belly.
   vne: 130, // kt (published Vne at low altitude)
+  // Power model (the default 'power' handling, see heliModel.js): one power
+  // lever, the vertical part of the thrust in proportion to it. Tuned to the R44's figures: hover at
+  // the MTOW at 70 % power out of ground effect (62 % on the skids), about
+  // 54 % / 48 % light; full power at the MTOW climbs ~1,000 ft/min; ~110 kt
+  // at the assist's nose-down limit.
+  power: {
+    maxThrust: 15890, // N at 100 % (sea level, out of ground effect)
+    lagS: 0.25, // power response to the lever
+    climbDamp: 0.8, // 1/s: rotor inflow damping of vertical speed
+    spoolS: 1.4, // rotor run-up time constant once the engine runs (~6 s to speed)
+    yawMoment: 4500, yawDamp: 2500, // N·m per unit pedal; N·m per rad/s
+    etl: 0.03, // translational lift: small thrust gain from ~10 to 30 kt (power stays the up/down control)
+    dragFrontal: 2.4, // m², replaces dragArea[2] in this model
+  },
 };

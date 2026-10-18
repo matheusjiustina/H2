@@ -110,9 +110,18 @@ export class HUD {
     const sprayingNow = g.sprayer.on;
     $.hgt.className = 'ro r-hgt' + (sprayingNow ? (t.hgt < 1.5 ? ' bad' : t.hgt > 6 ? ' warn' : t.hgt >= SPRAY.idealHeight[0] && t.hgt <= SPRAY.idealHeight[1] ? ' good' : '') : '');
     // Load factor (smoothed): what the pull-up and the balão cost the wing.
-    if (t.heli) {
-      // Helicopter: main-rotor speed (%) in place of the load factor.
-      if (!this._heliRo) { $.gl.querySelector('.l').textContent = 'Rotor'; $.gl.querySelector('.u').textContent = '%'; this._heliRo = true; }
+    const pm = t.heli && t.powerModel === 'power';
+    if (pm) {
+      // Helicopter, power model: rotor and power are one, so the slot shows
+      // what the power does — the climb or sink rate.
+      if (this._heliRo !== 'vs') { $.gl.querySelector('.l').textContent = 'Climb'; $.gl.querySelector('.u').textContent = 'm/s'; this._heliRo = 'vs'; }
+      this.vsS = (this.vsS ?? 0) + (t.vs - (this.vsS ?? 0)) * Math.min(1, dt * 5);
+      const vsv = t.onGround ? 0 : this.vsS;
+      $.gl.querySelector('.v').firstChild.nodeValue = (vsv > 0.05 ? '+' : '') + vsv.toFixed(1);
+      $.gl.className = 'ro r-g' + (Math.abs(vsv) < 0.2 ? ' dim' : vsv < -2.5 && t.agl < 15 ? ' bad' : '');
+    } else if (t.heli) {
+      // Helicopter, detailed rotor model: main-rotor speed (%) in place of the load factor.
+      if (this._heliRo !== 'rotor') { $.gl.querySelector('.l').textContent = 'Rotor'; $.gl.querySelector('.u').textContent = '%'; this._heliRo = 'rotor'; }
       $.gl.querySelector('.v').firstChild.nodeValue = String(Math.round(t.rotorPct));
       $.gl.className = 'ro r-g' + (t.rotorPct < 1 ? ' dim' : t.lowRotor ? ' bad' : t.rotorPct < 97 || t.rotorPct > 108 ? ' warn' : '');
     } else {
@@ -122,6 +131,9 @@ export class HUD {
       $.gl.className = 'ro r-g' + (t.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
     }
     $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round(t.power * 100));
+    // Power model: the power that hovers here, next to the label.
+    const pl = pm && t.engine === 'running' ? `Power · hover ${Math.round(t.hoverPower * 100)}` : 'Power';
+    if (pl !== this._pwrL) { $.pwr.querySelector('.l').textContent = pl; this._pwrL = pl; }
     $.fuel.querySelector('.v').firstChild.nodeValue = String(Math.round(t.fuel));
     $.fuel.querySelector('.bar span').style.width = `${(t.fuel / t.fuelCap) * 100}%`;
     $.fuel.className = 'ro r-fuel' + (t.fuel < t.fuelCap * 0.15 ? ' bad' : '');

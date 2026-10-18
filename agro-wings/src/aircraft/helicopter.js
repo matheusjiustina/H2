@@ -5,7 +5,7 @@
 // (HeliAssist), events and visuals. The fixed-wing Aircraft and FlightModel
 // are not used or modified by it.
 import * as THREE from 'three';
-import { HeliModel } from '../flight/heliModel.js';
+import { HeliModel, hoverPowerFrac } from '../flight/heliModel.js';
 import { HeliAssist } from '../flight/heliAssist.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
@@ -96,8 +96,9 @@ export class Helicopter {
   placeOnRunway() { this.placeAtPad(); }
   placeAirborne(x, z, heading, agl = 150, speed = 30) {
     const g = this.world.terrain.heightAt(x, z);
+    this.fm.setPowerModel(this.game.settings?.heliModel ?? 'power');
     this.fm.reset(new THREE.Vector3(x, g + agl - this.A.skids[0][1], z), heading, { speed: Math.min(speed, 50), engineOn: true });
-    this.fm.collective = 0.45;
+    if (this.fm.powerModel !== 'power') this.fm.collective = 0.45; // (the power model starts at the hover power)
     this._afterPlace();
   }
   repair() { this.damage = 0; this.fm.roughness = 0; this.fm.extraDrag = 0; }
@@ -135,6 +136,7 @@ export class Helicopter {
   update(dt, input, opts) {
     const fm = this.fm;
     if (this.state === 'crashed') { this._animate(dt); return; }
+    if (opts.heliModel) fm.setPowerModel(opts.heliModel);
     this._readControls(dt, input, opts);
     const DT = this.A.sim.dt;
     this.acc += Math.min(dt, 0.25);
@@ -506,10 +508,16 @@ export class Helicopter {
 
   telemetry() {
     const fm = this.fm, o = fm.out;
+    // Power model: the HUD shows the power the pilot has set (the lever) and
+    // the power that holds a hover right here (weight, ground cushion,
+    // density), so the two can be compared at a glance.
+    const pm = fm.powerModel === 'power';
     return {
       ias: o.airspeed * KT * Math.sqrt(o.density / 1.225), gs: o.groundSpeed * KT,
       hgt: this.workHeight(), agl: o.agl, altFt: (fm.pos.y + UNITS.altOffsetM) * FT,
-      power: fm.power / (this.A.engine.ratedKW * 1000), rpm: fm.rpm, fuel: fm.fuel, hopper: fm.hopper, engine: fm.engine,
+      power: pm ? (fm.engine === 'running' ? this.lever : 0) : fm.power / (this.A.engine.ratedKW * 1000),
+      powerModel: fm.powerModel, hoverPower: pm ? hoverPowerFrac(this.A, fm.mass, Math.max(0, o.agl), fm.pos.y + UNITS.altOffsetM) : null,
+      rpm: fm.rpm, fuel: fm.fuel, hopper: fm.hopper, engine: fm.engine,
       fuelCap: this.A.fuelCapacity, hopperCap: this.A.hopperCapacity,
       stall: 0, onGround: o.onGround, flaps: 0, brake: 0, parkBrake: false,
       vs: o.vs, damage: this.damage, mass: fm.mass, hdg: this.headingDeg(), state: this.state, g: o.gLoad,

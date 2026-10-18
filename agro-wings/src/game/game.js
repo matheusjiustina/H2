@@ -37,7 +37,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'high', timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'high', heliModel: 'power', timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     const q = new URLSearchParams(location.search).get('q');
     if (q && QUALITY[q]) { this.settings.quality = q; this.qualityForced = true; }
@@ -431,7 +431,7 @@ export class Game {
 
     if (dt > 0) {
       if (this.playing) {
-        ac.update(dt, input, { mouse, assist: ac.kind === 'heli' ? this.settings.heliAssist : this.settings.assist, windScale: this.settings.wind, cameraMode: this.cameraMode });
+        ac.update(dt, input, { mouse, assist: ac.kind === 'heli' ? this.settings.heliAssist : this.settings.assist, heliModel: this.settings.heliModel, windScale: this.settings.wind, cameraMode: this.cameraMode });
       } else {
         ac.update(dt, { ...input, isDown: () => false, wasPressed: () => false, virtual: { active: false } }, { mouse: { buttons: 0, dx: 0, dy: 0, wheel: 0 }, assist: 'normal', windScale: this.settings.wind, cameraMode: 'orbit' });
       }
@@ -563,9 +563,10 @@ export class Game {
       return this.hud.setPrompt(`${k('interact')} Service (fuel &amp; liquid)`, () => this._interact());
     }
     if (fm.engine === 'off' && this._rotorTurning() && fm.out.onGround) return this.hud.setPrompt(`Rotor running down (${Math.round(fm.out.rotorPct)} %) — crew waits for it to stop`);
-    if (fm.engine === 'off' && fm.out.onGround && !this.service.busy()) return this.hud.setPrompt(ac.kind === 'heli' ? `Collective down, hold ${k('engine')} to start` : `Hold ${k('engine')} to start the engine`);
+    const lever = ac.kind === 'heli' && fm.powerModel === 'power' ? 'Power' : 'Collective';
+    if (fm.engine === 'off' && fm.out.onGround && !this.service.busy()) return this.hud.setPrompt(ac.kind === 'heli' ? `${lever} down, hold ${k('engine')} to start` : `Hold ${k('engine')} to start the engine`);
     if (fm.engine === 'running' && fm.out.onGround && this.service.inZone() && fm.out.groundSpeed < 0.3 && (this.job || this.mode === 'free')) {
-      return this.hud.setPrompt(ac.kind === 'heli' ? `Collective down — tap ${k('engine')} to shut down for service` : `Tap ${k('engine')} to shut down for service`);
+      return this.hud.setPrompt(ac.kind === 'heli' ? `${lever} down — tap ${k('engine')} to shut down for service` : `Tap ${k('engine')} to shut down for service`);
     }
     this.hud.setPrompt(null);
   }
@@ -583,7 +584,7 @@ export class Game {
       if (fm.engine !== 'running' && !o.onGround && o.rotorPct > 5) out.push({ text: 'Engine out — autorotate', cls: 'blink' });
       if (o.vrs > 0.3) out.push({ text: 'Settling with power — forward speed', cls: 'amber blink' });
     }
-    if (!o.onGround && o.agl < 6 && o.vs < -3.5) out.push({ text: ac.kind === 'heli' ? 'Sink rate — collective' : 'Sink rate — pull up', cls: 'blink' });
+    if (!o.onGround && o.agl < 6 && o.vs < -3.5) out.push({ text: ac.kind === 'heli' ? (fm.powerModel === 'power' ? 'Sink rate — more power' : 'Sink rate — collective') : 'Sink rate — pull up', cls: 'blink' });
     if (t.ias > ac.type.vspeeds.vne) out.push({ text: 'Overspeed', cls: 'amber' });
     if (!o.onGround && o.agl < 30) {
       // Power line ahead?

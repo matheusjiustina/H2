@@ -1,6 +1,7 @@
 // Test/demo autopilot for the helicopter. Like the airplane autopilot it
 // flies only through the player's inputs (virtual cyclic, pedals, collective
-// rate, engine switch) with the 'high' assist engaged, so a full contract can
+// rate, engine switch) with the assist's 'auto' mode (the beginner laws plus
+// a climb-rate lever) engaged, so a full contract can
 // be validated end to end: service on the helipad, start and spool-up,
 // vertical lift-off, transit, spray passes with hover turnarounds at the
 // field ends, return, hover over the H, vertical landing, collective down,
@@ -26,7 +27,7 @@ export class HeliAutopilot {
   engage(plan = 'contract') {
     this.plan = plan;
     this.prevAssist = this.game.settings.heliAssist;
-    this.game.settings.heliAssist = 'high';
+    this.game.settings.heliAssist = 'auto';
     const v = this.v;
     v.active = true; v.pitch = 0; v.roll = 0; v.yaw = 0; v.throttle = null; v.leverRate = 0; v.engine = false;
     this.set('service');

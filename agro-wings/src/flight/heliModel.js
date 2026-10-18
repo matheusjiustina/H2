@@ -19,6 +19,18 @@
 //  * four skid contacts (spring/damper, Coulomb friction, no wheels);
 //  * never-touch points: blade tips, tail rotor, stinger, nose, tank, booms.
 //
+// Two power models (`powerModel`):
+//  * 'power' (default, the handling of the Tropical Island helicopter as
+//    asked for): one power lever. Rotor and torque act as one — while the
+//    engine runs the rotor is held at its speed and the drive torque is
+//    balanced for the pilot (no yaw kick when the power changes); thrust
+//    follows the power, so the power needed to hover depends only on the
+//    weight, more power climbs and less sinks at a rate that settles in
+//    proportion to the difference. The pedals only turn the aircraft.
+//  * 'rotor': the detailed model above (blade element, governor, droop,
+//    tail rotor, torque reaction, autorotation).
+// Disc tilt, airframe, skids and crash points are shared by both.
+//
 // Body frame as the airplanes: +Z nose, +Y up, +X left. omega in body frame:
 // +x = nose down, +y = yaw left, +z = roll right.
 import { Vector3, Quaternion } from 'three';
@@ -86,10 +98,24 @@ export function hoverPower(A, mass, skidAGL = Infinity, alt = UNITS.altOffsetM) 
   return (pMain + pTail + 900 + 4.5 * Om * Om) / A.engine.transEff;
 }
 
+// Power-model ('power') lever position that holds a hover at a given mass:
+// thrust at 100 % against the weight, with the ground cushion near the
+// skids (skidAGL: skid height above the ground; Infinity = out of ground
+// effect).
+export function hoverPowerFrac(A, mass, skidAGL = Infinity, alt = UNITS.altOffsetM) {
+  const R = A.rotor;
+  const rho = 1.225 * Math.pow(Math.max(0.3, 1 - 2.25577e-5 * alt), 4.2559);
+  const zg = Math.max(0.5 * R.radius, skidAGL - A.skids[0][1] + R.hubHeight);
+  const kGE = Number.isFinite(zg) ? 1 - (R.radius / (4 * zg)) ** 2 : 1;
+  return (mass * G) / (A.power.maxThrust * (rho / 1.225) * Math.pow(1 / Math.max(0.6, kGE), 2 / 3));
+}
+
 export class HeliModel {
   constructor(A) {
     this.A = A;
     this.kind = 'heli';
+    this.powerModel = 'power'; // 'power' | 'rotor' (see the header)
+    this.power01 = 0; // power model: delivered power, fraction of 100 %
     this.pos = new Vector3();
     this.vel = new Vector3();
     this.quat = new Quaternion();
@@ -133,6 +159,20 @@ export class HeliModel {
     this.updateMass();
   }
 
+  // Switch the power model in place (Settings), carrying the state over.
+  setPowerModel(m) {
+    if (m === this.powerModel || (m !== 'power' && m !== 'rotor')) return;
+    this.powerModel = m;
+    const running = this.engine === 'running';
+    if (m === 'power') {
+      this.power01 = running ? clamp(this.collective, 0, 1) : 0;
+      if (running && this.phase !== 'flight') this.phase = 'spool';
+    } else {
+      this.govI = 0;
+      if (running && this.phase === 'spool') { this.phase = 'warm'; this.clutch = 1; this.phaseT = 0; }
+    }
+  }
+
   updateMass() {
     const A = this.A;
     const fuelKg = this.fuel * A.fuelDensity, hopKg = this.hopper * A.liquidDensity;
@@ -173,7 +213,8 @@ export class HeliModel {
     if (engineOn) {
       this.power = this.powerCmd = hoverPower(this.A, this.mass);
       this.lam = 0.06;
-    } else { this.power = this.powerCmd = 0; this.rpm = 0; }
+      if (this.powerModel === 'power') this.collective = this.power01 = hoverPowerFrac(this.A, this.mass);
+    } else { this.power = this.powerCmd = 0; this.rpm = 0; this.power01 = 0; }
     this._instruments(0, 1.2);
   }
 
@@ -247,6 +288,42 @@ export class HeliModel {
     return { pShaft, pAvail, nr };
   }
 
+  // Power model: the engine brings the rotor up to speed and holds it there;
+  // the lever is the power. Engine off, the rotor runs down on its inertia
+  // (a descent keeps it turning, pulling power from it spends its speed).
+  _powerDrive(h, sigmaRho) {
+    const A = this.A, E = A.engine, R = A.rotor, P = A.power;
+    const omGov = (R.rpm100 * R.govPct / 100) * TAU / 60;
+    this.phaseT += h;
+    if (this.engine === 'cranking') {
+      this.crankTime += h;
+      if (this.crankTime > E.crankS) {
+        this.engine = 'running'; this.phase = 'spool'; this.phaseT = 0; this.clutch = 1;
+        this.events.push({ kind: 'catch' });
+      }
+    } else if (this.engine === 'running' && this.fuel <= 0) {
+      this.engine = 'off'; this.phase = 'off'; this.events.push({ kind: 'starved' });
+    }
+    if (this.engine === 'running') {
+      this.rotorOmega += (omGov - this.rotorOmega) * Math.min(1, h / P.spoolS);
+      if (this.phase !== 'flight' && this.rotorOmega > omGov * 0.985) { this.phase = 'flight'; this.phaseT = 0; }
+    } else {
+      const nr = this.rotorOmega / omGov;
+      this.rotorBrake = this.engine === 'off' && nr < 0.4 && nr > 0;
+      const windmill = this.out.onGround ? 0 : clamp(-this.vel.y / 8, 0, 1) * 0.1;
+      const k = 1 / 16 + clamp(this.collective, 0, 1) * 0.16 + (this.rotorBrake ? 0.3 : 0) - windmill;
+      this.rotorOmega = clamp(this.rotorOmega - omGov * k * h, 0, omGov);
+    }
+    const pCmd = this.engine === 'running' && this.phase === 'flight' ? clamp(this.collective, 0, 1) : 0;
+    this.power01 += (pCmd - this.power01) * Math.min(1, h / P.lagS);
+    // Gauges and fuel burn from the same power (8 % of the rating at idle).
+    const running = this.engine === 'running';
+    this.rpm = running ? (this.rotorOmega / (R.rpm100 * TAU / 60)) * E.rpm100
+      : this.engine === 'cranking' ? 0.1 * E.rpm100 : Math.max(0, this.rpm - h * 0.4 * E.rpm100);
+    this.power = this.powerCmd = running ? (0.08 + 0.92 * this.power01) * E.ratedKW * 1000 * Math.min(1, 1.065 * Math.pow(sigmaRho, 1.1)) : 0;
+    this.throttle = this.power01;
+  }
+
   // ------------------------------------------------------------------ step
   step(h, env) {
     const A = this.A, R = A.rotor, TR = A.tailRotor;
@@ -265,6 +342,7 @@ export class HeliModel {
     const mom = _m.set(0, 0, 0); // body frame
 
     // --- main rotor ------------------------------------------------------
+    const pm = this.powerModel === 'power';
     const Om = this.rotorOmega;
     const Vt = Math.max(1e-3, Om * R.radius);
     const area = Math.PI * R.radius * R.radius;
@@ -282,7 +360,9 @@ export class HeliModel {
     this.b1 += (clamp(b1t, -0.22, 0.22) - this.b1) * kf;
     const nb = _n.set(-Math.sin(this.b1) * Math.cos(this.a1), Math.cos(this.a1) * Math.cos(this.b1), Math.sin(this.a1)).normalize();
     // Flow through the disc (body frame, includes the rotor's own motion from body rates at the hub).
-    const hub = _r.set(-A.cgLateral, R.hubHeight, R.hubZ);
+    // (Power model: no tail-rotor side thrust to balance a lateral CG offset,
+    // so the hub is taken over the CG and the aircraft hangs level.)
+    const hub = _r.set(pm ? 0 : -A.cgLateral, R.hubHeight, R.hubZ);
     const vHub = _v2.copy(_vb).add(_v3.copy(this.omega).cross(hub)); // ω × r adds the hub's rotational velocity
     const vn = vHub.dot(nb);
     const vip = _v4.copy(vHub).addScaledVector(nb, -vn);
@@ -295,7 +375,24 @@ export class HeliModel {
     const vHor = Math.hypot(_air.x, _air.z);
     kGE = 1 - (1 - kGE) / (1 + (vHor / vh0) ** 2);
     let T = 0, pMain = 0, H = 0, vrs = 0;
-    if (Om > 2) {
+    if (pm) {
+      // Power model: thrust follows the power (and the rotor speed squared),
+      // with the ground cushion of a constant-power rotor, (1/kGE)^(2/3), and
+      // translational lift; the rotor's inflow damps vertical motion.
+      this.lam = 0.06;
+      if (Om > 2) {
+        const P = A.power;
+        const nr = Om / ((R.rpm100 * R.govPct / 100) * TAU / 60);
+        const pw = this.engine === 'running' ? this.power01 : clamp(this.collective, 0, 1) * 0.8;
+        T = pw * P.maxThrust * sigmaRho * nr * nr * Math.pow(1 / Math.max(0.6, kGE), 2 / 3) * (1 + P.etl * smoothstep(5, 15, vHor));
+        // Power is the up/down control: tilting the disc to move does not take
+        // lift away (the extra thrust a tilted rotor needs comes with it), so
+        // the vertical part of the thrust stays what the power sets.
+        const up = _v1.copy(nb).applyQuaternion(q).y;
+        T /= clamp(up, 0.7, 1);
+        force.y -= this.mass * P.climbDamp * Math.min(1, nr) * this.vel.y;
+      }
+    } else if (Om > 2) {
       const sol = solveRotor(theta, vn / Vt, mu, sigma, R.liftSlope, kGE, this.lam);
       this.lam = sol.lam;
       T = sol.CT * rho * area * Vt * Vt;
@@ -328,7 +425,11 @@ export class HeliModel {
     const vAx = -vT.x;
     const muT = Math.hypot(vT.y, vT.z) / VtT;
     let TT = 0, pTail = 0;
-    if (Om > 2) {
+    if (pm) {
+      // Pedals: a yaw moment and the tail rotor's damping; no torque to hold.
+      const P = A.power, nr = Math.min(1, Om / (R.rpm100 * TAU / 60));
+      mom.y -= clamp(this.pedal, -1, 1) * P.yawMoment * nr * nr + P.yawDamp * nr * this.omega.y;
+    } else if (Om > 2) {
       const sol = solveRotor(thetaT, vAx / VtT, muT, sigmaT, 5.73, 1, this.lamTr);
       this.lamTr = sol.lam;
       TT = sol.CT * rho * areaT * VtT * VtT;
@@ -341,26 +442,34 @@ export class HeliModel {
     // --- drive train and rotor speed -------------------------------------
     const friction = 900 + 4.5 * Om * Om; // bearings, gearbox, cooling fan (W)
     const pReq = pMain + pTail + friction;
-    const dt = this._driveTrain(h, rho, sigmaRho, pReq);
-    // Rotor brake (pilot applies it after shutdown below ~40 %).
-    this.rotorBrake = this.engine === 'off' && dt.nr < 0.4 && dt.nr > 0;
-    const brakeQ = this.rotorBrake ? 900 : 0;
-    const Qnet = (dt.pShaft - pReq) / Math.max(Om, 4) - brakeQ * Math.sign(Om);
-    this.rotorOmega = Math.max(0, Om + (Qnet / R.inertia) * h);
+    if (pm) {
+      this._powerDrive(h, sigmaRho);
+      this.shaftTorque = 0;
+    } else {
+      const dt = this._driveTrain(h, rho, sigmaRho, pReq);
+      // Rotor brake (pilot applies it after shutdown below ~40 %).
+      this.rotorBrake = this.engine === 'off' && dt.nr < 0.4 && dt.nr > 0;
+      const brakeQ = this.rotorBrake ? 900 : 0;
+      const Qnet = (dt.pShaft - pReq) / Math.max(Om, 4) - brakeQ * Math.sign(Om);
+      this.rotorOmega = Math.max(0, Om + (Qnet / R.inertia) * h);
+      // Reaction of the torque applied to the main-rotor shaft on the cabin
+      // (CCW rotor: nose right). The tail rotor and friction are driven by the
+      // same gearbox, so in autorotation the reaction reverses (nose left).
+      this.shaftTorque = (dt.pShaft - pTail - friction) / Math.max(Om, 4);
+      mom.y -= this.shaftTorque;
+    }
     if (this.rotorOmega < 0.05 && this.engine !== 'running') this.rotorOmega = 0;
     this.rotorRpm = this.rotorOmega * 60 / TAU;
     this.rotorAngle = (this.rotorAngle + this.rotorOmega * h) % TAU;
     this.tailAngle = (this.tailAngle - this.rotorOmega * TR.gear * h) % TAU;
-    // Reaction of the torque applied to the main-rotor shaft on the cabin
-    // (CCW rotor: nose right). The tail rotor and friction are driven by the
-    // same gearbox, so in autorotation the reaction reverses (nose left).
-    this.shaftTorque = (dt.pShaft - pTail - friction) / Math.max(Om, 4);
-    mom.y -= this.shaftTorque;
     this.thrust = T; this.tailThrust = TT; this.pMain = pMain; this.pTail = pTail;
 
     // --- airframe aerodynamics --------------------------------------------
     const V = _vb.length();
-    const [fx, fy, fz] = A.dragArea;
+    const [fx, fy, fz0] = A.dragArea;
+    // Power model: the top speed is set by the drag at the nose-down limit
+    // (there is no power-required curve), so the frontal area is larger.
+    const fz = pm ? A.power.dragFrontal : fz0;
     const dragB = _v1.set(-0.5 * rho * Math.abs(_vb.x) * _vb.x * fx, -0.5 * rho * Math.abs(_vb.y) * _vb.y * fy, -0.5 * rho * Math.abs(_vb.z) * _vb.z * fz * (1 + this.extraDrag));
     force.add(dragB.applyQuaternion(q));
     const qd = 0.5 * rho * V * V;
@@ -476,7 +585,7 @@ export class HeliModel {
     o.gLoad = _v1.copy(this._accel).add(_v2.set(0, G, 0)).applyQuaternion(_qInv).y / G;
     o.rotorPct = (this.rotorOmega / om100) * 100;
     o.enginePct = (this.rpm / A.engine.rpm100) * 100;
-    o.lowRotor = this.engine === 'running' && this.phase === 'flight' && this.phaseT > 3 && o.rotorPct < 97 ? 1 : 0;
+    o.lowRotor = !pm && this.engine === 'running' && this.phase === 'flight' && this.phaseT > 3 && o.rotorPct < 97 ? 1 : 0;
     o.stall = 0; o.stallWarn = o.lowRotor;
     o.mu = mu; o.inGE = 1 - kGE; o.vrs = vrs;
   }

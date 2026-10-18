@@ -14,8 +14,11 @@ export function makeEnv({ ground = 0, crop = 0, wind = [0, 0, 0] } = {}) {
   };
 }
 
-export function makeHeli({ fuel = 80, hopper = 0, engineOn = false, alt = 0, heading = 0, speed = 0 } = {}) {
+// model: 'rotor' (the detailed model, which r44.test.mjs checks against the
+// published figures) or 'power' (the game's default handling).
+export function makeHeli({ fuel = 80, hopper = 0, engineOn = false, alt = 0, heading = 0, speed = 0, model = 'rotor' } = {}) {
   const fm = new HeliModel(FLIGHT_R44);
+  fm.setPowerModel(model);
   fm.fuel = fuel; fm.hopper = hopper; fm.updateMass();
   const env = makeEnv();
   if (engineOn) fm.reset(new Vector3(0, alt, 0), heading, { engineOn: true, speed });
