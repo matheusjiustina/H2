@@ -219,7 +219,7 @@ function buildCanopy(f, h, terrain, mat) {
       pos[k * 3] = x; pos[k * 3 + 1] = terrain.heightAt(x, z) + hc * eh; pos[k * 3 + 2] = z;
       if (f.rowAxis === 'x') { uv[k * 2] = x / 4; uv[k * 2 + 1] = z / (4 * sp); }
       else { uv[k * 2] = z / 4; uv[k * 2 + 1] = x / (4 * sp); }
-      terrain.normalAt(x, z, n);
+      terrain.visualNormalAt(x, z, n);
       nrm[k * 3] = n.x; nrm[k * 3 + 1] = n.y; nrm[k * 3 + 2] = n.z;
       // Vigour patches (soil fertility, moisture): mottled tone from altitude.
       const v = fbm(x / 140 + f.id * 3.1, z / 140, 3);

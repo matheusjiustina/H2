@@ -4,7 +4,7 @@
 // splat textures).
 import * as THREE from 'three';
 import { ATMO_U } from './atmosphere.js';
-import { GRID_N, CELL } from './terrainData.js';
+import { GRID_N, CELL, RELIEF_SHADE } from './terrainData.js';
 import {
   WORLD_HALF, FAR_HALF, RUNWAY, BASE, FIELDS, ROADS, CREEK,
 } from './layout.js';
@@ -15,6 +15,7 @@ const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 
 
 const GLSL_FUNCS = /* glsl */ `
 varying vec3 vWPos;
+varying float vTN; // y of the (exaggerated) terrain normal
 uniform sampler2D uNoise;
 uniform sampler2D uDetail;
 uniform vec4 uFieldRect[NF];
@@ -171,6 +172,11 @@ vec3 terrainColor(vec2 p, out float rough) {
   tBump = det.b * 0.6 + det.a * 0.4;
   tBumpK = near * 0.7;
 
+  // Slopes: grass thins out and the red soil shows through (erosion, cattle
+  // tracks) on the steeper ground, mostly on the shaded-looking flanks.
+  float steep = smoothstep(0.992, 0.955, vTN);
+  col = mix(col, dirtColor(nB, nC, nD) * 0.92, steep * 0.34 * smoothstep(0.35, 0.7, nC.g + nA.g * 0.5));
+
   // Fields + carreadores.
   float dmin = 1e9;
   int imin = 0;
@@ -285,7 +291,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0.0 });
   const nf = FIELDS.length;
   const segs = [];
-  for (const r of ROADS) for (let i = 0; i < r.pts.length - 1; i++) segs.push({ a: r.pts[i], b: r.pts[i + 1], w: r.w });
+  for (const r of ROADS) if (!r.mesh) for (let i = 0; i < r.pts.length - 1; i++) segs.push({ a: r.pts[i], b: r.pts[i + 1], w: r.w });
   const nr = segs.length;
   const nc = CREEK.points.length;
   mat.defines = { NF: nf, NR: nr, NC: nc };
@@ -313,8 +319,8 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying float vTN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvTN = normal.y;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uWet;\n' + GLSL_FUNCS)
       .replace('#include <color_fragment>', '#include <color_fragment>\nfloat tRough;\ndiffuseColor.rgb = terrainColor(vWPos.xz, tRough);\n'
@@ -323,7 +329,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => 'terrain-v3';
+  mat.customProgramCacheKey = () => 'terrain-v4';
   return mat;
 }
 
@@ -334,8 +340,8 @@ function buildChunk(td, cx, cz, size, step) {
   const pos = [], nrm = [], idx = [];
   const nAt = (ix, iz) => {
     const c = (i, j) => td.h[Math.min(N - 1, Math.max(0, j)) * N + Math.min(N - 1, Math.max(0, i))];
-    const hx = c(ix + step, iz) - c(ix - step, iz);
-    const hz = c(ix, iz + step) - c(ix, iz - step);
+    const hx = (c(ix + step, iz) - c(ix - step, iz)) * RELIEF_SHADE;
+    const hz = (c(ix, iz + step) - c(ix, iz - step)) * RELIEF_SHADE;
     const l = Math.hypot(hx, 2 * CELL * step, hz);
     return [-hx / l, (2 * CELL * step) / l, -hz / l];
   };
@@ -388,7 +394,7 @@ export function createTerrain(td, noiseTex) {
     for (let i = 0; i < chunks; i++) {
       const lod = new THREE.LOD();
       const cx = i * CH, cz = j * CH;
-      const levels = [[1, 0], [2, 900], [4, 1900], [8, 3200]];
+      const levels = [[1, 0], [2, 950], [4, 2000], [8, 4200]];
       for (const [step, dist] of levels) {
         const m = new THREE.Mesh(buildChunk(td, cx, cz, CH, step), mat);
         m.receiveShadow = true;

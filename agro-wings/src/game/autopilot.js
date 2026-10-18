@@ -303,7 +303,10 @@ export class Autopilot {
     const bank = this.att.bank, pitch = this.att.pitch;
     v.roll = clamp((bankCmd - bank) * 2.2 - fm.omega.z * 0.4, -1, 1);
     const hErr = altTarget - (opts.height ?? fm.pos.y);
-    const vsT = clamp(hErr * (opts.kh ?? 0.35), -(opts.maxSink ?? 4), opts.maxClimb ?? 4);
+    // Terrain following: the vertical speed that keeps the height over ground
+    // sloping under the track (ff, m/s) is added to the height-error term.
+    const ff = opts.ff ?? 0;
+    const vsT = clamp(hErr * (opts.kh ?? 0.35) + ff, -((opts.maxSink ?? 4) + Math.max(0, -ff)), (opts.maxClimb ?? 4) + Math.max(0, ff));
     const pitchT = clamp(0.03 + (vsT - o.vs) * 0.08 + (vsT / Math.max(20, o.airspeed)), -0.25, opts.maxPitch ?? 0.3);
     v.pitch = clamp((pitchT - pitch) * 3.5 + fm.omega.x * 1.0, opts.minStick ?? -1, 1);
     if (Math.abs(v.pitch) < 0.06) v.pitch = Math.sign(v.pitch || 1) * 0.06;
@@ -350,7 +353,15 @@ export class Autopilot {
       if (s <= 160 && g.world.wireDistance(x, fm.pos.y, z) < 18) ahead = Math.max(ahead, fm.pos.y + 15);
     }
     if (ahead > top + 2) alt = Math.max(alt, ahead + 4.5 + fm.A.aglOffset);
-    this._fly(bank, alt, inSpan && established ? 46 : 44, dt, { kh: workZone ? 0.45 : 0.35, maxSink: workZone && alt - fm.pos.y > -8 ? 1.8 : 3.0 });
+    // Terrain following: rate of change of the ground height under the track
+    // 2 s ahead. Descending ground is followed fully; for rising ground only
+    // part of the rate is fed forward (the climb response lags and would
+    // overshoot the work height at the crest).
+    const gsNow = Math.max(5, o.groundSpeed);
+    const gAhead = ac.env.ground(fm.pos.x + (fm.vel.x / gsNow) * gsNow * 2, fm.pos.z + (fm.vel.z / gsNow) * gsNow * 2);
+    const dG = (gAhead - ac.env.ground(fm.pos.x, fm.pos.z)) / 2;
+    const ff = dG < 0 ? dG : 0.3 * dG;
+    this._fly(bank, alt, inSpan && established ? 46 : 44, dt, { kh: workZone ? 0.45 : 0.35, maxSink: workZone && alt - fm.pos.y > -8 ? 1.8 : 3.0, ff });
     // Spray only over a target field, never over gaps.
     const over = g.job.fields.some((f) => fm.pos.x > f.x0 + 2 && fm.pos.x < f.x1 - 2 && fm.pos.z > f.z0 + 2 && fm.pos.z < f.z1 - 2);
     const want = over && established && ac.workHeight() < 8 && fm.hopper > 0.5;

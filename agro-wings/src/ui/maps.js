@@ -1,8 +1,70 @@
 // Farm map rendering for the minimap and the full map (M).
-import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ } from '../world/layout.js';
+import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ, WORLD_HALF } from '../world/layout.js';
+import { rawHeight } from '../world/terrainData.js';
 
-const EXT = 3200; // half extent of the base map (m)
+const EXT = WORLD_HALF - 100; // half extent of the base map (m)
 const CROP_COL = { soy: '#3f8f2c', corn: '#2f7224', cotton: '#5f8f4a', stubble: '#b79a5a', fallow: '#9a3a1c', pasture: '#6f9a3a' };
+
+
+// Hillshade + a light elevation tint from the real height function (not an
+// invented picture): lit slopes lighten, shaded slopes darken, the high ground
+// of the rolling and hilly zones warms and the valleys cool. Flat land stays
+// as drawn. `grid` samples across the whole map.
+function reliefOverlay(size, grid = 256) {
+  const N = grid + 1, step = (EXT * 2) / grid;
+  const h = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) h[j * N + i] = rawHeight(-EXT + i * step, -EXT + j * step);
+  const c = document.createElement('canvas');
+  c.width = c.height = grid;
+  const g = c.getContext('2d');
+  const img = g.createImageData(grid, grid);
+  const L = [-0.5, 0.78, -0.5], ll = Math.hypot(...L);
+  const base = L[1] / ll;
+  for (let j = 0; j < grid; j++) {
+    for (let i = 0; i < grid; i++) {
+      const a = h[j * N + i], b = h[j * N + i + 1], d = h[(j + 1) * N + i], e = h[(j + 1) * N + i + 1];
+      const gx = ((b - a) + (e - d)) / (2 * step), gz = ((d - a) + (e - b)) / (2 * step);
+      const nl = Math.hypot(gx, 1, gz);
+      const shade = ((-gx * L[0] + L[1] - gz * L[2]) / (nl * ll) - base) * 7; // ± about 0 on flat ground
+      const avg = (a + b + d + e) / 4;
+      let r = 0, gg = 0, bl = 0, al = 0;
+      if (shade > 0) { r = gg = bl = 255; al = Math.min(0.5, shade * 0.6); } else { al = Math.min(0.55, -shade * 0.7); }
+      if (avg > 10) { const t = Math.min(0.32, (avg - 10) / 70); r = r * (1 - t) + 255 * t; gg = gg * (1 - t) + 214 * t; bl = bl * (1 - t) + 140 * t; al = Math.max(al, t); }
+      else if (avg < -10) { const t = Math.min(0.3, (-avg - 10) / 60); r = r * (1 - t) + 30 * t; gg = gg * (1 - t) + 70 * t; bl = bl * (1 - t) + 95 * t; al = Math.max(al, t); }
+      const k = (j * grid + i) * 4;
+      img.data[k] = r; img.data[k + 1] = gg; img.data[k + 2] = bl; img.data[k + 3] = al * 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+// Same overlay for one rectangle (the GPS page of a job): returns a canvas and
+// the elevation range of the real terrain under it.
+export function reliefPatch(x0, z0, x1, z1, px = 160) {
+  const W = px, Hh = Math.max(16, Math.round((px * (z1 - z0)) / (x1 - x0)));
+  const sx = (x1 - x0) / W, sz = (z1 - z0) / Hh;
+  const hs = new Float32Array((W + 1) * (Hh + 1));
+  let mn = 1e9, mx = -1e9;
+  for (let j = 0; j <= Hh; j++) for (let i = 0; i <= W; i++) { const v = rawHeight(x0 + i * sx, z0 + j * sz); hs[j * (W + 1) + i] = v; mn = Math.min(mn, v); mx = Math.max(mx, v); }
+  const c = document.createElement('canvas');
+  c.width = W; c.height = Hh;
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, Hh);
+  const L = [-0.5, 0.78, -0.5], ll = Math.hypot(...L), base = L[1] / ll;
+  for (let j = 0; j < Hh; j++) for (let i = 0; i < W; i++) {
+    const a = hs[j * (W + 1) + i], b = hs[j * (W + 1) + i + 1], d = hs[(j + 1) * (W + 1) + i], e = hs[(j + 1) * (W + 1) + i + 1];
+    const gx = ((b - a) + (e - d)) / (2 * sx), gz = ((d - a) + (e - b)) / (2 * sz);
+    const shade = ((-gx * L[0] + L[1] - gz * L[2]) / (Math.hypot(gx, 1, gz) * ll) - base) * 9;
+    // Elevation tint inside the shown range: low = dark green, high = olive/tan.
+    const t = mx > mn ? ((a + b + d + e) / 4 - mn) / (mx - mn) : 0.5;
+    const r = 28 + 90 * t, gg = 62 + 70 * t, bl = 36 + 40 * t;
+    const k = (j * W + i) * 4, m = 1 + Math.max(-0.5, Math.min(0.6, shade));
+    img.data[k] = Math.min(255, r * m); img.data[k + 1] = Math.min(255, gg * m); img.data[k + 2] = Math.min(255, bl * m); img.data[k + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return { canvas: c, min: mn, max: mx };
+}
 
 export function buildBaseMap(size = 1024) {
   const c = document.createElement('canvas');
@@ -54,6 +116,9 @@ export function buildBaseMap(size = 1024) {
   POWERLINE.points.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
   g.stroke();
   g.setLineDash([]);
+  // Relief shading over everything but the labels (flat land is unchanged).
+  g.imageSmoothingEnabled = true;
+  g.drawImage(reliefOverlay(size), -EXT, -EXT, EXT * 2, EXT * 2);
   return { canvas: c, ext: EXT };
 }
 

@@ -3,7 +3,9 @@
 // crash.
 import { h } from './hud.js';
 import { TIMES, WEATHER, TIME_ORDER, WEATHER_ORDER } from '../world/atmosphere.js';
-import { CONTRACTS } from '../game/contracts.js';
+import { CONTRACTS, LEVELS } from '../game/contracts.js';
+import { fieldsTerrain } from '../world/terrainInfo.js';
+import { BASE } from '../world/layout.js';
 import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
@@ -103,27 +105,33 @@ export class Screens {
   // --------------------------------------------------------------- contracts
   board() {
     const g = this.game;
-    const cards = CONTRACTS.map((c) => {
+    const card = (c) => {
       const job = g.career.jobs[c.id];
       const st = job ? job.stats() : null;
-      const ha = job ? job.ha : g.career.job(c.id).ha;
+      const jb = job || g.career.job(c.id);
+      const ha = jb.ha;
       const done = g.career.completed[c.id];
       const prog = st && st.coverage > 0.001 ? `In progress · ${pct(st.coverage)} covered` : done ? `Completed ${done.stars ? '★'.repeat(done.stars) : ''} · can be flown again` : 'Not started';
+      // Real terrain data of the talhões (from the height field the aircraft flies over).
+      const T = fieldsTerrain(g.world.terrain, jb.fields);
+      const dist = Math.hypot(T.cx - BASE.pad.x, T.cz - BASE.pad.z) / 1000;
+      const terr = c.level > 1 ? `<span>relief ${Math.round(T.relief)} m</span><span>slope ≤ ${Math.round(T.maxSlope)}°</span>` : '';
       return `<div class="card ${g.job?.c.id === c.id ? 'sel' : ''}">
-        <span class="tag">${c.difficulty}</span>
+        <span class="tag lv${c.level}">${LEVELS[c.level].short} · ${c.difficulty}</span>
         <div class="name">${c.title}</div>
         <div class="desc">${c.brief}</div>
-        <div class="meta"><span>${ha.toFixed(1)} ha</span><span>${GAME.currency} ${c.payPerHa}/ha</span><span>bonus ${money(c.bonus)}</span></div>
+        <div class="meta"><span>${ha.toFixed(1)} ha</span><span>${GAME.currency} ${c.payPerHa}/ha</span><span>bonus ${money(c.bonus)}</span><span>${dist.toFixed(1)} km</span>${terr}</div>
         <div class="prog">${prog}</div>
         <div class="btn-row" style="justify-content:flex-start">
           <button class="btn primary small" data-sel="${c.id}">${st && st.coverage > 0.001 ? 'Resume' : 'Accept'}</button>
           ${st && st.coverage > 0.001 ? `<button class="btn small" data-restart="${c.id}">Restart</button>` : ''}
         </div>
       </div>`;
-    }).join('');
+    };
+    const cards = [1, 2, 3].map((lv) => `<h3 class="lvl">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => c.level === lv).map(card).join('')}</div>`).join('');
     const el = h(`<div class="panel"><h2>Service orders</h2>
       <div class="sub">Choose a job, set the load, and the badeco will service the aircraft on the pad.</div>
-      <div class="cards">${cards}</div>
+      ${cards}
       <div class="row2"><span class="money">Balance ${money(g.career.money)}</span>
       <div class="btn-row">${g.job ? '<button class="btn small" data-a="abandon">Hand in current job</button>' : ''}<button class="btn small" data-a="close">Close</button></div></div></div>`);
     el.addEventListener('click', (e) => {

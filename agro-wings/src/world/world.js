@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { Atmosphere } from './atmosphere.js';
 import { TerrainData } from './terrainData.js';
 import { createTerrain } from './terrain.js';
+import { createRoads } from './roads.js';
 import { createSky } from './sky.js';
 import { createCrops } from './crops.js';
 import { makeNoiseTexture } from '../core/textures.js';
@@ -30,6 +31,8 @@ export class World {
     this.terrain = await step('Terrain', () => new TerrainData());
     this.terrainMesh = await step('Ground', () => createTerrain(this.terrain, this.noise));
     this.scene.add(this.terrainMesh.group);
+    this.roads = createRoads(this.terrain);
+    this.scene.add(this.roads.group);
     this.sky = await step('Sky', () => createSky(this.renderer, this.scene, this.quality));
     this.atmo = new Atmosphere({ renderer: this.renderer, scene: this.scene, sky: this.sky, terrain: this.terrain, quality: this.quality });
     this.visualWind = new THREE.Vector3(0, 0, 3);

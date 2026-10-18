@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FORESTS, CREEK, FIELDS, HQ, BASE, ROADS, RUNWAY } from './layout.js';
+import { reliefWeights } from './relief.js';
 import { rng, fbm, segDist } from '../core/math.js';
 import {
   makeFoliageAtlas, makeCanopyTexture, foliageMaterial, tileRect, TILES,
@@ -227,6 +228,46 @@ export function createVegetation(terrain, quality) {
         const side = r2() < 0.5 ? -1 : 1, off = rd.w / 2 + 4 + r2() * 5;
         const x = ax + (bx - ax) * (s / len) + nx * off * side, z = az + (bz - az) * (s / len) + nz * off * side;
         if (!avoid(x, z, 4)) add2('bush', x, z, 0.5 + r2() * 0.7);
+      }
+    }
+  }
+
+  // --- vegetation that follows the landforms (own random stream: nothing
+  // placed above moves). Gallery woods fill the valley floors of the rolling
+  // and hilly zones, scrub (capoeira) clings to the steeper flanks, and a few
+  // isolated trees stand on the crests.
+  const r3 = rng(7788);
+  const add3 = (kind, x, z, s = 1) => {
+    trees.push({ kind, v: Math.floor(r3() * variants[kind].length), x, z, s, rot: r3() * Math.PI * 2 });
+    // Same collision volumes as the trees of the same kind elsewhere.
+    if (kind === 'mata' || kind === 'buriti') colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + 20 });
+    else if (kind === 'shade' || kind === 'ipe') colliders.push({ x, z, r: 4.5 * s, top: terrain.heightAt(x, z) + 11 * s });
+  };
+  for (let z = -3800; z <= 3800; z += 60) {
+    for (let x = -3800; x <= 3800; x += 60) {
+      const w = reliefWeights(x + 30, z + 30);
+      if (w.roll < 0.3 && w.hill < 0.1) continue;
+      const px = x + r3() * 60, pz = z + r3() * 60;
+      if (avoid(px, pz, 12)) continue;
+      const h = terrain.heightAt(px, pz);
+      // Valley depth: height against the mean of the surroundings (200 m).
+      const around = (terrain.heightAt(px + 200, pz) + terrain.heightAt(px - 200, pz) + terrain.heightAt(px, pz + 200) + terrain.heightAt(px, pz - 200)) / 4;
+      const rel = h - around;
+      const gx = terrain.heightAt(px + 10, pz) - terrain.heightAt(px - 10, pz), gz = terrain.heightAt(px, pz + 10) - terrain.heightAt(px, pz - 10);
+      const slope = Math.hypot(gx, gz) / 20;
+      const k = r3();
+      if (rel < -3.5 && slope < 0.08 && k < 0.55) {
+        // Gallery wood: a tight cluster of mixed trees and buritis.
+        const n = 2 + Math.floor(r3() * 3);
+        for (let i = 0; i < n; i++) {
+          const qx = px + (r3() - 0.5) * 26, qz = pz + (r3() - 0.5) * 26;
+          if (avoid(qx, qz, 8)) continue;
+          if (r3() < 0.22) add3('buriti', qx, qz, 0.9 + r3() * 0.3); else add3('mata', qx, qz, 0.9 + r3() * 0.5);
+        }
+      } else if (slope > 0.05 && k < 0.3) {
+        add3('bush', px, pz, 0.5 + r3() * 0.7);
+      } else if (rel > 4 && k < 0.12) {
+        add3(r3() < 0.2 ? 'ipe' : 'shade', px, pz, 0.9 + r3() * 0.4);
       }
     }
   }

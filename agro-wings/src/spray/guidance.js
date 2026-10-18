@@ -5,6 +5,8 @@
 // cockpit unit and by the HUD's GPS mode. Every readout comes from live
 // state: position, heading, ground speed, coverage grid, sprayer flow.
 import { clamp, KT } from '../core/math.js';
+import { reliefPatch } from '../ui/maps.js';
+import { UNITS } from '../config.js';
 
 const TRACK_MAX = 2400; // points (~16 min at 0.4 s)
 
@@ -56,6 +58,16 @@ export class Guidance {
       const c = a0 + sp * (k + 0.5);
       this.passes.push({ k, c, c0: c - sp / 2, c1: c + sp / 2, done: 0 });
     }
+    // Terrain under the job (real heights): shading for the GPS page and the
+    // elevation range of the talhões.
+    const m = 350;
+    const bx0 = Math.min(...fs.map((f) => f.x0)) - m, bx1 = Math.max(...fs.map((f) => f.x1)) + m;
+    const bz0 = Math.min(...fs.map((f) => f.z0)) - m, bz1 = Math.max(...fs.map((f) => f.z1)) + m;
+    const rp = reliefPatch(bx0, bz0, bx1, bz1, 160);
+    let fmn = 1e9, fmx = -1e9;
+    const T = this.game.world.terrain;
+    for (const f of fs) for (let z = f.z0; z <= f.z1; z += 30) for (let x = f.x0; x <= f.x1; x += 30) { const v = T.heightAt(x, z); fmn = Math.min(fmn, v); fmx = Math.max(fmx, v); }
+    this.relief = { ...rp, bx0, bz0, bx1, bz1, fmn, fmx, shade: fmx - fmn >= 6 };
     this.axis = axis;
     this.a0 = a0; this.a1 = a1; this.l0 = l0; this.l1 = l1;
     this.spacing = sp;
@@ -149,6 +161,14 @@ export class Guidance {
     g.rotate(hdg - Math.PI);
     g.scale(scale, scale);
     g.translate(-pos.x, -pos.z);
+    // Terrain shading from the real height field (only where there is relief).
+    if (this.relief?.shade) {
+      const R = this.relief;
+      g.globalAlpha = 0.9;
+      g.imageSmoothingEnabled = true;
+      g.drawImage(R.canvas, R.bx0, R.bz0, R.bx1 - R.bx0, R.bz1 - R.bz0);
+      g.globalAlpha = 1;
+    }
     // Coverage images
     for (const cov of this.job.coverages) {
       const img = this.game.overlay?.canvasFor(cov);
@@ -211,6 +231,16 @@ export class Guidance {
     const done = this.passes.filter((p) => p.done > 0.85).length;
     g.fillText(`PASS ${this.next ? this.next.k + 1 : '-'} / ${this.passes.length}`, x + 8, y + 20 * fs);
     g.fillText(`DONE ${done}`, x + 8, y + 40 * fs);
+    if (this.relief?.shade) {
+      // Terrain under the aircraft and the talhões' elevation range (MSL, m).
+      const gnd = this.game.world.terrain.heightAt(pos.x, pos.z) + UNITS.altOffsetM;
+      g.fillStyle = '#c9d8a0';
+      g.font = `bold ${Math.round(13 * fs)}px monospace`;
+      g.fillText(`GND ${Math.round(gnd)}m`, x + 8, y + 58 * fs);
+      g.fillText(`FLD ${Math.round(this.relief.fmn + UNITS.altOffsetM)}-${Math.round(this.relief.fmx + UNITS.altOffsetM)}m`, x + 8, y + 74 * fs);
+      g.font = `bold ${Math.round(16 * fs)}px monospace`;
+      g.fillStyle = '#9ff0a4';
+    }
     if (this.next && this.aligned) {
       const e = this.xte;
       g.textAlign = 'right';

@@ -178,3 +178,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
   .keys { grid-template-columns: 1fr; }
   .panel { padding: 16px; }
 }
+
+.lvl { margin: 14px 0 8px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.lvl span { text-transform: none; letter-spacing: 0; color: var(--ink-faint); margin-left: 8px; font-size: 11.5px; }
+.card .tag.lv2 { border-color: rgba(240,192,32,.55); color: #f0c020; }
+.card .tag.lv3 { border-color: rgba(255,120,80,.6); color: #ff8860; }

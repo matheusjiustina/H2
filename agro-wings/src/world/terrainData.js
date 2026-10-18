@@ -1,9 +1,13 @@
 // Terrain heights and surface types. Pure JS (no three.js) so the flight model
 // and tests can query the exact same triangulated surface the renderer draws.
 import { fbm, smoothstep, lerp, segDist, clamp } from '../core/math.js';
+import { reliefAt } from './relief.js';
 import {
   WORLD_HALF, RUNWAY, BASE, FIELDS, CREEK, ROADS, HQ, fieldAt, cropHeight,
 } from './layout.js';
+
+// Slope exaggeration of the shading normals (visual only).
+export const RELIEF_SHADE = 1.9;
 
 export const GRID_N = 512; // cells per side
 export const CELL = (WORLD_HALF * 2) / GRID_N; // 15.625 m
@@ -37,8 +41,12 @@ const H0 = baseHeight(-100, -40);
 
 export function rawHeight(x, z) {
   let h = baseHeight(x, z) - H0;
-  // Creek valley + channel.
   const cd = creekDist(x, z);
+  // Rolling country and hills in the outer zones (exactly zero over the farm
+  // core). The creek keeps a calm floodplain through them.
+  const rel = reliefAt(x, z);
+  if (rel !== 0) h += rel * smoothstep(110, 480, cd);
+  // Creek valley + channel.
   const v = 1 - smoothstep(0, CREEK.valley, cd);
   h -= CREEK.valleyDepth * v * v;
   h -= CREEK.depth * (1 - smoothstep(CREEK.width * 0.5, CREEK.width * 0.5 + 5, cd));
@@ -93,6 +101,17 @@ export class TerrainData {
     const e = 1.5;
     const hx = this.heightAt(x + e, z) - this.heightAt(x - e, z);
     const hz = this.heightAt(x, z + e) - this.heightAt(x, z - e);
+    const l = Math.hypot(hx, 2 * e, hz);
+    out.x = -hx / l; out.y = (2 * e) / l; out.z = -hz / l;
+    return out;
+  }
+
+  // Normal used for shading only: the slope is exaggerated so gentle relief
+  // reads from the air (the physical normal above is untouched).
+  visualNormalAt(x, z, out = { x: 0, y: 1, z: 0 }) {
+    const e = 1.5;
+    const hx = (this.heightAt(x + e, z) - this.heightAt(x - e, z)) * RELIEF_SHADE;
+    const hz = (this.heightAt(x, z + e) - this.heightAt(x, z - e)) * RELIEF_SHADE;
     const l = Math.hypot(hx, 2 * e, hz);
     out.x = -hx / l; out.y = (2 * e) / l; out.z = -hz / l;
     return out;
