@@ -114,7 +114,7 @@ export const CONTRACTS = [
     id: 'ridge-corn',
     title: 'Corn — Talhões T-43A + T-43B',
     client: 'Fazenda Boa Esperança · Serra do Norte',
-    brief: 'Tall corn on the long hillside west of the soybean ridge, with a step-out talhão on the lower side. Slopes up to 6° and 15 m of relief across the field: the corn canopy is 2.4 m, so the margin over a crest is thin.',
+    brief: 'Tall corn over a hill west of the creek, with a step-out talhão on the north side and the legal-reserve forest just south. Slopes up to 7° and 30 m of relief across the field: the corn canopy is 2.4 m, so the margin over a crest is thin.',
     difficulty: 'Hilly fields',
     level: 3,
     fields: ['T-43A', 'T-43B'],
@@ -127,8 +127,8 @@ export const CONTRACTS = [
 
 export const LEVELS = {
   1: { label: 'Level 1 · Flat farmland', short: 'L1', blurb: 'Mostly level terrain.' },
-  2: { label: 'Level 2 · Rolling fields', short: 'L2', blurb: 'Gentle elevation changes, 10–25 m of relief across a field.' },
-  3: { label: 'Level 3 · Hilly agricultural fields', short: 'L3', blurb: 'Noticeable hills and valleys, slopes up to ~9°.' },
+  2: { label: 'Level 2 · Rolling fields', short: 'L2', blurb: 'Gentle swells: about 20–30 m of relief across a field, slopes up to 5°.' },
+  3: { label: 'Level 3 · Hilly agricultural fields', short: 'L3', blurb: 'Noticeable hills and valleys: 25–37 m of relief, slopes up to 7°.' },
 };
 
 const STORE = 'agrowings.save.v1';

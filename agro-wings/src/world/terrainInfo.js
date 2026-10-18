@@ -1,6 +1,5 @@
 // Terrain information derived from the actual height data (no invented
-// numbers): relief and slope of a field set, elevation profile along a line.
-// Used by the mission board and the GPS page.
+// numbers): relief and slope of a field set. Used by the mission board.
 import { terrainLevel } from './relief.js';
 
 const cache = new WeakMap();
@@ -30,12 +29,3 @@ export function fieldsTerrain(terrain, fields) {
   return v;
 }
 
-// Heights along a straight line (for profile displays).
-export function profile(terrain, x0, z0, x1, z1, n = 48) {
-  const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const t = i / (n - 1);
-    out[i] = terrain.heightAt(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t);
-  }
-  return out;
-}

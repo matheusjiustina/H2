@@ -30,7 +30,7 @@ is the Wind setting, as before. Settings → Cockpit shake: off / low / normal.
 
 ## Gameplay loop
 
-Service orders (3 contracts) → load sheet (fuel / application liquid) → the
+Service orders (9 contracts on three terrain levels) → load sheet (fuel / application liquid) → the
 badeco services the aircraft on the pad → engine start → taxi → take-off →
 spray passes → return → landing → taxi to the pad → shut down → results and
 payment in Cr$ → next order. Partial work can be handed in; landing for a
@@ -44,6 +44,18 @@ Contracts (`src/game/contracts.js`):
 | soy | T-07 | soybean 0.8 m | 18.4 ha | wide, flat, beside the strip — learn the circuit |
 | corn | T-12 | corn 2.4 m | 16.1 ha | tall canopy on a swell, tree line along the south edge, power line past the east end |
 | cotton | T-03A + T-03B | cotton 1.2 m | 13.8 ha | two fields split by the creek — valve off over the gap |
+| roll-soy | T-31A + T-31B | soybean 0.8 m | 19.5 ha | level 2: 25 m of relief in the south-east swells, stepped boundary |
+| roll-corn | T-32A + T-32B | corn 2.4 m | 19.8 ha | level 2: tall canopy over a swell, the longest ferry (4.2 km) |
+| roll-cotton | T-33A + T-33B | cotton 1.2 m | 19.1 ha | level 2: 30 m of relief on the north-west plateau edge |
+| ridge-soy | T-41A + T-41B | soybean 0.8 m | 16.1 ha | level 3: ridge flank, steepest field (mean 4.5°, max 7°) |
+| ridge-cotton | T-42A + T-42B | cotton 1.2 m | 16.1 ha | level 3: 37 m of relief across the talhão |
+| ridge-corn | T-43A + T-43B | corn 2.4 m | 15.8 ha | level 3: tall corn over a hill, forest along the south edge |
+
+The order board groups them by terrain level (Level 1 · Flat farmland,
+Level 2 · Rolling fields, Level 3 · Hilly agricultural fields); each card
+shows the distance from the base and, for levels 2–3, the relief and the
+steepest slope measured on the terrain itself. See *Terrain relief and
+advanced missions* below.
 
 Evaluation: useful coverage (dose ≥ 0.7 of target), uniformity (1 − CV of
 dose), gaps, overlap (dose > 1.5), waste (off-target + drift/evaporation +
@@ -256,9 +268,11 @@ Air Tractor expansion (this build):
 
 ## World
 
-The farm layout, strip, roads, fields and colliders are unchanged
-(`src/world/layout.js`, `terrainData.js`); everything below is how the
-world is drawn, built for perceived realism at low cost.
+The farm core — strip, base, HQ, the original fields, roads and colliders —
+is unchanged (`src/world/layout.js`, `terrainData.js`); the outer land got
+relief and new fields later (see *Terrain relief and advanced missions*).
+Everything below is how the world is drawn, built for perceived realism at
+low cost.
 
 - **Trees** (`foliage.js`, `vegetation.js`): every plant is a cloud of
   alpha-tested leaf-cluster cards around a tapered trunk with branches, with

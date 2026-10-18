@@ -649,7 +649,7 @@ function buildFences(B, M, group, H, dyn) {
   for (const f of FENCES) {
     const [a, b] = f.pts;
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const gateS = f.gateAt * len, gateW = 5;
+    const gateS = f.gateAt != null ? f.gateAt * len : -1e9, gateW = 5;
     const dirx = (b[0] - a[0]) / len, dirz = (b[1] - a[1]) / len;
     const ry = Math.atan2(dirx, dirz);
     let prev = null;
@@ -660,6 +660,7 @@ function buildFences(B, M, group, H, dyn) {
       if (prev) for (const hh of [0.45, 0.8, 1.1]) wirePts.push(prev[0], prev[1] + hh, prev[2], x, y + hh, z);
       prev = [x, y, z];
     }
+    if (f.gateAt == null) continue;
     // Porteira: wooden gate, slightly open.
     const gx = a[0] + dirx * (gateS - gateW / 2), gz = a[1] + dirz * (gateS - gateW / 2), gy = H(gx, gz);
     B.box(0.2, 1.9, 0.2, M.woodDark, gx, gy + 0.9, gz);
