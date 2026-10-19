@@ -1,6 +1,7 @@
 // Touch controls: left virtual stick (pitch/roll), right power slider, and a
 // few buttons kept to the screen edges so the view ahead stays clear.
 import { h } from './hud.js';
+import { t } from '../i18n/index.js';
 
 export class TouchControls {
   constructor(game, root) {
@@ -8,14 +9,14 @@ export class TouchControls {
     this.active = false;
     this.el = h(`<div class="touch">
       <div class="t-stick"><div class="t-knob"></div></div>
-      <div class="t-rud"><button class="tb small" data-hold="yawL">◀ R</button><button class="tb small" data-hold="yawR">R ▶</button></div>
+      <div class="t-rud"><button class="tb small" data-hold="yawL">◀ ${t('R')}</button><button class="tb small" data-hold="yawR">${t('R')} ▶</button></div>
       <div class="t-thr"><span style="height:0%"></span></div>
       <div class="t-btns">
-        <button class="tb" data-tap="spray">SPRAY</button><button class="tb" data-hold="brake">BRAKE</button>
-        <button class="tb" data-hold="engine">ENG</button><button class="tb" data-tap="camera">CAM</button>
+        <button class="tb" data-tap="spray">${t('SPRAY')}</button><button class="tb" data-hold="brake">${t('BRAKE')}</button>
+        <button class="tb" data-hold="engine">${t('ENG')}</button><button class="tb" data-tap="camera">${t('CAM')}</button>
         <button class="tb small" data-tap="flapsDown">FLP+</button><button class="tb small" data-tap="flapsUp">FLP−</button>
       </div>
-      <div class="t-top"><button class="tb small" data-tap="interact">E</button><button class="tb small" data-tap="map">MAP</button><button class="tb small" data-tap="pause">II</button></div>
+      <div class="t-top"><button class="tb small" data-tap="interact">E</button><button class="tb small" data-tap="map">${t('MAP')}</button><button class="tb small" data-tap="pause">II</button></div>
     </div>`);
     root.appendChild(this.el);
     const input = game.input;
