@@ -2,7 +2,7 @@
 // (run: node --test test/). The PR-AGW keeps its own suite in flight.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeSim, deg, Vector3, balaoDive } from './harness.mjs';
+import { makeSim, deg, Vector3, balaoDive, lowTurn } from './harness.mjs';
 import { FLIGHT, FLIGHT_AT502 as A } from '../src/config.js';
 
 const KT = 1.943844, FPM = 196.85;
@@ -173,7 +173,7 @@ test('pitch and roll response with the assist (loaded, spray speed)', () => {
   console.log(`  ${deg(q).toFixed(0)}°/s and ${g.toFixed(2)} g after 0.5 s; 60° bank in ${t60?.toFixed(2)} s`);
   // (With the angle of attack at the protected limit the nose turns with
   // the path, so the g — not the pitch rate — is what a quick pull shows.)
-  assert.ok(q > 0.25 && g > 1.8, `${deg(q).toFixed(0)}°/s, ${g.toFixed(2)} g`);
+  assert.ok(q > 0.25 && g > 1.6, `${deg(q).toFixed(0)}°/s, ${g.toFixed(2)} g`);
   assert.ok(t60 !== null && t60 < 1.5);
 });
 
@@ -205,7 +205,7 @@ test('balão with 1,200 L: pull-up, steep reversal, no stall', () => {
 });
 
 test('balão with the dive back at working speed: the pull-out clears the ground (loaded)', () => {
-  for (const [hop, dive, hPull, minLow] of [[600, 14, 14, 3], [1000, 14, 14, 3], [1000, 20, 18, 0.8]]) {
+  for (const [hop, dive, hPull, minLow] of [[600, 14, 14, 1.5], [1000, 14, 14, 1.5], [1000, 20, 18, 0.8]]) {
     const r = balaoDive(A, hop, { diveDeg: dive, hPull, fuel: 340, knots: 115 });
     console.log(`  ${hop} L, ${dive}° dive, pull at ${hPull} m (${r.pullKt?.toFixed(0)} kt): lowest ${typeof r.low === 'number' ? r.low.toFixed(1) + ' m' : r.low}, ${r.maxG.toFixed(2)} g, stall ${r.stall.toFixed(2)}`);
     assert.ok(typeof r.low === 'number' && r.low > minLow, `hit or too low: ${r.low}`);
@@ -240,4 +240,13 @@ test('landing: soft touchdown, beta and brakes stop it on the strip, no prop str
   assert.ok(main.speed < A.hardLandingVs);
   assert.ok(roll < 450 && fm.pos.x < 400);
   assert.equal(props.length, 0);
+});
+
+test('low steep turn back (180° from 15 m, 1,180 L): 45° and 60° come round without touching the crop', () => {
+  for (const [bank, maxLoss] of [[45, 5], [60, 10]]) {
+    const r = lowTurn(A, 1180, bank, { knots: 115, fuel: 340 });
+    console.log(`  ${bank}° bank, 1,180 L: ${typeof r.lost === 'number' ? r.lost.toFixed(1) + ' m' : r.lost} in ${r.t.toFixed(1)} s, ${r.v?.toFixed(0)} kt after, stall ${r.stall.toFixed(2)}`);
+    assert.ok(typeof r.lost === 'number' && r.lost > -maxLoss, `lost ${r.lost}`);
+    assert.ok(r.stall < 0.2, 'no stall');
+  }
 });

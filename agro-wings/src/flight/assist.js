@@ -75,7 +75,12 @@ export class Assist {
     const gamma = Math.asin(clamp(vel.y / Math.max(1, vel.length()), -1, 1));
     const cphi = Math.cos(bank);
     const nAuto = Math.min(nAvail * (Math.abs(cmd.pitch) > 0.05 ? 1 : 0.88), nLimit);
-    const nCoord = cphi > 0.02 ? Math.min(Math.cos(gamma) / cphi, nAuto) : 0;
+    // Rolling into a turn, the pull leads the bank (~0.3 s of roll rate), as a
+    // pilot's hand does: waiting for the bank first let a low steep turn sink
+    // several metres before the g came (enough to put a wingtip in the crop).
+    const bankL = bank + clamp(fm.omega.z, -1.2, 1.2) * 0.3;
+    const cphiL = Math.abs(bankL) > Math.abs(bank) ? Math.max(Math.cos(clamp(bankL, -1.45, 1.45)), 0.12) : cphi;
+    const nCoord = cphi > 0.02 ? Math.min(Math.cos(gamma) / cphiL, nAuto) : 0;
     let qCmd;
     const sp = cmd.pitch;
     // Rotation rate of the flight path itself (positive in a pull), lightly
@@ -83,7 +88,13 @@ export class Assist {
     this.gamDot += ((G / v) * (a.gLoad - Math.cos(gamma) * cphi) - this.gamDot) * Math.min(1, dt * 20);
     const gamDot = this.gamDot;
     if (Math.abs(sp) > 0.05) {
-      qCmd = (high ? 0.24 * sp + 0.06 * sp ** 3 : 0.24 * sp + 0.22 * sp ** 3) * auth;
+      // (~19°/s at full stick, ~26°/s before: holding the key for 2 s from
+      // level flight put the nose 37° up and the stall horn on.)
+      // Pulling out of a dive the full rate (~26°/s) is there.
+      const wDive = clamp((-gamma - 0.02) / 0.08, 0, 1);
+      const qSoft = high ? 0.2 * sp + 0.06 * sp ** 3 : 0.19 * sp + 0.15 * sp ** 3;
+      const qHard = high ? 0.24 * sp + 0.06 * sp ** 3 : 0.24 * sp + 0.22 * sp ** 3;
+      qCmd = (sp > 0 ? qSoft + (qHard - qSoft) * wDive : qHard) * auth;
       this.holdPitch = null;
       this.trimmed = false;
       // Keep the turn coordinated underneath the pilot's own pull or push.
@@ -93,7 +104,10 @@ export class Assist {
       // building up to the protected limit instead of the path catching up
       // with a fixed pitch rate (before, a full pull at 100 kt took over a
       // second to reach ~3 g and the height went meanwhile).
-      if (sp > 0.5) qCmd += Math.max(0, gamDot) * Math.min(1, (sp - 0.5) / 0.4) * (high ? 0.6 : 1);
+      // Only while descending (a pull-out): from level or climbing flight
+      // the same key raises the nose progressively instead of going straight
+      // to the stall warning.
+      if (sp > 0.5 && wDive > 0) qCmd += Math.max(0, gamDot) * Math.min(1, (sp - 0.5) / 0.4) * wDive * (high ? 0.6 : 1);
     } else {
       const lim = high ? [-0.1, 0.26] : [-0.15, 0.45];
       // Capture the flight path the moment the stick is released (the path
@@ -118,8 +132,15 @@ export class Assist {
         if (this.holdPitch > gMax) this.holdPitch = Math.max(gMax, this.holdPitch - 0.25 * dt);
       }
       const gH = this.holdPitch ?? gamma;
-      const nCmd = cphi > 0.02 ? clamp(Math.cos(gamma) / cphi + (gH - gamma) * 7, 0, nAuto) : 0;
+      // (Below the held path in a bank: a firmer correction, so a steep turn
+      // does not settle into a slow sink.)
+      const kPath = gamma < gH && cphi < 0.85 ? 11 : 7;
+      const nCmd = cphi > 0.02 ? clamp(Math.cos(gamma) / cphiL + (gH - gamma) * kPath, 0, nAuto) : 0;
       qCmd = (G / v) * (nCmd - Math.cos(gamma) * cphi);
+      // The angle of attack has to build before the path turns: a g error
+      // adds pitch rate, so the load the turn needs arrives within ~0.5 s
+      // (a rate command alone left it a second behind in a steep turn).
+      qCmd += clamp(nCmd - a.gLoad, -0.8, 1.2) * 0.22;
     }
     // Stall / negative-alpha / load protection.
     // Anticipating on the alpha trend (a sharp pull is caught before the

@@ -414,9 +414,10 @@ export class Screens {
   crash(reason, cost) {
     const g = this.game;
     const el = h(`<div class="panel" style="width:min(480px,calc(100vw - 32px))"><h2>${reason}</h2>
-      <div class="sub">The aircraft is down. You walked away from it. Recovery and repairs: <b>${money(cost)}</b>. Job coverage is kept.</div>
-      <div class="row2"><span class="money">Balance ${money(g.career.money)}</span><button class="btn primary" data-a="recover">Recover at the base</button></div></div>`);
-    el.addEventListener('click', (e) => { if (e.target.closest('[data-a]')) { this.close(); g.recover(); } });
+      <div class="sub">The aircraft is down. You walked away from it.${cost ? ` Recovery and repairs: <b>${money(cost)}</b>.` : ''} It comes back repaired, as new (hopper empty). Job coverage is kept.</div>
+      <div class="row2"><span class="money">Balance ${money(g.career.money)}</span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap">${g.aircraft.kind === 'heli' ? '' : '<button class="btn" data-a="runway">Back to the runway</button>'}<button class="btn primary" data-a="pad">Back to the base</button></span></div></div>`);
+    el.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b) g.recover(b.dataset.a === 'runway' ? 'runway' : 'pad'); });
     this._show('crash', el);
   }
 }

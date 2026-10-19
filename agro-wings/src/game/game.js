@@ -315,6 +315,9 @@ export class Game {
   }
 
   resetAircraft(where) {
+    // A crashed (or written-off) aircraft comes back repaired: placed with
+    // 100 % damage it would fail again at once.
+    if (this.aircraft.state === 'crashed' || this.aircraft.damage >= 100) return this.recover(where);
     this.sprayer.on = false;
     if (this.service.busy()) this.service.abort('Aircraft reset — service stopped.');
     if (where === 'runway') this.aircraft.placeOnRunway('west');
@@ -324,14 +327,22 @@ export class Game {
     this.toast(where === 'runway' ? 'Aircraft placed on runway 09.' : 'Aircraft towed back to the pad.');
   }
 
-  recover() {
+  // After a crash: back to the runway or the base, repaired as new (the
+  // recovery cost was charged at the crash). The hopper is emptied.
+  recover(where = 'pad') {
     const ac = this.aircraft;
+    this.screens.close();
+    this.sprayer.on = false;
+    this.service.resetAll();
     ac.repair();
     ac.fm.hopper = 0;
-    ac.placeAtPad();
-    this.sprayer.on = false;
+    ac.fm.updateMass?.();
+    if (where === 'runway' && ac.kind !== 'heli') ac.placeOnRunway('west'); else ac.placeAtPad();
+    ac.repair();
+    ac.stuck = false;
     this.rig.initialized = false;
     this.career.save();
+    this.toast(where === 'runway' && ac.kind !== 'heli' ? `${ac.type.reg} repaired — on runway 09, ready to start.` : `${ac.type.reg} repaired — at the base, ready to start.`);
   }
 
   _acEvent(e) {
@@ -411,7 +422,7 @@ export class Game {
     // Global keys
     if (this.playing) {
       if (input.wasPressed('pause')) {
-        if (modal) this.screens.close(); else this.screens.pause();
+        if (modal === 'crash') { /* the crash screen needs a choice */ } else if (modal) this.screens.close(); else this.screens.pause();
       } else if (!modal || modal === 'map') {
         if (input.wasPressed('map')) { if (modal === 'map') this.screens.close(); else this.screens.map(); }
       }
@@ -504,7 +515,7 @@ export class Game {
     if (input.wasPressed('interact')) this._interact();
     if (input.wasPressed('gps')) this.hud.toggleGps();
     if (input.wasPressed('reset')) {
-      if (ac.state === 'crashed') return;
+      if (ac.state === 'crashed') { if (this.screens.open !== 'crash') this.screens.crash(ac.crashReason ?? 'Crashed', 0); return; }
       this.resetAircraft('pad');
     }
   }
@@ -552,7 +563,8 @@ export class Game {
   _prompts() {
     const ac = this.aircraft, fm = ac.fm;
     const k = (a) => this.hud.key(a);
-    if (ac.state === 'crashed' || this.screens.open) return this.hud.setPrompt(null);
+    if (this.screens.open) return this.hud.setPrompt(null);
+    if (ac.state === 'crashed') return this.hud.setPrompt(`${k('reset')} Recover the aircraft (runway / base)`, () => this.screens.crash(ac.crashReason ?? 'Crashed', 0));
     if (ac.stuck) return this.hud.setPrompt(`Aircraft stuck — ${k('reset')} tow back to the pad`, () => this.resetAircraft('pad'));
     if (this._atPadStopped() && !this.service.busy()) {
       if (this.mode === 'career') {

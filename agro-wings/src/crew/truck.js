@@ -91,6 +91,12 @@ export class ServiceTruck {
     const cp = BASE.crewPost, pad = BASE.pad;
     statics.push({ x0: cp.x - 2.3, x1: cp.x + 2.3, z0: cp.z - 1.7, z1: cp.z + 1.7 }); // crew shade
     statics.push({ x0: pad.x + 8.6, x1: pad.x + 9.4, z0: pad.z - 0.8, z1: pad.z + 0.8 }); // stop board
+    // Small props the truck used to drive over: the pad's corner tyres, the
+    // drums by the mixing station, the extinguisher stand at the fuel slab.
+    for (const [dx, dz] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) statics.push({ x0: pad.x + dx - 0.6, x1: pad.x + dx + 0.6, z0: pad.z + dz - 0.6, z1: pad.z + dz + 0.6 });
+    const mt = BASE.mixTank, ft = BASE.fuelTank;
+    statics.push({ x0: mt.x + 2.2, x1: mt.x + 4.9, z0: mt.z - 2.2, z1: mt.z + 0.8 }); // drums
+    statics.push({ x0: ft.x - 5.4, x1: ft.x - 3.8, z0: ft.z + 0.9, z1: ft.z + 2.5 }); // extinguisher
     this.planner = new ApronPlanner(PLAN_BOUNDS, statics);
     // State: rear-axle pose, speed, steering.
     const h = TRUCK.home;
@@ -107,6 +113,16 @@ export class ServiceTruck {
     this.beaconOn = false;
     this.blockedT = 0;
     this.lights = 0;
+    this._place();
+  }
+
+  // Straight back into the bay (crash recovery), engine off.
+  resetHome() {
+    const h = TRUCK.home;
+    this.x = h.x; this.z = h.z; this.yaw = h.yaw;
+    this.v = 0; this.steer = 0; this.acc = 0;
+    this.state = 'home'; this.purpose = 'home'; this.job = null; this.path = null; this.planFailed = false;
+    this.engineOn = false; this.beaconOn = false; this.blockedT = 0;
     this._place();
   }
 

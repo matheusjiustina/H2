@@ -141,9 +141,28 @@ interpolation. All tuning values live in `src/config.js`.
 - a hard pull (stick past half, the pull-out from the balão's dive) also
   turns the nose with the flight path's own rotation, so the angle of
   attack, and with it the g, keeps building up to the protected limit
-  instead of the path catching up with a fixed pitch rate. On the keyboard
-  a pull now reaches full travel in 0.2 s (0.3 s before; pushes and
-  releases are unchanged).
+  instead of the path catching up with a fixed pitch rate. This applies
+  only while descending.
+- from level or climbing flight a full pull is now progressive: ~19°/s
+  (26°/s before, still available in a dive).
+  - Holding the key for 2 s at 100 kt with the Ipanema loaded now ends
+    32° nose up with the stall horn on for 0.6 s (before: 37° and 1.2 s).
+  - On the keyboard a pull reaches full travel in 0.4 s; pushes and
+    releases are unchanged.
+- turns: the pull leads the bank by ~0.3 s of roll rate, and a g error adds
+  pitch rate, so the load a steep turn needs arrives within ~0.5 s.
+  - Before, rolling into 60° at 15 m the aircraft sank ~4 m/s before the g
+    came, lost ~10 m, and the low wingtip went into the crop.
+  - Now a 180° turn back from 15 m with a load (`lowTurn` in the harness)
+    loses about this much height:
+
+    | Aircraft | 45° bank | 60° bank |
+    |---|---|---|
+    | Ipanema, 560 L | 0 m | 4.6 m |
+    | AT-502B, 1,180 L | 0.7 m | 4.3 m |
+
+  - A level 70° turn with a full AT is beyond its wing (2.9 g needed,
+    ~2.4 g available): it has to climb, as in the balão.
   - Measured with the same input ramp before and after, in a 20° dive at
     ~100 kt:
 
@@ -189,7 +208,9 @@ bank in 1.1 s, 45° turns hold height within ~7 m, a balão with 560 L tops
 out ~29 m above the pass and ends above it, never stalling.
 
 **The whole balão near the ground.** `balaoDive` in `test/harness.mjs` flies
-the balão with keyboard-shaped inputs over the real terrain:
+the balão with keyboard-shaped inputs over the real terrain (the table was
+measured with the 0.2 s pull; with the final 0.4 s pull the Ipanema 560 L
+20°/18 m case touches again, the AT 1,000 L 20°/18 m one clears by 1.6 m):
 
 1. a pass at 3 m;
 2. a full pull to 25° nose up;
@@ -225,6 +246,28 @@ So a loaded pull-out is limited by the wing:
 
 A stronger elevator on the AT was tried and changed nothing for that
 reason.
+
+### Crash recovery and the service truck
+
+- **After a crash the panel offers two choices:** back to the runway, or
+  back to the base (the R44 always goes to its pad). Either way the
+  aircraft comes back repaired as new, with the hopper empty. The truck
+  returns to its bay, and the badeco and the hoses are put back. The
+  recovery cost is charged at the crash.
+- **Esc no longer dismisses the crash panel.** If the panel is gone,
+  Backspace brings it back.
+- **The pause menu's reset after a crash also repairs.** Before, it put the
+  aircraft back with 100 % damage, so it failed again at once ("Structural
+  failure") and the engine would not start.
+- **The engine may start once the badeco has finished,** with the truck
+  still alongside or driving off.
+- **The truck's route planner now knows the small props.** These are the
+  pad's corner tyres, the drums by the mixing station and the
+  extinguisher stand at the fuel slab. It used to drive over them; it now
+  backs out and returns around them.
+  - Measured with `test/truck.mjs`, all three aircraft: the truck arrives,
+    services, and is back in its bay.
+  - Closest approach to the aircraft: ≥ 0.5 m.
 
 ## Tests
 

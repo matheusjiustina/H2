@@ -249,10 +249,10 @@ export class Aircraft {
   _simStep(h, opts) {
     const fm = this.fm;
     this.simTime += h;
-    // Command shaping, Tidemark's rates — except a pull, which reaches full
-    // travel in 0.2 s (a pull-out from the balão cannot wait 0.3 s for it).
+    // Command shaping, Tidemark's rates — a pull reaches full travel in
+    // 0.4 s: progressive on the key, quick enough for a pull-out.
     const s = this.shaped, t = this.target;
-    s.elev = approach(s.elev, t.pitch, t.pitch === 0 ? 4 : t.pitch > 0 ? 5 : 3.4, h);
+    s.elev = approach(s.elev, t.pitch, t.pitch === 0 ? 4 : t.pitch > 0 ? 2.5 : 3.4, h);
     s.ail = approach(s.ail, t.roll, t.roll === 0 ? 5 : 3.2, h);
     s.rud = approach(s.rud, t.yaw, t.yaw === 0 ? 4 : 2.5, h);
     const o = fm.out;

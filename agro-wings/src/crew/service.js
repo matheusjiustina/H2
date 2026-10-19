@@ -37,6 +37,16 @@ export class GroundService {
     this.walkPlanner = this.truck.makeWalkPlanner();
     this.useTruck = false;
     this.post = new THREE.Vector3(BASE.crewPost.x, 0, BASE.crewPost.z + 0.3);
+    this.resetAll();
+  }
+
+  // Everything back in place at once (after a crash recovery): truck in its
+  // bay, badeco at the post, hoses reeled in, no service running.
+  resetAll() {
+    this.truck.resetHome?.();
+    this.useTruck = false;
+    this.fuelReel.copy(this.stationFuel);
+    this.mixReel.copy(this.stationMix);
     this.fuelHose.reset(this.fuelReel);
     this.mixHose.reset(this.mixReel);
     this.badeco.setPosition(this.post.x, 0, this.post.z);
@@ -75,7 +85,8 @@ export class GroundService {
     }
     if (this.state === 'aborting') return 'Ground crew is still clearing the aircraft.';
     const ac = this.game.aircraft;
-    if (!this.truck.atHome && Math.hypot(this.truck.x - ac.fm.pos.x, this.truck.z - ac.fm.pos.z) < ac.type.service.veto + 9) return 'Service truck is still beside the aircraft.';
+    // Once the badeco has finished, the engine may start with the truck still
+    // alongside (it stands off the wingtip, clear of the prop) or driving off.
     if (this.badeco.pos.distanceTo(_v.set(ac.fm.pos.x, this.badeco.pos.y, ac.fm.pos.z)) < ac.type.service.veto) return ac.kind === 'heli' ? 'Ground crew is inside the rotor disc.' : 'Ground crew is too close to the propeller.';
     return null;
   }

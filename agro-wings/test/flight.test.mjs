@@ -1,7 +1,7 @@
 // Flight-model validation (run: node --test test/)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeSim, deg, balaoDive } from './harness.mjs';
+import { makeSim, deg, balaoDive, lowTurn } from './harness.mjs';
 import { FlightModel } from '../src/flight/flightModel.js';
 import { Assist } from '../src/flight/assist.js';
 import { createFlightEnv } from '../src/flight/env.js';
@@ -194,7 +194,7 @@ test('balão: pull-up, steep reversal and the nose falls back — energy traded,
   }
 });
 
-test('pitch response: full back stick brings the nose up within half a second', () => {
+test('pitch response: full back stick brings the nose up firmly, progressively', () => {
   for (const v0 of [46, 60]) {
     const sim = trimmed(300, v0, 0.9);
     holdSpeed(sim, v0, 6);
@@ -207,8 +207,10 @@ test('pitch response: full back stick brings the nose up within half a second', 
     }
     q05 = -fm.omega.x; g05 = fm.out.gLoad;
     console.log(`  ${(v0 * KT).toFixed(0)} kt: pitch rate ${deg(q05).toFixed(0)}°/s and ${g05.toFixed(2)} g after 0.5 s`);
-    assert.ok(q05 > 0.38, `pitch rate only ${deg(q05)}°/s`);
-    assert.ok(g05 > 1.8, `only ${g05} g after 0.5 s`);
+    // Firm but progressive from level flight (~19°/s at full stick; the hard
+    // pull-out rate is kept for dives): not a snap to the stall warning.
+    assert.ok(q05 > 0.28 && q05 < 0.4, `pitch rate ${deg(q05)}°/s`);
+    assert.ok(g05 > 1.5, `only ${g05} g after 0.5 s`);
   }
 });
 
@@ -423,5 +425,14 @@ test('trim with the assist on moves the held flight path (and it stays trimmed)'
     console.log(`  ${mode} trim ${dir > 0 ? 'up' : 'down'}: ${vs.toFixed(1)} m/s held, ${dy.toFixed(0)} m in 10 s`);
     assert.ok(dir * vs > 3, `${mode} ${dir}: vertical speed ${vs}`);
     assert.ok(dir * dy > 25, `${mode} ${dir}: height change ${dy}`);
+  }
+});
+
+test('low steep turn back (180° from 15 m, loaded): 45° and 60° come round without touching the crop', () => {
+  for (const [bank, maxLoss] of [[45, 5], [60, 10]]) {
+    const r = lowTurn(FLIGHT, 560, bank);
+    console.log(`  ${bank}° bank, 560 L: ${typeof r.lost === 'number' ? r.lost.toFixed(1) + ' m' : r.lost} in ${r.t.toFixed(1)} s, ${r.v?.toFixed(0)} kt after, stall ${r.stall.toFixed(2)}`);
+    assert.ok(typeof r.lost === 'number' && r.lost > -maxLoss, `lost ${r.lost}`);
+    assert.ok(r.stall < 0.2, 'no stall');
   }
 });
