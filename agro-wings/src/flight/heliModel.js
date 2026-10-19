@@ -391,7 +391,7 @@ export class HeliModel {
         // The thrust acts along the rotor axis: tilting the disc turns lift
         // into push, so the speed comes from the tilt and the power together
         // (a steep tilt sinks unless the power comes up).
-        force.y -= this.mass * P.climbDamp * Math.min(1, nr) * this.vel.y;
+        force.y -= this.mass * Math.min(1, nr) * (P.climbDamp * this.vel.y + (P.holdDamp ?? 0) * this.vel.y / (1 + Math.abs(this.vel.y) / (P.holdV ?? 1)));
         // The rotor's damping of slow horizontal motion (H-force and wake): a
         // level helicopter glides on and slows down by itself; it fades out
         // towards cruise speed, where the airframe drag takes over. It

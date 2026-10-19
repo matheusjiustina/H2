@@ -275,7 +275,7 @@ if (PM) {
   // Down to a low hover, then the power a little under the hover figure.
   await powerTo(-0.12);
   await until('g.aircraft.fm.out.agl < 4', 40);
-  await powerTo(-0.05);
+  await powerTo(-0.08);
   tDown = await until('g.aircraft.fm.out.onGround', 60);
 } else tDown = await until('g.aircraft.fm.out.onGround', 60, ['throttleDown']);
 await run(3, ['throttleDown']);

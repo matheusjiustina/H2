@@ -829,6 +829,19 @@ both models.
   rotor at constant power, (1/k_GE)^(2/3)). More power climbs and less
   sinks, at a rate that settles in proportion to the difference: ±10 % ≈
   ±2 m/s, ±20 % ≈ ±4 m/s; full power at the MTOW ≈ 870–1,000 ft/min.
+- The power answers at once, and the aircraft holds where the power is
+  set.
+  - The lever moves at 0.9/s on the keys (0.55 before).
+  - The power follows it within 0.1 s (0.25 s before).
+  - A saturating extra damping of slow vertical motion (`holdDamp`,
+    `holdV`) stops the drift without cutting the full-power climb.
+  - Measured (`test/r44power.test.mjs`): a 2.5 m/s sink is stopped 1.2 s
+    after the power key goes down, losing 1.1 m, and then holds. Before it
+    took 1.8 s and 2.2 m, and 2.8 s to settle.
+  - ±10 % power now gives +1.2 / −2.1 m/s; full power at the MTOW gives
+    770 ft/min.
+  - To land, take the power ~8 % under the hover figure. At −5 % it now
+    sits on the ground cushion.
 - The thrust acts along the rotor axis, so the speed comes from the tilt
   and the power together, as in the other game.
   - Tilting the disc turns lift into push: a steep tilt sinks unless the

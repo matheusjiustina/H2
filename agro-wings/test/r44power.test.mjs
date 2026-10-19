@@ -53,7 +53,7 @@ test('hover power depends only on the weight (light ~55 %, MTOW ~70 %), less in 
   t.diagnostic(`hover ${(light * 100).toFixed(0)} % light, ${(heavy * 100).toFixed(0)} % at MTOW`);
 });
 
-test('climb and sink follow the power: rate in proportion to the difference, no yaw kick', (t) => {
+test('climb and sink follow the power: more power, more climb, no yaw kick', (t) => {
   const rates = [];
   for (const dp of [-0.2, -0.1, 0.1, 0.2]) {
     const { fm, env } = heli({ engineOn: true, alt: 400 });
@@ -65,8 +65,9 @@ test('climb and sink follow the power: rate in proportion to the difference, no 
     assert.ok(Math.sign(fm.vel.y) === Math.sign(dp) && Math.abs(fm.vel.y) > 1, `${dp}: ${fm.vel.y}`);
     assert.ok(Math.abs(wrap(fm.heading() - h0)) < 0.01, 'power changes do not swing the nose');
   }
-  // Twice the difference, about twice the rate (linear within 20 %).
-  assert.ok(Math.abs(rates[3] / rates[2] - 2) < 0.4 && Math.abs(rates[0] / rates[1] - 2) < 0.4, rates.join(' '));
+  // Twice the difference, a clearly bigger rate (the extra damping of slow
+  // vertical motion makes small power changes settle gently: not linear).
+  for (const r of [rates[3] / rates[2], rates[0] / rates[1]]) assert.ok(r > 1.6 && r < 3.2, rates.join(' '));
   // Full power at the MTOW: about the published ~1,000 ft/min.
   const { fm, env } = heli({ engineOn: true, alt: 400, hopper: 250, fuel: 60 });
   fly(fm, env, new HeliAssist(), 'high', 15, { pitch: 0, roll: 0, yaw: 0, lever: 1 });
@@ -247,4 +248,26 @@ test('released in a breeze: the hover holds over the ground (no drifting off wit
     assert.ok(tilt * 57.3 < 5, `gentle lean: ${(tilt * 57.3).toFixed(1)}°`);
     t.diagnostic(`wind ${wind.length().toFixed(1)} m/s: drift ${drift.toFixed(2)} m in 20 s, lean ≤ ${(tilt * 57.3).toFixed(1)}°`);
   }
+});
+
+test('power answers at once: a 2.5 m/s sink is stopped within ~1.3 s on the power keys, then it holds', (t) => {
+  const { fm, env } = heli({ engineOn: true, alt: 60, hopper: 150 });
+  const as = new HeliAssist();
+  const hov = hoverPowerFrac(A, fm.mass);
+  let lever = hov;
+  const step = (l) => { as.update(fm, { pitch: 0, roll: 0, yaw: 0, lever: l }, 'high', DT); fm.step(DT, env); };
+  for (let i = 0; i < 3 / DT; i++) step(lever);
+  lever = hov - 0.12;
+  for (let i = 0; i < 20 / DT && fm.vel.y > -2.5; i++) step(lever);
+  const y0 = fm.pos.y;
+  let tStop = null, low = 0, i = 0;
+  // The power key held (0.9/s, as the game moves the lever) to hover + 6 %, back to the hover figure once the sink stops.
+  for (; i < 10 / DT; i++) {
+    if (tStop === null) { lever = Math.min(hov + 0.06, lever + 0.9 * DT); if (fm.vel.y >= 0) tStop = i * DT; } else lever = Math.max(hov, lever - 0.9 * DT);
+    step(lever); low = Math.min(low, fm.pos.y - y0);
+  }
+  assert.ok(tStop !== null && tStop < 1.3, `stopped after ${tStop} s`);
+  assert.ok(-low < 1.3, `lost ${-low} m`);
+  assert.ok(Math.abs(fm.vel.y) < 0.15, `holds: ${fm.vel.y} m/s`);
+  t.diagnostic(`sink stopped after ${tStop.toFixed(2)} s, ${(-low).toFixed(1)} m lost, then holds (${fm.vel.y.toFixed(2)} m/s)`);
 });

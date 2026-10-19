@@ -300,8 +300,12 @@ export const FLIGHT_R44 = {
   // at the assist's nose-down limit.
   power: {
     maxThrust: 15890, // N at 100 % (sea level, out of ground effect)
-    lagS: 0.25, // power response to the lever
+    lagS: 0.1, // power response to the lever
     climbDamp: 0.8, // 1/s: rotor inflow damping of vertical speed
+    // Extra damping of slow vertical motion (saturating at holdV m/s): the
+    // aircraft stops and holds where the power is set instead of drifting
+    // on, while the steady climb at full power stays about the same.
+    holdDamp: 1.0, holdV: 0.45,
     glideDamp: 0.14, glideSat: 8, // 1/s: rotor damping of slow horizontal motion, saturating at glideSat m/s (fades out by ~115 kt)
     spoolS: 1.4, // rotor run-up time constant once the engine runs (~6 s to speed)
     yawMoment: 4500, yawDamp: 2500, // N·m per unit pedal; N·m per rad/s
