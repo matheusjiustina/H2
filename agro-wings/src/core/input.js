@@ -1,5 +1,6 @@
 // Keyboard / mouse / gamepad / touch input with rebindable actions.
 // Default bindings keep the Tidemark aircraft mapping where it exists.
+import { t } from '../i18n/index.js';
 
 // Flight keys come in two schemes (Settings → Flying → Flight keys), for
 // every aircraft: 'numpad' (the default: Num 8 / 5 stick forward / back,
@@ -14,8 +15,6 @@
 // scope are used by both schemes and conflict with everything. `shares`
 // names an intended overlap: E is the right rudder in the numpad scheme and
 // still the service key, which only acts with the engine off.
-import { t } from '../i18n/index.js';
-
 export const ACTIONS = {
   pitchDown: { get label() { return t('Pitch down (stick forward)'); }, keys: ['KeyW', 'ArrowUp'], scope: 'classic' },
   pitchUp: { get label() { return t('Pitch up (stick back)'); }, keys: ['KeyS', 'ArrowDown'], scope: 'classic' },

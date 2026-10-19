@@ -10,6 +10,7 @@ import { createTurbinePanel } from './atPanel.js';
 import { createR44Model, R44_SHADOW } from './r44Model.js';
 import { createR44Panel } from './r44Panel.js';
 import { BASE } from '../world/layout.js';
+import { t } from '../i18n/index.js';
 
 const R44_ROTOR = FLIGHT_R44.rotor.radius;
 
@@ -17,11 +18,11 @@ export const AIRCRAFT_TYPES = {
   ipanema: {
     id: 'ipanema',
     slot: '01',
-    label: 'Original',
+    get label() { return t('Original'); },
     reg: 'PR-AGW',
     name: 'EMB-202A Ipanema',
-    engineName: 'Lycoming IO-540 · 320 hp (ethanol)',
-    summary: '900 L hopper · 260 L fuel · 1,800 kg MTOW',
+    get engineName() { return t('Lycoming IO-540 · 320 hp (ethanol)'); },
+    get summary() { return t('900 L hopper · 260 L fuel · 1,800 kg MTOW'); },
     flight: FLIGHT,
     spray: { swath: SPRAY.swath, flow: SPRAY.flow, boom: [4.7, -0.3, -0.95] },
     // Lowest working points (wheel, boom ends) for the spray height.
@@ -34,7 +35,7 @@ export const AIRCRAFT_TYPES = {
     vspeeds: { vs0: 48, vs1: 55, vfe: 95, vne: 140 },
     camera: { dist: 12.5, height: 3.7, orbit: 19 },
     audio: { profile: 'piston', blades: 3 },
-    fuel: { name: 'ethanol', price: GAME.fuelPrice },
+    fuel: { get name() { return t('ethanol'); }, price: GAME.fuelPrice },
     loads: { free: { fuel: 220, hopper: 500 }, boot: 120 },
     loadSheet: { bankKt: 90, roll: [140, 1303, 2.9] },
     service: {
@@ -61,8 +62,8 @@ export const AIRCRAFT_TYPES = {
     label: 'Air Tractor',
     reg: 'PR-AWT',
     name: 'Air Tractor AT-502B',
-    engineName: 'P&WC PT6A-34AG turboprop · 750 shp',
-    summary: '1,893 L hopper · 643 L fuel · 4,264 kg MTOW',
+    get engineName() { return t('P&WC PT6A-34AG turboprop · 750 shp'); },
+    get summary() { return t('1,893 L hopper · 643 L fuel · 4,264 kg MTOW'); },
     flight: FLIGHT_AT502,
     spray: { swath: SPRAY_AT502.swath, flow: SPRAY_AT502.flow, boom: [7.0, -0.45, -1.26] },
     work: [[0, -1.45, 0.95], [7.1, -0.45, -1.3], [-7.1, -0.45, -1.3]],
@@ -104,9 +105,9 @@ export const AIRCRAFT_TYPES = {
     label: 'Robinson R44',
     reg: 'PR-AGH',
     name: 'Robinson R44 Raven II · Agricultural',
-    role: 'Rotary-Wing Agricultural Aircraft',
-    engineName: 'Lycoming IO-540-AE1A5 · 245 hp take-off / 205 hp MCP',
-    summary: '250 L spray tank · 176 L fuel · 1,134 kg MTOW',
+    get role() { return t('Rotary-Wing Agricultural Aircraft'); },
+    get engineName() { return t('Lycoming IO-540-AE1A5 · 245 hp take-off / 205 hp MCP'); },
+    get summary() { return t('250 L spray tank · 176 L fuel · 1,134 kg MTOW'); },
     flight: FLIGHT_R44,
     // 8 m boom under the nose (80 % of the rotor diameter), engine-driven
     // pump: 1.3 L/s gives the contracts' 40 L/ha at 13 m × 25 m/s (≈ 50 kt).
@@ -126,9 +127,12 @@ export const AIRCRAFT_TYPES = {
       pedalLeft: 'yawLeft', pedalRight: 'yawRight', collectiveUp: 'throttleUp', collectiveDown: 'throttleDown',
       trimAft: 'trimUp', trimForward: 'trimDown', engine: 'engine',
       labels: {
-        pitchDown: 'Cyclic forward', pitchUp: 'Cyclic aft', rollLeft: 'Cyclic left', rollRight: 'Cyclic right',
-        yawLeft: 'Pedal left (nose left)', yawRight: 'Pedal right (nose right)', throttleUp: 'Collective up', throttleDown: 'Collective down',
-        trimUp: 'Cyclic trim aft', trimDown: 'Cyclic trim forward', engine: 'Engine (hold start, collective down / tap stop)',
+        get pitchDown() { return t('Cyclic forward'); }, get pitchUp() { return t('Cyclic aft'); },
+        get rollLeft() { return t('Cyclic left'); }, get rollRight() { return t('Cyclic right'); },
+        get yawLeft() { return t('Pedal left (nose left)'); }, get yawRight() { return t('Pedal right (nose right)'); },
+        get throttleUp() { return t('Collective up'); }, get throttleDown() { return t('Collective down'); },
+        get trimUp() { return t('Cyclic trim aft'); }, get trimDown() { return t('Cyclic trim forward'); },
+        get engine() { return t('Engine (hold start, collective down / tap stop)'); },
         brakes: null, flapsUp: null, flapsDown: null,
       },
     },
