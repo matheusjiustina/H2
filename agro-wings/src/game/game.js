@@ -23,8 +23,16 @@ import { smoothstep } from '../core/math.js';
 import { Autopilot } from './autopilot.js';
 import { HeliAutopilot } from './heliAutopilot.js';
 import { windAt } from '../flight/env.js';
+import { t } from '../i18n/index.js';
 
 const SETTINGS = 'agrowings.settings.v1';
+
+// Crash reasons stay in English on the aircraft (tests and logs read them);
+// they are translated here, when shown.
+function crashText(reason) {
+  const m = /^(Hit|Main rotor struck the) parked (.+)$/.exec(reason);
+  return m ? t(`${m[1]} parked {0}`, m[2]) : t(reason);
+}
 
 export class Game {
   constructor(canvas, uiRoot) {
@@ -74,10 +82,10 @@ export class Game {
     this.world = new World(this.renderer, this.scene, this.quality);
     await this.world.build((label) => {
       si = Math.max(si, steps.indexOf(label) + 1);
-      this.screens.setLoading(si / (steps.length + 2), label);
+      this.screens.setLoading(si / (steps.length + 2), t(label));
     });
     this.world.atmo.set(this.settings.timeOfDay, this.settings.weather, true);
-    this.screens.setLoading(0.85, 'Aircraft');
+    this.screens.setLoading(0.85, t('Aircraft'));
     await new Promise((r) => setTimeout(r, 0));
     // Both aircraft live in the world; the one not selected waits parked.
     this.fleet = {};
@@ -111,7 +119,7 @@ export class Game {
     window.addEventListener('pointerdown', startAudio);
     window.addEventListener('keydown', startAudio);
     this.resize();
-    this.screens.setLoading(1, 'Ready');
+    this.screens.setLoading(1, t('Ready'));
     this.rig.setMode('orbit', this.aircraft);
     this.rig.orbit.dist = this.aircraft.type.camera.orbit;
     this.rig.orbit.pitch = 0.16;
@@ -195,7 +203,7 @@ export class Game {
   // each aircraft; the chosen one is towed to the pad.
   selectAircraft(id) {
     if (!this.fleet[id] || id === this.aircraftId) return;
-    if (this.service.busy()) this.service.abort('Aircraft change — service stopped.');
+    if (this.service.busy()) this.service.abort(t('Aircraft change — service stopped.'));
     this.sprayer.on = false;
     this._activate(id);
     this.setSetting('aircraft', id);
@@ -223,7 +231,7 @@ export class Game {
         this.aircraft.placeAtPad();
         this.aircraft.repair();
         { const L = this.aircraft.type.loads.free; this.aircraft.fm.fuel = L.fuel; this.aircraft.fm.hopper = L.hopper; this.aircraft.fm.updateMass(); }
-        this.toast(`Free flight in ${this.aircraft.type.reg}: tanks loaded. Hold ${keyLabel(this.input.keysOf('engine')[0])} to start the engine.`);
+        this.toast(t('Free flight in {0}: tanks loaded. Hold {1} to start the engine.', this.aircraft.type.reg, keyLabel(this.input.keysOf('engine')[0])));
         break;
       case 'freeAir':
         this._enterPlay('free');
@@ -275,7 +283,7 @@ export class Game {
     this.setJob(job);
     this.screens.close();
     if (!this.service.inZone()) {
-      this.toast(`Job accepted: ${job.c.title}. Fly back to the pad for loading.`);
+      this.toast(t('Job accepted: {0}. Fly back to the pad for loading.', job.c.title));
       return;
     }
     this.screens.loadSheet(job);
@@ -290,7 +298,7 @@ export class Game {
 
   onServiceStart() { this.sprayer.on = false; }
   onServiceDone(loaded) {
-    this.toast(`Service complete: +${Math.round(loaded.fuel)} L fuel, +${Math.round(loaded.liquid)} L liquid. Aircraft released.`);
+    this.toast(t('Service complete: +{0} L fuel, +{1} L liquid. Aircraft released.', Math.round(loaded.fuel), Math.round(loaded.liquid)));
     if (this.job && loaded.liquid > 0) this.job.sorties++;
     this.audio.play('success');
     this.career.save();
@@ -319,12 +327,12 @@ export class Game {
     // 100 % damage it would fail again at once.
     if (this.aircraft.state === 'crashed' || this.aircraft.damage >= 100) return this.recover(where);
     this.sprayer.on = false;
-    if (this.service.busy()) this.service.abort('Aircraft reset — service stopped.');
+    if (this.service.busy()) this.service.abort(t('Aircraft reset — service stopped.'));
     if (where === 'runway') this.aircraft.placeOnRunway('west');
     else this.aircraft.placeAtPad();
     this.aircraft.stuck = false;
     this.rig.initialized = false;
-    this.toast(where === 'runway' ? 'Aircraft placed on runway 09.' : 'Aircraft towed back to the pad.');
+    this.toast(where === 'runway' ? t('Aircraft placed on runway 09.') : t('Aircraft towed back to the pad.'));
   }
 
   // After a crash: back to the runway or the base, repaired as new (the
@@ -342,7 +350,7 @@ export class Game {
     ac.stuck = false;
     this.rig.initialized = false;
     this.career.save();
-    this.toast(where === 'runway' && ac.kind !== 'heli' ? `${ac.type.reg} repaired — on runway 09, ready to start.` : `${ac.type.reg} repaired — at the base, ready to start.`);
+    this.toast(where === 'runway' && ac.kind !== 'heli' ? t('{0} repaired — on runway 09, ready to start.', ac.type.reg) : t('{0} repaired — at the base, ready to start.', ac.type.reg));
   }
 
   _acEvent(e) {
@@ -351,7 +359,7 @@ export class Game {
       const cost = 6000;
       this.career.money -= cost;
       this.rig.shake = 1;
-      setTimeout(() => this.screens.crash(e.reason, cost), 2200);
+      setTimeout(() => this.screens.crash(crashText(e.reason), cost), 2200);
     }
     if (e.kind === 'engineStart' && this.job) this.job.started = true;
   }
@@ -397,7 +405,7 @@ export class Game {
     this.autoQualityResult = { ...st, from: s.quality, to: order[i] };
     if (order[i] !== s.quality) {
       this.setSetting('quality', order[i], true);
-      this.toast(`Graphics set to ${order[i]} for this device (change it in Settings).`);
+      this.toast(t('Graphics set to {0} for this device (change it in Settings).', t({ low: 'Low', medium: 'Medium', high: 'High' }[order[i]])));
     } else this.setSetting('autoChecked', true);
   }
 
@@ -508,14 +516,14 @@ export class Game {
     }
     if (input.wasPressed('coverage')) {
       const v = !this.overlay.visible;
-      if (!this.job) this.toast('Coverage view needs an active job.');
+      if (!this.job) this.toast(t('Coverage view needs an active job.'));
       this.overlay.setVisible(v && !!this.job, this.job ? this.job.coverages : []);
-      if (this.job) this.toast(v ? 'Coverage overlay on (red = not covered, green = good, purple = overlap).' : 'Coverage overlay off.');
+      if (this.job) this.toast(v ? t('Coverage overlay on (red = not covered, green = good, purple = overlap).') : t('Coverage overlay off.'));
     }
     if (input.wasPressed('interact')) this._interact();
     if (input.wasPressed('gps')) this.hud.toggleGps();
     if (input.wasPressed('reset')) {
-      if (ac.state === 'crashed') { if (this.screens.open !== 'crash') this.screens.crash(ac.crashReason ?? 'Crashed', 0); return; }
+      if (ac.state === 'crashed') { if (this.screens.open !== 'crash') this.screens.crash(crashText(ac.crashReason ?? 'Crashed'), 0); return; }
       this.resetAircraft('pad');
     }
   }
@@ -564,21 +572,21 @@ export class Game {
     const ac = this.aircraft, fm = ac.fm;
     const k = (a) => this.hud.key(a);
     if (this.screens.open) return this.hud.setPrompt(null);
-    if (ac.state === 'crashed') return this.hud.setPrompt(`${k('reset')} Recover the aircraft (runway / base)`, () => this.screens.crash(ac.crashReason ?? 'Crashed', 0));
-    if (ac.stuck) return this.hud.setPrompt(`Aircraft stuck — ${k('reset')} tow back to the pad`, () => this.resetAircraft('pad'));
+    if (ac.state === 'crashed') return this.hud.setPrompt(t('{0} Recover the aircraft (runway / base)', k('reset')), () => this.screens.crash(crashText(ac.crashReason ?? 'Crashed'), 0));
+    if (ac.stuck) return this.hud.setPrompt(t('Aircraft stuck — {0} tow back to the pad', k('reset')), () => this.resetAircraft('pad'));
     if (this._atPadStopped() && !this.service.busy()) {
       if (this.mode === 'career') {
-        if (!this.job) return this.hud.setPrompt(`${k('interact')} Service orders`, () => this._interact());
-        if (this.job.complete()) return this.hud.setPrompt(`${k('interact')} Hand in the job`, () => this._interact());
-        return this.hud.setPrompt(`${k('interact')} Load sheet — call the badeco`, () => this._interact());
+        if (!this.job) return this.hud.setPrompt(t('{0} Service orders', k('interact')), () => this._interact());
+        if (this.job.complete()) return this.hud.setPrompt(t('{0} Hand in the job', k('interact')), () => this._interact());
+        return this.hud.setPrompt(t('{0} Load sheet — call the badeco', k('interact')), () => this._interact());
       }
-      return this.hud.setPrompt(`${k('interact')} Service (fuel &amp; liquid)`, () => this._interact());
+      return this.hud.setPrompt(t('{0} Service (fuel &amp; liquid)', k('interact')), () => this._interact());
     }
-    if (fm.engine === 'off' && this._rotorTurning() && fm.out.onGround) return this.hud.setPrompt(`Rotor running down (${Math.round(fm.out.rotorPct)} %) — crew waits for it to stop`);
-    const lever = ac.kind === 'heli' && fm.powerModel === 'power' ? 'Power' : 'Collective';
-    if (fm.engine === 'off' && fm.out.onGround && !this.service.busy()) return this.hud.setPrompt(ac.kind === 'heli' ? `${lever} down, hold ${k('engine')} to start` : `Hold ${k('engine')} to start the engine`);
+    if (fm.engine === 'off' && this._rotorTurning() && fm.out.onGround) return this.hud.setPrompt(t('Rotor running down ({0} %) — crew waits for it to stop', Math.round(fm.out.rotorPct)));
+    const pw = ac.kind === 'heli' && fm.powerModel === 'power';
+    if (fm.engine === 'off' && fm.out.onGround && !this.service.busy()) return this.hud.setPrompt(ac.kind === 'heli' ? t(pw ? 'Power down, hold {0} to start' : 'Collective down, hold {0} to start', k('engine')) : t('Hold {0} to start the engine', k('engine')));
     if (fm.engine === 'running' && fm.out.onGround && this.service.inZone() && fm.out.groundSpeed < 0.3 && (this.job || this.mode === 'free')) {
-      return this.hud.setPrompt(ac.kind === 'heli' ? `${lever} down — tap ${k('engine')} to shut down for service` : `Tap ${k('engine')} to shut down for service`);
+      return this.hud.setPrompt(ac.kind === 'heli' ? t(pw ? 'Power down — tap {0} to shut down for service' : 'Collective down — tap {0} to shut down for service', k('engine')) : t('Tap {0} to shut down for service', k('engine')));
     }
     this.hud.setPrompt(null);
   }
@@ -587,17 +595,17 @@ export class Game {
     const out = [];
     const ac = this.aircraft;
     if (!this.playing || ac.state !== 'ok') return out;
-    const t = ac.telemetry();
+    const tm = ac.telemetry();
     const fm = ac.fm, o = fm.out;
-    if (t.stall > 0.5 && !o.onGround) out.push({ text: 'Stall', cls: 'blink' });
+    if (tm.stall > 0.5 && !o.onGround) out.push({ text: t('Stall'), cls: 'blink' });
     if (ac.kind === 'heli') {
-      if (o.lowRotor) out.push({ text: `Low rotor RPM ${Math.round(o.rotorPct)} % — lower collective`, cls: 'blink' });
-      else if (fm.engine === 'running' && o.rotorPct > 108) out.push({ text: `Rotor overspeed ${Math.round(o.rotorPct)} %`, cls: 'amber' });
-      if (fm.engine !== 'running' && !o.onGround && o.rotorPct > 5) out.push({ text: 'Engine out — autorotate', cls: 'blink' });
-      if (o.vrs > 0.3) out.push({ text: 'Settling with power — forward speed', cls: 'amber blink' });
+      if (o.lowRotor) out.push({ text: t('Low rotor RPM {0} % — lower collective', Math.round(o.rotorPct)), cls: 'blink' });
+      else if (fm.engine === 'running' && o.rotorPct > 108) out.push({ text: t('Rotor overspeed {0} %', Math.round(o.rotorPct)), cls: 'amber' });
+      if (fm.engine !== 'running' && !o.onGround && o.rotorPct > 5) out.push({ text: t('Engine out — autorotate'), cls: 'blink' });
+      if (o.vrs > 0.3) out.push({ text: t('Settling with power — forward speed'), cls: 'amber blink' });
     }
-    if (!o.onGround && o.agl < 6 && o.vs < -3.5) out.push({ text: ac.kind === 'heli' ? (fm.powerModel === 'power' ? 'Sink rate — more power' : 'Sink rate — collective') : 'Sink rate — pull up', cls: 'blink' });
-    if (t.ias > ac.type.vspeeds.vne) out.push({ text: 'Overspeed', cls: 'amber' });
+    if (!o.onGround && o.agl < 6 && o.vs < -3.5) out.push({ text: ac.kind === 'heli' ? (fm.powerModel === 'power' ? t('Sink rate — more power') : t('Sink rate — collective')) : t('Sink rate — pull up'), cls: 'blink' });
+    if (tm.ias > ac.type.vspeeds.vne) out.push({ text: t('Overspeed'), cls: 'amber' });
     if (!o.onGround && o.agl < 30) {
       // Power line ahead?
       const f = ac.forward();
@@ -609,19 +617,19 @@ export class Game {
           const x = ax + (bx - ax) * s, z = az + (bz - az) * s;
           const dx = x - p.x, dz = z - p.z;
           const d = Math.hypot(dx, dz);
-          if (d < 220 && (dx * f.x + dz * f.z) / d > 0.6) { out.push({ text: 'Wires ahead', cls: 'amber blink' }); i = 99; break; }
+          if (d < 220 && (dx * f.x + dz * f.z) / d > 0.6) { out.push({ text: t('Wires ahead'), cls: 'amber blink' }); i = 99; break; }
         }
       }
     }
     if (this.sprayer.on && !o.onGround) {
-      const hh = t.hgt;
-      if (hh < 1.5) out.push({ text: `Too low ${hh.toFixed(1)} m`, cls: 'blink' });
-      else if (hh > 8) out.push({ text: `Too high to spray (${hh.toFixed(0)} m)`, cls: 'amber' });
-      if (this.job && !this._overTarget()) out.push({ text: 'Spraying off target', cls: 'amber' });
+      const hh = tm.hgt;
+      if (hh < 1.5) out.push({ text: t('Too low {0} m', hh.toFixed(1)), cls: 'blink' });
+      else if (hh > 8) out.push({ text: t('Too high to spray ({0} m)', hh.toFixed(0)), cls: 'amber' });
+      if (this.job && !this._overTarget()) out.push({ text: t('Spraying off target'), cls: 'amber' });
     }
-    if (this.sprayer.on && o.onGround) out.push({ text: 'Spray on the ground', cls: 'amber' });
-    if (t.fuel < ac.A.fuelCapacity * 0.12 && fm.engine === 'running') out.push({ text: 'Low fuel', cls: 'amber' });
-    if (t.damage > 50) out.push({ text: `Damage ${Math.round(t.damage)}%`, cls: 'amber' });
+    if (this.sprayer.on && o.onGround) out.push({ text: t('Spray on the ground'), cls: 'amber' });
+    if (tm.fuel < ac.A.fuelCapacity * 0.12 && fm.engine === 'running') out.push({ text: t('Low fuel'), cls: 'amber' });
+    if (tm.damage > 50) out.push({ text: t('Damage {0}%', Math.round(tm.damage)), cls: 'amber' });
     return out;
   }
 
