@@ -336,16 +336,22 @@ export class Game {
   }
 
   // After a crash: back to the runway or the base, repaired as new (the
-  // recovery cost was charged at the crash). The hopper is emptied.
+  // recovery cost was charged at the crash). To the runway it keeps the load
+  // it had (fuel and hopper, as the badeco left them) and flies on; to the
+  // base the hopper is emptied and the badeco loads it again.
   recover(where = 'pad') {
     const ac = this.aircraft;
+    const load = this._loadAtCrash ?? { fuel: ac.fm.fuel, hopper: ac.fm.hopper };
+    this._loadAtCrash = null;
     this.screens.close();
     this.sprayer.on = false;
     this.service.resetAll();
     ac.repair();
-    ac.fm.hopper = 0;
+    const toRunway = where === 'runway' && ac.kind !== 'heli';
+    ac.fm.fuel = load.fuel;
+    ac.fm.hopper = toRunway ? load.hopper : 0;
     ac.fm.updateMass?.();
-    if (where === 'runway' && ac.kind !== 'heli') ac.placeOnRunway('west'); else ac.placeAtPad();
+    if (toRunway) ac.placeOnRunway('west'); else ac.placeAtPad();
     ac.repair();
     ac.stuck = false;
     this.rig.initialized = false;
@@ -355,6 +361,7 @@ export class Game {
 
   _acEvent(e) {
     if (e.kind === 'crash') {
+      this._loadAtCrash = { fuel: this.aircraft.fm.fuel, hopper: this.aircraft.fm.hopper };
       this.sprayer.on = false;
       const cost = 6000;
       this.career.money -= cost;

@@ -437,7 +437,7 @@ export class Screens {
   crash(reason, cost) {
     const g = this.game;
     const el = h(`<div class="panel" style="width:min(480px,calc(100vw - 32px))"><h2>${reason}</h2>
-      <div class="sub">${t('The aircraft is down. You walked away from it.')}${cost ? ` ${t('Recovery and repairs: <b>{0}</b>.', money(cost))}` : ''} ${t('It comes back repaired, as new (hopper empty). Job coverage is kept.')}</div>
+      <div class="sub">${t('The aircraft is down. You walked away from it.')}${cost ? ` ${t('Recovery and repairs: <b>{0}</b>.', money(cost))}` : ''} ${t('It comes back repaired, as new: to the runway with the load it had, to the base with the hopper empty for the badeco to load again. Job coverage is kept.')}</div>
       <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span>
         <span style="display:flex;gap:8px;flex-wrap:wrap">${g.aircraft.kind === 'heli' ? '' : `<button class="btn" data-a="runway">${t('Back to the runway')}</button>`}<button class="btn primary" data-a="pad">${t('Back to the base')}</button></span></div></div>`);
     el.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b) g.recover(b.dataset.a === 'runway' ? 'runway' : 'pad'); });

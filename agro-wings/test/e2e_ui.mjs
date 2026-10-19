@@ -105,10 +105,13 @@ check('crash panel shown', await page.evaluate(() => window.__agro.screens.open 
 await page.keyboard.press('Escape'); await page.evaluate(() => window.__agro.simulate(0.2, 1 / 30));
 check('Esc keeps the crash panel', await page.evaluate(() => window.__agro.screens.open === 'crash'));
 check('crash panel offers runway and base', await page.evaluate(() => !!document.querySelector('[data-a="runway"]') && !!document.querySelector('[data-a="pad"]')));
+const loadBefore = await page.evaluate(() => ({ fuel: Math.round(window.__agro.aircraft.fm.fuel), hopper: Math.round(window.__agro.aircraft.fm.hopper) }));
 await page.click('[data-a="runway"]');
 await page.evaluate(() => window.__agro.simulate(1, 1 / 30));
 const rwy = await page.evaluate(() => { const g = window.__agro; return { state: g.aircraft.state, dmg: g.aircraft.damage, open: g.screens.open, gnd: g.aircraft.fm.out.onGround }; });
 check('back to the runway: repaired as new', rwy.state === 'ok' && rwy.dmg === 0 && !rwy.open && rwy.gnd, JSON.stringify(rwy));
+const loadAfter = await page.evaluate(() => ({ fuel: Math.round(window.__agro.aircraft.fm.fuel), hopper: Math.round(window.__agro.aircraft.fm.hopper) }));
+check('back to the runway: keeps the load it had', loadBefore.hopper > 0 && Math.abs(loadAfter.hopper - loadBefore.hopper) <= 1 && Math.abs(loadAfter.fuel - loadBefore.fuel) <= 2, JSON.stringify({ loadBefore, loadAfter }));
 // ...and it starts and stays healthy.
 await page.evaluate(() => { const g = window.__agro; g.input.pressAction('engine'); g.simulate(4, 1 / 30); g.input.releaseAction('engine'); g.simulate(3, 1 / 30); });
 const run = await page.evaluate(() => { const g = window.__agro; return { eng: g.aircraft.fm.engine, state: g.aircraft.state, dmg: g.aircraft.damage }; });
@@ -117,6 +120,7 @@ check('engine starts after the recovery', run.eng === 'running' && run.state ===
 await page.evaluate(() => { const g = window.__agro; g.aircraft.crash('Test crash'); g.screens.close(); g.resetAircraft('pad'); g.simulate(2, 1 / 30); });
 const rec = await page.evaluate(() => { const g = window.__agro; return { state: g.aircraft.state, x: Math.round(g.aircraft.fm.pos.x), z: Math.round(g.aircraft.fm.pos.z), dmg: g.aircraft.damage }; });
 check('reset after a crash: at the pad, repaired', rec.state === 'ok' && rec.dmg === 0 && Math.hypot(rec.x + 352, rec.z + 64) < 3, JSON.stringify(rec));
+check('back to the base: hopper emptied for the badeco to load again', await page.evaluate(() => window.__agro.aircraft.fm.hopper === 0));
 
 // --- Stuck detection + reset (aircraft tipped onto a wingtip) ----------------
 await page.evaluate(() => {

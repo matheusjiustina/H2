@@ -206,4 +206,5 @@ export default {
   'ENG': 'MOTOR',
   'CAM': 'CÂM',
   'MAP': 'MAPA',
+  'It comes back repaired, as new: to the runway with the load it had, to the base with the hopper empty for the badeco to load again. Job coverage is kept.': 'Ela volta consertada, como nova: na pista com a carga que tinha; na base com o hopper vazio para o badeco carregar de novo. A cobertura do serviço é mantida.',
 };
