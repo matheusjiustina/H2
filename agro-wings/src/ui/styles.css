@@ -185,3 +185,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .lvl span { text-transform: none; letter-spacing: 0; color: var(--ink-faint); margin-left: 8px; font-size: 11.5px; }
 .card .tag.lv2 { border-color: rgba(240,192,32,.55); color: #f0c020; }
 .card .tag.lv3 { border-color: rgba(255,120,80,.6); color: #ff8860; }
+/* Language flags on the title screen (top right). */
+.lang-pick { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); display: flex; gap: 8px; z-index: 2; }
+.lang-pick button { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 6px 4px; border-radius: 6px; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.35); color: #e8e6dc; font: 600 10px var(--sans); letter-spacing: .12em; cursor: pointer; opacity: .62; transition: opacity .15s, border-color .15s, transform .15s; }
+.lang-pick button:hover { opacity: .9; transform: translateY(-1px); }
+.lang-pick button.sel { opacity: 1; border-color: var(--accent); }
+.lang-pick svg { width: 34px; height: 23px; border-radius: 2px; display: block; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
