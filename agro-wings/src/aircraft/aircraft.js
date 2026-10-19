@@ -6,6 +6,7 @@ import { FlightModel } from '../flight/flightModel.js';
 import { Assist } from '../flight/assist.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
+import { t } from '../i18n/index.js';
 import { FLIGHT, UNITS } from '../config.js';
 import { BASE, RUNWAY, POWERLINE } from '../world/layout.js';
 import { approach, clamp, smoothstep, damp, KT, FT } from '../core/math.js';
@@ -230,8 +231,8 @@ export class Aircraft {
     if (fm.engine !== 'off' || this.state !== 'ok') return false;
     const veto = this.game.canStartEngine?.();
     if (veto) { this.game.toast(veto); this.holdQ = -10; return false; }
-    if (fm.fuel <= 0.5) { this.game.toast('No fuel. Taxi is impossible — request service at the pad.'); this.holdQ = -10; return false; }
-    if (this.damage >= 90) { this.game.toast('The engine won’t turn over.'); this.holdQ = -10; return false; }
+    if (fm.fuel <= 0.5) { this.game.toast(t('No fuel. Taxi is impossible — request service at the pad.')); this.holdQ = -10; return false; }
+    if (this.damage >= 90) { this.game.toast(t('The engine won’t turn over.')); this.holdQ = -10; return false; }
     fm.engine = 'cranking';
     fm.crankTime = 0;
     fm.parkBrake = false;
@@ -284,7 +285,7 @@ export class Aircraft {
       if (e.speed > A.crashVs * k) return this.crash('Hard impact');
       if (e.speed > A.hardLandingVs * k) {
         this.hurt((e.speed - A.hardLandingVs * k) * 22);
-        this._toast('hard', `Hard landing (${e.speed.toFixed(1)} m/s).`);
+        this._toast('hard', t('Hard landing ({0} m/s).', e.speed.toFixed(1)));
       }
       this.game.audio?.play('thump', { volume: Math.min(1, 0.2 + e.speed * 0.25) });
     } else if (e.kind === 'bottom') {
@@ -297,12 +298,12 @@ export class Aircraft {
           if (e.speed > 14) return this.crash('Nose-over at speed');
           this.hurt(45);
           this.fm.engine = 'off';
-          this._toast('prop', 'Prop strike! The engine stopped.');
+          this._toast('prop', t('Prop strike! The engine stopped.'));
         }
       } else if (p.startsWith('wingtip') || p.startsWith('boom') || p.startsWith('stab')) {
         if (e.speed > 14) return this.crash('Wing struck the ground');
         this.hurt(12);
-        this._toast('tip', 'Wingtip scraped the ground.');
+        this._toast('tip', t('Wingtip scraped the ground.'));
       } else if (p === 'tail') {
         if (e.speed > 6) this.hurt(4);
       } else if (e.speed > 6) {
@@ -312,9 +313,9 @@ export class Aircraft {
       const deep = e.depth;
       if (deep > 1.4 && e.speed > 18) return this.crash('Flew into the crop');
       this.hurt(Math.min(8, deep * 4));
-      this._toast('crop', 'Crop strike — wheels in the canopy. Climb!');
+      this._toast('crop', t('Crop strike — wheels in the canopy. Climb!'));
     } else if (e.kind === 'starved') {
-      this._toast('fuel', this.A.turbine ? 'Flame-out: out of fuel.' : 'Engine stopped: out of fuel.');
+      this._toast('fuel', this.A.turbine ? t('Flame-out: out of fuel.') : t('Engine stopped: out of fuel.'));
     } else if (e.kind === 'lightoff') {
       this.game.audio?.play('lightoff');
     }
@@ -326,7 +327,7 @@ export class Aircraft {
     this.damage = Math.min(100, this.damage + n);
     this.fm.roughness = smoothstep(55, 95, this.damage) * 0.7;
     this.fm.extraDrag = this.damage * 0.0002;
-    if (before < 50 && this.damage >= 50) this.game.toast('Aircraft damaged — the engine sounds rough.');
+    if (before < 50 && this.damage >= 50) this.game.toast(t('Aircraft damaged — the engine sounds rough.'));
     if (this.damage >= 100) this.crash('Structural failure');
   }
 
@@ -425,7 +426,7 @@ export class Aircraft {
     this.stuck = this.stuckT > 6 || this.flipT > 2.5 || far;
     if (far) {
       // Turn the aircraft back toward the farm.
-      this._toast('far', 'Leaving the farm area — turning back.', 8);
+      this._toast('far', t('Leaving the farm area — turning back.'), 8);
       const h = Math.atan2(-fm.pos.x, -fm.pos.z);
       this.placeAirborne(fm.pos.x * 0.92, fm.pos.z * 0.92, h, Math.max(120, o.agl), Math.max(40, o.airspeed));
     }

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { SPRAY } from '../config.js';
 import { smoothstep, clamp } from '../core/math.js';
 import { fieldAt, cropHeight } from '../world/layout.js';
+import { t } from '../i18n/index.js';
 
 const _p = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _side = new THREE.Vector3();
 const SAMPLES = 64;
@@ -33,7 +34,7 @@ export class Sprayer {
     const fm = this.game.aircraft.fm;
     const next = force ?? !this.on;
     if (next && fm.hopper <= 0.5) {
-      this.game.toast('Hopper is empty — return to base for a reload.');
+      this.game.toast(t('Hopper is empty — return to base for a reload.'));
       this.on = false;
       return;
     }
@@ -62,7 +63,7 @@ export class Sprayer {
     if (!this.on) return;
     if (fm.hopper <= 0) {
       this.on = false;
-      this.game.toast('Hopper empty. Valve closed.');
+      this.game.toast(t('Hopper empty. Valve closed.'));
       return;
     }
     const litres = Math.min(fm.hopper, this.flowNow * h);

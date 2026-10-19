@@ -10,6 +10,7 @@ import { HeliAssist } from '../flight/heliAssist.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
+import { t } from '../i18n/index.js';
 import { UNITS } from '../config.js';
 import { BASE, POWERLINE } from '../world/layout.js';
 import { approach, clamp, smoothstep, damp, KT, FT } from '../core/math.js';
@@ -217,9 +218,9 @@ export class Helicopter {
     if (fm.engine !== 'off' || this.state !== 'ok') return false;
     const veto = this.game.canStartEngine?.();
     if (veto) { this.game.toast(veto); this.holdQ = -10; return false; }
-    if (fm.fuel <= 0.5) { this.game.toast('No fuel — request service at the helipad.'); this.holdQ = -10; return false; }
-    if (this.damage >= 90) { this.game.toast('The engine won’t turn over.'); this.holdQ = -10; return false; }
-    if (this.lever > 0.08) { this.game.toast('Collective full down before starting.'); this.holdQ = -10; return false; }
+    if (fm.fuel <= 0.5) { this.game.toast(t('No fuel — request service at the helipad.')); this.holdQ = -10; return false; }
+    if (this.damage >= 90) { this.game.toast(t('The engine won’t turn over.')); this.holdQ = -10; return false; }
+    if (this.lever > 0.08) { this.game.toast(t('Collective full down before starting.')); this.holdQ = -10; return false; }
     fm.engine = 'cranking';
     fm.crankTime = 0;
     this.game.audio?.play('starter');
@@ -260,7 +261,7 @@ export class Helicopter {
       if (e.speed > A.crashVs) return this.crash('Hard landing — skids collapsed');
       if (e.speed > A.hardLandingVs) {
         this.hurt((e.speed - A.hardLandingVs) * 30);
-        this._toast('hard', `Hard landing (${e.speed.toFixed(1)} m/s).`);
+        this._toast('hard', t('Hard landing ({0} m/s).', e.speed.toFixed(1)));
       }
       this.game.audio?.play('thump', { volume: Math.min(1, 0.15 + e.speed * 0.25) });
     } else if (e.kind === 'ground') {
@@ -270,18 +271,18 @@ export class Helicopter {
       else if (p === 'tailRotor') {
         if (turning) return this.crash('Tail rotor strike');
         this.hurt(10);
-      } else if (p === 'stinger') { if (e.speed > 3) this.hurt(8); this._toast('stinger', 'Tail stinger hit the ground — tail low!'); }
-      else if (p.startsWith('boom')) { this.hurt(e.speed > 4 ? 15 : 5); this._toast('boom', 'Spray boom struck the ground.'); }
+      } else if (p === 'stinger') { if (e.speed > 3) this.hurt(8); this._toast('stinger', t('Tail stinger hit the ground — tail low!')); }
+      else if (p.startsWith('boom')) { this.hurt(e.speed > 4 ? 15 : 5); this._toast('boom', t('Spray boom struck the ground.')); }
       else if (e.speed > 5) return this.crash('Impact');
       else this.hurt(10);
     } else if (e.kind === 'crop') {
       this.hurt(Math.min(4, e.depth * 3));
-      this._toast('crop', 'Skids in the crop — climb!');
+      this._toast('crop', t('Skids in the crop — climb!'));
     } else if (e.kind === 'starved') {
-      this._toast('fuel', 'Engine stopped: out of fuel. Lower the collective — autorotate!');
+      this._toast('fuel', t('Engine stopped: out of fuel. Lower the collective — autorotate!'));
     } else if (e.kind === 'catch') {
       this.game.audio?.play('catch');
-      this._toast('start', 'Engine running — clutch engaging, rotor spinning up.', 20);
+      this._toast('start', t('Engine running — clutch engaging, rotor spinning up.'), 20);
     }
     this.onEvent?.(e);
   }
@@ -291,7 +292,7 @@ export class Helicopter {
     this.damage = Math.min(100, this.damage + n);
     this.fm.roughness = smoothstep(55, 95, this.damage) * 0.7;
     this.fm.extraDrag = this.damage * 0.004;
-    if (before < 50 && this.damage >= 50) this.game.toast('Helicopter damaged — the engine sounds rough.');
+    if (before < 50 && this.damage >= 50) this.game.toast(t('Helicopter damaged — the engine sounds rough.'));
     if (this.damage >= 100) this.crash('Structural failure');
   }
 
@@ -397,7 +398,7 @@ export class Helicopter {
     const far = Math.abs(fm.pos.x) > 3900 || Math.abs(fm.pos.z) > 3900;
     this.stuck = this.flipT > 2.5 || far;
     if (far) {
-      this._toast('far', 'Leaving the farm area — turning back.', 8);
+      this._toast('far', t('Leaving the farm area — turning back.'), 8);
       const h = Math.atan2(-fm.pos.x, -fm.pos.z);
       this.placeAirborne(fm.pos.x * 0.92, fm.pos.z * 0.92, h, Math.max(60, o.agl), 25);
     }
