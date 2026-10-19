@@ -250,10 +250,13 @@ export class Aircraft {
   _simStep(h, opts) {
     const fm = this.fm;
     this.simTime += h;
-    // Command shaping, Tidemark's rates — a pull reaches full travel in
-    // 0.4 s: progressive on the key, quick enough for a pull-out.
+    // Command shaping, Tidemark's rates. A pull on the keys is progressive:
+    // in level flight, a climb or a turn it reaches full travel in ~0.8 s
+    // (the nose comes up gradually, as in other simulators); descending —
+    // the pull-out from a dive or the balão — in 0.4 s.
     const s = this.shaped, t = this.target;
-    s.elev = approach(s.elev, t.pitch, t.pitch === 0 ? 4 : t.pitch > 0 ? 2.5 : 3.4, h);
+    const v = this.fm.vel, descending = v.y < -0.05 * Math.max(1, v.length());
+    s.elev = approach(s.elev, t.pitch, t.pitch === 0 ? 4 : t.pitch > 0 ? (descending || s.elev < 0 ? 2.5 : 1.2) : 3.4, h);
     s.ail = approach(s.ail, t.roll, t.roll === 0 ? 5 : 3.2, h);
     s.rud = approach(s.rud, t.yaw, t.yaw === 0 ? 4 : 2.5, h);
     const o = fm.out;

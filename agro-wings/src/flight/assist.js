@@ -61,7 +61,7 @@ export class Assist {
     const high = mode === 'high';
 
     // Load factor the wing can give right now at the protected angle of attack.
-    const aProt = A.alphaStall - fm.flaps * 0.035 - (high ? 0.06 : 0.018);
+    const aProt = A.alphaStall - fm.flaps * 0.035 - (high ? 0.06 : 0.03);
     const clProt = A.CL0 + A.CLa * aProt + A.CLflap * fm.flaps;
     const nAvail = clamp((clProt * qd * A.wingArea) / (fm.mass * G), 0.3, 6);
     const nLimit = high ? 3.0 : 3.8; // normal-category structural limit

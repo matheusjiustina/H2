@@ -44,12 +44,12 @@ export const deg = (r) => (r * 180) / Math.PI;
 export { Vector3 };
 
 // The whole balão near the ground, flown as on the keyboard (a pull reaches
-// full travel in 0.4 s, as the game shapes it): a pass at 3 m and working
+// full travel as the game shapes it: 0.4 s descending, ~0.8 s otherwise): a pass at 3 m and working
 // speed, full pull to 25° nose up, roll into a 65° bank and turn back ~150°,
 // roll level, dive back at `diveDeg`, and a full pull once the wheels are
 // `hPull` metres up. Returns the lowest wheel height after the turn (or
 // 'HIT'), the speed and g of the pull-out and the worst stall.
-export function balaoDive(A, hopper, { hPull = 14, diveDeg = 14, fuel = 140, knots = 100, pullRamp = 2.5 } = {}) {
+export function balaoDive(A, hopper, { hPull = 14, diveDeg = 14, fuel = 140, knots = 100, pullRamp = null } = {}) {
   const KT = 1.943844, D = 180 / Math.PI;
   const V = knots / KT;
   const sim = makeSim({ hopper, fuel, wind: false, A });
@@ -82,7 +82,7 @@ export function balaoDive(A, hopper, { hPull = 14, diveDeg = 14, fuel = 140, kno
       if (t - tPh > 15) break;
     } else if (phase === 6) { cp = 1; if (fm.vel.y >= 0) { phase = 7; tPh = t; } }
     else if (t - tPh > 2) break;
-    sh.p = ap(sh.p, cp, cp === 0 ? 4 : cp > 0 ? pullRamp : 3.4); sh.r = ap(sh.r, cr, cr === 0 ? 5 : 3.2);
+    sh.p = ap(sh.p, cp, cp === 0 ? 4 : cp > 0 ? (pullRamp ?? (fm.vel.y < -0.05 * Math.max(1, fm.vel.length()) || sh.p < 0 ? 2.5 : 1.2)) : 3.4); sh.r = ap(sh.r, cr, cr === 0 ? 5 : 3.2);
     sim.step(1, { pitch: sh.p, roll: sh.r, yaw: 0 }, 'normal');
     let d = fm.heading() - prev; d = Math.atan2(Math.sin(d), Math.cos(d)); turned += d; prev = fm.heading();
     t += 1 / 120;
