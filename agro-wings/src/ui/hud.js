@@ -3,6 +3,7 @@
 import { SPRAY, GAME } from '../config.js';
 import { buildBaseMap, drawMap } from './maps.js';
 import { keyLabel } from '../core/input.js';
+import { t } from '../i18n/index.js';
 
 const h = (html) => {
   const t = document.createElement('template');
@@ -17,24 +18,24 @@ export class HUD {
     this.el = h(`<div class="hud">
       <div class="vignette"></div>
       <div class="jobcard"><div class="t"></div><div class="s s1"></div><div class="bar"><span></span></div><div class="s s2"></div></div>
-      <div class="crew"><div class="h">Ground crew</div><div class="msg"></div>
-        <div class="levels"><div>Fuel <b class="lf"></b><div class="bar"><span class="bf"></span></div></div><div>Hopper <b class="lh"></b><div class="bar blue"><span class="bh"></span></div></div></div>
+      <div class="crew"><div class="h">${t('Ground crew')}</div><div class="msg"></div>
+        <div class="levels"><div>${t('Fuel')} <b class="lf"></b><div class="bar"><span class="bf"></span></div></div><div>${t('Hopper')} <b class="lh"></b><div class="bar blue"><span class="bh"></span></div></div></div>
         <div class="s hint" style="margin-top:6px;color:var(--ink-faint)"></div></div>
       <div class="toasts"></div>
       <div class="warnings"></div>
       <div class="prompt interactive"></div>
-      <div class="spraybadge">SPRAY ON</div>
+      <div class="spraybadge">${t('SPRAY ON')}</div>
       <div class="trimbadge"></div>
       <div class="readouts">
-        <div class="ro r-spd"><span class="l">Speed</span><span class="v">0<span class="u">kt</span></span></div>
-        <div class="ro r-hgt"><span class="l">Height</span><span class="v">0<span class="u">m</span></span></div>
-        <div class="ro r-g"><span class="l">Load</span><span class="v">1.0<span class="u">G</span></span></div>
-        <div class="ro r-pwr"><span class="l">Power</span><span class="v">0<span class="u">%</span></span></div>
-        <div class="ro r-fuel"><span class="l">Fuel</span><span class="v">0<span class="u">L</span></span><div class="bar"><span></span></div></div>
-        <div class="ro r-hop"><span class="l">Hopper</span><span class="v">0<span class="u">L</span></span><div class="bar blue"><span></span></div></div>
+        <div class="ro r-spd"><span class="l">${t('Speed')}</span><span class="v">0<span class="u">kt</span></span></div>
+        <div class="ro r-hgt"><span class="l">${t('Height')}</span><span class="v">0<span class="u">m</span></span></div>
+        <div class="ro r-g"><span class="l">${t('Load')}</span><span class="v">1.0<span class="u">G</span></span></div>
+        <div class="ro r-pwr"><span class="l">${t('Power')}</span><span class="v">0<span class="u">%</span></span></div>
+        <div class="ro r-fuel"><span class="l">${t('Fuel')}</span><span class="v">0<span class="u">L</span></span><div class="bar"><span></span></div></div>
+        <div class="ro r-hop"><span class="l">${t('Hopper')}</span><span class="v">0<span class="u">L</span></span><div class="bar blue"><span></span></div></div>
       </div>
       <div class="minimap"><canvas width="352" height="352"></canvas></div>
-      <div class="tut interactive"><div class="step"></div><div class="txt"></div><div class="row"><span class="dim" style="font-size:11px;color:var(--ink-faint)"></span><button class="btn small skip">Skip tutorial</button></div></div>
+      <div class="tut interactive"><div class="step"></div><div class="txt"></div><div class="row"><span class="dim" style="font-size:11px;color:var(--ink-faint)"></span><button class="btn small skip">${t('Skip tutorial')}</button></div></div>
       <div class="fps"></div>
     </div>`);
     root.appendChild(this.el);
@@ -64,7 +65,7 @@ export class HUD {
     const g = this.game;
     g.setSetting('hudGps', !g.settings.hudGps);
     this.miniT = 0;
-    if (g.settings.hudGps && !g.job) this.toast('GPS guidance shows passes once a job is active.');
+    if (g.settings.hudGps && !g.job) this.toast(t('GPS guidance shows passes once a job is active.'));
   }
 
   toast(msg, dur = 4.5) {
@@ -102,10 +103,10 @@ export class HUD {
     const $ = this.$;
     // Readouts
     // Airspeed in flight; ground speed while taxiing (an ASI reads nothing useful there).
-    $.spd.querySelector('.l').textContent = tm.onGround ? 'Gnd spd' : 'Speed';
+    $.spd.querySelector('.l').textContent = tm.onGround ? t('Gnd spd') : t('Speed');
     $.spd.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.onGround ? tm.gs : tm.ias));
     const overCrop = ac.env.cropHeight(ac.fm.pos.x, ac.fm.pos.z) > 0;
-    $.hgt.querySelector('.l').textContent = overCrop ? 'Hgt crop' : 'Hgt gnd';
+    $.hgt.querySelector('.l').textContent = overCrop ? t('Hgt crop') : t('Hgt gnd');
     $.hgt.querySelector('.v').firstChild.nodeValue = tm.hgt > 99 ? Math.round(tm.hgt).toString() : tm.hgt.toFixed(1);
     const sprayingNow = g.sprayer.on;
     $.hgt.className = 'ro r-hgt' + (sprayingNow ? (tm.hgt < 1.5 ? ' bad' : tm.hgt > 6 ? ' warn' : tm.hgt >= SPRAY.idealHeight[0] && tm.hgt <= SPRAY.idealHeight[1] ? ' good' : '') : '');
@@ -114,25 +115,25 @@ export class HUD {
     if (pm) {
       // Helicopter, power model: rotor and power are one, so the slot shows
       // what the power does — the climb or sink rate.
-      if (this._heliRo !== 'vs') { $.gl.querySelector('.l').textContent = 'Climb'; $.gl.querySelector('.u').textContent = 'm/s'; this._heliRo = 'vs'; }
+      if (this._heliRo !== 'vs') { $.gl.querySelector('.l').textContent = t('Climb'); $.gl.querySelector('.u').textContent = 'm/s'; this._heliRo = 'vs'; }
       this.vsS = (this.vsS ?? 0) + (tm.vs - (this.vsS ?? 0)) * Math.min(1, dt * 5);
       const vsv = tm.onGround ? 0 : this.vsS;
       $.gl.querySelector('.v').firstChild.nodeValue = (vsv > 0.05 ? '+' : '') + vsv.toFixed(1);
       $.gl.className = 'ro r-g' + (Math.abs(vsv) < 0.2 ? ' dim' : vsv < -2.5 && tm.agl < 15 ? ' bad' : '');
     } else if (tm.heli) {
       // Helicopter, detailed rotor model: main-rotor speed (%) in place of the load factor.
-      if (this._heliRo !== 'rotor') { $.gl.querySelector('.l').textContent = 'Rotor'; $.gl.querySelector('.u').textContent = '%'; this._heliRo = 'rotor'; }
+      if (this._heliRo !== 'rotor') { $.gl.querySelector('.l').textContent = t('Rotor'); $.gl.querySelector('.u').textContent = '%'; this._heliRo = 'rotor'; }
       $.gl.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.rotorPct));
       $.gl.className = 'ro r-g' + (tm.rotorPct < 1 ? ' dim' : tm.lowRotor ? ' bad' : tm.rotorPct < 97 || tm.rotorPct > 108 ? ' warn' : '');
     } else {
-      if (this._heliRo) { $.gl.querySelector('.l').textContent = 'Load'; $.gl.querySelector('.u').textContent = 'G'; this._heliRo = false; }
+      if (this._heliRo) { $.gl.querySelector('.l').textContent = t('Load'); $.gl.querySelector('.u').textContent = 'G'; this._heliRo = false; }
       this.gs = (this.gs ?? 1) + (tm.g - (this.gs ?? 1)) * Math.min(1, dt * 6);
       $.gl.querySelector('.v').firstChild.nodeValue = tm.onGround ? '1.0' : this.gs.toFixed(1);
       $.gl.className = 'ro r-g' + (tm.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
     }
     $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.power * 100));
     // Power model: the power that hovers here, next to the label.
-    const pl = pm && tm.engine === 'running' ? `Power · hover ${Math.round(tm.hoverPower * 100)}` : 'Power';
+    const pl = pm && tm.engine === 'running' ? t('Power · hover {0}', Math.round(tm.hoverPower * 100)) : t('Power');
     if (pl !== this._pwrL) { $.pwr.querySelector('.l').textContent = pl; this._pwrL = pl; }
     $.fuel.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.fuel));
     $.fuel.querySelector('.bar span').style.width = `${(tm.fuel / tm.fuelCap) * 100}%`;
@@ -142,26 +143,26 @@ export class HUD {
     // Spray badge
     $.spray.classList.toggle('show', sprayingNow || (g.job && !tm.onGround));
     $.spray.classList.toggle('off', !sprayingNow);
-    $.spray.textContent = sprayingNow ? (g.sprayer.flowNow > 0 ? `SPRAY ON · ${(g.sprayer.flowNow * 60).toFixed(0)} L/min` : 'SPRAY ON · NO FLOW') : `SPRAY OFF · ${keyLabel(g.input.bindings.spray[0])}`;
+    $.spray.textContent = sprayingNow ? (g.sprayer.flowNow > 0 ? t('SPRAY ON · {0} L/min', (g.sprayer.flowNow * 60).toFixed(0)) : t('SPRAY ON · NO FLOW')) : t('SPRAY OFF · {0}', keyLabel(g.input.bindings.spray[0]));
     // Trim, shown for a moment while it is being set: the held flight path
     // with the assist flying, the elevator tab otherwise.
     $.trim.classList.toggle('show', !!tm.trim);
     if (tm.trim) {
       const deg = tm.trim.path !== null ? (tm.trim.path * 180) / Math.PI : null;
       $.trim.textContent = deg !== null
-        ? `TRIM · PATH ${deg >= 0.05 ? '+' : ''}${deg.toFixed(1)}° ${deg > 0.3 ? 'CLIMB' : deg < -0.3 ? 'DESCENT' : 'LEVEL'}`
-        : `TRIM · ${Math.round(Math.abs(tm.trim.tab) * 100)} % ${tm.trim.tab >= 0 ? 'NOSE UP' : 'NOSE DOWN'}`;
+        ? t('TRIM · PATH {0}° {1}', `${deg >= 0.05 ? '+' : ''}${deg.toFixed(1)}`, deg > 0.3 ? t('CLIMB') : deg < -0.3 ? t('DESCENT') : t('LEVEL'))
+        : t('TRIM · {0} % {1}', Math.round(Math.abs(tm.trim.tab) * 100), tm.trim.tab >= 0 ? t('NOSE UP') : t('NOSE DOWN'));
     }
     // Job card
     if (g.job) {
       $.job.classList.add('show');
       const s = g.jobStats || g.job.stats();
       $.jobT.textContent = g.job.c.title;
-      $.jobS1.textContent = `${g.job.ha.toFixed(1)} ha · ${g.job.crop} · sortie ${Math.max(1, g.job.sorties)}`;
+      $.jobS1.textContent = t('{0} ha · {1} · sortie {2}', g.job.ha.toFixed(1), g.job.crop, Math.max(1, g.job.sorties));
       $.jobBar.style.width = `${Math.min(100, (s.coverage / GAME.completeCoverage) * 100)}%`;
       const gd = g.guidance;
-      const passes = gd.passes.length ? `pass ${gd.next ? gd.next.k + 1 : '—'}/${gd.passes.length}` : '';
-      $.jobS2.textContent = `${Math.round(s.coverage * 100)}% covered · ${passes}${s.overlap > 0.02 ? ` · overlap ${Math.round(s.overlap * 100)}%` : ''}${g.job.complete() ? ' · COMPLETE — return to base' : ''}`;
+      const passes = gd.passes.length ? t('pass {0}/{1}', gd.next ? gd.next.k + 1 : '—', gd.passes.length) : '';
+      $.jobS2.textContent = `${t('{0}% covered · {1}', Math.round(s.coverage * 100), passes)}${s.overlap > 0.02 ? t(' · overlap {0}%', Math.round(s.overlap * 100)) : ''}${g.job.complete() ? t(' · COMPLETE — return to base') : ''}`;
     } else $.job.classList.remove('show');
     // Crew card
     const sv = g.service;
@@ -172,7 +173,7 @@ export class HUD {
       $.lh.textContent = `${Math.round(ac.fm.hopper)} / ${Math.round(sv.target.liquid)} L`;
       $.bf.style.width = `${(ac.fm.fuel / ac.A.fuelCapacity) * 100}%`;
       $.bh.style.width = `${(ac.fm.hopper / ac.A.hopperCapacity) * 100}%`;
-      $.crewHint.innerHTML = `Hold <span class="k">T</span> to speed up · ${this.key('orbit')} free camera`;
+      $.crewHint.innerHTML = t('Hold {0} to speed up · {1} free camera', '<span class="k">T</span>', this.key('orbit'));
     } else $.crew.classList.remove('show');
     // Warnings (only when needed)
     const w = g.warnings();
