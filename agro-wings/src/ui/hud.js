@@ -68,12 +68,12 @@ export class HUD {
   }
 
   toast(msg, dur = 4.5) {
-    const t = document.createElement('div');
-    t.className = 'toast';
-    t.textContent = msg;
-    this.$.toasts.appendChild(t);
-    requestAnimationFrame(() => t.classList.add('in'));
-    setTimeout(() => { t.classList.remove('in'); setTimeout(() => t.remove(), 500); }, dur * 1000);
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    this.$.toasts.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('in'));
+    setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 500); }, dur * 1000);
     while (this.$.toasts.children.length > 4) this.$.toasts.firstChild.remove();
   }
 
@@ -98,59 +98,59 @@ export class HUD {
   update(dt) {
     const g = this.game;
     const ac = g.aircraft;
-    const t = ac.telemetry();
+    const tm = ac.telemetry();
     const $ = this.$;
     // Readouts
     // Airspeed in flight; ground speed while taxiing (an ASI reads nothing useful there).
-    $.spd.querySelector('.l').textContent = t.onGround ? 'Gnd spd' : 'Speed';
-    $.spd.querySelector('.v').firstChild.nodeValue = String(Math.round(t.onGround ? t.gs : t.ias));
+    $.spd.querySelector('.l').textContent = tm.onGround ? 'Gnd spd' : 'Speed';
+    $.spd.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.onGround ? tm.gs : tm.ias));
     const overCrop = ac.env.cropHeight(ac.fm.pos.x, ac.fm.pos.z) > 0;
     $.hgt.querySelector('.l').textContent = overCrop ? 'Hgt crop' : 'Hgt gnd';
-    $.hgt.querySelector('.v').firstChild.nodeValue = t.hgt > 99 ? Math.round(t.hgt).toString() : t.hgt.toFixed(1);
+    $.hgt.querySelector('.v').firstChild.nodeValue = tm.hgt > 99 ? Math.round(tm.hgt).toString() : tm.hgt.toFixed(1);
     const sprayingNow = g.sprayer.on;
-    $.hgt.className = 'ro r-hgt' + (sprayingNow ? (t.hgt < 1.5 ? ' bad' : t.hgt > 6 ? ' warn' : t.hgt >= SPRAY.idealHeight[0] && t.hgt <= SPRAY.idealHeight[1] ? ' good' : '') : '');
+    $.hgt.className = 'ro r-hgt' + (sprayingNow ? (tm.hgt < 1.5 ? ' bad' : tm.hgt > 6 ? ' warn' : tm.hgt >= SPRAY.idealHeight[0] && tm.hgt <= SPRAY.idealHeight[1] ? ' good' : '') : '');
     // Load factor (smoothed): what the pull-up and the balão cost the wing.
-    const pm = t.heli && t.powerModel === 'power';
+    const pm = tm.heli && tm.powerModel === 'power';
     if (pm) {
       // Helicopter, power model: rotor and power are one, so the slot shows
       // what the power does — the climb or sink rate.
       if (this._heliRo !== 'vs') { $.gl.querySelector('.l').textContent = 'Climb'; $.gl.querySelector('.u').textContent = 'm/s'; this._heliRo = 'vs'; }
-      this.vsS = (this.vsS ?? 0) + (t.vs - (this.vsS ?? 0)) * Math.min(1, dt * 5);
-      const vsv = t.onGround ? 0 : this.vsS;
+      this.vsS = (this.vsS ?? 0) + (tm.vs - (this.vsS ?? 0)) * Math.min(1, dt * 5);
+      const vsv = tm.onGround ? 0 : this.vsS;
       $.gl.querySelector('.v').firstChild.nodeValue = (vsv > 0.05 ? '+' : '') + vsv.toFixed(1);
-      $.gl.className = 'ro r-g' + (Math.abs(vsv) < 0.2 ? ' dim' : vsv < -2.5 && t.agl < 15 ? ' bad' : '');
-    } else if (t.heli) {
+      $.gl.className = 'ro r-g' + (Math.abs(vsv) < 0.2 ? ' dim' : vsv < -2.5 && tm.agl < 15 ? ' bad' : '');
+    } else if (tm.heli) {
       // Helicopter, detailed rotor model: main-rotor speed (%) in place of the load factor.
       if (this._heliRo !== 'rotor') { $.gl.querySelector('.l').textContent = 'Rotor'; $.gl.querySelector('.u').textContent = '%'; this._heliRo = 'rotor'; }
-      $.gl.querySelector('.v').firstChild.nodeValue = String(Math.round(t.rotorPct));
-      $.gl.className = 'ro r-g' + (t.rotorPct < 1 ? ' dim' : t.lowRotor ? ' bad' : t.rotorPct < 97 || t.rotorPct > 108 ? ' warn' : '');
+      $.gl.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.rotorPct));
+      $.gl.className = 'ro r-g' + (tm.rotorPct < 1 ? ' dim' : tm.lowRotor ? ' bad' : tm.rotorPct < 97 || tm.rotorPct > 108 ? ' warn' : '');
     } else {
       if (this._heliRo) { $.gl.querySelector('.l').textContent = 'Load'; $.gl.querySelector('.u').textContent = 'G'; this._heliRo = false; }
-      this.gs = (this.gs ?? 1) + (t.g - (this.gs ?? 1)) * Math.min(1, dt * 6);
-      $.gl.querySelector('.v').firstChild.nodeValue = t.onGround ? '1.0' : this.gs.toFixed(1);
-      $.gl.className = 'ro r-g' + (t.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
+      this.gs = (this.gs ?? 1) + (tm.g - (this.gs ?? 1)) * Math.min(1, dt * 6);
+      $.gl.querySelector('.v').firstChild.nodeValue = tm.onGround ? '1.0' : this.gs.toFixed(1);
+      $.gl.className = 'ro r-g' + (tm.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
     }
-    $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round(t.power * 100));
+    $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.power * 100));
     // Power model: the power that hovers here, next to the label.
-    const pl = pm && t.engine === 'running' ? `Power · hover ${Math.round(t.hoverPower * 100)}` : 'Power';
+    const pl = pm && tm.engine === 'running' ? `Power · hover ${Math.round(tm.hoverPower * 100)}` : 'Power';
     if (pl !== this._pwrL) { $.pwr.querySelector('.l').textContent = pl; this._pwrL = pl; }
-    $.fuel.querySelector('.v').firstChild.nodeValue = String(Math.round(t.fuel));
-    $.fuel.querySelector('.bar span').style.width = `${(t.fuel / t.fuelCap) * 100}%`;
-    $.fuel.className = 'ro r-fuel' + (t.fuel < t.fuelCap * 0.15 ? ' bad' : '');
-    $.hop.querySelector('.v').firstChild.nodeValue = String(Math.round(t.hopper));
-    $.hop.querySelector('.bar span').style.width = `${(t.hopper / t.hopperCap) * 100}%`;
+    $.fuel.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.fuel));
+    $.fuel.querySelector('.bar span').style.width = `${(tm.fuel / tm.fuelCap) * 100}%`;
+    $.fuel.className = 'ro r-fuel' + (tm.fuel < tm.fuelCap * 0.15 ? ' bad' : '');
+    $.hop.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.hopper));
+    $.hop.querySelector('.bar span').style.width = `${(tm.hopper / tm.hopperCap) * 100}%`;
     // Spray badge
-    $.spray.classList.toggle('show', sprayingNow || (g.job && !t.onGround));
+    $.spray.classList.toggle('show', sprayingNow || (g.job && !tm.onGround));
     $.spray.classList.toggle('off', !sprayingNow);
     $.spray.textContent = sprayingNow ? (g.sprayer.flowNow > 0 ? `SPRAY ON · ${(g.sprayer.flowNow * 60).toFixed(0)} L/min` : 'SPRAY ON · NO FLOW') : `SPRAY OFF · ${keyLabel(g.input.bindings.spray[0])}`;
     // Trim, shown for a moment while it is being set: the held flight path
     // with the assist flying, the elevator tab otherwise.
-    $.trim.classList.toggle('show', !!t.trim);
-    if (t.trim) {
-      const deg = t.trim.path !== null ? (t.trim.path * 180) / Math.PI : null;
+    $.trim.classList.toggle('show', !!tm.trim);
+    if (tm.trim) {
+      const deg = tm.trim.path !== null ? (tm.trim.path * 180) / Math.PI : null;
       $.trim.textContent = deg !== null
         ? `TRIM · PATH ${deg >= 0.05 ? '+' : ''}${deg.toFixed(1)}° ${deg > 0.3 ? 'CLIMB' : deg < -0.3 ? 'DESCENT' : 'LEVEL'}`
-        : `TRIM · ${Math.round(Math.abs(t.trim.tab) * 100)} % ${t.trim.tab >= 0 ? 'NOSE UP' : 'NOSE DOWN'}`;
+        : `TRIM · ${Math.round(Math.abs(tm.trim.tab) * 100)} % ${tm.trim.tab >= 0 ? 'NOSE UP' : 'NOSE DOWN'}`;
     }
     // Job card
     if (g.job) {
@@ -181,7 +181,7 @@ export class HUD {
       this.warnState = ws;
       $.warnings.innerHTML = w.map((x) => `<div class="warning ${x.cls}">${x.text}</div>`).join('');
     }
-    $.vig.classList.toggle('show', t.stall > 0.5 && !t.onGround);
+    $.vig.classList.toggle('show', tm.stall > 0.5 && !tm.onGround);
     // Minimap at 10 Hz
     this.miniT -= dt;
     if (this.miniT <= 0) {

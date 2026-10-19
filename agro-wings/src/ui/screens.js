@@ -11,6 +11,7 @@ import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap } from './maps.js';
+import { t } from '../i18n/index.js';
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -21,27 +22,27 @@ export class Screens {
     this.game = game;
     this.root = root;
     this.open = null;
-    this.loading = h(`<div class="loading"><div class="brand">AGRO <b>WINGS</b></div><div class="loading-bar"><span style="width:0%"></span></div><div class="loading-label">Loading</div></div>`);
+    this.loading = h(`<div class="loading"><div class="brand">AGRO <b>WINGS</b></div><div class="loading-bar"><span style="width:0%"></span></div><div class="loading-label">${t('Loading')}</div></div>`);
     root.appendChild(this.loading);
     this.title = h(`<div class="overlay title interactive">
       <div class="title-inner">
         <div class="brand">AGRO <b>WINGS</b></div>
-        <div class="title-sub">Agricultural aviation · Fazenda Boa Esperança, Mato Grosso</div>
-        <div class="ac-select" role="radiogroup" aria-label="Aircraft">${AIRCRAFT_ORDER.map((id) => {
-          const t = AIRCRAFT_TYPES[id];
+        <div class="title-sub">${t('Agricultural aviation · Fazenda Boa Esperança, Mato Grosso')}</div>
+        <div class="ac-select" role="radiogroup" aria-label="${t('Aircraft')}">${AIRCRAFT_ORDER.map((id) => {
+          const ty = AIRCRAFT_TYPES[id];
           return `<button class="ac-card" role="radio" aria-checked="false" data-ac="${id}">
-            <span class="ac-slot">Aircraft ${t.slot}</span>
-            <span class="ac-label">${t.label}</span>
-            <span class="ac-reg">${t.reg} · ${t.name}</span>${t.role ? `<span class="ac-role">${t.role}</span>` : ''}
-            <span class="ac-spec">${t.engineName}<br>${t.summary}</span>
+            <span class="ac-slot">${t('Aircraft {0}', ty.slot)}</span>
+            <span class="ac-label">${ty.label}</span>
+            <span class="ac-reg">${ty.reg} · ${ty.name}</span>${ty.role ? `<span class="ac-role">${ty.role}</span>` : ''}
+            <span class="ac-spec">${ty.engineName}<br>${ty.summary}</span>
           </button>`;
         }).join('')}</div>
         <div class="btn-row">
-          <button class="btn primary" data-a="career">Contracts</button>
-          <button class="btn" data-a="free">Free flight</button>
-          <button class="btn" data-a="freeAir">Free flight (airborne)</button>
-          <button class="btn" data-a="settings">Settings</button>
-          <button class="btn" data-a="help">Controls</button>
+          <button class="btn primary" data-a="career">${t('Contracts')}</button>
+          <button class="btn" data-a="free">${t('Free flight')}</button>
+          <button class="btn" data-a="freeAir">${t('Free flight (airborne)')}</button>
+          <button class="btn" data-a="settings">${t('Settings')}</button>
+          <button class="btn" data-a="help">${t('Controls')}</button>
         </div>
         <div class="title-keys"></div>
       </div></div>`);
@@ -78,10 +79,10 @@ export class Screens {
       const k = (a) => keyLabel(this.game.input.keysOf(a)[0]);
       const heli = this.game.aircraft?.kind === 'heli';
       this.title.querySelector('.title-keys').innerHTML = this.game.touch?.active
-        ? (heli ? 'Touch: left stick is the cyclic, right slider the collective. Buttons for spray, camera and engine.' : 'Touch: left stick flies, right slider sets power. Buttons for spray, brakes, camera and engine.')
+        ? (heli ? t('Touch: left stick is the cyclic, right slider the collective. Buttons for spray, camera and engine.') : t('Touch: left stick flies, right slider sets power. Buttons for spray, brakes, camera and engine.'))
         : heli
-          ? `${k('pitchDown')}/${k('pitchUp')}/${k('rollLeft')}/${k('rollRight')} cyclic · ${k('yawLeft')}/${k('yawRight')} pedals · ${k('throttleUp')}/${k('throttleDown')} collective · ${k('spray')} spray · hold ${k('engine')} engine · ${k('camera')} camera · ${k('map')} map · Esc menu`
-          : `${k('pitchDown')}/${k('pitchUp')} pitch · ${k('rollLeft')}/${k('rollRight')} roll · ${k('yawLeft')}/${k('yawRight')} rudder · ${k('throttleUp')}/${k('throttleDown')} power · ${k('brakes')} brakes · ${k('spray')} spray · hold ${k('engine')} engine · ${k('camera')} camera · ${k('map')} map · Esc menu`;
+          ? t('{0}/{1}/{2}/{3} cyclic · {4}/{5} pedals · {6}/{7} collective · {8} spray · hold {9} engine · {10} camera · {11} map · Esc menu', k('pitchDown'), k('pitchUp'), k('rollLeft'), k('rollRight'), k('yawLeft'), k('yawRight'), k('throttleUp'), k('throttleDown'), k('spray'), k('engine'), k('camera'), k('map'))
+          : t('{0}/{1} pitch · {2}/{3} roll · {4}/{5} rudder · {6}/{7} power · {8} brakes · {9} spray · hold {10} engine · {11} camera · {12} map · Esc menu', k('pitchDown'), k('pitchUp'), k('rollLeft'), k('rollRight'), k('yawLeft'), k('yawRight'), k('throttleUp'), k('throttleDown'), k('brakes'), k('spray'), k('engine'), k('camera'), k('map'));
     }
   }
 
@@ -111,29 +112,29 @@ export class Screens {
       const jb = job || g.career.job(c.id);
       const ha = jb.ha;
       const done = g.career.completed[c.id];
-      const prog = st && st.coverage > 0.001 ? `In progress · ${pct(st.coverage)} covered` : done ? `Completed ${done.stars ? '★'.repeat(done.stars) : ''} · can be flown again` : 'Not started';
+      const prog = st && st.coverage > 0.001 ? t('In progress · {0} covered', pct(st.coverage)) : done ? t('Completed {0} · can be flown again', done.stars ? '★'.repeat(done.stars) : '') : t('Not started');
       // Real terrain data of the talhões (from the height field the aircraft flies over).
       const T = fieldsTerrain(g.world.terrain, jb.fields);
       const dist = Math.hypot(T.cx - BASE.pad.x, T.cz - BASE.pad.z) / 1000;
-      const terr = c.level > 1 ? `<span>relief ${Math.round(T.relief)} m</span><span>slope ≤ ${Math.round(T.maxSlope)}°</span>` : '';
+      const terr = c.level > 1 ? `<span>${t('relief {0} m', Math.round(T.relief))}</span><span>${t('slope ≤ {0}°', Math.round(T.maxSlope))}</span>` : '';
       return `<div class="card ${g.job?.c.id === c.id ? 'sel' : ''}">
         <span class="tag lv${c.level}">${LEVELS[c.level].short} · ${c.difficulty}</span>
         <div class="name">${c.title}</div>
         <div class="desc">${c.brief}</div>
-        <div class="meta"><span>${ha.toFixed(1)} ha</span><span>${GAME.currency} ${c.payPerHa}/ha</span><span>bonus ${money(c.bonus)}</span><span>${dist.toFixed(1)} km</span>${terr}</div>
+        <div class="meta"><span>${ha.toFixed(1)} ha</span><span>${GAME.currency} ${c.payPerHa}/ha</span><span>${t('bonus {0}', money(c.bonus))}</span><span>${dist.toFixed(1)} km</span>${terr}</div>
         <div class="prog">${prog}</div>
         <div class="btn-row" style="justify-content:flex-start">
-          <button class="btn primary small" data-sel="${c.id}">${st && st.coverage > 0.001 ? 'Resume' : 'Accept'}</button>
-          ${st && st.coverage > 0.001 ? `<button class="btn small" data-restart="${c.id}">Restart</button>` : ''}
+          <button class="btn primary small" data-sel="${c.id}">${st && st.coverage > 0.001 ? t('Resume') : t('Accept')}</button>
+          ${st && st.coverage > 0.001 ? `<button class="btn small" data-restart="${c.id}">${t('Restart')}</button>` : ''}
         </div>
       </div>`;
     };
     const cards = [1, 2, 3].map((lv) => `<h3 class="lvl">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => c.level === lv).map(card).join('')}</div>`).join('');
-    const el = h(`<div class="panel"><h2>Service orders</h2>
-      <div class="sub">Choose a job, set the load, and the badeco will service the aircraft on the pad.</div>
+    const el = h(`<div class="panel"><h2>${t('Service orders')}</h2>
+      <div class="sub">${t('Choose a job, set the load, and the badeco will service the aircraft on the pad.')}</div>
       ${cards}
-      <div class="row2"><span class="money">Balance ${money(g.career.money)}</span>
-      <div class="btn-row">${g.job ? '<button class="btn small" data-a="abandon">Hand in current job</button>' : ''}<button class="btn small" data-a="close">Close</button></div></div></div>`);
+      <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span>
+      <div class="btn-row">${g.job ? `<button class="btn small" data-a="abandon">${t('Hand in current job')}</button>` : ''}<button class="btn small" data-a="close">${t('Close')}</button></div></div></div>`);
     el.addEventListener('click', (e) => {
       const sel = e.target.closest('[data-sel]')?.dataset.sel;
       const rs = e.target.closest('[data-restart]')?.dataset.restart;
@@ -158,34 +159,34 @@ export class Screens {
     let fuel = Math.max(fm.fuel, Math.min(A.fuelCapacity, rec.fuel));
     let liquid = Math.max(fm.hopper, Math.min(A.hopperCapacity, rec.liquid));
     const st = job ? job.stats() : null;
-    const el = h(`<div class="panel" style="width:min(620px,calc(100vw - 32px))"><h2>Load sheet</h2>
-      <div class="sub">${T.reg} · ${T.name}. ${job ? `${job.c.title} — ${pct(st.coverage)} covered. ${job.c.tip}` : 'Free flight — load as you like.'}</div>
-      <div class="field"><label>Fuel (${T.fuel.name})</label><input type="range" min="0" max="${A.fuelCapacity}" step="5" value="${fuel}" data-k="fuel"><span class="val vf"></span></div>
-      <div class="field"><label>Application liquid</label><input type="range" min="0" max="${A.hopperCapacity}" step="10" value="${liquid}" data-k="liquid"><span class="val vl"></span></div>
-      <h3>Weight &amp; performance</h3>
+    const el = h(`<div class="panel" style="width:min(620px,calc(100vw - 32px))"><h2>${t('Load sheet')}</h2>
+      <div class="sub">${T.reg} · ${T.name}. ${job ? t('{0} — {1} covered. {2}', job.c.title, pct(st.coverage), job.c.tip) : t('Free flight — load as you like.')}</div>
+      <div class="field"><label>${t('Fuel ({0})', T.fuel.name)}</label><input type="range" min="0" max="${A.fuelCapacity}" step="5" value="${fuel}" data-k="fuel"><span class="val vf"></span></div>
+      <div class="field"><label>${t('Application liquid')}</label><input type="range" min="0" max="${A.hopperCapacity}" step="10" value="${liquid}" data-k="liquid"><span class="val vl"></span></div>
+      <h3>${t('Weight &amp; performance')}</h3>
       <div class="stats">
-        <div class="stat"><b class="m"></b><span>Take-off mass · MTOW ${A.mtow.toLocaleString('en-US')} kg</span></div>
-        ${T.loadSheet.heli ? `<div class="stat"><b class="b"></b><span>Hover power at 1 m (in ground effect)${g.settings.heliModel === 'rotor' ? ` · ${Math.round(A.engine.ratedKW / 0.7457)} hp take-off` : ''}</span></div>
-        <div class="stat"><b class="r"></b><span>Hover power out of ground effect</span></div>` : `<div class="stat"><b class="b"></b><span>Max level bank at ${T.loadSheet.bankKt} kt</span></div>
-        <div class="stat"><b class="r"></b><span>Est. ground roll</span></div>`}
-        <div class="stat"><b class="c"></b><span>Fuel cost</span></div>
-        <div class="stat"><b class="e"></b><span>Spray time at full flow</span></div>
+        <div class="stat"><b class="m"></b><span>${t('Take-off mass · MTOW {0} kg', A.mtow.toLocaleString('en-US'))}</span></div>
+        ${T.loadSheet.heli ? `<div class="stat"><b class="b"></b><span>${t('Hover power at 1 m (in ground effect)')}${g.settings.heliModel === 'rotor' ? t(' · {0} hp take-off', Math.round(A.engine.ratedKW / 0.7457)) : ''}</span></div>
+        <div class="stat"><b class="r"></b><span>${t('Hover power out of ground effect')}</span></div>` : `<div class="stat"><b class="b"></b><span>${t('Max level bank at {0} kt', T.loadSheet.bankKt)}</span></div>
+        <div class="stat"><b class="r"></b><span>${t('Est. ground roll')}</span></div>`}
+        <div class="stat"><b class="c"></b><span>${t('Fuel cost')}</span></div>
+        <div class="stat"><b class="e"></b><span>${t('Spray time at full flow')}</span></div>
       </div>
-      <div class="note">Fuel is billed to you. The client supplies the application liquid; whatever lands outside the talhão, drifts away or is over-applied counts as waste in the evaluation. ${T.loadSheet.heli ? 'A heavy tank needs more power for the hover and leaves less to climb or stop a descent: keep the mass under the MTOW, take off into the wind and transition to forward flight low over the pad.' : 'A heavy hopper means a longer take-off roll, slower climb, a higher stall speed and shallower turns: pull up before the balão, then bank.'}</div>
-      <div class="row2"><span class="money">Balance ${money(g.career.money)}</span><div class="btn-row">
-        <button class="btn small" data-a="rec">Recommended</button><button class="btn small" data-a="close">Cancel</button><button class="btn primary" data-a="go">Request service</button></div></div></div>`);
+      <div class="note">${t('Fuel is billed to you. The client supplies the application liquid; whatever lands outside the talhão, drifts away or is over-applied counts as waste in the evaluation.')} ${T.loadSheet.heli ? t('A heavy tank needs more power for the hover and leaves less to climb or stop a descent: keep the mass under the MTOW, take off into the wind and transition to forward flight low over the pad.') : t('A heavy hopper means a longer take-off roll, slower climb, a higher stall speed and shallower turns: pull up before the balão, then bank.')}</div>
+      <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span><div class="btn-row">
+        <button class="btn small" data-a="rec">${t('Recommended')}</button><button class="btn small" data-a="close">${t('Cancel')}</button><button class="btn primary" data-a="go">${t('Request service')}</button></div></div></div>`);
     const upd = () => {
       el.querySelector('.vf').textContent = `${Math.round(fuel)} L`;
       el.querySelector('.vl').textContent = `${Math.round(liquid)} L`;
       const mass = A.emptyMass + (A.agKitMass ?? 0) + A.pilotMass + fuel * A.fuelDensity + liquid * A.liquidDensity;
       const mEl = el.querySelector('.m');
-      mEl.textContent = `${Math.round(mass)} kg${mass > A.mtow ? ' · OVER' : ''}`;
+      mEl.textContent = `${Math.round(mass)} kg${mass > A.mtow ? t(' · OVER') : ''}`;
       mEl.style.color = mass > A.mtow ? 'var(--bad)' : '';
       if (T.loadSheet.heli && g.settings.heliModel !== 'rotor') {
         // Power model: the lever power that hovers at this weight.
         for (const [sel, k] of [['.b', 1], ['.r', Infinity]]) {
           const p = Math.round(hoverPowerFrac(A, mass, k) * 100), e = el.querySelector(sel);
-          e.textContent = `${p} % power${p > 100 ? ' · NO HOVER' : ''}`;
+          e.textContent = `${t('{0} % power', p)}${p > 100 ? t(' · NO HOVER') : ''}`;
           e.style.color = p > 100 ? 'var(--bad)' : p > 92 ? 'var(--warn, #f0c020)' : '';
         }
       } else if (T.loadSheet.heli) {
@@ -194,7 +195,7 @@ export class Screens {
         const cap = A.engine.ratedKW / 0.7457;
         for (const [sel, k] of [['.b', 1], ['.r', Infinity]]) {
           const p = hp(k), e = el.querySelector(sel);
-          e.textContent = `${p} hp${p > cap ? ' · NO HOVER' : ''}`;
+          e.textContent = `${p} hp${p > cap ? t(' · NO HOVER') : ''}`;
           e.style.color = p > cap ? 'var(--bad)' : p > cap * 0.95 ? 'var(--warn, #f0c020)' : '';
         }
       } else {
@@ -234,36 +235,36 @@ export class Screens {
   // --------------------------------------------------------------- results
   results(r, job) {
     const g = this.game;
-    const el = h(`<div class="panel"><h2>${r.done ? 'Job complete' : 'Job handed in'} — ${job.c.title}</h2>
-      <div class="sub">${r.done ? 'The client inspected the talhão.' : 'Partial work is paid pro rata.'} <span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}</span></div>
+    const el = h(`<div class="panel"><h2>${r.done ? t('Job complete') : t('Job handed in')} — ${job.c.title}</h2>
+      <div class="sub">${r.done ? t('The client inspected the talhão.') : t('Partial work is paid pro rata.')} <span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}</span></div>
       <div class="stats">
-        <div class="stat"><b>${pct(r.coverage)}</b><span>Useful coverage</span></div>
-        <div class="stat"><b>${pct(r.uniformity)}</b><span>Uniformity</span></div>
-        <div class="stat"><b>${pct(r.gaps)}</b><span>Gaps (falhas)</span></div>
-        <div class="stat"><b>${pct(r.overlap)}</b><span>Overlap</span></div>
-        <div class="stat"><b>${pct(r.waste)}</b><span>Waste</span></div>
-        <div class="stat"><b>${Math.round(100 - r.damage)}%</b><span>Aircraft condition</span></div>
-        <div class="stat"><b>${mmss(job.flightTime)}</b><span>Flight time · ${Math.max(1, job.sorties)} sortie${job.sorties > 1 ? 's' : ''}</span></div>
-        <div class="stat"><b>${job.flightTime > 30 ? ((job.ha * Math.min(1, r.coverage)) / (job.flightTime / 3600)).toFixed(0) : '—'}</b><span>Work rate (ha/h)</span></div>
+        <div class="stat"><b>${pct(r.coverage)}</b><span>${t('Useful coverage')}</span></div>
+        <div class="stat"><b>${pct(r.uniformity)}</b><span>${t('Uniformity')}</span></div>
+        <div class="stat"><b>${pct(r.gaps)}</b><span>${t('Gaps (falhas)')}</span></div>
+        <div class="stat"><b>${pct(r.overlap)}</b><span>${t('Overlap')}</span></div>
+        <div class="stat"><b>${pct(r.waste)}</b><span>${t('Waste')}</span></div>
+        <div class="stat"><b>${Math.round(100 - r.damage)}%</b><span>${t('Aircraft condition')}</span></div>
+        <div class="stat"><b>${mmss(job.flightTime)}</b><span>${job.sorties > 1 ? t('Flight time · {0} sorties', job.sorties) : t('Flight time · 1 sortie')}</span></div>
+        <div class="stat"><b>${job.flightTime > 30 ? ((job.ha * Math.min(1, r.coverage)) / (job.flightTime / 3600)).toFixed(0) : '—'}</b><span>${t('Work rate (ha/h)')}</span></div>
       </div>
-      <h3>Liquid</h3>
+      <h3>${t('Liquid')}</h3>
       <table class="ledger">
-        <tr><td>Sprayed</td><td>${Math.round(r.sprayed)} L</td></tr>
-        <tr><td>Landed on the talhão</td><td>${Math.round(r.applied)} L</td></tr>
-        <tr><td>Off target (roads, creek, other fields)</td><td>${Math.round(r.offTarget)} L</td></tr>
-        <tr><td>Drift / evaporation</td><td>${Math.round(r.lost)} L</td></tr>
-        <tr><td>Over-application</td><td>${Math.round(r.overdose)} L</td></tr>
+        <tr><td>${t('Sprayed')}</td><td>${Math.round(r.sprayed)} L</td></tr>
+        <tr><td>${t('Landed on the talhão')}</td><td>${Math.round(r.applied)} L</td></tr>
+        <tr><td>${t('Off target (roads, creek, other fields)')}</td><td>${Math.round(r.offTarget)} L</td></tr>
+        <tr><td>${t('Drift / evaporation')}</td><td>${Math.round(r.lost)} L</td></tr>
+        <tr><td>${t('Over-application')}</td><td>${Math.round(r.overdose)} L</td></tr>
       </table>
-      <h3>Payment</h3>
+      <h3>${t('Payment')}</h3>
       <table class="ledger">
-        <tr><td>Area rate (${job.ha.toFixed(1)} ha × ${GAME.currency} ${job.c.payPerHa}, by coverage)</td><td>${money(r.base)}</td></tr>
-        <tr><td>Quality factor (uniformity, waste)</td><td>× ${(r.quality).toFixed(2)}</td></tr>
-        <tr><td>Completion bonus</td><td>${money(r.bonus)}</td></tr>
-        <tr><td>Repairs</td><td>− ${money(r.repair)}</td></tr>
-        <tr class="total"><td>Credited</td><td>${money(r.total)}</td></tr>
+        <tr><td>${t('Area rate ({0} ha × {1} {2}, by coverage)', job.ha.toFixed(1), GAME.currency, job.c.payPerHa)}</td><td>${money(r.base)}</td></tr>
+        <tr><td>${t('Quality factor (uniformity, waste)')}</td><td>× ${(r.quality).toFixed(2)}</td></tr>
+        <tr><td>${t('Completion bonus')}</td><td>${money(r.bonus)}</td></tr>
+        <tr><td>${t('Repairs')}</td><td>− ${money(r.repair)}</td></tr>
+        <tr class="total"><td>${t('Credited')}</td><td>${money(r.total)}</td></tr>
       </table>
-      <div class="row2"><span class="money">Balance ${money(g.career.money)}</span><div class="btn-row">
-        <button class="btn" data-a="fly">Keep flying</button><button class="btn primary" data-a="board">New service</button></div></div></div>`);
+      <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span><div class="btn-row">
+        <button class="btn" data-a="fly">${t('Keep flying')}</button><button class="btn primary" data-a="board">${t('New service')}</button></div></div></div>`);
     el.addEventListener('click', (e) => {
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a === 'fly') this.close();
@@ -276,17 +277,17 @@ export class Screens {
   // --------------------------------------------------------------- pause
   pause() {
     const g = this.game;
-    const el = h(`<div class="panel" style="width:min(420px,calc(100vw - 32px))"><h2>Paused</h2>
-      <div class="sub">${g.job ? g.job.c.title : g.mode === 'free' ? 'Free flight' : ''}</div>
+    const el = h(`<div class="panel" style="width:min(420px,calc(100vw - 32px))"><h2>${t('Paused')}</h2>
+      <div class="sub">${g.job ? g.job.c.title : g.mode === 'free' ? t('Free flight') : ''}</div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn primary" data-a="resume">Resume</button>
-        <button class="btn" data-a="board">Service orders</button>
-        <button class="btn" data-a="map">Map</button>
-        <button class="btn" data-a="settings">Settings</button>
-        <button class="btn" data-a="help">Controls</button>
-        <button class="btn" data-a="resetPad">Reset aircraft to the pad</button>
-        <button class="btn" data-a="resetRwy">Reset aircraft on the strip</button>
-        <button class="btn" data-a="title">Main menu</button>
+        <button class="btn primary" data-a="resume">${t('Resume')}</button>
+        <button class="btn" data-a="board">${t('Service orders')}</button>
+        <button class="btn" data-a="map">${t('Map')}</button>
+        <button class="btn" data-a="settings">${t('Settings')}</button>
+        <button class="btn" data-a="help">${t('Controls')}</button>
+        <button class="btn" data-a="resetPad">${t('Reset aircraft to the pad')}</button>
+        <button class="btn" data-a="resetRwy">${t('Reset aircraft on the strip')}</button>
+        <button class="btn" data-a="title">${t('Main menu')}</button>
       </div></div>`);
     el.addEventListener('click', (e) => {
       const a = e.target.closest('[data-a]')?.dataset.a;
@@ -305,30 +306,30 @@ export class Screens {
     const keyRow = ([a, d]) => `<div class="kr"><span>${d.label}</span><button class="keybtn" data-bind="${a}">${g.input.bindings[a].map(keyLabel).join(' / ')}</button></div>`;
     const keyGroup = (scope) => Object.entries(ACTIONS).filter(([, d]) => d.scope === scope).map(keyRow).join('');
     const keys = keyGroup(undefined), numKeys = keyGroup('num'), classicKeys = keyGroup('classic');
-    const el = h(`<div class="panel"><h2>Settings</h2>
-      <h3>Graphics</h3>
-      <div class="field"><label>Quality</label>${seg('quality', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']])}<span></span></div>
-      <div class="field"><label>Show FPS</label>${seg('showFps', [[false, 'Off'], [true, 'On']])}<span></span></div>
-      <div class="field"><label>Cockpit shake</label>${seg('shake', [[0, 'Off'], [0.5, 'Low'], [1, 'Normal']])}<span></span></div>
-      <h3>Environment</h3>
-      <div class="field"><label>Time of day</label>${seg('timeOfDay', TIME_ORDER.map((k) => [k, TIMES[k].label]))}<span></span></div>
-      <div class="field"><label>Weather</label>${seg('weather', WEATHER_ORDER.map((k) => [k, WEATHER[k].label]))}<span></span></div>
-      <h3>Flying</h3>
-      <div class="field"><label>Airplane assist</label>${seg('assist', [['off', 'Off'], ['normal', 'Normal'], ['high', 'High']])}<span></span></div>
-      <div class="field"><label>Helicopter model</label>${seg('heliModel', [['power', 'Power (one lever)'], ['rotor', 'Detailed rotor']])}<span></span></div>
-      <div class="field"><label>Helicopter assist</label>${seg('heliAssist', [['off', 'Off'], ['normal', 'Normal'], ['high', 'High']])}<span></span></div>
-      <div class="field"><label>Wind</label>${seg('wind', [[0, 'Calm'], [1, 'Light'], [1.8, 'Moderate']])}<span></span></div>
-      <div class="field"><label>Flight keys</label>${seg('keyScheme', [['numpad', 'Numpad + Q/E'], ['classic', 'W/S/A/D + Z/X']])}<span></span></div>
-      <h3>Audio</h3>
-      <div class="field"><label>Volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-vol><span class="val">${Math.round(s.volume * 100)}%</span></div>
-      <h3>Keys <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">— click a key, then press the new one (Esc cancels)</span></h3>
+    const el = h(`<div class="panel"><h2>${t('Settings')}</h2>
+      <h3>${t('Graphics')}</h3>
+      <div class="field"><label>${t('Quality')}</label>${seg('quality', [['low', t('Low')], ['medium', t('Medium')], ['high', t('High')]])}<span></span></div>
+      <div class="field"><label>${t('Show FPS')}</label>${seg('showFps', [[false, t('Off')], [true, t('On')]])}<span></span></div>
+      <div class="field"><label>${t('Cockpit shake')}</label>${seg('shake', [[0, t('Off')], [0.5, t('Low')], [1, t('Normal')]])}<span></span></div>
+      <h3>${t('Environment')}</h3>
+      <div class="field"><label>${t('Time of day')}</label>${seg('timeOfDay', TIME_ORDER.map((k) => [k, TIMES[k].label]))}<span></span></div>
+      <div class="field"><label>${t('Weather')}</label>${seg('weather', WEATHER_ORDER.map((k) => [k, WEATHER[k].label]))}<span></span></div>
+      <h3>${t('Flying')}</h3>
+      <div class="field"><label>${t('Airplane assist')}</label>${seg('assist', [['off', t('Off')], ['normal', t('Normal')], ['high', t('High')]])}<span></span></div>
+      <div class="field"><label>${t('Helicopter model')}</label>${seg('heliModel', [['power', t('Power (one lever)')], ['rotor', t('Detailed rotor')]])}<span></span></div>
+      <div class="field"><label>${t('Helicopter assist')}</label>${seg('heliAssist', [['off', t('Off')], ['normal', t('Normal')], ['high', t('High')]])}<span></span></div>
+      <div class="field"><label>${t('Wind')}</label>${seg('wind', [[0, t('Calm')], [1, t('Light')], [1.8, t('Moderate')]])}<span></span></div>
+      <div class="field"><label>${t('Flight keys')}</label>${seg('keyScheme', [['numpad', t('Numpad + Q/E')], ['classic', 'W/S/A/D + Z/X']])}<span></span></div>
+      <h3>${t('Audio')}</h3>
+      <div class="field"><label>${t('Volume')}</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-vol><span class="val">${Math.round(s.volume * 100)}%</span></div>
+      <h3>${t('Keys')} <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">${t('— click a key, then press the new one (Esc cancels)')}</span></h3>
       <div class="keys">${keys}</div>
-      <h3>Flight keys — numpad scheme <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">(default; Flying → Flight keys picks the scheme, all aircraft)</span></h3>
+      <h3>${t('Flight keys — numpad scheme')} <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">${t('(default; Flying → Flight keys picks the scheme, all aircraft)')}</span></h3>
       <div class="keys">${numKeys}</div>
-      <h3>Flight keys — classic scheme</h3>
+      <h3>${t('Flight keys — classic scheme')}</h3>
       <div class="keys">${classicKeys}</div>
-      <div class="note">Assist Normal keeps attitude when the stick is centred, coordinates turns and protects against stalls; High also limits bank and pitch. Off gives raw control surfaces. On the ground, assist adds a light yaw damper against ground loops.</div>
-      <div class="row2"><button class="btn small" data-a="resetKeys">Reset keys</button><button class="btn small" data-a="resetSave">Reset career</button><button class="btn primary small" data-a="close">Done</button></div></div>`);
+      <div class="note">${t('Assist Normal keeps attitude when the stick is centred, coordinates turns and protects against stalls; High also limits bank and pitch. Off gives raw control surfaces. On the ground, assist adds a light yaw damper against ground loops.')}</div>
+      <div class="row2"><button class="btn small" data-a="resetKeys">${t('Reset keys')}</button><button class="btn small" data-a="resetSave">${t('Reset career')}</button><button class="btn primary small" data-a="close">${t('Done')}</button></div></div>`);
     el.addEventListener('click', (e) => {
       const b = e.target.closest('.seg button');
       if (b) {
@@ -343,7 +344,7 @@ export class Screens {
       const kb = e.target.closest('[data-bind]');
       if (kb) {
         kb.classList.add('wait');
-        kb.textContent = 'press a key…';
+        kb.textContent = t('press a key…');
         g.input.rebind(kb.dataset.bind, () => { this.settings(); });
         return;
       }
@@ -353,8 +354,8 @@ export class Screens {
       if (a === 'resetSave') {
         // Two-step confirmation inside the page (no browser dialogs).
         const btn = e.target.closest('[data-a]');
-        if (btn.dataset.armed) { g.career.resetAll(); g.job = null; g.setJob(null); this.settings(); g.toast('Career reset.'); }
-        else { btn.dataset.armed = '1'; btn.textContent = 'Click again to reset'; }
+        if (btn.dataset.armed) { g.career.resetAll(); g.job = null; g.setJob(null); this.settings(); g.toast(t('Career reset.')); }
+        else { btn.dataset.armed = '1'; btn.textContent = t('Click again to reset'); }
       }
     });
     el.addEventListener('input', (e) => {
@@ -375,14 +376,14 @@ export class Screens {
     // The scheme not in use, for the notes.
     const other = g.settings.keyScheme === 'classic' ? 'numpad' : 'classic';
     const ko = (a) => keyLabel(g.input.bindings[KEY_SCHEMES[other][a] ?? a][0]);
-    const el = h(`<div class="panel"><h2>Controls</h2>
-      <div class="sub">Flight keys: ${kk('pitchDown')} / ${kk('pitchUp')} stick forward / back, ${kk('rollLeft')} / ${kk('rollRight')} roll, ${kk('yawLeft')} / ${kk('yawRight')} rudder, ${kk('engine')} engine — Settings → Flying → Flight keys switches to ${other === 'classic' ? 'the Tidemark layout' : 'the numpad layout'} (${ko('pitchDown')} / ${ko('pitchUp')} / ${ko('rollLeft')} / ${ko('rollRight')}, ${ko('yawLeft')} / ${ko('yawRight')}, ${ko('engine')}). Mouse: left-drag looks around, right-drag is a virtual stick, wheel sets power (zoom in the free camera). Gamepad: left stick flies, triggers set power, bumpers rudder, A spray, B brakes.</div>
-      <div class="helpgrid">${rows}<div><span>Speed up ground service</span><b>T (hold)</b></div></div>
+    const el = h(`<div class="panel"><h2>${t('Controls')}</h2>
+      <div class="sub">${t('Flight keys: {0} / {1} stick forward / back, {2} / {3} roll, {4} / {5} rudder, {6} engine — Settings → Flying → Flight keys switches to {7} ({8} / {9} / {10} / {11}, {12} / {13}, {14}). Mouse: left-drag looks around, right-drag is a virtual stick, wheel sets power (zoom in the free camera). Gamepad: left stick flies, triggers set power, bumpers rudder, A spray, B brakes.', kk('pitchDown'), kk('pitchUp'), kk('rollLeft'), kk('rollRight'), kk('yawLeft'), kk('yawRight'), kk('engine'), other === 'classic' ? t('the Tidemark layout') : t('the numpad layout'), ko('pitchDown'), ko('pitchUp'), ko('rollLeft'), ko('rollRight'), ko('yawLeft'), ko('yawRight'), ko('engine'))}</div>
+      <div class="helpgrid">${rows}<div><span>${t('Speed up ground service')}</span><b>${t('T (hold)')}</b></div></div>
       ${g.aircraft?.kind === 'heli' ? `<h3>Robinson R44</h3>
-      <div class="note" style="color:var(--ink-dim)">${g.settings.heliModel !== 'rotor' ? `${kk('pitchDown')} / ${kk('pitchUp')} / ${kk('rollLeft')} / ${kk('rollRight')} tilt the helicopter forward / aft / left / right — the tilt keeps growing while the key is held (up to 45°) and levels out when you let go — ${kk('yawLeft')} / ${kk('yawRight')} turn the nose. The more it tilts, the faster it goes (about 10° for 40–60 kt, 20° for 100 kt); a steep tilt takes lift away, so add power or it sinks. ${keyLabel(g.input.bindings.throttleUp[0])}/${keyLabel(g.input.bindings.throttleDown[0])} (or Shift / Ctrl, the wheel, the triggers) set the <b>power</b> — the one control for up and down: rotor and torque act as one, so the power never swings the nose. The power that hovers is shown next to the POWER readout (about 50–55 % light, 65–70 % with a full tank, less close to the ground); more power climbs, less sinks, and the CLIMB readout shows by how much. Start with the power at zero (hold ${kk('engine')}): the rotor comes up to speed in about 6 s — then raise the power until the skids leave the ground, settle it at the hover figure and ease the cyclic forward. To land, hover low over the spot and take the power a few percent below the hover figure. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> levels it out when the keys are released, then it glides on, slows down and holds the hover. Settings → Helicopter model → <b>Detailed rotor</b> gives the full rotor simulation (governor, rotor droop, torque, autorotation). Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.</div>` : `${kk('pitchDown')} / ${kk('pitchUp')} / ${kk('rollLeft')} / ${kk('rollRight')} tilt the cyclic forward / aft / left / right, ${kk('yawLeft')} / ${kk('yawRight')} are the anti-torque pedals, ${keyLabel(g.input.bindings.throttleUp[0])}/${keyLabel(g.input.bindings.throttleDown[0])} (or Shift / Ctrl, the wheel, the triggers) raise and lower the collective; the governor holds the rotor at 101–102 %. Start with the collective full down (hold ${kk('engine')}): the clutch engages and the rotor spins up — wait for the green before lifting. Pull the collective slowly to a hover at about 1 m, then ease the cyclic forward; the aircraft shudders through translational lift. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> also holds height and the hover. Watch LOW RPM (horn): lower the collective. Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.</div>`}` : ''}
-      <h3>Agricultural flying</h3>
-      <div class="note" style="color:var(--ink-dim)">Work at 2.5–4.5 m over the crop canopy (the HGT readout turns green), around 85–105 kt. Too low narrows the swath and risks a crop strike; too high widens it but liquid drifts and evaporates. Fly along the yellow pass line — the lightbar on the glareshield shows which way to steer. Switch the spray off at the field edge and over gaps. Land back on the strip, taxi to the pad and tap ${kk('engine')} to shut down: the badeco reloads and your coverage is kept.</div>
-      <div class="row2"><span></span><button class="btn primary small" data-a="close">Close</button></div></div>`);
+      <div class="note" style="color:var(--ink-dim)">${g.settings.heliModel !== 'rotor' ? `${t('{0} / {1} / {2} / {3} tilt the helicopter forward / aft / left / right — the tilt keeps growing while the key is held (up to 45°) and levels out when you let go — {4} / {5} turn the nose. The more it tilts, the faster it goes (about 10° for 40–60 kt, 20° for 100 kt); a steep tilt takes lift away, so add power or it sinks. {6}/{7} (or Shift / Ctrl, the wheel, the triggers) set the <b>power</b> — the one control for up and down: rotor and torque act as one, so the power never swings the nose. The power that hovers is shown next to the POWER readout (about 50–55 % light, 65–70 % with a full tank, less close to the ground); more power climbs, less sinks, and the CLIMB readout shows by how much. Start with the power at zero (hold {8}): the rotor comes up to speed in about 6 s — then raise the power until the skids leave the ground, settle it at the hover figure and ease the cyclic forward. To land, hover low over the spot and take the power a few percent below the hover figure. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> levels it out when the keys are released, then it glides on, slows down and holds the hover. Settings → Helicopter model → <b>Detailed rotor</b> gives the full rotor simulation (governor, rotor droop, torque, autorotation). Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.', kk('pitchDown'), kk('pitchUp'), kk('rollLeft'), kk('rollRight'), kk('yawLeft'), kk('yawRight'), keyLabel(g.input.bindings.throttleUp[0]), keyLabel(g.input.bindings.throttleDown[0]), kk('engine'))}</div>` : `${t('{0} / {1} / {2} / {3} tilt the cyclic forward / aft / left / right, {4} / {5} are the anti-torque pedals, {6}/{7} (or Shift / Ctrl, the wheel, the triggers) raise and lower the collective; the governor holds the rotor at 101–102 %. Start with the collective full down (hold {8}): the clutch engages and the rotor spins up — wait for the green before lifting. Pull the collective slowly to a hover at about 1 m, then ease the cyclic forward; the aircraft shudders through translational lift. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> also holds height and the hover. Watch LOW RPM (horn): lower the collective. Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.', kk('pitchDown'), kk('pitchUp'), kk('rollLeft'), kk('rollRight'), kk('yawLeft'), kk('yawRight'), keyLabel(g.input.bindings.throttleUp[0]), keyLabel(g.input.bindings.throttleDown[0]), kk('engine'))}</div>`}` : ''}
+      <h3>${t('Agricultural flying')}</h3>
+      <div class="note" style="color:var(--ink-dim)">${t('Work at 2.5–4.5 m over the crop canopy (the HGT readout turns green), around 85–105 kt. Too low narrows the swath and risks a crop strike; too high widens it but liquid drifts and evaporates. Fly along the yellow pass line — the lightbar on the glareshield shows which way to steer. Switch the spray off at the field edge and over gaps. Land back on the strip, taxi to the pad and tap {0} to shut down: the badeco reloads and your coverage is kept.', kk('engine'))}</div>
+      <div class="row2"><span></span><button class="btn primary small" data-a="close">${t('Close')}</button></div></div>`);
     el.addEventListener('click', (e) => { if (e.target.closest('[data-a]')) this.close(); });
     this._show('help', el);
   }
@@ -390,7 +391,7 @@ export class Screens {
   map() {
     const g = this.game;
     const el = h(`<div class="mapwrap"><canvas width="1400" height="1400"></canvas>
-      <div class="legend"><div><i style="background:#3f8f2c"></i>Soy</div><div><i style="background:#2f7224"></i>Corn</div><div><i style="background:#5f8f4a"></i>Cotton</div><div><i style="background:#9a3a1c"></i>Roads / fallow</div><div><i style="background:#1f3a18"></i>Forest</div><div><i style="background:#c83228"></i>Not covered</div><div><i style="background:#46c85a"></i>Covered</div><div><i style="background:#9650dc"></i>Overlap</div><div><i style="background:#ffe14a"></i>Next pass</div></div></div>`);
+      <div class="legend"><div><i style="background:#3f8f2c"></i>${t('Soy')}</div><div><i style="background:#2f7224"></i>${t('Corn')}</div><div><i style="background:#5f8f4a"></i>${t('Cotton')}</div><div><i style="background:#9a3a1c"></i>${t('Roads / fallow')}</div><div><i style="background:#1f3a18"></i>${t('Forest')}</div><div><i style="background:#c83228"></i>${t('Not covered')}</div><div><i style="background:#46c85a"></i>${t('Covered')}</div><div><i style="background:#9650dc"></i>${t('Overlap')}</div><div><i style="background:#ffe14a"></i>${t('Next pass')}</div></div></div>`);
     const c = el.querySelector('canvas');
     const draw = () => {
       if (this.open !== 'map') return;
@@ -414,9 +415,9 @@ export class Screens {
   crash(reason, cost) {
     const g = this.game;
     const el = h(`<div class="panel" style="width:min(480px,calc(100vw - 32px))"><h2>${reason}</h2>
-      <div class="sub">The aircraft is down. You walked away from it.${cost ? ` Recovery and repairs: <b>${money(cost)}</b>.` : ''} It comes back repaired, as new (hopper empty). Job coverage is kept.</div>
-      <div class="row2"><span class="money">Balance ${money(g.career.money)}</span>
-        <span style="display:flex;gap:8px;flex-wrap:wrap">${g.aircraft.kind === 'heli' ? '' : '<button class="btn" data-a="runway">Back to the runway</button>'}<button class="btn primary" data-a="pad">Back to the base</button></span></div></div>`);
+      <div class="sub">${t('The aircraft is down. You walked away from it.')}${cost ? ` ${t('Recovery and repairs: <b>{0}</b>.', money(cost))}` : ''} ${t('It comes back repaired, as new (hopper empty). Job coverage is kept.')}</div>
+      <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap">${g.aircraft.kind === 'heli' ? '' : `<button class="btn" data-a="runway">${t('Back to the runway')}</button>`}<button class="btn primary" data-a="pad">${t('Back to the base')}</button></span></div></div>`);
     el.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b) g.recover(b.dataset.a === 'runway' ? 'runway' : 'pad'); });
     this._show('crash', el);
   }

@@ -56,7 +56,7 @@ export class Game {
 
   createRenderer() {
     const ctx = this.canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance', stencil: false });
-    if (!ctx) throw new Error('WebGL2 is not available on this device.');
+    if (!ctx) throw new Error(t('WebGL2 is not available on this device.'));
     const clip = !!ctx.getExtension('EXT_clip_control');
     const r = new THREE.WebGLRenderer({ canvas: this.canvas, context: ctx, antialias: true, reversedDepthBuffer: clip, logarithmicDepthBuffer: !clip });
     r.toneMapping = THREE.ACESFilmicToneMapping;
