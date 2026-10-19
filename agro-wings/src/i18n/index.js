@@ -23,6 +23,11 @@ function initial() {
 }
 
 let lang = typeof location === 'undefined' ? 'en' : initial();
+try { document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en'; } catch { /* no document */ }
+
+// Keys asked for in Portuguese that have no entry (checked by the tests).
+export const misses = new Set();
+if (typeof globalThis !== 'undefined') globalThis.__i18nMisses = misses;
 
 export const getLang = () => lang;
 
@@ -36,7 +41,8 @@ export function setLang(l) {
 const fill = (s, args) => (args.length ? s.replace(/\{(\d+)\}/g, (m, i) => (args[i] ?? m)) : s);
 
 export function t(en, ...args) {
-  const s = lang === 'pt' ? PT[en] ?? en : en;
+  let s = en;
+  if (lang === 'pt') { if (en in PT) s = PT[en]; else if (en) misses.add(en); }
   return fill(s, args);
 }
 

@@ -18,7 +18,7 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-await page.goto(url + '?q=low', { waitUntil: 'load' });
+await page.goto(url + '?q=low&lang=en', { waitUntil: 'load' }); // English labels are checked below
 await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null, { timeout: 180000 });
 await page.evaluate(() => localStorage.clear());
 await page.reload({ waitUntil: 'load' });

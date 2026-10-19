@@ -11,7 +11,7 @@ import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap } from './maps.js';
-import { t } from '../i18n/index.js';
+import { t, getLang, setLang } from '../i18n/index.js';
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -46,6 +46,28 @@ export class Screens {
         </div>
         <div class="title-keys"></div>
       </div></div>`);
+    // Language: two small flags, top right (Portuguese is the default).
+    const BR = '<svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#009c3b"/><path d="M10 1.6 18.2 7 10 12.4 1.8 7z" fill="#ffdf00"/><circle cx="10" cy="7" r="3.1" fill="#002776"/><path d="M7.1 6.3q3-1 5.8.9" stroke="#fff" stroke-width=".5" fill="none"/></svg>';
+    const US = '<svg viewBox="0 0 19 10" aria-hidden="true"><rect width="19" height="10" fill="#fff"/>' +
+      [0, 2, 4, 6, 8, 10, 12].map((i) => `<rect y="${(i * 10) / 13}" width="19" height="${10 / 13}" fill="#b22234"/>`).join('') +
+      '<rect width="7.6" height="5.4" fill="#3c3b6e"/>' +
+      [0, 1, 2, 3].map((r) => [0, 1, 2, 3, 4].map((c) => `<circle cx="${0.8 + c * 1.5 + (r % 2) * 0.75}" cy="${0.75 + r * 1.3}" r=".3" fill="#fff"/>`).join('')).join('') + '</svg>';
+    const pick = h(`<div class="lang-pick" role="radiogroup" aria-label="Idioma / Language">
+      <button data-lang="pt" role="radio" title="Português">${BR}<span>PT</span></button>
+      <button data-lang="en" role="radio" title="English">${US}<span>EN</span></button></div>`);
+    for (const b of pick.querySelectorAll('[data-lang]')) {
+      const on = b.dataset.lang === getLang();
+      b.classList.toggle('sel', on);
+      b.setAttribute('aria-checked', String(on));
+    }
+    pick.addEventListener('click', (e) => {
+      const l = e.target.closest('[data-lang]')?.dataset.lang;
+      if (!l || l === getLang()) return;
+      setLang(l);
+      // Everything is rebuilt in the new language (the game has not started yet).
+      try { location.reload(); } catch { /* sandboxed: applies on the next load */ }
+    });
+    this.title.appendChild(pick);
     root.appendChild(this.title);
     this.title.addEventListener('click', (e) => {
       const ac = e.target.closest('[data-ac]')?.dataset.ac;
@@ -312,8 +334,8 @@ export class Screens {
       <div class="field"><label>${t('Show FPS')}</label>${seg('showFps', [[false, t('Off')], [true, t('On')]])}<span></span></div>
       <div class="field"><label>${t('Cockpit shake')}</label>${seg('shake', [[0, t('Off')], [0.5, t('Low')], [1, t('Normal')]])}<span></span></div>
       <h3>${t('Environment')}</h3>
-      <div class="field"><label>${t('Time of day')}</label>${seg('timeOfDay', TIME_ORDER.map((k) => [k, TIMES[k].label]))}<span></span></div>
-      <div class="field"><label>${t('Weather')}</label>${seg('weather', WEATHER_ORDER.map((k) => [k, WEATHER[k].label]))}<span></span></div>
+      <div class="field"><label>${t('Time of day')}</label>${seg('timeOfDay', TIME_ORDER.map((k) => [k, t(TIMES[k].label)]))}<span></span></div>
+      <div class="field"><label>${t('Weather')}</label>${seg('weather', WEATHER_ORDER.map((k) => [k, t(WEATHER[k].label)]))}<span></span></div>
       <h3>${t('Flying')}</h3>
       <div class="field"><label>${t('Airplane assist')}</label>${seg('assist', [['off', t('Off')], ['normal', t('Normal')], ['high', t('High')]])}<span></span></div>
       <div class="field"><label>${t('Helicopter model')}</label>${seg('heliModel', [['power', t('Power (one lever)')], ['rotor', t('Detailed rotor')]])}<span></span></div>

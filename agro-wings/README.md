@@ -269,6 +269,36 @@ reason.
     services, and is back in its bay.
   - Closest approach to the aircraft: ≥ 0.5 m.
 
+### Language
+
+The game starts in **Portuguese (Brazil)**; **English** is the second
+option.
+
+- **Choosing:** two small flags (Brazil / United States) at the top right
+  of the title screen switch the language. The page reloads in the chosen
+  one.
+- **Where the choice lives:** it is kept in `localStorage`
+  (`agrowings.lang`). `?lang=en` or `?lang=pt` on the URL overrides it.
+- **How it works** (`src/i18n/`):
+  - The English text in the code is the key, and `t(en, ...args)` returns
+    the Portuguese for it, with `{0}`, `{1}`… filled in.
+  - The dictionaries are split by area: `pt-ui.js` (screens, HUD, touch),
+    `pt-game.js` (game, aircraft, key actions, crash reasons), `pt-jobs.js`
+    (contracts, tutorial, crops) and `pt-crew.js` (badeco and truck
+    messages, time of day, weather).
+  - Module-level data with visible text (contract titles, aircraft labels,
+    key-action labels) uses getters, so it always shows in the current
+    language.
+  - Crash reasons stay in English inside the simulation and are translated
+    where they are shown.
+- **Missing translations:** any key asked for in Portuguese without an
+  entry is collected in `window.__i18nMisses`. A browser tour of the title,
+  settings, controls, contracts, load sheet, flight HUD, pause and crash
+  screens found none.
+- **Tests:** Node tests run in English (no `location`). `test/keys.mjs`
+  loads with `?lang=en` because it checks the English key labels. The other
+  browser runs use the Portuguese default.
+
 ## Tests
 
 `npm test` runs `test/flight.test.mjs` (PR-AGW, incl. the trim),

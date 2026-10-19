@@ -104,7 +104,7 @@ export const AIRCRAFT_TYPES = {
     slot: '03',
     label: 'Robinson R44',
     reg: 'PR-AGH',
-    name: 'Robinson R44 Raven II · Agricultural',
+    get name() { return t('Robinson R44 Raven II · Agricultural'); },
     get role() { return t('Rotary-Wing Agricultural Aircraft'); },
     get engineName() { return t('Lycoming IO-540-AE1A5 · 245 hp take-off / 205 hp MCP'); },
     get summary() { return t('250 L spray tank · 176 L fuel · 1,134 kg MTOW'); },

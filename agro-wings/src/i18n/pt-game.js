@@ -190,4 +190,5 @@ export default {
   'Lycoming IO-540-AE1A5 · 245 hp take-off / 205 hp MCP': 'Lycoming IO-540-AE1A5 · 245 hp decolagem / 205 hp contínua',
   '250 L spray tank · 176 L fuel · 1,134 kg MTOW': 'Tanque de calda 250 L · 176 L combustível · PMD 1.134 kg',
   ethanol: 'etanol',
+  'Robinson R44 Raven II · Agricultural': 'Robinson R44 Raven II · Agrícola',
 };
