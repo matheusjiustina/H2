@@ -2,6 +2,7 @@
 // first pass with the spray, turn, and the return to the pad.
 import { RUNWAY, BASE } from '../world/layout.js';
 import { SPRAY } from '../config.js';
+import { t } from '../i18n/index.js';
 
 export class Tutorial {
   constructor(game) {
@@ -34,44 +35,44 @@ export class Tutorial {
     const hdg = ac.headingDeg();
     return [
       {
-        label: 'Ground service',
-        text: `The badeco is loading fuel and liquid. Watch him work with the free camera ${k('orbit')} (drag to look). Hold <span class="k">T</span> to speed it up.`,
+        label: t('Ground service'),
+        text: t('The badeco is loading fuel and liquid. Watch him work with the free camera {0} (drag to look). Hold {1} to speed it up.', k('orbit'), '<span class="k">T</span>'),
         done: () => !g.service.busy() && fm.hopper > 50,
       },
-      { label: 'Engine', text: `Hold ${k('engine')} to start the engine. Keep the area clear — the crew is at the bench.`, done: () => fm.engine === 'running' },
+      { label: t('Engine'), text: t('Hold {0} to start the engine. Keep the area clear — the crew is at the bench.', k('engine')), done: () => fm.engine === 'running' },
       {
-        label: 'Taxi',
-        text: `Add a little power ${k('throttleUp')} and steer with ${k('yawLeft')} ${k('yawRight')} (or A / D). Hold ${k('brakes')} to brake. Taxi south to the strip (west end).`,
+        label: t('Taxi'),
+        text: t('Add a little power {0} and steer with {1} {2} (or A / D). Hold {3} to brake. Taxi south to the strip (west end).', k('throttleUp'), k('yawLeft'), k('yawRight'), k('brakes')),
         done: () => onRunway() && fm.pos.x < RUNWAY.x0 + 80,
       },
       {
-        label: 'Line up',
-        text: `Line up on the centreline facing east (runway 09). Set 10° of flaps with ${k('flapsDown')}.`,
+        label: t('Line up'),
+        text: t('Line up on the centreline facing east (runway 09). Set 10° of flaps with {0}.', k('flapsDown')),
         done: () => onRunway() && Math.abs(((hdg - 90 + 540) % 360) - 180) < 12 && o.groundSpeed < 6,
       },
       {
-        label: 'Take-off',
-        text: `Full power ${k('throttleUp')}. Keep it straight with the rudder; ease the stick forward ${k('pitchDown')} to raise the tail, then back ${k('pitchUp')} at about 60 kt. A full hopper needs a longer run.`,
+        label: t('Take-off'),
+        text: t('Full power {0}. Keep it straight with the rudder; ease the stick forward {1} to raise the tail, then back {2} at about 60 kt. A full hopper needs a longer run.', k('throttleUp'), k('pitchDown'), k('pitchUp')),
         done: () => !o.onGround && o.agl > 25,
       },
       {
-        label: 'To the talhão',
-        text: `Flaps up ${k('flapsUp')}. Turn toward the job (yellow outline on the minimap; ${k('map')} opens the map). Follow the yellow pass line.`,
+        label: t('To the talhão'),
+        text: t('Flaps up {0}. Turn toward the job (yellow outline on the minimap; {1} opens the map). Follow the yellow pass line.', k('flapsUp'), k('map')),
         done: () => g.job && this._nearJob(450),
       },
       {
-        label: 'First pass',
-        text: `Descend to 2.5–4.5 m over the crop (HGT turns green), line up on the yellow line and press ${k('spray')} to spray. Keep the lightbar centred.`,
+        label: t('First pass'),
+        text: t('Descend to 2.5–4.5 m over the crop (HGT turns green), line up on the yellow line and press {0} to spray. Keep the lightbar centred.', k('spray')),
         done: () => this.sprayGood > 5,
       },
       {
-        label: 'Balão',
-        text: `At the field edge press ${k('spray')} to stop and fly the balão: pull ${k('pitchUp')} firmly to climb 20–30 m while the speed bleeds off, turn about 45° away, then bank steeply (60–75°) back toward the next line and let the nose fall. Dive back to 3 m on the yellow line. A loaded hopper climbs less and needs a shallower bank — watch the LOAD readout.`,
+        label: t('Balão'),
+        text: t('At the field edge press {0} to stop and fly the balão: pull {1} firmly to climb 20–30 m while the speed bleeds off, turn about 45° away, then bank steeply (60–75°) back toward the next line and let the nose fall. Dive back to 3 m on the yellow line. A loaded hopper climbs less and needs a shallower bank — watch the LOAD readout.', k('spray'), k('pitchUp')),
         done: () => g.guidance.passes.filter((p) => p.done > 0.85).length >= 2,
       },
       {
-        label: 'Back to base',
-        text: `Keep working until the job is done or the hopper is empty. Then land on the strip, taxi to the pad (blue circle) and tap ${k('engine')} to shut down. The badeco reloads and your coverage is kept.`,
+        label: t('Back to base'),
+        text: t('Keep working until the job is done or the hopper is empty. Then land on the strip, taxi to the pad (blue circle) and tap {0} to shut down. The badeco reloads and your coverage is kept.', k('engine')),
         done: () => g.service.inZone() && fm.engine === 'off' && o.groundSpeed < 0.3,
       },
     ];
@@ -91,7 +92,7 @@ export class Tutorial {
       this.active = false;
       g.career.tutorialDone = true;
       g.career.save();
-      g.toast('Tutorial complete. Good flying!');
+      g.toast(t('Tutorial complete. Good flying!'));
       return;
     }
     const s = st[this.i];
@@ -99,7 +100,7 @@ export class Tutorial {
     const ac = g.aircraft;
     const hh = ac.workHeight();
     if (g.sprayer.on && g.sprayer.flowNow > 0 && hh > SPRAY.idealHeight[0] - 0.5 && hh < SPRAY.idealHeight[1] + 1.5) this.sprayGood += dt;
-    g.hud.setTutorial(`Tutorial ${this.i + 1} / ${st.length} · ${s.label}`, s.text, '');
+    g.hud.setTutorial(t('Tutorial {0} / {1} · {2}', this.i + 1, st.length, s.label), s.text, '');
     this.t += dt;
     if (this.t > 0.6 && s.done()) {
       this.i++;

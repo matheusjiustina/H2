@@ -12,6 +12,7 @@ import { Badeco } from './badeco.js';
 import { Hose } from './hose.js';
 import { ServiceTruck } from './truck.js';
 import { BASE } from '../world/layout.js';
+import { t } from '../i18n/index.js';
 
 export const SERVICE = { fuelRate: 4.5, liquidRate: 14, walk: 1.35, carry: 1.1, run: 3.0 };
 
@@ -80,14 +81,14 @@ export class GroundService {
   // Called before an engine start; returns a veto message while the crew is close.
   engineVeto() {
     if (this.state === 'working') {
-      this.abort('Engine start requested — ground crew clearing the aircraft.');
-      return 'Ground crew is clearing the aircraft. Wait for the all-clear before starting.';
+      this.abort(t('Engine start requested — ground crew clearing the aircraft.'));
+      return t('Ground crew is clearing the aircraft. Wait for the all-clear before starting.');
     }
-    if (this.state === 'aborting') return 'Ground crew is still clearing the aircraft.';
+    if (this.state === 'aborting') return t('Ground crew is still clearing the aircraft.');
     const ac = this.game.aircraft;
     // Once the badeco has finished, the engine may start with the truck still
     // alongside (it stands off the wingtip, clear of the prop) or driving off.
-    if (this.badeco.pos.distanceTo(_v.set(ac.fm.pos.x, this.badeco.pos.y, ac.fm.pos.z)) < ac.type.service.veto) return ac.kind === 'heli' ? 'Ground crew is inside the rotor disc.' : 'Ground crew is too close to the propeller.';
+    if (this.badeco.pos.distanceTo(_v.set(ac.fm.pos.x, this.badeco.pos.y, ac.fm.pos.z)) < ac.type.service.veto) return ac.kind === 'heli' ? t('Ground crew is inside the rotor disc.') : t('Ground crew is too close to the propeller.');
     return null;
   }
 
@@ -96,7 +97,7 @@ export class GroundService {
     this.target.fuel = Math.min(ac.A.fuelCapacity, Math.max(fm.fuel, fuelTarget));
     this.target.liquid = Math.min(ac.A.hopperCapacity, Math.max(fm.hopper, liquidTarget));
     if (!this.ready()) {
-      this.game.toast(this.game.aircraft.kind === 'heli' ? 'Land on the helipad, shut down and wait for the rotor to stop.' : 'Park on the service pad and shut the engine down for service.');
+      this.game.toast(this.game.aircraft.kind === 'heli' ? t('Land on the helipad, shut down and wait for the rotor to stop.') : t('Park on the service pad and shut the engine down for service.'));
       return false;
     }
     this.parkRef = fm.pos.clone();
@@ -104,7 +105,7 @@ export class GroundService {
     this.loaded.fuel = this.loaded.liquid = 0;
     const needFuel = this.target.fuel - fm.fuel > 1;
     const needLiq = this.target.liquid - fm.hopper > 1;
-    if (!needFuel && !needLiq) { this.game.toast('Tanks already at the requested levels.'); return false; }
+    if (!needFuel && !needLiq) { this.game.toast(t('Tanks already at the requested levels.')); return false; }
     this.queue = [];
     const Lp = (k) => this._local(k);
     const heli = ac.kind === 'heli';
@@ -112,24 +113,24 @@ export class GroundService {
     // equipment); fixed station hoses if no drivable path exists.
     this.useTruck = this.truck.atHome && this.truck.dispatch(ac, this.side);
     if (this.useTruck) {
-      this.queue.push({ a: 'truckIn', t: 120, msg: 'Service truck on its way to the aircraft.' });
+      this.queue.push({ a: 'truckIn', t: 120, msg: t('Service truck on its way to the aircraft.') });
     } else if (!this.truck.atHome) {
       this.useTruck = this.truck.parkedAtStand;
     } else {
-      this.game.toast('Service truck cannot reach the aircraft here — using the station hoses.');
+      this.game.toast(t('Service truck cannot reach the aircraft here — using the station hoses.'));
     }
     // A turboprop's prop takes many seconds to run down after shutdown: the
     // badeco stays at his post until it has stopped.
     if (ac.A.turbine && fm.rpm > 60) {
-      this.queue.push({ a: 'wait', t: 40, until: () => this.game.aircraft.fm.rpm < 40, msg: 'Badeco waits for the propeller to stop.' });
+      this.queue.push({ a: 'wait', t: 40, until: () => this.game.aircraft.fm.rpm < 40, msg: t('Badeco waits for the propeller to stop.') });
     }
     if (needFuel) {
       this.queue.push(
-        { a: 'walk', to: () => this._walkTo(this._reelAccess('fuel')), speed: SERVICE.walk, msg: this.useTruck ? 'Badeco is heading to the truck (fuel reel).' : 'Badeco is heading to the fuel pump.' },
+        { a: 'walk', to: () => this._walkTo(this._reelAccess('fuel')), speed: SERVICE.walk, msg: this.useTruck ? t('Badeco is heading to the truck (fuel reel).') : t('Badeco is heading to the fuel pump.') },
         { a: 'pickup', hose: 'fuel', t: 1.0 },
-        { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), Lp('F')], speed: SERVICE.carry, pose: 'carry', msg: heli ? 'Carrying the fuel hose (around the boom).' : 'Carrying the fuel hose (behind the wing).' },
+        { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), Lp('F')], speed: SERVICE.carry, pose: 'carry', msg: heli ? t('Carrying the fuel hose (around the boom).') : t('Carrying the fuel hose (behind the wing).') },
         { a: 'face', at: () => this._world(this._port(this.game.aircraft.model.fuelFiller)) },
-        { a: 'connect', hose: 'fuel', t: 1.6, pose: 'reach', msg: heli ? 'Connecting to the main fuel tank.' : 'Connecting to the wing tank.' },
+        { a: 'connect', hose: 'fuel', t: 1.6, pose: 'reach', msg: heli ? t('Connecting to the main fuel tank.') : t('Connecting to the wing tank.') },
         { a: 'transfer', kind: 'fuel', pose: 'hold' },
         { a: 'disconnect', hose: 'fuel', t: 1.2, pose: 'reach' },
         { a: 'walk', to: () => [Lp('B'), Lp('A'), ...this._walkTo(this._reelAccess('fuel'), Lp('A'))], speed: SERVICE.carry, pose: 'carry' },
@@ -138,11 +139,11 @@ export class GroundService {
     }
     if (needLiq) {
       this.queue.push(
-        { a: 'walk', to: () => this._walkTo(this._reelAccess('mix')), speed: SERVICE.walk, msg: this.useTruck ? 'Badeco is heading to the truck (calda reel).' : 'Badeco is heading to the mixing station.' },
+        { a: 'walk', to: () => this._walkTo(this._reelAccess('mix')), speed: SERVICE.walk, msg: this.useTruck ? t('Badeco is heading to the truck (calda reel).') : t('Badeco is heading to the mixing station.') },
         { a: 'pickup', hose: 'mix', t: 1.0 },
-        { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), Lp('P')], speed: SERVICE.carry, pose: 'carry', msg: 'Carrying the loading hose.' },
+        { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), Lp('P')], speed: SERVICE.carry, pose: 'carry', msg: t('Carrying the loading hose.') },
         { a: 'face', at: () => this._world(this._port(this.game.aircraft.model.hopperPort)) },
-        { a: 'connect', hose: 'mix', t: 1.8, pose: 'reachLow', msg: heli ? 'Coupling the spray-tank quick-fill.' : 'Coupling the hopper quick-fill.' },
+        { a: 'connect', hose: 'mix', t: 1.8, pose: 'reachLow', msg: heli ? t('Coupling the spray-tank quick-fill.') : t('Coupling the hopper quick-fill.') },
         { a: 'transfer', kind: 'liquid', pose: 'crouch' },
         { a: 'disconnect', hose: 'mix', t: 1.3, pose: 'reachLow' },
         { a: 'walk', to: () => [Lp('B'), Lp('A'), ...this._walkTo(this._reelAccess('mix'), Lp('A'))], speed: SERVICE.carry, pose: 'carry' },
@@ -153,8 +154,8 @@ export class GroundService {
       { a: 'walk', to: () => this._walkTo(this.post.clone()), speed: SERVICE.walk },
       { a: 'face', at: () => this.game.aircraft.fm.pos.clone() },
     );
-    if (this.useTruck) this.queue.push({ a: 'truckOut', t: 90, msg: 'Service truck backing out to its bay.' });
-    this.queue.push({ a: 'signal', t: 2.2, pose: 'thumbs', msg: 'All clear — aircraft released.' });
+    if (this.useTruck) this.queue.push({ a: 'truckOut', t: 90, msg: t('Service truck backing out to its bay.') });
+    this.queue.push({ a: 'signal', t: 2.2, pose: 'thumbs', msg: t('All clear — aircraft released.') });
     this.state = 'working';
     this.step = null;
     this.game.onServiceStart?.();
@@ -163,7 +164,7 @@ export class GroundService {
 
   abort(reason) {
     if (this.state !== 'working') return;
-    this.game.toast(reason || 'Ground crew: service interrupted.');
+    this.game.toast(reason || t('Ground crew: service interrupted.'));
     this.state = 'aborting';
     this.queue = [];
     if (this.connected || this.carry) {
@@ -236,7 +237,7 @@ export class GroundService {
     // Abort if the aircraft moves while working.
     if (this.state === 'working' && this.parkRef) {
       if (fm.engine !== 'off' || fm.pos.distanceTo(this.parkRef) > 0.4 || fm.out.groundSpeed > 0.25) {
-        this.abort('Aircraft moved — ground crew stopped the service.');
+        this.abort(t('Aircraft moved — ground crew stopped the service.'));
       }
     }
     this.pumpOn = false;
@@ -381,7 +382,7 @@ export class GroundService {
           // Could not get there: back to the bay, use the station hoses.
           this.truck.recall();
           this.useTruck = false;
-          this.game.toast('Service truck could not reach the stand — using the station hoses.');
+          this.game.toast(t('Service truck could not reach the stand — using the station hoses.'));
           this.step = null;
         }
         break;
