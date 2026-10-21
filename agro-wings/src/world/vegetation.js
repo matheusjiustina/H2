@@ -11,7 +11,7 @@ import { reliefWeights } from './relief.js';
 import { rng, fbm, segDist } from '../core/math.js';
 import {
   makeFoliageAtlas, makeCanopyTexture, foliageMaterial, tileRect, TILES,
-  broadTree, mangoTree, ipeTree, eucalyptusTree, buritiPalm, shrub,
+  broadTree, mangoTree, ipeTree, eucalyptusTree, buritiPalm, shrub, cerradoTree, macaubaPalm, deadTree,
 } from './foliage.js';
 
 const C = (r, g, b) => new THREE.Color(r, g, b);
@@ -34,7 +34,17 @@ function buildVariants() {
     ipe: [pair((hi) => ipeTree(hi, 61))],
     euca: [0, 1].map((i) => pair((hi) => eucalyptusTree(hi, 71 + i))),
     buriti: [0, 1].map((i) => pair((hi) => buritiPalm(hi, 81 + i))),
-    bush: [0, 1].map((i) => pair((hi) => shrub(hi, 91 + i))),
+    bush: [
+      ...[0, 1].map((i) => pair((hi) => shrub(hi, 91 + i))),
+      pair((hi) => shrub(hi, 93, [TILES.cerrado, TILES.redFlush, TILES.shrub], C(0.95, 0.95, 0.9))),
+    ],
+    cerrado: [
+      pair((hi) => cerradoTree(hi, 101)),
+      pair((hi) => cerradoTree(hi, 102, { tiles: [TILES.cerrado, TILES.redFlush, TILES.fine[0]], tint: C(1.0, 0.96, 0.92) })),
+    ],
+    macauba: [0, 1].map((i) => pair((hi) => macaubaPalm(hi, 111 + i))),
+    ipeRoxo: [pair((hi) => ipeTree(hi, 121, TILES.ipeRoxo))],
+    snag: [pair((hi) => deadTree(hi, 131))],
     mound: [(() => { const g = termiteMound(95); return [g, g]; })()],
   };
 }
@@ -343,6 +353,49 @@ export function createVegetation(terrain, quality) {
     }
   }
 
+  // Cerrado vegetation (own random stream): clumps of crooked cerrado trees,
+  // macaúba palms, a pink ipê here and there and dead snags in the open
+  // country, and a shrubby, irregular margin (orla) where the mata meets the
+  // pasture instead of a clean wall of trunks.
+  const r6 = rng(6060);
+  const add6 = (kind, x, z, s = 1) => {
+    trees.push({ kind, v: Math.floor(r6() * variants[kind].length), x, z, s, rot: r6() * Math.PI * 2 });
+    if (kind !== 'bush') colliders.push({ x, z, r: kind === 'macauba' ? 2 : 3, top: terrain.heightAt(x, z) + (kind === 'macauba' ? 14 : 10) * s });
+  };
+  const inForest = (x, z, m = 0) => FORESTS.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
+  for (let i = 0; i < 420; i++) {
+    const cx = -3800 + r6() * 7600, cz = -3800 + r6() * 7600;
+    if (avoid(cx, cz, 30) || inForest(cx, cz, 20)) continue;
+    const n = 2 + Math.floor(r6() * 6);
+    for (let k = 0; k < n; k++) {
+      const x = cx + (r6() - 0.5) * 50, z = cz + (r6() - 0.5) * 50;
+      if (avoid(x, z, 8) || inForest(x, z, 4)) continue;
+      const q = r6();
+      if (q < 0.5) add6('cerrado', x, z, 0.8 + r6() * 0.5);
+      else if (q < 0.64) add6('macauba', x, z, 0.85 + r6() * 0.3);
+      else if (q < 0.68) add6('ipeRoxo', x, z, 0.85 + r6() * 0.3);
+      else if (q < 0.72) add6('snag', x, z, 0.8 + r6() * 0.4);
+      else add6('bush', x, z, 0.6 + r6() * 0.6);
+    }
+  }
+  for (const fb of FORESTS) {
+    if (fb.kind !== 'mata' || Math.min(fb.x1 - fb.x0, fb.z1 - fb.z0) < 100) continue;
+    const per = [[fb.x0, fb.z0, fb.x1, fb.z0, 0, -1], [fb.x1, fb.z0, fb.x1, fb.z1, 1, 0], [fb.x1, fb.z1, fb.x0, fb.z1, 0, 1], [fb.x0, fb.z1, fb.x0, fb.z0, -1, 0]];
+    for (const [ax, az, bx, bz, nx, nz] of per) {
+      const len = Math.hypot(bx - ax, bz - az);
+      for (let sd = 0; sd < len; sd += 6) {
+        if (r6() < 0.3) continue;
+        const t = sd / len, off = 2 + r6() * r6() * 14;
+        const x = ax + (bx - ax) * t + nx * off, z = az + (bz - az) * t + nz * off;
+        if (avoid(x, z, 4)) continue;
+        const q = r6();
+        if (q < 0.62) add6('bush', x, z, 0.7 + r6() * 0.8);
+        else if (q < 0.86) add6('cerrado', x, z, 0.8 + r6() * 0.4);
+        else add6('macauba', x, z, 0.8 + r6() * 0.3);
+      }
+    }
+  }
+
   // Nothing grows in the açudes, the lake or the stream channels.
   const inWater = (x, z) => WATER.ponds.some((p) => Math.hypot(x - p.x, z - p.z) < pondRadius(p, Math.atan2(z - p.z, x - p.x)) * 1.08)
     || WATER.streams.some((st) => st.points.some((q, i) => i < st.points.length - 1 && segDist(x, z, q[0], q[1], st.points[i + 1][0], st.points[i + 1][1]) < st.width * 0.5 + 7));
@@ -380,7 +433,10 @@ export function createVegetation(terrain, quality) {
     for (const [k, ts] of byVar) {
       const [kind, v] = k.split(':');
       const [gh, gl] = variants[kind][+v];
-      for (const [grp, geo] of [[hi, gh], [lo, gl]]) {
+      // Small plants (shrubs, termite mounds, snags) are a few pixels beyond
+      // the near radius: no far-LOD copy, one draw call less per cell.
+      const small = kind === 'bush' || kind === 'mound' || kind === 'snag';
+      for (const [grp, geo] of small ? [[hi, gh]] : [[hi, gh], [lo, gl]]) {
         const im = new THREE.InstancedMesh(geo, mat, ts.length);
         ts.forEach((t, i) => {
           pos.set(t.x, terrain.heightAt(t.x, t.z) - 0.3, t.z);
@@ -400,7 +456,7 @@ export function createVegetation(terrain, quality) {
   }
   if (canopyParts.length) {
     const cg = mergeGeometries(canopyParts);
-    const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ map: makeCanopyTexture(), vertexColors: true, roughness: 0.9, metalness: 0 }));
+    const cm = new THREE.Mesh(cg, canopyMaterial(makeCanopyTexture()));
     cm.receiveShadow = true;
     cm.name = 'forestCanopy';
     group.add(cm);
@@ -425,22 +481,54 @@ export function createVegetation(terrain, quality) {
   };
 }
 
+// Canopy surface material: the crown texture sampled twice (the second at
+// another scale and rotation) and blended by a slow noise carried on the
+// vertices, so the tile never reads as a grid from altitude; the crown
+// luminance as a bump map gives every crown its sunlit and shaded side.
+function canopyMaterial(tex) {
+  const m = new THREE.MeshStandardMaterial({ map: tex, bumpMap: tex, bumpScale: 3.5, vertexColors: true, roughness: 0.92, metalness: 0 });
+  m.onBeforeCompile = (s) => {
+    s.vertexShader = s.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aMix;\nvarying float vMix;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMix = aMix;');
+    s.fragmentShader = s.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vMix;')
+      .replace('#include <map_fragment>', `
+        vec4 tA = texture2D(map, vMapUv);
+        vec2 uv2 = mat2(0.81, -0.59, 0.59, 0.81) * vMapUv * 0.73 + vec2(0.37, 0.61);
+        vec4 tB = texture2D(map, uv2);
+        diffuseColor *= mix(tA, tB, smoothstep(0.3, 0.7, vMix));`);
+  };
+  m.customProgramCacheKey = () => 'canopy-v2';
+  return m;
+}
+
 function forestCanopy(fb, terrain) {
   const step = 10;
-  const inset = 6;
+  const inset = 9;
   const x0 = fb.x0 + inset, x1 = fb.x1 - inset, z0 = fb.z0 + inset, z1 = fb.z1 - inset;
   const nx = Math.ceil((x1 - x0) / step) + 1, nz = Math.ceil((z1 - z0) / step) + 1;
-  const pos = [], col = [], idx = [], uv = [];
+  const pos = [], col = [], idx = [], uv = [], mix = [];
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
     const x = Math.min(x1, x0 + i * step), z = Math.min(z1, z0 + j * step);
-    uv.push(x / 36, z / 36);
     const edge = Math.min(x - x0, x1 - x, z - z0, z1 - z);
+    // Edge (ground) vertices: the texture is pulled outward so the shade
+    // wall carries it at its real scale instead of in vertical streaks.
+    const ox = x - x0 < 0.5 ? -14 : x1 - x < 0.5 ? 14 : 0, oz = z - z0 < 0.5 ? -14 : z1 - z < 0.5 ? 14 : 0;
+    uv.push((x + ox) / 48, (z + oz) / 48);
     const lump = fbm(x / 16, z / 16, 3), big = fbm(x / 120 + 4, z / 120, 2);
-    const h = edge < 0.5 ? 4 : 17 + 4 * big + 3.2 * lump;
+    // The edge goes down to the ground behind the edge trees: a wall of deep
+    // shade, so the forest never shows daylight under its roof.
+    // Near the edge the roof comes down to the height of the edge trees.
+    const full = 17 + 4 * big + 3.2 * lump;
+    const h = edge < 0.5 ? -0.8 : 9 + (full - 9) * Math.min(1, edge / 30);
     pos.push(x, terrain.heightAt(x, z) + h, z);
-    const k = 0.7 + 0.35 * (lump * 0.5 + 0.5) + 0.1 * big;
-    const tint = fbm(x / 60, z / 60 + 9, 2);
-    col.push(0.95 * k * (1 + Math.max(0, tint) * 0.5), 1.0 * k, 0.9 * k);
+    const k = 0.72 + 0.3 * (lump * 0.5 + 0.5) + 0.1 * big;
+    const tint = fbm(x / 60, z / 60 + 9, 2), dry = fbm(x / 200 - 3, z / 200 + 1, 2);
+    // The skirt down to the edge trees is the deep shade under the crowns.
+    const shade = edge < 0.5 ? 0.16 : 1;
+    col.push(0.95 * k * (1 + Math.max(0, tint) * 0.35 + Math.max(0, dry) * 0.25) * shade, 1.0 * k * shade, 0.88 * k * (1 - Math.max(0, dry) * 0.2) * shade);
+    mix.push(0.5 + 0.5 * fbm(x / 90 + 7, z / 90 - 2, 2) * 1.6);
   }
   for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
     const a = j * nx + i, d = a + 1, b = a + nx, c = b + 1;
@@ -450,6 +538,7 @@ function forestCanopy(fb, terrain) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aMix', new THREE.Float32BufferAttribute(mix, 1));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g.toNonIndexed();

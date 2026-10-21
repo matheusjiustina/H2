@@ -1,7 +1,7 @@
 // Foliage atlas and card-built plants. Crowns are clouds of small alpha-tested
 // leaf-cluster cards with "spherized" normals (each card lit as part of the
 // crown's volume, not as a flat plane), on a tapered trunk with branches.
-// Everything (leaves, flowers, fronds, bark, grass) lives in one 4x4 atlas so
+// Everything (leaves, flowers, fronds, bark, grass) lives in one 5x5 atlas so
 // every plant variant is one geometry / one material / one instanced draw.
 import * as THREE from 'three';
 import { ATMO_U } from './atmosphere.js';
@@ -11,8 +11,9 @@ import { rng } from '../core/math.js';
 export const TILES = {
   broad: [0, 1, 2, 3], fine: [4, 5], euca: [6, 7], ipe: 8, palm: 9, bark: 10,
   grass: 11, dry: 12, mango: 13, shrub: 14, barkLight: 15,
+  ipeRoxo: 16, feather: 17, cerrado: 18, deadLeaf: 19, redFlush: 20, barkRough: 21,
 };
-const N = 4;
+const N = 5;
 const TS = 256; // tile size in px
 
 // UV rectangle of a tile (canvas textures are flipped: row 0 is the top).
@@ -177,6 +178,53 @@ export function makeFoliageAtlas() {
     const [x, y] = at(TILES.shrub);
     cluster(g, x, y, r, { hue: 80, sat: 34, light: 27, n: 1200, rim: 0.5, len: 9, wid: 3.4, hv: 18, lv: 10, pass: 5, twigs: 6, twig: '#4a3626', core: 0.55 });
   }
+  // Ipê-roxo in bloom: lilac-pink trumpet clusters, almost leafless.
+  {
+    const [x, y] = at(TILES.ipeRoxo);
+    cluster(g, x, y, r, { hue: 95, sat: 26, light: 19, n: 90, rim: 0.5, len: 11, wid: 4, hv: 10, lv: 6, pass: 4, twigs: 9, twig: '#4a3626', core: 0 });
+    for (let i = 0; i < 1300; i++) {
+      const a = r() * Math.PI * 2, d = Math.pow(r(), 0.55) * TS * 0.42;
+      const px = x + TS / 2 + Math.cos(a) * d, py = y + TS * 0.55 + Math.sin(a) * d * 0.9;
+      g.fillStyle = hsl(312 + r() * 18, 42 + r() * 14, 52 + r() * 18);
+      g.beginPath(); g.ellipse(px, py, 3 + r() * 3, 2.2 + r() * 2, r() * Math.PI, 0, Math.PI * 2); g.fill();
+    }
+  }
+  // Macaúba / feather palm frond: a curved rachis with fine pinnae on both sides.
+  {
+    const [x, y] = at(TILES.feather);
+    const x0 = x + TS * 0.5, y0 = y + TS - 6;
+    const pts = [];
+    for (let i = 0; i <= 40; i++) { const k = i / 40; pts.push([x0 + Math.sin(k * 1.2) * TS * 0.08, y0 - k * TS * 0.9]); }
+    for (let i = 2; i < pts.length; i++) {
+      const [px, py] = pts[i], k = i / 40;
+      const len = TS * 0.28 * Math.sin(Math.PI * Math.min(1, k * 1.05)) + 6;
+      for (const sd of [-1, 1]) {
+        g.strokeStyle = hsl(84 + r() * 16, 34 + r() * 10, 22 + r() * 12);
+        g.lineWidth = 1.6 + r();
+        g.beginPath(); g.moveTo(px, py);
+        g.quadraticCurveTo(px + sd * len * 0.5, py - 4, px + sd * len, py + len * 0.35 + r() * 6);
+        g.stroke();
+      }
+    }
+    g.strokeStyle = '#6a6232'; g.lineWidth = 3;
+    g.beginPath(); pts.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py))); g.stroke();
+  }
+  // Cerrado trees (pequi, lixeira, barbatimão): big leathery leaves, olive to yellowish.
+  {
+    const [x, y] = at(TILES.cerrado);
+    cluster(g, x, y, r, { hue: 72, sat: 34, light: 29, n: 260, rim: 0.55, len: 22, wid: 10, hv: 16, lv: 9, pass: 5, twigs: 8, twig: '#3b2a1c', core: 0.55 });
+  }
+  // Dry-season / dead foliage: brown, sparse, many bare twigs.
+  {
+    const [x, y] = at(TILES.deadLeaf);
+    cluster(g, x, y, r, { hue: 30, sat: 26, light: 30, n: 120, rim: 0.6, len: 12, wid: 5, hv: 14, lv: 10, pass: 4, twigs: 16, twig: '#4f3f30', core: 0 });
+  }
+  // Red new flush (copaíba, jatobá in spring).
+  {
+    const [x, y] = at(TILES.redFlush);
+    cluster(g, x, y, r, { hue: 18, sat: 28, light: 28, n: 420, rim: 0.6, len: 14, wid: 5, hv: 16, lv: 8, pass: 5, twigs: 7, twig: '#3b2a1c', core: 0.6 });
+  }
+  bark(TILES.barkRough, '#4a3c30', '#211810', '#6e5a48');
   if (clipped) g.restore();
   const t = canvasTexture(c);
   t.anisotropy = 4;
@@ -312,7 +360,7 @@ export function foliageMaterial(atlas) {
       // Mipmaps average leaf alpha toward the gaps; boost alpha with the mip
       // level so far crowns stay full instead of thinning to twigs.
       .replace('#include <alphatest_fragment>', `
-        vec2 mdx = dFdx(vMapUv * 1024.0), mdy = dFdy(vMapUv * 1024.0);
+        vec2 mdx = dFdx(vMapUv * 1280.0), mdy = dFdy(vMapUv * 1280.0);
         float mlod = 0.5 * log2(min(dot(mdx, mdx), dot(mdy, mdy)));
         diffuseColor.a *= 1.0 + clamp(mlod, 0.0, 6.0) * 0.32;
         #include <alphatest_fragment>`);
@@ -370,7 +418,7 @@ export function mangoTree(hi, seed) {
 }
 
 // Ipê-amarelo in bloom: open crown of yellow flower clusters.
-export function ipeTree(hi, seed) {
+export function ipeTree(hi, seed, tile = TILES.ipe) {
   const B = new PlantBuilder(seed);
   const r = B.r;
   const H = 4.5 + r();
@@ -379,7 +427,7 @@ export function ipeTree(hi, seed) {
     const a = (i / 4) * Math.PI * 2 + r() * 0.5;
     const c = [Math.cos(a) * 2.0, H + 2.2 + r() * 1.5, Math.sin(a) * 2.0];
     if (hi) B.limb([0.3, H, 0.1], [c[0] * 0.8, c[1] - 0.5, c[2] * 0.8], 0.12, 0.05, 4, tileRect(TILES.bark), BARK);
-    B.clump(c[0], c[1], c[2], 2.0, 1.4, 2.0, hi ? 22 : 6, hi ? 1.8 : 3.4, TILES.ipe, C(1, 1, 1), H, H + 5);
+    B.clump(c[0], c[1], c[2], 2.0, 1.4, 2.0, hi ? 22 : 6, hi ? 1.8 : 3.4, tile, C(1, 1, 1), H, H + 5);
   }
   return B.geometry();
 }
@@ -419,9 +467,75 @@ export function buritiPalm(hi, seed) {
 }
 
 // Low shrub (cerrado bush / fence-line scrub).
-export function shrub(hi, seed) {
+export function shrub(hi, seed, tiles = [TILES.shrub, TILES.fine[0]], tint = C(1, 1, 1)) {
   const B = new PlantBuilder(seed);
-  B.clump(0, 0.75, 0, 1.4, 0.8, 1.4, hi ? 18 : 6, hi ? 1.2 : 2.0, [TILES.shrub, TILES.fine[0]], C(1, 1, 1), 0, 1.6);
+  B.clump(0, 0.75, 0, 1.4, 0.8, 1.4, hi ? 18 : 6, hi ? 1.2 : 2.0, tiles, tint, 0, 1.6);
+  return B.geometry();
+}
+
+// Cerrado tree (pequi, lixeira): short crooked trunk with thick rough bark,
+// a few twisted limbs and a sparse, open crown of big leathery leaves.
+export function cerradoTree(hi, seed, o = {}) {
+  const B = new PlantBuilder(seed);
+  const r = B.r;
+  const bark = tileRect(TILES.barkRough);
+  let p = [0, -0.3, 0];
+  const segs = 3, H = 2.2 + r() * 1.2;
+  for (let i = 0; i < segs; i++) {
+    const q = [p[0] + (r() - 0.5) * 0.9, p[1] + H / segs, p[2] + (r() - 0.5) * 0.9];
+    B.limb(p, q, 0.24 - i * 0.04, 0.2 - i * 0.04, hi ? 6 : 4, bark, BARK);
+    p = q;
+  }
+  const n = hi ? 4 + Math.floor(r() * 2) : 3;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + r() * 0.9, d = 1.2 + r() * 1.6;
+    const tip = [p[0] + Math.cos(a) * d, p[1] + 0.8 + r() * 1.6, p[2] + Math.sin(a) * d];
+    B.limb(p, tip, 0.13, 0.05, hi ? 4 : 3, bark, BARK);
+    const rad = 1.1 + r() * 0.7;
+    B.clump(tip[0], tip[1] + 0.3, tip[2], rad, rad * 0.6, rad, hi ? 16 : 5, hi ? 1.5 : 3.0, o.tiles ?? [TILES.cerrado, TILES.cerrado, TILES.fine[1]], o.tint ?? C(1, 1, 1), H, H + 3.5);
+  }
+  return B.geometry();
+}
+
+// Macaúba: slender, slightly curved palm with a rough stem and a round crown
+// of arching feather fronds.
+export function macaubaPalm(hi, seed) {
+  const B = new PlantBuilder(seed);
+  const r = B.r;
+  const H = 8 + r() * 4, bend = (r() - 0.5) * 1.2;
+  const mid = [bend * 0.4, H * 0.5, 0], top = [bend, H, 0];
+  B.limb([0, -0.3, 0], mid, 0.26, 0.22, hi ? 7 : 4, tileRect(TILES.barkRough), BARK);
+  B.limb(mid, top, 0.22, 0.2, hi ? 7 : 4, tileRect(TILES.barkRough), BARK);
+  const n = hi ? 18 : 9;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + r() * 0.3;
+    const out = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+    const up = 0.2 + r() * 0.9; // upper fronds stand, lower ones arch down
+    const c = new THREE.Vector3(top[0] + out.x * 2.2, H + 0.2 + (up - 0.5) * 1.6, top[2] + out.z * 2.2);
+    // The card's long side runs out along the frond.
+    const f = new THREE.Vector3(-out.z, 0.35, out.x).normalize();
+    const k = 0.8 + r() * 0.35;
+    B.card(c, f, 1.8, 5.2, tileRect(TILES.feather), C(k, k, k * 0.95), new THREE.Vector3(out.x * 0.5, 0.85, out.z * 0.5).normalize(), Math.PI / 2 + (up - 0.6) * 0.9);
+  }
+  return B.geometry();
+}
+
+// Dead tree (snag) in a pasture: bare grey limbs, a few dry leaves left.
+export function deadTree(hi, seed) {
+  const B = new PlantBuilder(seed);
+  const r = B.r;
+  const bark = tileRect(TILES.barkLight);
+  const H = 4.5 + r() * 2.5;
+  const top = [(r() - 0.5) * 0.6, H, (r() - 0.5) * 0.6];
+  B.limb([0, -0.3, 0], top, 0.3, 0.18, hi ? 6 : 4, bark, C(0.75, 0.72, 0.68));
+  const n = hi ? 5 : 3;
+  for (let i = 0; i < n; i++) {
+    const a = r() * Math.PI * 2, d = 1.6 + r() * 2.2;
+    const tip = [top[0] + Math.cos(a) * d, H + 1 + r() * 2.5, top[2] + Math.sin(a) * d];
+    const from = [top[0] * 0.8, H * (0.75 + r() * 0.25), top[2] * 0.8];
+    B.limb(from, tip, 0.11, 0.03, hi ? 4 : 3, bark, C(0.75, 0.72, 0.68));
+    if (r() < 0.5) B.clump(tip[0], tip[1], tip[2], 0.9, 0.6, 0.9, hi ? 6 : 2, hi ? 1.4 : 2.6, TILES.deadLeaf, C(1, 1, 1), H, H + 4);
+  }
   return B.geometry();
 }
 
@@ -438,38 +552,86 @@ export function grassTuft(tile, seed, w = 0.9, h = 0.6) {
 
 // Native forest canopy seen from above (tileable): packed crowns, each lit on
 // top and shaded at its rim, gaps in deep shadow, the odd flowering crown.
+// Forest canopy seen from above: packed tree crowns, each a mass of leaf
+// clusters lit from the sun side with a shadowed flank, deep shade in the
+// gaps between crowns, and the natural mix of a cerrado/amazon-edge mata —
+// mostly greens, some yellow-olive and reddish new leaves, a few greyish
+// crowns and, rarely, a muted flowering ipê. Tiles seamlessly (wrap-drawn);
+// the luminance doubles as the canopy's bump map.
 export function makeCanopyTexture() {
-  const S = 512;
+  const S = 1024;
   const c = canvas(S, S);
   const g = c.getContext('2d');
   const r = rng(909);
-  g.fillStyle = '#16200d';
+  g.fillStyle = '#0b1307';
   g.fillRect(0, 0, S, S);
-  const wrapDraw = (x, y, rad, fn) => {
+  const wrap = (x, y, rad, fn) => {
     for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
       if (x + ox + rad < 0 || x + ox - rad > S || y + oy + rad < 0 || y + oy - rad > S) continue;
       fn(x + ox, y + oy);
     }
   };
-  for (let i = 0; i < 420; i++) {
-    const x = r() * S, y = r() * S, rad = 14 + r() * 30;
-    const k = r();
-    const hue = k < 0.03 ? 48 : k < 0.05 ? 330 : 80 + r() * 34;
-    const sat = k < 0.05 ? 70 : 28 + r() * 16;
-    const lit = k < 0.05 ? 50 : 18 + r() * 10;
-    wrapDraw(x, y, rad, (px, py) => {
-      const grd = g.createRadialGradient(px - rad * 0.25, py - rad * 0.3, rad * 0.1, px, py, rad);
-      grd.addColorStop(0, hsl(hue, sat, lit + 9));
-      grd.addColorStop(0.65, hsl(hue, sat, lit));
-      grd.addColorStop(1, hsl(hue, sat, lit * 0.45, 0.0));
-      g.fillStyle = grd;
-      g.beginPath(); g.arc(px, py, rad, 0, Math.PI * 2); g.fill();
+  const blob = (x, y, rad, col) => {
+    g.fillStyle = col;
+    g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill();
+  };
+  // Crown palette: [hue, sat, light, weight].
+  const PAL = [
+    [92, 34, 22, 26], [104, 30, 19, 20], [84, 38, 25, 18], [112, 26, 17, 12],
+    [74, 40, 27, 8], [60, 38, 30, 4], // yellow-olive
+    [28, 26, 24, 3], // reddish new leaves
+    [80, 10, 30, 3], // greyish (dry season / dead branches)
+    [318, 18, 40, 0.35], [48, 52, 42, 0.3], // flowering ipê-roxo / amarelo (rare, muted)
+  ];
+  const tot = PAL.reduce((a, p) => a + p[3], 0);
+  const pick = () => { let k = r() * tot; for (const p of PAL) { k -= p[3]; if (k <= 0) return p; } return PAL[0]; };
+  // Crowns on a jittered grid (no overlaps at the centres, overlapping edges).
+  const G = 11, cellPx = S / G;
+  const crowns = [];
+  for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
+    crowns.push({ x: (i + 0.15 + r() * 0.7) * cellPx, y: (j + 0.15 + r() * 0.7) * cellPx, rad: cellPx * (0.42 + r() * 0.34), p: pick() });
+    if (r() < 0.45) crowns.push({ x: (i + r()) * cellPx, y: (j + r()) * cellPx, rad: cellPx * (0.22 + r() * 0.16), p: pick() });
+  }
+  // Big crowns first, small ones on top (emergent / understory gaps).
+  crowns.sort((a, b) => b.rad - a.rad);
+  const sun = [-0.55, -0.62]; // light from the upper left
+  for (const cr of crowns) {
+    const [h, sa, li] = cr.p;
+    const flower = h > 300 || (h === 48 && sa > 50);
+    wrap(cr.x, cr.y, cr.rad * 1.25, (cx, cy) => {
+      // Shade cast into the gap (lower right).
+      const sh = g.createRadialGradient(cx + cr.rad * 0.25, cy + cr.rad * 0.3, cr.rad * 0.5, cx + cr.rad * 0.25, cy + cr.rad * 0.3, cr.rad * 1.15);
+      sh.addColorStop(0, 'rgba(0,0,0,0.55)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = sh; g.beginPath(); g.arc(cx + cr.rad * 0.25, cy + cr.rad * 0.3, cr.rad * 1.15, 0, Math.PI * 2); g.fill();
+      // Body of the crown.
+      blob(cx, cy, cr.rad * 0.92, hsl(h, sa, li * 0.7));
+      // Leaf clusters: lighter toward the sun, darker on the far flank.
+      const n = Math.round(18 + cr.rad * 0.9);
+      for (let k = 0; k < n; k++) {
+        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * cr.rad * 0.88;
+        const px = cx + Math.cos(a) * d, py = cy + Math.sin(a) * d;
+        const lit = -((px - cx) * sun[0] + (py - cy) * sun[1]) / cr.rad; // -1 .. 1
+        const lr = cr.rad * (0.14 + r() * 0.14) * (flower ? 0.8 : 1);
+        const L = li * (0.85 + 0.45 * lit + (r() - 0.5) * 0.3);
+        const grd = g.createRadialGradient(px - lr * 0.3, py - lr * 0.35, lr * 0.1, px, py, lr);
+        grd.addColorStop(0, hsl(h + (r() - 0.5) * 8, sa, Math.min(70, L + 8)));
+        grd.addColorStop(0.7, hsl(h + (r() - 0.5) * 8, sa, L));
+        grd.addColorStop(1, hsl(h, sa, L * 0.5, 0));
+        g.fillStyle = grd; g.beginPath(); g.arc(px, py, lr, 0, Math.PI * 2); g.fill();
+      }
+      // Flowering crowns keep some green leaves showing through.
+      if (flower) for (let k = 0; k < 14; k++) {
+        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * cr.rad * 0.8;
+        blob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, cr.rad * 0.12, hsl(95, 30, 20, 0.8));
+      }
     });
   }
   // Leaf-scale speckle so the canopy holds up at low altitude.
-  for (let i = 0; i < 9000; i++) {
-    g.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.18)' : 'rgba(190,220,140,0.10)';
-    g.fillRect(r() * S, r() * S, 1 + r() * 2, 1 + r() * 2);
+  for (let i = 0; i < 26000; i++) {
+    g.fillStyle = r() < 0.55 ? 'rgba(0,0,0,0.2)' : 'rgba(200,230,150,0.09)';
+    g.fillRect(r() * S, r() * S, 1 + r() * 2.5, 1 + r() * 2.5);
   }
-  return canvasTexture(c, { repeat: true });
+  const t = canvasTexture(c, { repeat: true });
+  t.anisotropy = 8;
+  return t;
 }

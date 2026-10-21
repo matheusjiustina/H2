@@ -18,6 +18,10 @@ page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(url + '?q=medium', { waitUntil: 'load' });
 await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null, { timeout: 180000 });
 const views = [
+  ['mataLow', { cam: [-1520, 38, -560], target: [-1800, 0, -650] }],
+  ['mataEdge', { cam: [-1560, 2, -480], target: [-1640, 8, -520] }],
+  ['mataHigh', { cam: [-1350, 260, -150], target: [-2000, 0, -700] }],
+  ['cerrado', { cam: [-1900, 6, 500], target: [-2100, 3, 650] }],
   ['pondSede', { cam: [-700, 14, -350], target: [-800, 0, -420] }],
   ['lagoaSerra', { cam: [-2880, 30, 2620], target: [-3050, 0, 2770] }],
   ['creekBridge', { cam: [1590, 9, 175], target: [1648, 0, 140] }],
