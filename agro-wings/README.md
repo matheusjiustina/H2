@@ -1379,3 +1379,15 @@ Tests: `npm test` adds `i18n.test.mjs` (every `t()` text has Portuguese) and
 `node test/farmflow.mjs <out>` (office, conditions, accept, ferry, local
 truck service, work, separate history, replay with every camera) and
 `node test/expviews.mjs <out>` (water, machinery, farms from the air).
+
+### Validation (expansion build)
+
+- `npm test`: 80/80 (adds i18n coverage, weather cycle, farm platforms).
+- Browser: `e2e_ui` 22/22, `keys` 19/19, `farmflow` 15/15, `r44flight` 22/22.
+- Hands-off soy job (autopilot through the player inputs), unchanged from
+  before the expansion: Ipanema 2★, AT-502B 1★, R44 2★ (90 % coverage).
+- `perf.mjs` (SwiftShader, so render times are not GPU figures): game-logic
+  tick per frame unchanged (medium: base 1.8 ms, low soy pass 3.1 ms,
+  cockpit over corn 4.5 ms, high 2.3 ms vs 2.7 / 4.8 / 3.9 / 2.8 ms before);
+  draw calls about +5 % (water, gallery forest, machines when near; the
+  farms' service areas are not drawn beyond 2.2 km, machines beyond 1.5 km).
