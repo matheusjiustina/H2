@@ -186,7 +186,7 @@ export function createStructures(terrain, scene) {
   buildHelipad(B, M, group, H);
   buildVehicles(B, M, H);
   buildStripMarks(B, M, group, H, RUNWAY);
-  for (const site of FARM_SITES) buildFarmSite(B, M, group, H, site, dyn);
+  dyn.sites = FARM_SITES.map((site) => buildFarmSite(B, M, group, H, site, dyn));
   buildHQ(B, M, group, H);
   buildFences(B, M, group, H, dyn);
   for (const w of BASE.windsocks) dyn.windsocks.push(buildWindsock(B, M, group, w.x, H(w.x, w.z), w.z));
@@ -199,6 +199,8 @@ export function createStructures(terrain, scene) {
     hangar: dyn.hangar,
     update(dt, time, wind, ctx) {
       for (const ws of dyn.windsocks) ws.update(dt, time, wind);
+      // A farm's service area is a few pixels beyond ~2.2 km: not drawn.
+      if (ctx?.cam) for (const s of dyn.sites) s.group.visible = Math.hypot(ctx.cam.x - s.x, ctx.cam.z - s.z) < 2200;
       if (ctx) dyn.hangar.update(dt, ctx);
     },
   };
@@ -632,6 +634,7 @@ function buildFarmSite(B, M, group, H, site, dyn) {
   }
   buildStripMarks(B, M, group, H, site.runway);
   for (const w of site.windsocks) dyn.windsocks.push(buildWindsock(B, M, group, w.x, H(w.x, w.z), w.z));
+  return { group: g2, x: site.pad.x, z: site.pad.z };
 }
 
 function buildHQ(B, M, group, H) {
