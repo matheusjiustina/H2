@@ -14,7 +14,7 @@ export const TILES = {
   ipeRoxo: 16, feather: 17, cerrado: 18, deadLeaf: 19, redFlush: 20, barkRough: 21,
 };
 const N = 5;
-const TS = 256; // tile size in px
+const TS = 384; // tile size in px
 
 // UV rectangle of a tile (canvas textures are flipped: row 0 is the top).
 export function tileRect(t, inset = 3 / (TS * N)) {
@@ -24,60 +24,115 @@ export function tileRect(t, inset = 3 / (TS * N)) {
 
 const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
 
-function leaf(g, x, y, len, wid, ang, col, rib) {
+// One leaf in profile: a two-tone blade (the half toward the light brighter,
+// the other in its own shade), a pale midrib and a gloss line on bigger
+// leaves. shape: 0 elliptic, 1 lanceolate (narrow, pointed), 2 obovate (wide
+// near the tip, cerrado / mango style).
+function leaf(g, x, y, len, wid, ang, h, s, l, shape = 0, gloss = 0) {
   g.save();
   g.translate(x, y);
   g.rotate(ang);
-  g.fillStyle = col;
-  g.beginPath();
-  g.moveTo(0, 0);
-  g.quadraticCurveTo(len * 0.45, -wid, len, 0);
-  g.quadraticCurveTo(len * 0.45, wid, 0, 0);
-  g.fill();
-  if (rib) {
-    g.strokeStyle = rib; g.lineWidth = 0.8;
-    g.beginPath(); g.moveTo(len * 0.05, 0); g.lineTo(len * 0.85, 0); g.stroke();
+  const w = shape === 1 ? wid * 0.75 : wid;
+  const p = shape === 2 ? 0.62 : shape === 1 ? 0.3 : 0.42; // widest point along the blade
+  const outline = (side) => {
+    g.moveTo(0, 0);
+    g.bezierCurveTo(len * p * 0.55, side * w * 1.25, len * (p + 0.3), side * w * 1.05, len, 0);
+  };
+  g.fillStyle = hsl(h + 4, s - 3, l - 6);
+  g.beginPath(); outline(1); outline(-1); g.fill();
+  g.fillStyle = hsl(h, s, l + 3);
+  g.beginPath(); outline(-1); g.closePath(); g.fill();
+  if (len > 7) {
+    g.strokeStyle = hsl(h - 8, s - 10, l + 16, 0.45);
+    g.lineWidth = Math.max(0.5, w * 0.13);
+    g.beginPath(); g.moveTo(len * 0.04, 0); g.lineTo(len * 0.9, 0); g.stroke();
+  }
+  if (gloss > 0 && len > 9) {
+    g.strokeStyle = `rgba(235,245,215,${gloss})`;
+    g.lineWidth = Math.max(0.6, w * 0.22);
+    g.beginPath(); g.moveTo(len * 0.25, -w * 0.45); g.quadraticCurveTo(len * 0.5, -w * 0.7, len * 0.78, -w * 0.3); g.stroke();
   }
   g.restore();
 }
 
-// Leaf cluster seen from any side: twigs from the base, leaves dense toward
-// the rim; back leaves darker, front leaves lighter (depth inside the card).
+// A leaf mass seen from any side, drawn the way foliage photographs: a few
+// overlapping lobes (small branch ends), each lit like a little sphere — its
+// sun side (upper left) bright and warm, its far side and core dark and cool
+// — packed with leaves that radiate from the lobe's centre, so the outline
+// is ragged with leaf tips and the card reads as volume, not a flat blob.
+// Thin twigs show between the lobes; the dark core fades out under the leaves
+// (no hard disc edge after the alpha test). Options (sizes in px at 256):
+// n leaves, len / wid, hue / sat / light, hv / lv variation, pass (light
+// step from back to front), twigs, twig colour, droop, core, shape, gloss.
 function cluster(g, ox, oy, r, o) {
-  const S = TS, cx = ox + S / 2, cy = oy + S * 0.55;
-  const R = S * 0.42;
+  const S = TS, k = S / 256;
+  const cx = ox + S / 2, cy = oy + S * 0.54;
+  const R = S * 0.44;
   g.lineCap = 'round';
-  // Shaded core: the inside of a leaf mass reads solid, not see-through.
+  const shape = o.shape ?? (o.wid / o.len < 0.25 ? 1 : o.wid / o.len > 0.42 ? 2 : 0);
+  // Lobes: one central, the others around it, biased upward.
+  const nl = 5 + Math.floor(r() * 3);
+  const lobes = [{ x: cx, y: cy, r: R * (0.42 + r() * 0.08) }];
+  for (let i = 1; i < nl; i++) {
+    const a = -Math.PI / 2 + ((i - 1) / (nl - 1) - 0.5) * Math.PI * 1.9 + (r() - 0.5) * 0.4;
+    const d = R * (0.36 + r() * 0.2);
+    const lr = R * (0.26 + r() * 0.16);
+    lobes.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d * 0.9, r: lr });
+  }
+  // Twigs from the base to the lobes (mostly hidden by the leaves).
+  for (const lb of lobes) {
+    g.strokeStyle = o.twig; g.lineWidth = (1.1 + r() * 1.3) * k;
+    const bx = cx + (r() - 0.5) * S * 0.06, by = oy + S * 0.98;
+    g.beginPath(); g.moveTo(bx, by);
+    g.quadraticCurveTo((bx + lb.x) / 2 + (r() - 0.5) * R * 0.3, (by + lb.y) / 2, lb.x, lb.y); g.stroke();
+  }
+  for (let i = 0; i < (o.twigs ?? 6); i++) {
+    const lb = lobes[Math.floor(r() * lobes.length)];
+    const a = r() * Math.PI * 2;
+    g.strokeStyle = o.twig; g.lineWidth = (0.6 + r() * 0.6) * k;
+    g.beginPath(); g.moveTo(lb.x, lb.y); g.lineTo(lb.x + Math.cos(a) * lb.r * 0.95, lb.y + Math.sin(a) * lb.r * 0.95); g.stroke();
+  }
+  // Dark, soft core of each lobe (inside the leaf cover).
   if (o.core) {
-    for (let i = 0; i < 34; i++) {
-      const a = r() * Math.PI * 2, d = Math.sqrt(r()) * R * 0.52;
-      g.fillStyle = hsl(o.hue + (r() - 0.5) * 8, o.sat - 4, o.light * o.core + r() * 3);
-      g.beginPath(); g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.9, R * (0.16 + r() * 0.14), 0, Math.PI * 2); g.fill();
+    for (const lb of lobes) {
+      const grd = g.createRadialGradient(lb.x + lb.r * 0.12, lb.y + lb.r * 0.15, 0, lb.x, lb.y, lb.r * 0.72);
+      grd.addColorStop(0, hsl(o.hue + 8, o.sat - 6, o.light * 0.38, 0.95));
+      grd.addColorStop(0.75, hsl(o.hue + 8, o.sat - 6, o.light * 0.5, 0.75));
+      grd.addColorStop(1, hsl(o.hue + 8, o.sat - 6, o.light * 0.55, 0));
+      g.fillStyle = grd; g.beginPath(); g.arc(lb.x, lb.y, lb.r * 0.72, 0, Math.PI * 2); g.fill();
     }
   }
-  // twigs
-  for (let i = 0; i < o.twigs; i++) {
-    const a = -Math.PI / 2 + (r() - 0.5) * 2.6;
-    const len = R * (0.6 + r() * 0.45);
-    g.strokeStyle = o.twig; g.lineWidth = 1.2 + r() * 1.4;
-    g.beginPath(); g.moveTo(cx + (r() - 0.5) * 10, oy + S * 0.96);
-    g.quadraticCurveTo(cx + Math.cos(a) * len * 0.4, cy + Math.sin(a) * len * 0.3, cx + Math.cos(a) * len, cy + Math.sin(a) * len);
-    g.stroke();
+  // Leaves: positions in the union of the lobes, drawn back (deep, dark) to
+  // front (outer shell, lit).
+  const N = Math.round(o.n * 1.15);
+  const leaves = [];
+  for (let i = 0, tries = 0; i < N && tries < N * 6; tries++) {
+    const lb = lobes[Math.floor(r() * lobes.length)];
+    const a = r() * Math.PI * 2, d = Math.pow(r(), 0.6) * lb.r * 1.02;
+    const x = lb.x + Math.cos(a) * d, y = lb.y + Math.sin(a) * d;
+    const depth = d / lb.r; // 0 core .. 1 shell
+    leaves.push({ x, y, lb, a, depth, z: depth + r() * 0.45 });
+    i++;
   }
-  for (let pass = 0; pass < 3; pass++) {
-    const n = o.n * (pass === 2 ? 0.5 : 1);
-    for (let i = 0; i < n; i++) {
-      const a = r() * Math.PI * 2, d = Math.pow(r(), o.rim) * R;
-      const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * 0.9;
-      const ang = a + (r() - 0.5) * 1.6 + (o.droop ? Math.PI / 2 * o.droop : 0);
-      const L = o.len * (0.7 + r() * 0.6), W = o.wid * (0.7 + r() * 0.6);
-      const l = o.light + pass * o.pass + (r() - 0.5) * o.lv - (y - oy) / S * 6;
-      leaf(g, x, y, L, W, ang, hsl(o.hue + (r() - 0.5) * o.hv, o.sat + (r() - 0.5) * 10, l), pass === 2 && L > 14 ? hsl(o.hue, o.sat - 10, l + 10, 0.6) : null);
-    }
+  leaves.sort((p, q) => p.z - q.z);
+  for (const L of leaves) {
+    const { lb } = L;
+    // Radiating from the lobe centre, with scatter; drooping species hang.
+    let ang = L.a + (r() - 0.5) * 1.3;
+    if (o.droop) { const d = Math.PI / 2 - ang; ang += Math.atan2(Math.sin(d), Math.cos(d)) * o.droop * 0.75; }
+    // Sphere lighting of the lobe: sun from the upper left and in front.
+    const nx = (L.x - lb.x) / lb.r, ny = (L.y - lb.y) / lb.r;
+    const sun = Math.max(-1, Math.min(1, -(nx * 0.6 + ny * 0.75) * 0.9 + 0.25));
+    const l = o.light * (0.62 + 0.38 * L.depth) + sun * (5 + (o.pass ?? 5) * 0.8) + (r() - 0.5) * o.lv + (L.z > 1.1 ? 3 : 0);
+    const h = o.hue + (r() - 0.5) * o.hv + (sun < 0 ? 5 : -3);
+    const sat = o.sat + (r() - 0.5) * 8 + (sun < 0 ? -5 : 2);
+    const sz = 0.75 + r() * 0.5;
+    leaf(g, L.x, L.y, o.len * k * sz, o.wid * k * sz, ang, h, sat, l, shape, L.depth > 0.75 && sun > 0.2 ? 0.14 + (o.gloss ?? 0) : 0);
   }
 }
 
 export function makeFoliageAtlas() {
+  const K = TS / 256; // drawing sizes below were set for 256 px tiles
   const c = canvas(TS * N, TS * N);
   const g = c.getContext('2d');
   g.clearRect(0, 0, c.width, c.height);
@@ -119,31 +174,44 @@ export function makeFoliageAtlas() {
       const a = r() * Math.PI * 2, d = Math.pow(r(), 0.5) * TS * 0.42;
       const px = x + TS / 2 + Math.cos(a) * d, py = y + TS * 0.55 + Math.sin(a) * d * 0.9;
       g.fillStyle = hsl(46 + r() * 8, 88, 50 + r() * 16);
-      g.beginPath(); g.ellipse(px, py, 3 + r() * 3, 2.2 + r() * 2, r() * Math.PI, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(px, py, (3 + r() * 3) * K, (2.2 + r() * 2) * K, r() * Math.PI, 0, Math.PI * 2); g.fill();
     }
   }
   // Buriti fan frond: radiating segments on a petiole.
   {
     const [x, y] = at(TILES.palm);
     const cx = x + TS / 2, cy = y + TS * 0.62;
-    g.strokeStyle = '#5c5a2a'; g.lineWidth = 4;
+    g.strokeStyle = '#5c5a2a'; g.lineWidth = 4 * K;
     g.beginPath(); g.moveTo(cx, y + TS - 4); g.lineTo(cx, cy); g.stroke();
-    for (let i = 0; i < 46; i++) {
-      const a = -Math.PI + 0.15 + (i / 45) * (Math.PI - 0.3);
+    for (let i = 0; i < 62; i++) {
+      const a = -Math.PI + 0.15 + (i / 61) * (Math.PI - 0.3);
       const len = TS * (0.36 + r() * 0.08);
       const ex = cx + Math.cos(a) * len, ey = cy + Math.sin(a) * len * 0.92 + len * 0.15 * Math.abs(Math.cos(a));
-      g.strokeStyle = hsl(78 + r() * 18, 35 + r() * 12, 22 + r() * 12); g.lineWidth = 2.4;
-      g.beginPath(); g.moveTo(cx, cy); g.quadraticCurveTo((cx + ex) / 2, (cy + ey) / 2 - 8, ex, ey); g.stroke();
+      const fl = 22 + r() * 12;
+      g.strokeStyle = hsl(78 + r() * 18, 35 + r() * 12, fl); g.lineWidth = 2.6 * K;
+      g.beginPath(); g.moveTo(cx, cy); g.quadraticCurveTo((cx + ex) / 2, (cy + ey) / 2 - 8 * K, ex, ey); g.stroke();
+      g.strokeStyle = hsl(70, 30, fl + 14, 0.5); g.lineWidth = 0.7 * K;
+      g.beginPath(); g.moveTo(cx, cy); g.quadraticCurveTo((cx + ex) / 2, (cy + ey) / 2 - 8 * K, ex, ey); g.stroke();
     }
   }
   // Bark: grey-brown with vertical fissures (opaque).
   const bark = (t, base, dark, light) => {
     const [x, y] = at(t);
     g.fillStyle = base; g.fillRect(x, y, TS, TS);
-    for (let i = 0; i < 260; i++) {
-      g.strokeStyle = r() < 0.6 ? dark : light; g.lineWidth = 1 + r() * 2.5; g.globalAlpha = 0.35 + r() * 0.4;
-      const px = x + r() * TS, py = y + r() * TS, len = 10 + r() * 40;
-      g.beginPath(); g.moveTo(px, py); g.lineTo(px + (r() - 0.5) * 4, py + len); g.stroke();
+    for (let i = 0; i < Math.round(260 * K * K); i++) {
+      g.strokeStyle = r() < 0.6 ? dark : light; g.lineWidth = (1 + r() * 2.5) * K; g.globalAlpha = 0.35 + r() * 0.4;
+      const px = x + r() * TS, py = y + r() * TS, len = (10 + r() * 40) * K;
+      g.beginPath(); g.moveTo(px, py); g.lineTo(px + (r() - 0.5) * 4 * K, py + len); g.stroke();
+    }
+    // Cross cracks and lichen spots.
+    for (let i = 0; i < 90 * K; i++) {
+      g.strokeStyle = dark; g.globalAlpha = 0.3 + r() * 0.3; g.lineWidth = 0.8 * K;
+      const px = x + r() * TS, py = y + r() * TS;
+      g.beginPath(); g.moveTo(px, py); g.lineTo(px + (6 + r() * 10) * K, py + (r() - 0.5) * 3 * K); g.stroke();
+    }
+    for (let i = 0; i < 40 * K; i++) {
+      g.fillStyle = r() < 0.5 ? 'rgba(170,175,140,0.35)' : 'rgba(90,100,70,0.3)'; g.globalAlpha = 1;
+      g.beginPath(); g.arc(x + r() * TS, y + r() * TS, (1 + r() * 4) * K, 0, Math.PI * 2); g.fill();
     }
     g.globalAlpha = 1;
   };
@@ -156,13 +224,13 @@ export function makeFoliageAtlas() {
       const bx = x + TS * (0.1 + r() * 0.8), len = TS * (0.45 + r() * 0.45);
       const lean = (r() - 0.5) * TS * 0.5;
       g.strokeStyle = hsl(hue + (r() - 0.5) * 16, sat + (r() - 0.5) * 12, light + (r() - 0.5) * 12 + (i / 70) * 6);
-      g.lineWidth = 2 + r() * 2.2;
+      g.lineWidth = (2 + r() * 2.2) * K;
       g.beginPath(); g.moveTo(bx, y + TS - 2);
       g.quadraticCurveTo(bx + lean * 0.3, y + TS - len * 0.6, bx + lean, y + TS - len);
       g.stroke();
       if (seeds && r() < 0.25) {
         g.fillStyle = hsl(40, 30, 55);
-        g.beginPath(); g.ellipse(bx + lean, y + TS - len, 2, 6, 0.3, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(bx + lean, y + TS - len, 2 * K, 6 * K, 0.3, 0, Math.PI * 2); g.fill();
       }
     }
   };
@@ -171,7 +239,7 @@ export function makeFoliageAtlas() {
   // Mangueira (mango): large dark glossy leaves, dense.
   {
     const [x, y] = at(TILES.mango);
-    cluster(g, x, y, r, { hue: 108, sat: 36, light: 19, n: 380, rim: 0.55, len: 24, wid: 7, hv: 10, lv: 6, pass: 5, twigs: 5, twig: '#3b2a1c', core: 0.6 });
+    cluster(g, x, y, r, { hue: 108, sat: 36, light: 19, n: 380, rim: 0.55, len: 24, wid: 7, hv: 10, lv: 6, pass: 5, twigs: 5, twig: '#3b2a1c', core: 0.6, gloss: 0.22, shape: 1 });
   }
   // Shrub: small mixed leaves, very dense.
   {
@@ -186,7 +254,7 @@ export function makeFoliageAtlas() {
       const a = r() * Math.PI * 2, d = Math.pow(r(), 0.55) * TS * 0.42;
       const px = x + TS / 2 + Math.cos(a) * d, py = y + TS * 0.55 + Math.sin(a) * d * 0.9;
       g.fillStyle = hsl(312 + r() * 18, 42 + r() * 14, 52 + r() * 18);
-      g.beginPath(); g.ellipse(px, py, 3 + r() * 3, 2.2 + r() * 2, r() * Math.PI, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(px, py, (3 + r() * 3) * K, (2.2 + r() * 2) * K, r() * Math.PI, 0, Math.PI * 2); g.fill();
     }
   }
   // Macaúba / feather palm frond: a curved rachis with fine pinnae on both sides.
@@ -200,13 +268,13 @@ export function makeFoliageAtlas() {
       const len = TS * 0.28 * Math.sin(Math.PI * Math.min(1, k * 1.05)) + 6;
       for (const sd of [-1, 1]) {
         g.strokeStyle = hsl(84 + r() * 16, 34 + r() * 10, 22 + r() * 12);
-        g.lineWidth = 1.6 + r();
+        g.lineWidth = (1.6 + r()) * K;
         g.beginPath(); g.moveTo(px, py);
-        g.quadraticCurveTo(px + sd * len * 0.5, py - 4, px + sd * len, py + len * 0.35 + r() * 6);
+        g.quadraticCurveTo(px + sd * len * 0.5, py - 4 * K, px + sd * len, py + len * 0.35 + r() * 6 * K);
         g.stroke();
       }
     }
-    g.strokeStyle = '#6a6232'; g.lineWidth = 3;
+    g.strokeStyle = '#6a6232'; g.lineWidth = 3 * K;
     g.beginPath(); pts.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py))); g.stroke();
   }
   // Cerrado trees (pequi, lixeira, barbatimão): big leathery leaves, olive to yellowish.
@@ -328,22 +396,40 @@ export class PlantBuilder {
 
 // Shared material: alpha-tested cards, both faces lit with the crown normal
 // (no back-face flip: a card's back is the same piece of crown).
-export function foliageMaterial(atlas) {
+export function foliageMaterial(atlas, { fadeRadius = null } = {}) {
   const m = new THREE.MeshStandardMaterial({
     map: atlas, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true,
-    roughness: 0.82, metalness: 0, alphaToCoverage: true,
+    roughness: 0.78, metalness: 0, alphaToCoverage: true,
+    // The leaf drawing's own light and dark give each leaf a little relief.
+    bumpMap: atlas, bumpScale: 1.2,
   });
   m.onBeforeCompile = (s) => {
     s.uniforms.uTime = ATMO_U.time;
     s.uniforms.uWind = ATMO_U.wind;
+    s.uniforms.uSunDir = ATMO_U.sunDir;
+    s.uniforms.uSunCol = ATMO_U.sunCol;
+    if (fadeRadius) s.uniforms.uFadeR = fadeRadius;
     // Wind sway (instanced plants only): the crown bends downwind with gusts
-    // that travel across the stand, leaves flutter a little.
+    // that travel across the stand, leaves flutter a little. Each plant gets
+    // its own tone (hashed from its position) so no two trees are identical.
     s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec4 uWind;')
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec4 uWind;\n' + (fadeRadius ? 'uniform float uFadeR;\n' : ''))
+      .replace('#include <color_vertex>', `#include <color_vertex>
+        #ifdef USE_INSTANCING
+        {
+          vec2 ip = instanceMatrix[3].xz;
+          float h1 = fract(sin(dot(ip, vec2(12.9898, 78.233))) * 43758.5453);
+          float h2 = fract(h1 * 17.31 + 0.13), h3 = fract(h1 * 7.77 + 0.71);
+          vColor.rgb *= vec3(0.9 + 0.2 * h1, 0.92 + 0.14 * h2, 0.88 + 0.16 * h3) * (0.9 + 0.18 * h2);
+        }
+        #endif`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_INSTANCING
         {
           vec3 ipF = instanceMatrix[3].xyz;
+          ${fadeRadius ? `// Far crowns sink into the canopy surface (no pop at the radius).
+          float dC = distance(ipF.xz, cameraPosition.xz);
+          transformed *= 1.0 - smoothstep(uFadeR * 0.72, uFadeR, dC);` : ''}
           vec2 wdF = normalize((transpose(mat3(instanceMatrix)) * vec3(uWind.x, 0.0, uWind.y)).xz + 1e-5);
           float hF = max(transformed.y - 1.0, 0.0);
           float phF = dot(ipF.xz, uWind.xy) * 0.03 - uTime * (0.9 + uWind.z * 0.12);
@@ -355,17 +441,27 @@ export function foliageMaterial(atlas) {
         }
         #endif`);
     s.fragmentShader = s.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir;\nuniform vec3 uSunCol;')
       .replace('#include <normal_fragment_begin>',
         THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''))
       // Mipmaps average leaf alpha toward the gaps; boost alpha with the mip
       // level so far crowns stay full instead of thinning to twigs.
       .replace('#include <alphatest_fragment>', `
-        vec2 mdx = dFdx(vMapUv * 1280.0), mdy = dFdy(vMapUv * 1280.0);
+        vec2 mdx = dFdx(vMapUv * 1920.0), mdy = dFdy(vMapUv * 1920.0);
         float mlod = 0.5 * log2(min(dot(mdx, mdx), dot(mdy, mdy)));
         diffuseColor.a *= 1.0 + clamp(mlod, 0.0, 6.0) * 0.32;
-        #include <alphatest_fragment>`);
+        #include <alphatest_fragment>`)
+      // Leaves are thin: with the sun behind them they glow yellow-green.
+      .replace('#include <opaque_fragment>', `{
+          vec3 Lv = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
+          vec3 Vv = normalize(vViewPosition);
+          float back = pow(max(dot(-Vv, Lv), 0.0), 3.0);
+          float thin = 0.5 + 0.5 * max(dot(-normal, Lv), 0.0);
+          outgoingLight += diffuseColor.rgb * vec3(1.05, 1.15, 0.6) * uSunCol * back * thin * 0.16;
+        }
+        #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'foliage-v3';
+  m.customProgramCacheKey = () => 'foliage-v4' + (fadeRadius ? '-fade' : '');
   return m;
 }
 

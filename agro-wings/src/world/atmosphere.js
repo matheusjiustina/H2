@@ -20,6 +20,10 @@ export const ATMO_U = {
   // x, y: unit direction the air moves TO (world x, z); z: speed m/s; w: gustiness.
   wind: { value: new THREE.Vector4(0, 1, 3, 0.5) },
   wet: { value: 0 },
+  // Direction toward the sun (world) and its colour × intensity, for
+  // translucent foliage and crops.
+  sunDir: { value: new THREE.Vector3(0.3, 0.8, -0.5) },
+  sunCol: { value: new THREE.Color(1, 1, 1) },
 };
 // Height mist [density 1/m at the base, scale height m, base y m, unused].
 // A Float32Array is passed by reference by UniformsUtils.cloneUniforms, so
@@ -395,6 +399,8 @@ export class Atmosphere {
     const el = THREE.MathUtils.degToRad(c.el), az = THREE.MathUtils.degToRad(c.az);
     this._sunDir.set(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
     sky.setSun(this._sunDir);
+    ATMO_U.sunDir.value.copy(this._sunDir);
+    ATMO_U.sunCol.value.setRGB(c.sun[0] * c.sunI, c.sun[1] * c.sunI, c.sun[2] * c.sunI);
     for (const u of [sky.sky.material.uniforms, sky.envSky.material.uniforms]) {
       u.turbidity.value = c.turb; u.rayleigh.value = c.ray; u.mieCoefficient.value = c.mie; u.mieDirectionalG.value = c.mieG;
     }

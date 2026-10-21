@@ -22,6 +22,8 @@ const views = [
   ['mataEdge', { cam: [-1560, 2, -480], target: [-1640, 8, -520] }],
   ['mataHigh', { cam: [-1350, 260, -150], target: [-2000, 0, -700] }],
   ['cerrado', { cam: [-1900, 6, 500], target: [-2100, 3, 650] }],
+  ['sede', { cam: [-1185, 3, -205], target: [-1260, 7, -265] }],
+  ['baseTrees', { cam: [-300, 2.5, -150], target: [-380, 6, -120] }],
   ['pondSede', { cam: [-700, 14, -350], target: [-800, 0, -420] }],
   ['lagoaSerra', { cam: [-2880, 30, 2620], target: [-3050, 0, 2770] }],
   ['creekBridge', { cam: [1590, 9, 175], target: [1648, 0, 140] }],

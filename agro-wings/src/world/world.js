@@ -13,6 +13,7 @@ import { createStructures } from './structures.js';
 import { createGrass } from './grass.js';
 import { createFieldActivity } from './fieldActivity.js';
 import { createWater } from './water.js';
+import { createForestCrowns } from './forestCrowns.js';
 
 export class World {
   constructor(renderer, scene, quality) {
@@ -41,6 +42,7 @@ export class World {
     this.scene.add(this.crops.group);
     this.vegetation = await step('Forest', () => createVegetation(this.terrain, this.quality));
     this.scene.add(this.vegetation.group);
+    this.crowns = createForestCrowns(this.scene, this.terrain, this.vegetation.atlas, this.quality);
     this.grass = createGrass(this.terrain, this.quality, this.vegetation.atlas);
     this.scene.add(this.grass.group);
     this.structures = await step('Base', () => createStructures(this.terrain, this.scene));
@@ -91,6 +93,7 @@ export class World {
     this.atmo.setQuality(q);
     this.crops.setQuality(q);
     this.grass.setQuality(q);
+    this.crowns.setQuality(q);
     for (const u of this.updaters) u.setQuality?.(q);
   }
 
@@ -99,6 +102,7 @@ export class World {
     this.sky.update(camera, focus, dt, time);
     this.crops.update(camera.position);
     this.vegetation.update(camera);
+    this.crowns.update(camera, this.terrain.heightAt(camera.position.x, camera.position.z));
     this.grass.update(camera, time);
     for (const u of this.updaters) u.update?.(camera, focus, dt, time);
     this.activity.update(dt, time, camera, this.dust, this.mist);
