@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { rng, fbm } from '../core/math.js';
 import { grassTuft, TILES } from './foliage.js';
-import { BASE } from './layout.js';
+import { BASE, FARM_SITES } from './layout.js';
 import { ATMO_U } from './atmosphere.js';
 
 const CELL = 16;
@@ -74,6 +74,11 @@ export function createGrass(terrain, quality, atlas) {
     // Hangar slab and the parked door leaves either side of it.
     const hg = BASE.hangar;
     if (x > hg.x - hg.w / 2 - 8.5 && x < hg.x + hg.w / 2 + 8.5 && z > hg.z - hg.d / 2 - 1 && z < hg.z + hg.d / 2 + 1.5) return true;
+    for (const st of FARM_SITES) {
+      const r = st.runway, sh = st.hangar;
+      if (x > r.x0 - 2 && x < r.x1 + 2 && Math.abs(z - r.z) < r.width / 2 + 1) return true;
+      if (Math.abs(x - sh.x) < 12 && Math.abs(z - sh.z) < 9) return true;
+    }
     if (terrain.surfaceAt(x, z) !== 'grass') return true;
     if (terrain.waterLevel(x, z) > -1e8) return true;
     return false;

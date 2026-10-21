@@ -18,7 +18,10 @@ import { Screens, money } from '../ui/screens.js';
 import { TouchControls } from '../ui/touch.js';
 import { Career } from './contracts.js';
 import { Tutorial } from './tutorial.js';
-import { BASE, POWERLINE, CONTRACT_FIELDS } from '../world/layout.js';
+import { ReplayManager } from './replay.js';
+import { WeatherCycle } from '../world/weatherCycle.js';
+import { GroundMarks } from '../world/groundMarks.js';
+import { BASE, POWERLINE, CONTRACT_FIELDS, MAIN_SITE, SITES, nearestSite, siteById } from '../world/layout.js';
 import { smoothstep } from '../core/math.js';
 import { Autopilot } from './autopilot.js';
 import { HeliAutopilot } from './heliAutopilot.js';
@@ -84,7 +87,9 @@ export class Game {
       si = Math.max(si, steps.indexOf(label) + 1);
       this.screens.setLoading(si / (steps.length + 2), t(label));
     });
-    this.world.atmo.set(this.settings.timeOfDay, this.settings.weather, true);
+    this.marks = new GroundMarks(this.scene, this.world.terrain);
+    this.weatherCycle = new WeatherCycle(this);
+    this._startWeather(true);
     this.screens.setLoading(0.85, t('Aircraft'));
     await new Promise((r) => setTimeout(r, 0));
     // Both aircraft live in the world; the one not selected waits parked.
@@ -99,12 +104,14 @@ export class Game {
     this.rig.shakeScale = this.settings.shake;
     this.sprayer = new Sprayer(this);
     this.guidance = new Guidance(this);
+    this.replay = new ReplayManager(this);
     this.overlay = new CoverageOverlay(this);
     this.service = new GroundService(this);
     this.mist = new ParticlePool(SPRAY.maxParticles[this.settings.quality], { renderOrder: 22 });
     this.dust = new ParticlePool(1500, { renderOrder: 21 });
     this.scene.add(this.mist.points, this.dust.points);
     this.world.dust = this.dust;
+    this.world.mist = this.mist;
     this.mist.limit = SPRAY.maxParticles[this.settings.quality];
     this.audio = new GameAudio();
     this.audio.setVolume(this.settings.volume);
@@ -157,8 +164,22 @@ export class Game {
     if (k === 'volume') this.audio.setVolume(v);
     if (k === 'shake') this.rig.shakeScale = v;
     // Visual/audio only: the flight model's wind is not touched by weather.
-    if (k === 'timeOfDay' || k === 'weather') this.world.atmo.set(this.settings.timeOfDay, this.settings.weather);
+    if (k === 'timeOfDay' || k === 'weather') this._startWeather(false);
   }
+
+  // Sky state from the settings: a fixed preset, or 'dynamic' weather /
+  // 'flow' (passing) time of day run by the weather cycle.
+  _startWeather(instant) {
+    const s = this.settings, c = this.weatherCycle;
+    const cur = this.world.atmo;
+    const weather = s.weather === 'dynamic' ? (c.dynamic ? c.weather : cur.weatherId) : s.weather;
+    const time = s.timeOfDay === 'flow' ? (c.flow ? c.time : cur.timeId) : s.timeOfDay;
+    c.start({ weather, time, dynamic: s.weather === 'dynamic', flow: s.timeOfDay === 'flow' });
+    cur.set(c.time, c.weather, instant);
+  }
+
+  // Current time of day and weather (what the farms' requests are judged by).
+  envNow() { return { time: this.weatherCycle.time, weather: this.weatherCycle.weather }; }
 
   // Debug/validation: fly the current job hands-off through the normal inputs.
   startAutopilot(plan = 'contract') {
@@ -211,6 +232,30 @@ export class Game {
     this.rig.setMode(this.rig.mode, this.aircraft);
     if (this.rig.mode === 'orbit') this.rig.orbit.dist = this.aircraft.type.camera.orbit;
     this.audio?.play('ui');
+  }
+
+  // On the ground and stopped at the main base (office computer: accept
+  // secondary requests, change aircraft).
+  atMainBase() {
+    const fm = this.aircraft.fm;
+    return Math.hypot(fm.pos.x - BASE.hangar.x, fm.pos.z - BASE.hangar.z) < 260 && fm.out.onGround && fm.out.groundSpeed < 0.5;
+  }
+
+  // Service area the ground crew works in (main base or a secondary farm).
+  get site() { return this.service?.site ?? MAIN_SITE; }
+  get sites() { return SITES; }
+
+  // The crew moves to the service area the aircraft arrives at (each farm
+  // has its own truck and badeco; only the nearest one is simulated).
+  _followSite(dt) {
+    this._siteT = (this._siteT ?? 0) - dt;
+    if (this._siteT > 0) return;
+    this._siteT = 0.5;
+    const p = this.aircraft.fm.pos;
+    const { site, dist } = nearestSite(p.x, p.z);
+    if (site === this.service.site || dist > 900 || this.service.busy()) return;
+    this.service.setSite(site);
+    if (!site.main && this.playing) this.toast(t('{0}: the local service truck is waiting at the pad.', site.farm.name));
   }
 
   toast(msg) { this.toastLog = this.toastLog || []; this.toastLog.push(msg); this.hud?.toast(msg); }
@@ -272,6 +317,8 @@ export class Game {
 
   setJob(job) {
     this.job = job;
+    this.replay.begin(job);
+    this.world.activity?.setExcluded(job ? job.fields.map((f) => f.name) : []);
     this.guidance.setJob(job);
     this.sprayer.setTargets(job ? job.coverages : []);
     this.overlay.setVisible(this.overlay.visible && !!job, job ? job.coverages : []);
@@ -282,6 +329,14 @@ export class Game {
     const job = this.career.job(id);
     this.setJob(job);
     this.screens.close();
+    const farm = job.c.farm ? siteById(job.c.farm) : null;
+    if (farm && this.site !== farm) {
+      const p = this.aircraft.fm.pos;
+      const km = Math.hypot(farm.pad.x - p.x, farm.pad.z - p.z) / 1000;
+      const brg = Math.round(((Math.atan2(farm.pad.x - p.x, -(farm.pad.z - p.z)) * 180) / Math.PI + 360) % 360);
+      this.toast(t('Request accepted: {0}. Fly to {1} ({2} km, heading {3}°) — the local truck loads you there.', job.c.title, farm.farm.name, km.toFixed(1), String(brg).padStart(3, '0')));
+      return;
+    }
     if (!this.service.inZone()) {
       this.toast(t('Job accepted: {0}. Fly back to the pad for loading.', job.c.title));
       return;
@@ -310,7 +365,8 @@ export class Game {
     // Pull totals from the sprayer into the job before evaluating.
     const r = job.evaluate(this.aircraft.damage);
     this.career.money += r.total;
-    this.career.history.push({ id: job.c.id, total: r.total, coverage: r.coverage, stars: r.stars, t: Date.now() });
+    this.lastRecord = this.career.record(job, r, this.aircraft, this.replay.finish(job));
+    this.replay.attach(this.lastRecord.n);
     if (r.done) {
       const prev = this.career.completed[job.c.id];
       this.career.completed[job.c.id] = { stars: Math.max(r.stars, prev?.stars || 0) };
@@ -435,7 +491,7 @@ export class Game {
     this.autopilot?.update(rawDt);
     const modal = this.screens.open;
     // Global keys
-    if (this.playing) {
+    if (this.playing && !this.replay.active) {
       if (input.wasPressed('pause')) {
         if (modal === 'crash') { /* the crash screen needs a choice */ } else if (modal) this.screens.close(); else this.screens.pause();
       } else if (!modal || modal === 'map') {
@@ -443,12 +499,14 @@ export class Game {
       }
       if (!modal) {
         if (input.wasPressed('jobs') && this.mode === 'career') this.screens.board();
+        if (input.wasPressed('office') && this.mode === 'career') this.screens.office();
         if (input.wasPressed('help')) this.screens.help();
+        if (input.wasPressed('replay') && this.replay.latest() >= 0) this.replay.play(this.replay.latest());
       }
     }
-    const paused = this.playing && (modal === 'pause' || modal === 'settings' || modal === 'help');
+    const paused = (this.playing && (modal === 'pause' || modal === 'settings' || modal === 'help' || modal === 'office')) || this.replay.active;
     const dt = paused ? 0 : rawDt;
-    this.controlsLocked = !!modal && modal !== 'map';
+    this.controlsLocked = (!!modal && modal !== 'map') || this.replay.active;
     const mouse = input.consumeMouse();
     const ac = this.aircraft;
 
@@ -465,8 +523,11 @@ export class Game {
       this.mist.update(dt, ac.windVec, (x, z) => ac.env.top(x, z));
       this.dust.update(dt, ac.windVec, (x, z) => ac.env.ground(x, z));
       this.guidance.update(dt);
+      if (this.playing) this.replay.record(dt);
+      if (this.playing && this.weatherCycle.update(dt)) this.world.atmo.set(this.weatherCycle.time, this.weatherCycle.weather);
       this.overlay.update(this.job ? this.job.coverages : []);
       this.service.update(dt);
+      this._followSite(dt);
       this.world.structures.update(dt, this.time, ac.windVec, { acPos: ac.fm.pos, light: this.world.atmo.cur.light ?? 1, cam: this.camera.position });
       if (this.job && !ac.fm.out.onGround) this.job.flightTime += dt;
       this.statT -= dt;
@@ -485,14 +546,16 @@ export class Game {
       const pdt = headless ? this._presT : rawDt;
       this._presT = 0;
       if (!this.playing) this.rig.orbit.yaw += pdt * 0.06;
-      this.rig.update(pdt, ac, this.playing && !this.controlsLocked ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
+      if (this.replay.active) this.replay.update(pdt, mouse);
+      else this.rig.update(pdt, ac, this.playing && !this.controlsLocked ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
       // Parked aircraft: drawn only within 1.2 km (a few pixels beyond that).
       for (const p of this._parked) {
         const d = this.camera.position.distanceTo(p.rPos);
         p.model.root.visible = d < 1200;
         if (p.contactShadow) p.contactShadow.visible = d < 400;
       }
-      this.service.truck.cull(this.camera.position);
+      this.service.cull(this.camera.position);
+      this.marks.update(pdt, this.camera);
       // Visual wind for vegetation/rain = the aircraft's mean wind (no turbulence).
       windAt(this.world.visualWind, ac.simTime ?? this.time, null, 10, this.settings.wind);
       this.world.atmo.cameraInside = this.rig.mode === 'cockpit';
@@ -583,12 +646,13 @@ export class Game {
     if (ac.stuck) return this.hud.setPrompt(t('Aircraft stuck — {0} tow back to the pad', k('reset')), () => this.resetAircraft('pad'));
     if (this._atPadStopped() && !this.service.busy()) {
       if (this.mode === 'career') {
-        if (!this.job) return this.hud.setPrompt(t('{0} Service orders', k('interact')), () => this._interact());
+        if (!this.job) return this.hud.setPrompt(this.site.main ? t('{0} Service orders · {1} Office computer', k('interact'), k('office')) : t('{0} Service orders', k('interact')), () => this._interact());
         if (this.job.complete()) return this.hud.setPrompt(t('{0} Hand in the job', k('interact')), () => this._interact());
         return this.hud.setPrompt(t('{0} Load sheet — call the badeco', k('interact')), () => this._interact());
       }
       return this.hud.setPrompt(t('{0} Service (fuel &amp; liquid)', k('interact')), () => this._interact());
     }
+    if (this.mode === 'career' && fm.engine === 'off' && !this._rotorTurning() && this.atMainBase() && !this.service.busy()) return this.hud.setPrompt(t('{0} Office computer (requests from other farms)', k('office')), () => this.screens.office());
     if (fm.engine === 'off' && this._rotorTurning() && fm.out.onGround) return this.hud.setPrompt(t('Rotor running down ({0} %) — crew waits for it to stop', Math.round(fm.out.rotorPct)));
     const pw = ac.kind === 'heli' && fm.powerModel === 'power';
     if (fm.engine === 'off' && fm.out.onGround && !this.service.busy()) return this.hud.setPrompt(ac.kind === 'heli' ? t(pw ? 'Power down, hold {0} to start' : 'Collective down, hold {0} to start', k('engine')) : t('Hold {0} to start the engine', k('engine')));

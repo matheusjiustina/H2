@@ -11,7 +11,8 @@ import { makeNoiseTexture } from '../core/textures.js';
 import { createVegetation, makeTreeCollider } from './vegetation.js';
 import { createStructures } from './structures.js';
 import { createGrass } from './grass.js';
-import { createFarmLife } from './farmlife.js';
+import { createFieldActivity } from './fieldActivity.js';
+import { createWater } from './water.js';
 
 export class World {
   constructor(renderer, scene, quality) {
@@ -43,8 +44,13 @@ export class World {
     this.grass = createGrass(this.terrain, this.quality, this.vegetation.atlas);
     this.scene.add(this.grass.group);
     this.structures = await step('Base', () => createStructures(this.terrain, this.scene));
+    this.water = createWater(this.terrain, this.noise);
+    this.scene.add(this.water);
     this.treeHit = makeTreeCollider(this.vegetation);
-    this.farm = createFarmLife(this.scene, this.structures.M, this.terrain);
+    this.activity = createFieldActivity(this.scene, this.structures.M, this.terrain);
+    // The harrowing tractor on T-08 (audio, older checks).
+    const tr = this.activity.units[0];
+    this.farm = { root: tr.model.root, pose: (t) => tr.route.pose(tr.s0 + t * tr.K.speed) };
   }
 
   // Obstacle query for the aircraft: trees, buildings, wires. Returns a name or null.
@@ -95,7 +101,7 @@ export class World {
     this.vegetation.update(camera);
     this.grass.update(camera, time);
     for (const u of this.updaters) u.update?.(camera, focus, dt, time);
-    this.farm.update(dt, time, camera, this.dust);
+    this.activity.update(dt, time, camera, this.dust, this.mist);
   }
 }
 

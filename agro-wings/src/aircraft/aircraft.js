@@ -8,7 +8,7 @@ import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
 import { t } from '../i18n/index.js';
 import { FLIGHT, UNITS } from '../config.js';
-import { BASE, RUNWAY, POWERLINE } from '../world/layout.js';
+import { POWERLINE, MAIN_SITE, padOf } from '../world/layout.js';
 import { approach, clamp, smoothstep, damp, KT, FT } from '../core/math.js';
 
 const FLAP_NOTCHES = [0, 1 / 3, 2 / 3, 1];
@@ -82,8 +82,8 @@ export class Aircraft {
     this.state = 'ok';
     this._sync();
   }
-  placeAtPad() {
-    const p = BASE.pad;
+  placeAtPad(site = this.game?.site ?? MAIN_SITE) {
+    const p = padOf(site, 'plane');
     this.placeParked(p.x, p.z, p.heading);
   }
   placeParked(x, z, heading) {
@@ -91,9 +91,10 @@ export class Aircraft {
     this.fm.parkBrake = true;
     this._afterPlace();
   }
-  placeOnRunway(end = 'west') {
-    const x = end === 'west' ? RUNWAY.x0 + 18 : RUNWAY.x1 - 18;
-    this.fm.settleOnGround(x, RUNWAY.z, end === 'west' ? Math.PI / 2 : -Math.PI / 2, this.env);
+  placeOnRunway(end = 'west', site = this.game?.site ?? MAIN_SITE) {
+    const R = site.runway;
+    const x = end === 'west' ? R.x0 + 18 : R.x1 - 18;
+    this.fm.settleOnGround(x, R.z, end === 'west' ? Math.PI / 2 : -Math.PI / 2, this.env);
     this._afterPlace();
   }
   placeAirborne(x, z, heading, agl = 150, speed = 48) {
@@ -529,6 +530,21 @@ export class Aircraft {
     this.dustT = 0.04;
     const col = (s) => (s === 'dirt' ? [0.55, 0.22, 0.12] : s === 'runway' ? [0.62, 0.5, 0.38] : s === 'crop' ? [0.4, 0.42, 0.25] : [0.45, 0.43, 0.3]);
     const wind = this.windVec;
+    // Tyre marks on bare earth, and dust puffs when the wheels bite (hard
+    // acceleration or braking on dirt).
+    const marks = this.game.marks;
+    const acc = (o.groundSpeed - (this._gsPrev ?? o.groundSpeed)) / 0.04;
+    this._gsPrev = o.groundSpeed;
+    for (const g of fm.gear) {
+      _v.copy(g.pv).applyQuaternion(fm.quat).add(fm.pos);
+      const s = g.onGround ? this.env.surface(_v.x, _v.z) : null;
+      marks?.wheel(this.type.id + g.name, _v.x, _v.z, g.onGround && o.groundSpeed > 0.3, s, g.name === 'tail' ? 0.12 : 0.2);
+      if (g.onGround && g.name !== 'tail' && (s === 'dirt' || s === 'runway') && o.groundSpeed > 1.5 && (Math.abs(acc) > 1.6 || (fm.brake > 0.5 && o.groundSpeed > 2.5))) {
+        const k = Math.min(1, Math.abs(acc) / 4 + (fm.brake > 0.5 ? 0.5 : 0));
+        dust.spawn(_v.x, _v.y + 0.05, _v.z, (Math.random() - 0.5) + wind.x * 0.3, 0.3 + Math.random() * 0.4, (Math.random() - 0.5) + wind.z * 0.3,
+          { life: 1.2 + Math.random(), size: 0.6, grow: 3.2, alpha: 0.3 * k, drag: 1.6, gravity: -0.1, color: col(s) });
+      }
+    }
     if (o.onGround && o.groundSpeed > 3) {
       for (const g of fm.gear) {
         if (!g.onGround || g.name === 'tail') continue;

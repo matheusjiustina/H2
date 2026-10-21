@@ -1,5 +1,5 @@
 // Farm map rendering for the minimap and the full map (M).
-import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ, WORLD_HALF } from '../world/layout.js';
+import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ, WORLD_HALF, FARM_SITES, SITES, WATER, pondRadius } from '../world/layout.js';
 import { rawHeight } from '../world/terrainData.js';
 
 const EXT = WORLD_HALF - 100; // half extent of the base map (m)
@@ -99,6 +99,18 @@ export function buildBaseMap(size = 1024) {
   g.beginPath();
   CREEK.points.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
   g.stroke();
+  for (const st of WATER.streams) {
+    g.lineWidth = 11;
+    g.beginPath();
+    st.points.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
+    g.stroke();
+  }
+  g.fillStyle = '#3b6fa0';
+  for (const p of WATER.ponds) {
+    g.beginPath();
+    for (let a = 0; a <= Math.PI * 2 + 0.01; a += 0.2) { const r = pondRadius(p, a); g.lineTo(p.x + Math.cos(a) * r, p.z + Math.sin(a) * r); }
+    g.fill();
+  }
   g.fillStyle = '#d9c6a6';
   g.fillRect(RUNWAY.x0, RUNWAY.z - RUNWAY.width, RUNWAY.x1 - RUNWAY.x0, RUNWAY.width * 2);
   const a = BASE.apron;
@@ -108,6 +120,16 @@ export function buildBaseMap(size = 1024) {
   const h = BASE.hangar;
   g.fillRect(h.x - h.w / 2, h.z - h.d / 2, h.w, h.d);
   g.fillRect(HQ.house.x - 9, HQ.house.z - 5, 18, 10);
+  // Secondary farms: strip, apron, shed.
+  for (const st of FARM_SITES) {
+    const r = st.runway;
+    g.fillStyle = r.surface === 2 ? '#8fb46a' : r.surface === 3 ? '#b8b0a2' : '#c98a5c';
+    g.fillRect(r.x0, r.z - r.width, r.x1 - r.x0, r.width * 2);
+    g.fillStyle = '#b06a44';
+    g.fillRect(st.apron.x0, st.apron.z0, st.apron.x1 - st.apron.x0, st.apron.z1 - st.apron.z0);
+    g.fillStyle = '#d8d8d0';
+    g.fillRect(st.hangar.x - 10, st.hangar.z - 7, 20, 14);
+  }
   for (const si of HQ.silos) { g.beginPath(); g.arc(si.x, si.z, 6, 0, Math.PI * 2); g.fill(); }
   g.strokeStyle = '#ff8a2a';
   g.setLineDash([16, 12]);
@@ -161,12 +183,30 @@ export function drawMap(g, w, h, base, game, view) {
       g.setLineDash([]);
     }
   }
-  // Service pad marker
+  // Service pad marker (where the crew is now).
+  const pad = game.site?.pad ?? BASE.pad;
   g.strokeStyle = '#7fd0ff';
   g.lineWidth = 2 / scale;
   g.beginPath();
-  g.arc(BASE.pad.x, BASE.pad.z, BASE.pad.radius, 0, Math.PI * 2);
+  g.arc(pad.x, pad.z, BASE.pad.radius, 0, Math.PI * 2);
   g.stroke();
+  // Farm names (kept upright on a track-up map).
+  if (view.labels !== false) {
+    for (const st of SITES) {
+      const r = st.runway;
+      const lx = (r.x0 + r.x1) / 2, lz = r.z - 60;
+      g.save();
+      g.translate(lx, lz);
+      g.rotate(-rot);
+      g.scale(1 / scale, 1 / scale);
+      g.font = `bold ${view.labelPx ?? 13}px Arial`;
+      g.textAlign = 'center';
+      g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.fillStyle = st.main ? '#ffffff' : (st.farm.color);
+      const txt = st.main ? 'Boa Esperança' : st.farm.short;
+      g.strokeText(txt, 0, 0); g.fillText(txt, 0, 0);
+      g.restore();
+    }
+  }
   // Aircraft
   const ac = game.aircraft;
   const p = ac.fm.pos;

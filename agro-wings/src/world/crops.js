@@ -12,6 +12,7 @@ import { FIELDS, CROPS, cropHeight } from './layout.js';
 import { makeCropCard, makeCanopyTop } from '../core/textures.js';
 import { fbm } from '../core/math.js';
 import { ATMO_U } from './atmosphere.js';
+import { CUT_U, CUT_GLSL } from './cutState.js';
 
 const CANOPY = 0.78; // canopy surface relative to crop height
 const FIN_LO = 0.42, FIN_HI = 1.04;
@@ -27,12 +28,15 @@ function finMaterial(tex, radiusU) {
     s.uniforms.uRadius = radiusU;
     s.uniforms.uTime = ATMO_U.time;
     s.uniforms.uWind = ATMO_U.wind;
+    s.uniforms.uCut = CUT_U.rects;
+    s.uniforms.uCutKind = CUT_U.kinds;
     s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uRadius;\nuniform float uTime;\nuniform vec4 uWind;\nattribute float aBase;')
+      .replace('#include <common>', '#include <common>\nuniform float uRadius;\nuniform float uTime;\nuniform vec4 uWind;\nattribute float aBase;\n' + CUT_GLSL)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wpF = modelMatrix * vec4(transformed, 1.0);
         float dF = distance(wpF.xz, cameraPosition.xz);
-        float k = 1.0 - smoothstep(uRadius * 0.62, uRadius, dF);
+        // Harvested lanes: the plants are gone (fins collapse to the ground).
+        float k = (1.0 - smoothstep(uRadius * 0.62, uRadius, dF)) * (1.0 - harvestedAt(wpF.xz));
         transformed.y = aBase + (transformed.y - aBase) * k;
         // Plants lean and wave with the shared wind; gusts sweep down the rows.
         float hC = max(transformed.y - aBase, 0.0);
@@ -43,7 +47,7 @@ function finMaterial(tex, radiusU) {
     s.fragmentShader = s.fragmentShader.replace('#include <color_fragment>',
       '#include <color_fragment>\n diffuseColor.rgb *= mix(0.38, 1.05, smoothstep(0.0, 0.95, vMapUv.y));');
   };
-  m.customProgramCacheKey = () => 'fin-v2';
+  m.customProgramCacheKey = () => 'fin-v3';
   return m;
 }
 
@@ -57,14 +61,18 @@ function canopyMaterial(tex, kind) {
   m.onBeforeCompile = (s) => {
     s.uniforms.uTime = ATMO_U.time;
     s.uniforms.uWind = ATMO_U.wind;
+    s.uniforms.uCut = CUT_U.rects;
+    s.uniforms.uCutKind = CUT_U.kinds;
     s.vertexShader = s.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aField;\nattribute vec4 aInfo;\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvField = aField; vInfo = aInfo; vCWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     s.fragmentShader = s.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;\nuniform float uTime;\nuniform vec4 uWind;')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;\nuniform float uTime;\nuniform vec4 uWind;\n' + CUT_GLSL)
       .replace('#include <map_fragment>', `#include <map_fragment>
         {
           vec2 p = vCWP.xz;
+          // Harvested lanes: no canopy, the stubble on the ground shows.
+          if (harvestedAt(p) > 0.5) discard;
           bool ax = vInfo.x < 0.5;
           float along = ax ? p.x : p.y;
           float across = ax ? p.y : p.x;
@@ -87,7 +95,7 @@ function canopyMaterial(tex, kind) {
           diffuseColor.rgb *= 1.0 + wv * min(uWind.z, 7.0) * 0.009 * (0.5 + uWind.w);
         }`);
   };
-  m.customProgramCacheKey = () => 'canopy2-' + kind;
+  m.customProgramCacheKey = () => 'canopy3-' + kind;
   return m;
 }
 

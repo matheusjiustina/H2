@@ -106,6 +106,22 @@ FIELDS.push(
   field('T-43B', 'corn', 1140, 1380, -3040, -2900, 0.95, 'x', { contract: 'ridge-corn', level: 3 }),
   field('T-44', 'pasture', 2780, 3280, -3300, -2900, 1, 'x', { level: 3 }),
 );
+// --- secondary farms (src/world/layout.js FARMS): their own talhões ---
+// Santa Rita (far west, flat chapada): big rectangular soy and cotton.
+// Vale do Rio (south-east, rolling river valley): corn on the swells.
+// Serra Azul (south-west, hills): smaller talhões on broken ground.
+FIELDS.push(
+  field('SR-01', 'soy', -3820, -2980, -1760, -1260, 0.9, 'x', { contract: 'sr-soy', farm: 'santarita', level: 1 }),
+  field('SR-02', 'cotton', -3820, -3060, -830, -580, 0.85, 'x', { contract: 'sr-cotton', farm: 'santarita', level: 1 }),
+  field('SR-03', 'corn', -2900, -2620, -1760, -1300, 0.6, 'z', { farm: 'santarita', level: 1 }),
+  field('VR-01', 'corn', 2880, 3360, 2600, 2860, 0.95, 'x', { contract: 'vr-corn', farm: 'valedorio', level: 2 }),
+  field('VR-02', 'soy', 2380, 3000, 1700, 1980, 0.85, 'x', { contract: 'vr-soy', farm: 'valedorio', level: 2 }),
+  field('VR-03', 'stubble', 3480, 3860, 1900, 2320, 1, 'z', { farm: 'valedorio', level: 2 }),
+  field('SA-01', 'corn', -2280, -1880, 3480, 3800, 0.95, 'x', { contract: 'sa-corn', farm: 'serraazul', level: 3 }),
+  field('SA-02A', 'soy', -2000, -1640, 2960, 3180, 0.9, 'x', { contract: 'sa-soy', farm: 'serraazul', level: 3 }),
+  field('SA-02B', 'soy', -2000, -1820, 3180, 3300, 0.9, 'x', { contract: 'sa-soy', farm: 'serraazul', level: 3 }),
+  field('SA-03', 'pasture', -3380, -3020, 3700, 3940, 1, 'x', { farm: 'serraazul', level: 3 }),
+);
 for (const f of FIELDS) f.level ??= 1;
 
 export const CONTRACT_FIELDS = FIELDS.filter((f) => f.contract);
@@ -122,6 +138,27 @@ export const CREEK = {
   valley: 160,
   valleyDepth: 7,
 };
+
+// Other water: a tributary stream through the Vale do Rio valley into the
+// creek, and small farm reservoirs (açudes) / a valley lake. Pond outlines
+// are irregular (radius modulated by two harmonics, phase per pond); the
+// water level is set by terrainData from the lowest point of each rim.
+export const WATER = {
+  streams: [
+    {
+      name: 'Córrego do Vale', width: 6, depth: 1.6, valley: 70, valleyDepth: 2.6,
+      points: [[3990, 2490], [3780, 2460], [3570, 2425], [3420, 2470], [3200, 2505], [2960, 2480], [2720, 2430], [2480, 2350], [2250, 2335], [2000, 2330], [1790, 2310], [1615, 2295]],
+    },
+  ],
+  ponds: [
+    { name: 'Açude Santa Rita', x: -2760, z: -640, r: 60, depth: 2.4, ph: 0.7 },
+    { name: 'Lagoa da Serra', x: -3050, z: 2760, r: 95, depth: 3.2, ph: 2.1 },
+    { name: 'Açude da sede', x: -800, z: -420, r: 38, depth: 2.0, ph: 4.0 },
+    { name: 'Açude do sul', x: 900, z: 1550, r: 50, depth: 2.2, ph: 5.3 },
+  ],
+};
+// Radius of a pond's shoreline towards angle a.
+export const pondRadius = (p, a) => p.r * (1 + 0.16 * Math.sin(2 * a + p.ph) + 0.09 * Math.sin(3 * a + p.ph * 1.7));
 
 // Forest blocks (legal reserve) and tree belts. kind: 'mata' (dense native),
 // 'eucalyptus' (planted windbreak), 'riparian' (along the creek).
@@ -226,3 +263,77 @@ export function cropHeight(f) {
   if (!f) return 0;
   return CROPS[f.crop].height * (0.25 + 0.75 * f.growth);
 }
+
+// ---------------------------------------------------------------------------
+// Secondary farms: each has its own strip, a small service area (a copy of the
+// base's service layout moved by dx, dz; level y0 set by terrainData), a local
+// service truck and exclusive contracts taken at the hangar office computer.
+// Strips run 09/27 like the main one, the apron off the west end.
+//   surface: 0 laterite (main), 1 red earth, 2 mown grass, 3 gravel.
+//   grade: rise of the strip per metre towards the east (west end level).
+export const FARMS = [
+  {
+    id: 'santarita', name: 'Fazenda Santa Rita', short: 'Santa Rita', dx: -3000, dz: -1000,
+    len: 640, width: 22, surface: 1, grade: 0, difficulty: 1, color: '#d8a24a',
+    crops: ['soy', 'cotton'], weather: 'dry',
+  },
+  {
+    id: 'valedorio', name: 'Fazenda Vale do Rio', short: 'Vale do Rio', dx: 3200, dz: 2200,
+    len: 480, width: 18, surface: 2, grade: 0.011, difficulty: 2, color: '#5fb0d8',
+    crops: ['corn', 'soy'], weather: 'humid',
+  },
+  {
+    id: 'serraazul', name: 'Sítio Serra Azul', short: 'Serra Azul', dx: -2500, dz: 3600,
+    len: 430, width: 15, surface: 3, grade: 0, difficulty: 3, color: '#9a8cd8',
+    crops: ['corn', 'soy'], weather: 'mist',
+  },
+];
+
+const mv = (p, dx, dz) => ({ ...p, x: p.x + dx, z: p.z + dz });
+const mvr = (r, dx, dz) => ({ x0: r.x0 + dx, x1: r.x1 + dx, z0: r.z0 + dz, z1: r.z1 + dz });
+
+function makeSite(f) {
+  const { dx, dz } = f;
+  const x0 = RUNWAY.x0 + dx;
+  return {
+    id: f.id, farm: f, main: false, dx, dz, y0: 0,
+    runway: { x0, x1: x0 + f.len, z: dz, width: f.width, shoulder: 6, surface: f.surface, grade: f.grade },
+    apron: mvr(BASE.apron, dx, dz),
+    taxiway: { ...mvr(BASE.taxiway, dx, dz), z1: dz - f.width / 2 },
+    hangar: mv(BASE.hangar, dx, dz),
+    pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz),
+    helipad: mv(BASE.helipad, dx, dz),
+    fuelTank: mv(BASE.fuelTank, dx, dz), mixTank: mv(BASE.mixTank, dx, dz),
+    reservoirs: BASE.reservoirs.map((r) => mv(r, dx, dz)),
+    crewPost: mv(BASE.crewPost, dx, dz), pickup: mv(BASE.pickup, dx, dz), truck: mv(BASE.truck, dx, dz),
+    windsocks: [{ x: x0 + 70, z: dz + f.width / 2 + 14 }, { x: x0 + f.len - 40, z: dz - f.width / 2 - 14 }],
+  };
+}
+
+export const MAIN_SITE = {
+  id: 'main', farm: null, main: true, dx: 0, dz: 0, y0: 0,
+  runway: { ...RUNWAY, surface: 0, grade: 0 }, ...BASE,
+};
+export const SITES = [MAIN_SITE, ...FARMS.map(makeSite)];
+export const siteById = (id) => SITES.find((s) => s.id === id) ?? MAIN_SITE;
+export const FARM_SITES = SITES.filter((s) => !s.main);
+
+// Nearest site to a point and its distance (m).
+export function nearestSite(x, z) {
+  let best = MAIN_SITE, bd = 1e9;
+  for (const s of SITES) {
+    const d = Math.hypot(x - s.pad.x, z - s.pad.z);
+    if (d < bd) { bd = d; best = s; }
+  }
+  return { site: best, dist: bd };
+}
+
+// Strip level at x: flat at y0 past the apron (first 100 m), then rising
+// east by the grade.
+export function stripLevel(site, x) {
+  const r = site.runway;
+  return site.y0 + (r.grade || 0) * Math.max(0, Math.min(x, r.x1) - r.x0 - 100);
+}
+
+// Service pad of a site for an aircraft kind (helipad for the helicopter).
+export const padOf = (site, kind) => (kind === 'heli' ? site.helipad : site.pad);

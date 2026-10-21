@@ -6,10 +6,11 @@ import * as THREE from 'three';
 import { ATMO_U } from './atmosphere.js';
 import { GRID_N, CELL, RELIEF_SHADE } from './terrainData.js';
 import {
-  WORLD_HALF, FAR_HALF, RUNWAY, BASE, FIELDS, ROADS, CREEK,
+  WORLD_HALF, FAR_HALF, RUNWAY, BASE, FIELDS, ROADS, CREEK, FARM_SITES, WATER,
 } from './layout.js';
 import { rawHeight } from './terrainData.js';
 import { makeGroundDetail } from '../core/textures.js';
+import { CUT_U, NCUT } from './cutState.js';
 
 const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5 };
 
@@ -28,7 +29,16 @@ uniform vec4 uApron;
 uniform vec4 uTaxi;
 uniform vec2 uPad;
 uniform vec2 uFuel;
+uniform vec4 uSiteRw[NS];
+uniform vec4 uSiteAp[NS];
+uniform vec4 uSiteTx[NS];
+uniform vec4 uSiteOff[NS];
 uniform float uWorldHalf;
+uniform vec4 uCut[NCUT];
+uniform vec2 uStream[NSTP];
+uniform vec4 uStreamBox;
+uniform vec4 uPond[NPOND];
+uniform float uCutKind[NCUT];
 
 // Micro-relief written by terrainColor() and turned into a bump normal later.
 float tBump = 0.0;
@@ -157,6 +167,50 @@ vec3 farPatchwork(vec2 p, vec4 nA, vec4 nB, vec4 nC, vec4 nD, inout float rough)
   return c;
 }
 
+// Airstrip + apron of one site (main base or a secondary farm). off: site
+// offset from the main base layout; surf: 0 laterite, 1 red earth, 2 mown
+// grass, 3 gravel.
+vec3 stripColor(vec3 col, inout float rough, vec2 p, vec4 rw, vec4 apr, vec4 txw, vec2 pad, vec2 fuel, vec2 off, float surf,
+    vec4 nA, vec4 nB, vec4 nC, vec4 nD, vec4 det, float near) {
+  float dRw = sdBox(p, rw);
+  float dAp = min(sdBox(p, apr), sdBox(p, txw));
+  float dr = min(dRw, dAp);
+  if (dr < 8.0) {
+    float zc = 0.5 * (rw.y + rw.w);
+    float hwR = 0.5 * (rw.w - rw.y);
+    float cl = p.y - zc + (nB.r - 0.5) * 1.6;
+    vec3 lat = mix(vec3(0.285, 0.150, 0.078), vec3(0.385, 0.215, 0.120), smoothstep(0.25, 0.8, nC.r));
+    if (surf > 0.5 && surf < 1.5) lat = mix(vec3(0.36, 0.17, 0.085), vec3(0.47, 0.24, 0.13), smoothstep(0.2, 0.8, nC.r)); // red earth
+    if (surf > 1.5 && surf < 2.5) lat = grassColor(p, nA, nB, nC, nD) * vec3(1.16, 1.2, 0.9) * (0.86 + 0.2 * smoothstep(0.35, 0.65, abs(fract((p.y - rw.y) / 6.0) - 0.5) * 2.0)); // mown grass, mower stripes
+    if (surf > 2.5) lat = mix(vec3(0.40, 0.37, 0.33), vec3(0.55, 0.51, 0.45), smoothstep(0.2, 0.85, nD.b)); // gravel
+    lat *= 0.9 + 0.18 * nD.g;
+    float track = exp(-pow((abs(cl) - 1.55) / 0.95, 2.0));
+    float ends = max(1.0 - smoothstep(10.0, 26.0, length(p - vec2(rw.x + 14.0, zc))), 1.0 - smoothstep(10.0, 26.0, length(p - vec2(rw.z - 14.0, zc))));
+    track = max(track, ends * 0.8);
+    float scuff = smoothstep(0.55, 0.9, nD.r) * track * (1.0 - smoothstep(60.0, 200.0, abs(p.x - rw.x - 120.0))) ;
+    lat = mix(lat, lat * (surf > 1.5 && surf < 2.5 ? vec3(0.95, 0.86, 0.66) : vec3(0.76, 0.70, 0.68)), track * 0.65);
+    lat = mix(lat, vec3(0.06, 0.05, 0.045), scuff * 0.35);
+    lat = soilDetail(lat, det, near, 1.0 - track * 0.6, 0.2 * track);
+    float edgeIn = hwR - abs(p.y - zc);
+    float creep = 1.0 - smoothstep(0.0, 2.2 + nC.g * 2.5, edgeIn + (nD.r - 0.5) * 1.6);
+    vec3 g = mix(lat, grassColor(p, nA, nB, nC, nD) * 0.92, creep * 0.75 * step(dRw, dAp));
+
+    vec3 ap = dirtColor(nB, nC, nD) * vec3(1.06, 1.08, 1.1);
+    float tx = 1.0 - smoothstep(1.2, 2.6, min(segD(p, off + vec2(-382.0, -14.0), off + vec2(-370.0, -46.0)), segD(p, off + vec2(-370.0, -46.0), pad)));
+    float padWear = 1.0 - smoothstep(4.0, 11.0, length(p - pad));
+    ap = mix(ap, ap * vec3(0.78, 0.72, 0.7), max(tx * 0.6, padWear * 0.45));
+    float oil = smoothstep(0.62, 0.8, nC.b) * (1.0 - smoothstep(4.0, 9.0, length(p - fuel))) + smoothstep(0.7, 0.85, nD.g) * padWear * 0.5;
+    ap = mix(ap, vec3(0.045, 0.035, 0.03), oil * 0.6);
+    ap = soilDetail(ap, det, near, 0.6, 0.3 * (1.0 - padWear) * smoothstep(0.4, 0.7, nB.b));
+    g = mix(ap, g, step(dRw, dAp));
+    float m = 1.0 - aaStep(0.0, dr + (nC.b - 0.5) * 0.8);
+    col = mix(col, g, m);
+    rough = mix(rough, 0.92, m);
+  }
+
+  return col;
+}
+
 vec3 terrainColor(vec2 p, out float rough) {
   vec4 nA = texture2D(uNoise, p * 0.0021);
   vec4 nB = texture2D(uNoise, p * 0.017);
@@ -187,7 +241,15 @@ vec3 terrainColor(vec2 p, out float rough) {
   if (dmin < 14.0) {
     vec4 info = uFieldInfo[imin];
     float inField = 1.0 - aaStep(-0.4, dmin);
+    // Ground the machines have worked: harvested (stubble) or tilled (dark soil).
+    float worked = 0.0;
+    for (int i = 0; i < NCUT; i++) {
+      vec4 r = uCut[i];
+      float wk = mod(uCutKind[i], 4.0);
+      if (wk > 0.5 && p.x > r.x && p.x < r.z && p.y > r.y && p.y < r.w) { info.x = wk < 1.5 ? 3.0 : 4.0; info.z = 1.0; info.w = wk < 1.5 ? 0.5 : 0.9; worked = wk; }
+    }
     vec3 fc = fieldColor(p, info, -dmin, nA, nB, nC, nD, rough);
+    if (worked > 1.5) fc *= vec3(0.7, 0.64, 0.6);
     float rough2 = rough;
     // Carreador ring, slightly irregular edge, and a rank grass verge outside it.
     float ringOuter = 7.0 + (nB.g - 0.5) * 2.0;
@@ -229,37 +291,10 @@ vec3 terrainColor(vec2 p, out float rough) {
   // edges, worn turn-around patches at both ends and tyre scuffs where
   // aircraft touch down. Apron / taxiway: compacted red earth, oil stains at
   // the service pad, darker taxi tracks.
-  float dRw = sdBox(p, uRunway);
-  float dAp = min(sdBox(p, uApron), sdBox(p, uTaxi));
-  float dr = min(dRw, dAp);
-  if (dr < 8.0) {
-    float zc = 0.5 * (uRunway.y + uRunway.w);
-    float hwR = 0.5 * (uRunway.w - uRunway.y);
-    float cl = p.y - zc + (nB.r - 0.5) * 1.6;
-    vec3 lat = mix(vec3(0.285, 0.150, 0.078), vec3(0.385, 0.215, 0.120), smoothstep(0.25, 0.8, nC.r));
-    lat *= 0.9 + 0.18 * nD.g;
-    float track = exp(-pow((abs(cl) - 1.55) / 0.95, 2.0));
-    float ends = max(1.0 - smoothstep(10.0, 26.0, length(p - vec2(uRunway.x + 14.0, zc))), 1.0 - smoothstep(10.0, 26.0, length(p - vec2(uRunway.z - 14.0, zc))));
-    track = max(track, ends * 0.8);
-    float scuff = smoothstep(0.55, 0.9, nD.r) * track * (1.0 - smoothstep(60.0, 200.0, abs(p.x - uRunway.x - 120.0))) ;
-    lat = mix(lat, lat * vec3(0.76, 0.70, 0.68), track * 0.65);
-    lat = mix(lat, vec3(0.06, 0.05, 0.045), scuff * 0.35);
-    lat = soilDetail(lat, det, near, 1.0 - track * 0.6, 0.2 * track);
-    float edgeIn = hwR - abs(p.y - zc);
-    float creep = 1.0 - smoothstep(0.0, 2.2 + nC.g * 2.5, edgeIn + (nD.r - 0.5) * 1.6);
-    vec3 g = mix(lat, grassColor(p, nA, nB, nC, nD) * 0.92, creep * 0.75 * step(dRw, dAp));
-
-    vec3 ap = dirtColor(nB, nC, nD) * vec3(1.06, 1.08, 1.1);
-    float tx = 1.0 - smoothstep(1.2, 2.6, min(segD(p, vec2(-382.0, -14.0), vec2(-370.0, -46.0)), segD(p, vec2(-370.0, -46.0), uPad)));
-    float padWear = 1.0 - smoothstep(4.0, 11.0, length(p - uPad));
-    ap = mix(ap, ap * vec3(0.78, 0.72, 0.7), max(tx * 0.6, padWear * 0.45));
-    float oil = smoothstep(0.62, 0.8, nC.b) * (1.0 - smoothstep(4.0, 9.0, length(p - uFuel))) + smoothstep(0.7, 0.85, nD.g) * padWear * 0.5;
-    ap = mix(ap, vec3(0.045, 0.035, 0.03), oil * 0.6);
-    ap = soilDetail(ap, det, near, 0.6, 0.3 * (1.0 - padWear) * smoothstep(0.4, 0.7, nB.b));
-    g = mix(ap, g, step(dRw, dAp));
-    float m = 1.0 - aaStep(0.0, dr + (nC.b - 0.5) * 0.8);
-    col = mix(col, g, m);
-    rough = mix(rough, 0.92, m);
+  col = stripColor(col, rough, p, uRunway, uApron, uTaxi, uPad, uFuel, vec2(0.0), 0.0, nA, nB, nC, nD, det, near);
+  for (int i = 0; i < NS; i++) {
+    vec4 so = uSiteOff[i];
+    col = stripColor(col, rough, p, uSiteRw[i], uSiteAp[i], uSiteTx[i], so.xy + uPad, so.xy + uFuel, so.xy, so.z, nA, nB, nC, nD, det, near);
   }
 
   // Creek banks: wet earth and sand.
@@ -269,6 +304,22 @@ vec3 terrainColor(vec2 p, out float rough) {
     vec3 mud = mix(vec3(0.11, 0.055, 0.03), vec3(0.30, 0.22, 0.14), smoothstep(0.4, 0.7, nC.r));
     float m = 1.0 - smoothstep(7.0, 14.0 + nC.g * 4.0, dc);
     col = mix(col, mud, m);
+  }
+  // Stream banks and pond shores: wet earth, then lush grass.
+  float ds = 1e9;
+  if (sdBox(p, uStreamBox) < 30.0) for (int i = 0; i < NSTP - 1; i++) ds = min(ds, segD(p, uStream[i], uStream[i + 1]));
+  for (int i = 0; i < NPOND; i++) {
+    vec4 q = uPond[i];
+    vec2 d = p - q.xy;
+    if (dot(d, d) > q.z * q.z * 3.0) continue;
+    float a = atan(d.y, d.x);
+    float rr = q.z * (1.0 + 0.16 * sin(2.0 * a + q.w) + 0.09 * sin(3.0 * a + q.w * 1.7));
+    ds = min(ds, abs(length(d) - rr) + 2.0);
+  }
+  if (ds < 30.0) {
+    vec3 mud = mix(vec3(0.12, 0.07, 0.04), vec3(0.28, 0.21, 0.13), smoothstep(0.4, 0.7, nC.r));
+    col = mix(col, col * vec3(0.78, 0.95, 0.7), 1.0 - smoothstep(10.0, 28.0, ds));
+    col = mix(col, mud, 1.0 - smoothstep(4.0, 10.0 + nC.g * 4.0, ds));
   }
   return col;
 }
@@ -294,7 +345,8 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   for (const r of ROADS) if (!r.mesh) for (let i = 0; i < r.pts.length - 1; i++) segs.push({ a: r.pts[i], b: r.pts[i + 1], w: r.w });
   const nr = segs.length;
   const nc = CREEK.points.length;
-  mat.defines = { NF: nf, NR: nr, NC: nc };
+  const stp = WATER.streams[0].points;
+  mat.defines = { NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: WATER.ponds.length };
   const uniforms = {
     uNoise: { value: noiseTex },
     uDetail: { value: detailTex },
@@ -313,7 +365,16 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uRunway: { value: new THREE.Vector4(RUNWAY.x0, RUNWAY.z - RUNWAY.width / 2, RUNWAY.x1, RUNWAY.z + RUNWAY.width / 2) },
     uApron: { value: new THREE.Vector4(BASE.apron.x0, BASE.apron.z0, BASE.apron.x1, BASE.apron.z1) },
     uTaxi: { value: new THREE.Vector4(BASE.taxiway.x0, BASE.taxiway.z0, BASE.taxiway.x1, BASE.taxiway.z1) },
+    uSiteRw: { value: FARM_SITES.map((s) => new THREE.Vector4(s.runway.x0, s.runway.z - s.runway.width / 2, s.runway.x1, s.runway.z + s.runway.width / 2)) },
+    uSiteAp: { value: FARM_SITES.map((s) => new THREE.Vector4(s.apron.x0, s.apron.z0, s.apron.x1, s.apron.z1)) },
+    uSiteTx: { value: FARM_SITES.map((s) => new THREE.Vector4(s.taxiway.x0, s.taxiway.z0, s.taxiway.x1, s.taxiway.z1)) },
+    uSiteOff: { value: FARM_SITES.map((s) => new THREE.Vector4(s.dx, s.dz, s.runway.surface, 0)) },
     uWorldHalf: { value: WORLD_HALF },
+    uCut: CUT_U.rects,
+    uStream: { value: stp.map((q) => new THREE.Vector2(q[0], q[1])) },
+    uStreamBox: { value: new THREE.Vector4(Math.min(...stp.map((q) => q[0])), Math.min(...stp.map((q) => q[1])), Math.max(...stp.map((q) => q[0])), Math.max(...stp.map((q) => q[1]))) },
+    uPond: { value: WATER.ponds.map((q) => new THREE.Vector4(q.x, q.z, q.r, q.ph)) },
+    uCutKind: CUT_U.kinds,
     uWet: ATMO_U.wet,
   };
   mat.onBeforeCompile = (shader) => {

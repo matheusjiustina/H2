@@ -12,7 +12,7 @@ import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
 import { t } from '../i18n/index.js';
 import { UNITS } from '../config.js';
-import { BASE, POWERLINE } from '../world/layout.js';
+import { POWERLINE, MAIN_SITE, padOf } from '../world/layout.js';
 import { approach, clamp, smoothstep, damp, KT, FT } from '../core/math.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
@@ -86,8 +86,8 @@ export class Helicopter {
     this.state = 'ok';
     this._sync();
   }
-  placeAtPad() {
-    const p = this.type.servicePad ?? BASE.pad;
+  placeAtPad(site = this.game?.site ?? MAIN_SITE) {
+    const p = padOf(site, 'heli');
     this.placeParked(p.x, p.z, p.heading);
   }
   placeParked(x, z, heading) {

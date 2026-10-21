@@ -2,7 +2,7 @@
 // power line and creek water. Static parts are merged per material.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BASE, RUNWAY, HQ, FENCES, POWERLINE, CREEK } from './layout.js';
+import { BASE, RUNWAY, HQ, FENCES, POWERLINE, CREEK, FARM_SITES } from './layout.js';
 import { canvas, canvasTexture, makeLabel } from '../core/textures.js';
 import { rng } from '../core/math.js';
 import { pickup, tractor, sprayer, harvester, ibc, drumPallet, officeContainer } from './vehicles.js';
@@ -185,12 +185,12 @@ export function createStructures(terrain, scene) {
   buildService(B, M, group, H);
   buildHelipad(B, M, group, H);
   buildVehicles(B, M, H);
-  buildStripMarks(B, M, group, H);
+  buildStripMarks(B, M, group, H, RUNWAY);
+  for (const site of FARM_SITES) buildFarmSite(B, M, group, H, site, dyn);
   buildHQ(B, M, group, H);
   buildFences(B, M, group, H, dyn);
   for (const w of BASE.windsocks) dyn.windsocks.push(buildWindsock(B, M, group, w.x, H(w.x, w.z), w.z));
   const wires = buildPowerLine(B, M, group, H);
-  group.add(buildCreek(terrain));
   B.build(group);
   scene.add(group);
 
@@ -564,25 +564,74 @@ function buildVehicles(B, M, H) {
   B.cyl(0.11, 0.11, 0.62, M.red, ft.x - 4.6, 0.62, ft.z + 1.82, 14);
 }
 
-function buildStripMarks(B, M, group, H) {
+function buildStripMarks(B, M, group, H, R) {
   // Half-buried white tyres along the edges, rows across each threshold.
   const tyre = new THREE.TorusGeometry(0.42, 0.16, 10, 22);
-  const z = RUNWAY.z, hw = RUNWAY.width / 2;
-  for (let x = RUNWAY.x0; x <= RUNWAY.x1 + 0.1; x += 50) {
-    for (const s of [-1, 1]) B.add(tyre, M.white, x, 0.1, z + s * (hw + 1.2), 0, Math.PI / 2 * 0, Math.PI / 2 * 0, 1, 1, 1);
+  const z = R.z, hw = R.width / 2;
+  const step = R === RUNWAY ? 50 : 40;
+  for (let x = R.x0; x <= R.x1 + 0.1; x += step) {
+    for (const s of [-1, 1]) B.add(tyre, M.white, x, H(x, z + s * (hw + 1.2)) + 0.1, z + s * (hw + 1.2));
   }
-  for (const tx of [RUNWAY.x0 + 3, RUNWAY.x1 - 3]) {
-    for (let k = -4; k <= 4; k++) if (Math.abs(k) > 1) B.add(tyre, M.white, tx, 0.1, z + k * 2.6, Math.PI / 2);
+  for (const tx of [R.x0 + 3, R.x1 - 3]) {
+    const n = Math.floor(hw / 2.6);
+    for (let k = -n; k <= n; k++) if (Math.abs(k) > 1) B.add(tyre, M.white, tx, H(tx, z + k * 2.6) + 0.1, z + k * 2.6, Math.PI / 2);
   }
   // Threshold boards "09" (west end) and "27" (east end).
-  for (const [x, txt] of [[RUNWAY.x0 - 6, '09'], [RUNWAY.x1 + 6, '27']]) {
+  for (const [x, txt] of [[R.x0 - 6, '09'], [R.x1 + 6, '27']]) {
+    const y = H(x, z + hw + 6);
     const board = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6), new THREE.MeshStandardMaterial({ map: makeLabel(txt, { w: 256, h: 170, font: 'bold 120px Arial' }), roughness: 0.6, side: THREE.DoubleSide }));
-    board.position.set(x, 1.6, z + hw + 6);
+    board.position.set(x, y + 1.6, z + hw + 6);
     board.rotation.y = Math.PI / 2;
     group.add(board);
-    B.box(0.1, 1.0, 0.1, M.wood, x, 0.5, z + hw + 5.2);
-    B.box(0.1, 1.0, 0.1, M.wood, x, 0.5, z + hw + 6.8);
+    B.box(0.1, 1.0, 0.1, M.wood, x, y + 0.5, z + hw + 5.2);
+    B.box(0.1, 1.0, 0.1, M.wood, x, y + 0.5, z + hw + 6.8);
   }
+}
+
+// A secondary farm's strip and service area: the base's service equipment
+// (tanks, crew post, pad marks, helipad) rebuilt in the base's own layout and
+// moved to the site, an open machinery shed where the base has its hangar, a
+// farm sign, a pickup, windsocks and the strip markings.
+function buildFarmSite(B, M, group, H, site, dyn) {
+  const B2 = new Builder(M);
+  const g2 = new THREE.Group();
+  g2.name = 'site-' + site.id;
+  const flat = () => 0;
+  buildService(B2, M, g2, flat);
+  buildHelipad(B2, M, g2, flat);
+  const pk = BASE.pickup;
+  pickup(B2, M, pk.x, 0, pk.z, pk.heading + 0.3);
+  B2.collider(pk.x - 2.6, pk.x + 2.6, pk.z - 2.6, pk.z + 2.6, 2.1, 'pickup');
+  // Open machinery shed (galpão): steel columns, gable roof, earth floor.
+  const h = BASE.hangar, w = 20, d = 14, hh = 6;
+  for (const cx of [-w / 2, -w / 6, w / 6, w / 2]) for (const cz of [-d / 2, d / 2]) B2.box(0.25, hh, 0.25, M.steel, h.x + cx, hh / 2, h.z + cz);
+  B2.box(w, 0.35, 0.25, M.steel, h.x, hh - 0.18, h.z + d / 2);
+  B2.box(w, 0.35, 0.25, M.steel, h.x, hh - 0.18, h.z - d / 2);
+  B2.box(w, hh * 0.55, 0.1, M.metalWall, h.x, hh * 0.275, h.z - d / 2, 0, 4);
+  gableRoof(B2, M.metalRoof, h.x, hh, h.z, d, w, 1.8, Math.PI / 2, 0.8);
+  B2.collider(h.x - w / 2 - 0.5, h.x + w / 2 + 0.5, h.z - d / 2 - 0.5, h.z + d / 2 + 0.5, hh + 1.9, 'shed');
+  // Drum pallets and IBC stock under the shed.
+  drumPallet(B2, M, h.x - 6, 0, h.z - 3, 0.1, [M.blue, M.white, M.blue, M.blue]);
+  ibc(B2, M, h.x - 2.5, 0, h.z - 4, 0);
+  ibc(B2, M, h.x - 1.2, 0, h.z - 4, 0.05);
+  // Farm sign by the apron.
+  const f = site.farm;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.3), new THREE.MeshStandardMaterial({
+    map: makeLabel(f.name.toUpperCase(), { w: 1024, h: 320, bg: '#f2ead8', fg: '#2c4a22', font: 'bold 92px Arial' }), roughness: 0.6, side: THREE.DoubleSide,
+  }));
+  const ax = BASE.apron.x0 + 6, az = BASE.apron.z1 + 4;
+  sign.position.set(ax, 2.4, az);
+  g2.add(sign);
+  B2.box(0.12, 2.0, 0.12, M.wood, ax - 1.9, 1.0, az - 0.05);
+  B2.box(0.12, 2.0, 0.12, M.wood, ax + 1.9, 1.0, az - 0.05);
+  B2.build(g2);
+  g2.position.set(site.dx, site.y0, site.dz);
+  group.add(g2);
+  for (const c of B2.colliders) {
+    B.colliders.push({ ...c, x0: c.x0 + site.dx, x1: c.x1 + site.dx, z0: c.z0 + site.dz, z1: c.z1 + site.dz, top: c.top + site.y0, ...(c.bottom !== undefined ? { bottom: c.bottom + site.y0 } : {}) });
+  }
+  buildStripMarks(B, M, group, H, site.runway);
+  for (const w of site.windsocks) dyn.windsocks.push(buildWindsock(B, M, group, w.x, H(w.x, w.z), w.z));
 }
 
 function buildHQ(B, M, group, H) {
@@ -767,31 +816,3 @@ function buildPowerLine(B, M, group, H) {
   return wires;
 }
 
-function buildCreek(terrain) {
-  const p = CREEK.points;
-  const pos = [], idx = [];
-  const w = CREEK.width * 0.5 + 1.5;
-  let n = 0;
-  for (let i = 0; i < p.length - 1; i++) {
-    const [ax, az] = p[i], [bx, bz] = p[i + 1];
-    const len = Math.hypot(bx - ax, bz - az);
-    const steps = Math.ceil(len / 12);
-    const nx = -(bz - az) / len, nz = (bx - ax) / len;
-    for (let k = 0; k <= steps; k++) {
-      if (i > 0 && k === 0) continue;
-      const t = k / steps, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
-      const y = terrain.waterLevel(x, z);
-      pos.push(x + nx * w, y, z + nz * w, x - nx * w, y, z - nz * w);
-      if (n > 0) idx.push((n - 1) * 2, n * 2, (n - 1) * 2 + 1, (n - 1) * 2 + 1, n * 2, n * 2 + 1);
-      n++;
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x1d3b33, roughness: 0.08, metalness: 0.1, envMapIntensity: 1.4, side: THREE.DoubleSide }));
-  m.receiveShadow = true;
-  m.name = 'creek';
-  return m;
-}

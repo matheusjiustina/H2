@@ -14,7 +14,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { tanker, wheelGeometry, wheelSet, PartCollector, vehicleLod } from '../world/vehicles.js';
 import { makeSoftDot, makeLabel } from '../core/textures.js';
 import { ApronPlanner } from './planner.js';
-import { BASE } from '../world/layout.js';
+import { BASE, MAIN_SITE } from '../world/layout.js';
 import { clamp, damp } from '../core/math.js';
 
 export const TRUCK = {
@@ -34,6 +34,7 @@ export const TRUCK = {
 };
 
 // Apron plus the grass east and north of it (room to turn at the helipad).
+// (Main base coordinates; a secondary farm's are the same moved by its dx, dz.)
 const PLAN_BOUNDS = { x0: -402, x1: -280, z0: -110, z1: -28 };
 const _e = new THREE.Euler();
 
@@ -85,21 +86,9 @@ export class ServiceTruck {
     const world = game.world;
     this.model = buildTruckModel(world.structures.M);
     game.scene.add(this.model.root);
-    const statics = world.structures.colliders
-      .filter((c) => c.x1 > PLAN_BOUNDS.x0 && c.x0 < PLAN_BOUNDS.x1 && c.z1 > PLAN_BOUNDS.z0 && c.z0 < PLAN_BOUNDS.z1)
-      .map((c) => ({ x0: c.x0 - 0.3, x1: c.x1 + 0.3, z0: c.z0 - 0.3, z1: c.z1 + 0.3 }));
-    const cp = BASE.crewPost, pad = BASE.pad;
-    statics.push({ x0: cp.x - 2.3, x1: cp.x + 2.3, z0: cp.z - 1.7, z1: cp.z + 1.7 }); // crew shade
-    statics.push({ x0: pad.x + 8.6, x1: pad.x + 9.4, z0: pad.z - 0.8, z1: pad.z + 0.8 }); // stop board
-    // Small props the truck used to drive over: the pad's corner tyres, the
-    // drums by the mixing station, the extinguisher stand at the fuel slab.
-    for (const [dx, dz] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) statics.push({ x0: pad.x + dx - 0.6, x1: pad.x + dx + 0.6, z0: pad.z + dz - 0.6, z1: pad.z + dz + 0.6 });
-    const mt = BASE.mixTank, ft = BASE.fuelTank;
-    statics.push({ x0: mt.x + 2.2, x1: mt.x + 4.9, z0: mt.z - 2.2, z1: mt.z + 0.8 }); // drums
-    statics.push({ x0: ft.x - 5.4, x1: ft.x - 3.8, z0: ft.z + 0.9, z1: ft.z + 2.5 }); // extinguisher
-    this.planner = new ApronPlanner(PLAN_BOUNDS, statics);
+    this.setSite(MAIN_SITE, true);
     // State: rear-axle pose, speed, steering.
-    const h = TRUCK.home;
+    const h = this.home;
     this.x = h.x; this.z = h.z; this.yaw = h.yaw;
     this.v = 0; this.steer = 0; this.acc = 0;
     this.state = 'home'; // home | driving | parked | blocked
@@ -116,9 +105,34 @@ export class ServiceTruck {
     this._place();
   }
 
+  // Service area the truck works in (main base or a secondary farm): its
+  // bay, and the planning grid over that apron with its static obstacles.
+  setSite(site, init = false) {
+    this.site = site;
+    const { dx, dz } = site;
+    this.home = { x: TRUCK.home.x + dx, z: TRUCK.home.z + dz, yaw: TRUCK.home.yaw };
+    const PB = { x0: PLAN_BOUNDS.x0 + dx, x1: PLAN_BOUNDS.x1 + dx, z0: PLAN_BOUNDS.z0 + dz, z1: PLAN_BOUNDS.z1 + dz };
+    this.bounds = PB;
+    const statics = this.game.world.structures.colliders
+      .filter((c) => c.x1 > PB.x0 && c.x0 < PB.x1 && c.z1 > PB.z0 && c.z0 < PB.z1)
+      .map((c) => ({ x0: c.x0 - 0.3, x1: c.x1 + 0.3, z0: c.z0 - 0.3, z1: c.z1 + 0.3 }));
+    const mvp = (p) => ({ x: p.x + dx, z: p.z + dz });
+    const cp = mvp(BASE.crewPost), pad = mvp(BASE.pad);
+    statics.push({ x0: cp.x - 2.3, x1: cp.x + 2.3, z0: cp.z - 1.7, z1: cp.z + 1.7 }); // crew shade
+    statics.push({ x0: pad.x + 8.6, x1: pad.x + 9.4, z0: pad.z - 0.8, z1: pad.z + 0.8 }); // stop board
+    // Small props the truck used to drive over: the pad's corner tyres, the
+    // drums by the mixing station, the extinguisher stand at the fuel slab.
+    for (const [ddx, ddz] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) statics.push({ x0: pad.x + ddx - 0.6, x1: pad.x + ddx + 0.6, z0: pad.z + ddz - 0.6, z1: pad.z + ddz + 0.6 });
+    const mt = mvp(BASE.mixTank), ft = mvp(BASE.fuelTank);
+    statics.push({ x0: mt.x + 2.2, x1: mt.x + 4.9, z0: mt.z - 2.2, z1: mt.z + 0.8 }); // drums
+    statics.push({ x0: ft.x - 5.4, x1: ft.x - 3.8, z0: ft.z + 0.9, z1: ft.z + 2.5 }); // extinguisher
+    this.planner = new ApronPlanner(PB, statics);
+    if (!init) this.resetHome();
+  }
+
   // Straight back into the bay (crash recovery), engine off.
   resetHome() {
-    const h = TRUCK.home;
+    const h = this.home;
     this.x = h.x; this.z = h.z; this.yaw = h.yaw;
     this.v = 0; this.steer = 0; this.acc = 0;
     this.state = 'home'; this.purpose = 'home'; this.job = null; this.path = null; this.planFailed = false;
@@ -165,7 +179,7 @@ export class ServiceTruck {
   }
 
   // A second clearance grid over the same area for the badeco's walks.
-  makeWalkPlanner() { return new ApronPlanner(PLAN_BOUNDS, this.planner.staticBoxes); }
+  makeWalkPlanner() { return new ApronPlanner(this.bounds, this.planner.staticBoxes); }
 
   // Look for a loading stand: preferred side first, then the other side and
   // stands a little further aft/forward. The search runs over the next frames
@@ -201,7 +215,7 @@ export class ServiceTruck {
   // lead-ins are searched, the shorter drive wins).
   recall() {
     if (this.state === 'home' || this.job?.purpose === 'home') return;
-    const h = TRUCK.home;
+    const h = this.home;
     // Still in the bay (e.g. aborted while planning): just stay.
     if (Math.hypot(this.x - h.x, this.z - h.z) < 1 && Math.abs(Math.sin(this.yaw - h.yaw)) < 0.2) {
       this.job = null; this.state = 'home'; this.purpose = 'home'; this.v = 0;
@@ -316,6 +330,15 @@ export class ServiceTruck {
     if (this.state === 'home') { this.engineT += dt; if (this.engineT > 4) { this.engineOn = false; this.beaconOn = false; } } else this.engineT = 0;
     this._animate(dt);
     this._place();
+    // Tyre marks of the rear tandem on the earth apron.
+    const marks = this.game.marks;
+    if (marks && Math.abs(this.v) > 0.2) {
+      const cx = Math.cos(this.yaw), sx = Math.sin(this.yaw), T = this.game.world.terrain;
+      for (const [k, s] of [['trkL', 1.0], ['trkR', -1.0]]) {
+        const x = this.x + cx * s, z = this.z - sx * s;
+        marks.wheel(k, x, z, true, T.surfaceAt(x, z), 0.5, 0.8);
+      }
+    }
   }
 
   _drive(dt) {
@@ -465,4 +488,25 @@ function splitLegs(path) {
   }
   if (!legs.length) legs.push({ start: 0, end: path.length - 1 });
   return legs;
+}
+
+// The local service truck of a farm whose service area the crew is not
+// working right now: the same tanker, parked in its bay (engine off).
+export class ParkedTruck {
+  constructor(game, site) {
+    this.site = site;
+    this.model = buildTruckModel(game.world.structures.M);
+    game.scene.add(this.model.root);
+    const yaw = TRUCK.home.yaw, fx = Math.sin(yaw), fz = Math.cos(yaw);
+    const x = TRUCK.home.x + site.dx - fx * TRUCK.axleZ, z = TRUCK.home.z + site.dz - fz * TRUCK.axleZ;
+    this.model.root.position.set(x, game.world.terrain.heightAt(x, z), z);
+    this.model.root.rotation.y = yaw;
+    this.model.root.updateMatrixWorld(true);
+    this.model.root.matrixAutoUpdate = false;
+  }
+  set visible(v) { this.model.root.visible = v; this.shown = v; }
+  cull(cam) {
+    if (!this.shown) return;
+    vehicleLod(this.model.root, this.model.detail, cam, 220, 900, this.model.setWheels.meshes);
+  }
 }

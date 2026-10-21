@@ -11,6 +11,7 @@ import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap } from './maps.js';
+import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
@@ -125,6 +126,9 @@ export class Screens {
     this.game.audio?.play('ui');
   }
 
+  // Hangar office computer (secondary farms, messages, histories).
+  office(tab) { showOffice(this, tab); }
+
   // --------------------------------------------------------------- contracts
   board() {
     const g = this.game;
@@ -156,7 +160,7 @@ export class Screens {
       <div class="sub">${t('Choose a job, set the load, and the badeco will service the aircraft on the pad.')}</div>
       ${cards}
       <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span>
-      <div class="btn-row">${g.job ? `<button class="btn small" data-a="abandon">${t('Hand in current job')}</button>` : ''}<button class="btn small" data-a="close">${t('Close')}</button></div></div></div>`);
+      <div class="btn-row"><button class="btn small" data-a="office">${t('Office computer · other farms')}</button>${g.job ? `<button class="btn small" data-a="abandon">${t('Hand in current job')}</button>` : ''}<button class="btn small" data-a="close">${t('Close')}</button></div></div></div>`);
     el.addEventListener('click', (e) => {
       const sel = e.target.closest('[data-sel]')?.dataset.sel;
       const rs = e.target.closest('[data-restart]')?.dataset.restart;
@@ -165,6 +169,7 @@ export class Screens {
       else if (rs) { g.career.job(rs).reset(); g.career.save(); this.board(); }
       else if (a === 'close') this.close();
       else if (a === 'abandon') g.handIn();
+      else if (a === 'office') this.office();
     });
     this._show('board', el);
   }
@@ -286,11 +291,12 @@ export class Screens {
         <tr class="total"><td>${t('Credited')}</td><td>${money(r.total)}</td></tr>
       </table>
       <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span><div class="btn-row">
-        <button class="btn" data-a="fly">${t('Keep flying')}</button><button class="btn primary" data-a="board">${t('New service')}</button></div></div></div>`);
+        ${g.lastRecord && g.replay.has(g.lastRecord.n) ? `<button class="btn" data-a="replay">▶ ${t('Watch the replay')}</button>` : ''}<button class="btn" data-a="fly">${t('Keep flying')}</button><button class="btn primary" data-a="board">${t('New service')}</button></div></div></div>`);
     el.addEventListener('click', (e) => {
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a === 'fly') this.close();
       if (a === 'board') this.board();
+      if (a === 'replay') g.replay.play(g.lastRecord.n);
     });
     this._show('results', el);
     g.audio?.play('success');
@@ -334,8 +340,8 @@ export class Screens {
       <div class="field"><label>${t('Show FPS')}</label>${seg('showFps', [[false, t('Off')], [true, t('On')]])}<span></span></div>
       <div class="field"><label>${t('Cockpit shake')}</label>${seg('shake', [[0, t('Off')], [0.5, t('Low')], [1, t('Normal')]])}<span></span></div>
       <h3>${t('Environment')}</h3>
-      <div class="field"><label>${t('Time of day')}</label>${seg('timeOfDay', TIME_ORDER.map((k) => [k, t(TIMES[k].label)]))}<span></span></div>
-      <div class="field"><label>${t('Weather')}</label>${seg('weather', WEATHER_ORDER.map((k) => [k, t(WEATHER[k].label)]))}<span></span></div>
+      <div class="field"><label>${t('Time of day')}</label>${seg('timeOfDay', [...TIME_ORDER.map((k) => [k, t(TIMES[k].label)]), ['flow', t('Passing')]])}<span></span></div>
+      <div class="field"><label>${t('Weather')}</label>${seg('weather', [...WEATHER_ORDER.map((k) => [k, t(WEATHER[k].label)]), ['dynamic', t('Dynamic')]])}<span></span></div>
       <h3>${t('Flying')}</h3>
       <div class="field"><label>${t('Airplane assist')}</label>${seg('assist', [['off', t('Off')], ['normal', t('Normal')], ['high', t('High')]])}<span></span></div>
       <div class="field"><label>${t('Helicopter model')}</label>${seg('heliModel', [['power', t('Power (one lever)')], ['rotor', t('Detailed rotor')]])}<span></span></div>
@@ -426,7 +432,7 @@ export class Screens {
         cz = (Math.min(...f.map((x) => x.z0)) + Math.max(...f.map((x) => x.z1))) / 2 * 0.6 + ac.z * 0.4;
         range = 1200;
       }
-      drawMap(c.getContext('2d'), c.width, c.height, g.hud.base, g, { cx, cz, range });
+      drawMap(c.getContext('2d'), c.width, c.height, g.hud.base, g, { cx, cz, range, labelPx: 30 });
       requestAnimationFrame(draw);
     };
     this._show('map', el);

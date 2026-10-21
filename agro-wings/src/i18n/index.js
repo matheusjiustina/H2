@@ -6,9 +6,10 @@ import PT_UI from './pt-ui.js';
 import PT_GAME from './pt-game.js';
 import PT_JOBS from './pt-jobs.js';
 import PT_CREW from './pt-crew.js';
+import PT_FARMS from './pt-farms.js';
 
 const STORE = 'agrowings.lang';
-const PT = { ...PT_UI, ...PT_GAME, ...PT_JOBS, ...PT_CREW };
+const PT = { ...PT_UI, ...PT_GAME, ...PT_JOBS, ...PT_CREW, ...PT_FARMS };
 
 function initial() {
   try {

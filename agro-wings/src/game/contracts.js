@@ -3,6 +3,10 @@ import { CONTRACT_FIELDS, CROPS } from '../world/layout.js';
 import { FieldCoverage } from '../spray/coverage.js';
 import { GAME, SPRAY } from '../config.js';
 import { t } from '../i18n/index.js';
+import { FARM_CONTRACTS } from './farmContracts.js';
+
+export { FARM_CONTRACTS };
+export const contractById = (id) => CONTRACTS.find((c) => c.id === id) ?? FARM_CONTRACTS.find((c) => c.id === id);
 
 export const CONTRACTS = [
   {
@@ -139,21 +143,36 @@ export class Career {
     this.money = GAME.startMoney;
     this.completed = {};
     this.jobs = {}; // id -> Job
-    this.history = [];
+    this.history = []; // main-farm jobs
+    this.history2 = []; // secondary-farm jobs (kept apart)
+    this.read = {}; // office inbox: request id -> read
+    this.seq = 0; // operation counter (both histories)
     this.tutorialDone = false;
     this.load();
   }
 
   job(id) {
-    if (!this.jobs[id]) this.jobs[id] = new Job(CONTRACTS.find((c) => c.id === id));
+    if (!this.jobs[id]) this.jobs[id] = new Job(contractById(id));
     return this.jobs[id];
+  }
+
+  // One finished operation into its history: what, where, with what, when, how well.
+  record(job, r, aircraft, extra = {}) {
+    const c = job.c;
+    const e = {
+      id: c.id, n: ++this.seq, t: Date.now(), farm: c.farm ?? 'main', ac: aircraft.type.reg, acId: aircraft.type.id,
+      total: r.total, coverage: r.coverage, stars: r.stars, done: r.done, uniformity: r.uniformity, waste: r.waste,
+      ha: job.ha, flight: Math.round(job.flightTime), sorties: job.sorties, damage: Math.round(r.damage), ...extra,
+    };
+    (c.farm ? this.history2 : this.history).push(e);
+    return e;
   }
 
   save() {
     try {
       const jobs = {};
       for (const [id, j] of Object.entries(this.jobs)) jobs[id] = j.serialize();
-      localStorage.setItem(STORE, JSON.stringify({ money: this.money, completed: this.completed, jobs, history: this.history.slice(-20), tutorialDone: this.tutorialDone }));
+      localStorage.setItem(STORE, JSON.stringify({ money: this.money, completed: this.completed, jobs, history: this.history.slice(-30), history2: this.history2.slice(-30), read: this.read, seq: this.seq, tutorialDone: this.tutorialDone }));
     } catch { /* storage unavailable: progress stays in memory */ }
   }
   load() {
@@ -163,9 +182,12 @@ export class Career {
       this.money = s.money ?? this.money;
       this.completed = s.completed || {};
       this.history = s.history || [];
+      this.history2 = s.history2 || [];
+      this.read = s.read || {};
+      this.seq = s.seq ?? this.history.length + this.history2.length;
       this.tutorialDone = !!s.tutorialDone;
       for (const [id, js] of Object.entries(s.jobs || {})) {
-        const c = CONTRACTS.find((x) => x.id === id);
+        const c = contractById(id);
         if (!c) continue;
         const j = new Job(c);
         j.restore(js);
@@ -178,6 +200,9 @@ export class Career {
     this.completed = {};
     this.jobs = {};
     this.history = [];
+    this.history2 = [];
+    this.read = {};
+    this.seq = 0;
     this.tutorialDone = false;
     this.save();
   }

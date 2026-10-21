@@ -1356,3 +1356,26 @@ obstacle tests, grass cells on the slopes), well inside a 16.7 ms frame.
 - The hilly contracts are harder for the test autopilot (1★ on two of
   them); a pilot who anticipates the slopes does better.
 - FPS on a real GPU was not measured.
+
+## Expansion — secondary farms, office, dynamic world, replay
+
+Built into the existing game (aircraft, physics, the main farm and its
+missions, saves, controls and cameras untouched). Modules and where they live:
+
+| Module | File | What it does |
+| --- | --- | --- |
+| CockpitOperationsDisplay | `src/spray/guidance.js` | GPS unit with two pages chosen from the situation: **OPS** (track-up map of the talhão: boundaries, pass lines, coverage, flown track, cross-track, terrain shading, north pointer, scale bar, covered / total / remaining ha, progress bar) and **NAV** (ferry: strips and talhões around, course line, distance, bearing, ETE, WGS-84 position). Fuel and load columns, spray state, heading and ground speed on both. Colours per unit: green AgNav (PR-AGW), amber (AT-502B), cyan (R44). |
+| SecondaryFarmManager | `src/world/layout.js` (`FARMS`, `SITES`), `src/world/terrainData.js`, `src/world/structures.js`, `src/crew/*` | Three farms with their own strip, service area, shed, sign, windsocks and local truck: **Fazenda Santa Rita** (far west, 640 × 22 m red earth, big flat soy/cotton, easy), **Fazenda Vale do Rio** (south-east, 480 × 18 m mown grass climbing 1 % east, corn on swells, humid), **Sítio Serra Azul** (south-west, 430 × 15 m gravel, hills, hard). The strips sit on level platforms (graded for Vale do Rio) and are drawn by the ground shader; surface type affects rolling and dust. The ground crew (truck + badeco) works at the service area the aircraft arrives at; the other farms' trucks wait parked in their bays. |
+| Farm contracts | `src/game/farmContracts.js` | Six exclusive requests (two per farm) with a farmer's message and operating conditions: mornings only, postponed in rain, not in mist, before sunset. |
+| HangarOfficeMissionSystem | `src/ui/office.js` | The office computer at the main base (key **I**, or from the service orders): messages, requests (accept when the conditions allow and you are on the ground at the base), map of the farms with their profile, aircraft choice, and the **two histories kept apart** (main farm / secondary farms: number, date, job, farm, aircraft, coverage, uniformity, flight time, result, credit, replay). |
+| DistantFieldActivitySystem | `src/world/fieldActivity.js`, `src/world/cutState.js` | Tractor + disc harrow (T-08, VR-03), combines harvesting (T-16 soy, SR-03 corn), a self-propelled sprayer on its tramlines (T-13), a pickup on the sede road. Serpentine lanes with headland turns as analytic functions of time; distance-throttled updates and LOD, hidden beyond 1.5 km; never on the talhões of the player's job. The done lanes change the field: harvested ground loses its crop (canopy and row fins) and shows stubble, harrowed ground turns dark. |
+| WaterRegionSystem | `src/world/water.js`, `WATER` in `layout.js` | The creek, the Córrego do Vale (a tributary whose level only falls downstream), two açudes, a valley lake. One water material: colour and shore alpha from the real depth, sky reflection through the environment map, two drifting noise ripples. Timber bridges where the farm roads cross water, gallery forest and buritis along the stream, tree clumps around the ponds, wet banks in the ground shader. |
+| WeatherAndSkyManager | `src/world/weatherCycle.js` | Settings: weather **Dynamic** (clear spells, cloud building, brief light showers, clearing, morning mist that lifts) and time of day **Passing** (dawn → dusk and round, 6 min a stage). Farm tendencies near each farm. All changes use the atmosphere's smooth transitions; flight physics are not touched. Farm requests read the current state. |
+| ReplayManager | `src/game/replay.js` | Every job is recorded at 5 Hz (26 bytes a sample; the last four replays also in localStorage). After the hand-in (results screen), from the history, or with **L**: chase, side, orbit, cinematic (fly-by / wingtip / wide cuts), distant observer and free (mouse) cameras, 0.5–4×, seek bar, flown track (sprayed parts yellow) and talhão boundaries; the recorded aircraft's own model with prop / rotor and controls animated. |
+| GroundSurfaceEffectsManager | `src/world/groundMarks.js`, `aircraft.js`, `truck.js` | Tyre marks on bare earth from the aircraft wheels and the service truck (one instanced draw, ring buffer, fading over four minutes), dust puffs when the wheels bite (hard acceleration or braking on dirt), plus the existing taxi dust, prop wash, rotor downwash and contact shadows. |
+
+Tests: `npm test` adds `i18n.test.mjs` (every `t()` text has Portuguese) and
+`weather.test.mjs`; `terrain.test.mjs` checks the farm platforms. Browser:
+`node test/farmflow.mjs <out>` (office, conditions, accept, ferry, local
+truck service, work, separate history, replay with every camera) and
+`node test/expviews.mjs <out>` (water, machinery, farms from the air).

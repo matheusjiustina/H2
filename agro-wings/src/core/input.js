@@ -38,6 +38,8 @@ export const ACTIONS = {
   coverage: { get label() { return t('Coverage overlay'); }, keys: ['KeyK'] },
   gps: { get label() { return t('Minimap: map / GPS guidance'); }, keys: ['KeyN'] },
   jobs: { get label() { return t('Contracts'); }, keys: ['KeyJ'] },
+  office: { get label() { return t('Hangar office computer'); }, keys: ['KeyI'] },
+  replay: { get label() { return t('Replay of the last operation'); }, keys: ['KeyL'] },
   reset: { get label() { return t('Reset aircraft'); }, keys: ['Backspace'] },
   help: { get label() { return t('Controls help'); }, keys: ['KeyH'] },
   pause: { get label() { return t('Pause / menu'); }, keys: ['Escape', 'KeyP'] },

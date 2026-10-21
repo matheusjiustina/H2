@@ -10,8 +10,8 @@
 import * as THREE from 'three';
 import { Badeco } from './badeco.js';
 import { Hose } from './hose.js';
-import { ServiceTruck } from './truck.js';
-import { BASE } from '../world/layout.js';
+import { ServiceTruck, ParkedTruck } from './truck.js';
+import { MAIN_SITE, SITES, padOf } from '../world/layout.js';
 import { t } from '../i18n/index.js';
 
 export const SERVICE = { fuelRate: 4.5, liquidRate: 14, walk: 1.35, carry: 1.1, run: 3.0 };
@@ -29,15 +29,27 @@ export class GroundService {
     this.badeco = new Badeco(game.scene);
     this.fuelHose = new Hose(game.scene, 0x161616, 0.03);
     this.mixHose = new Hose(game.scene, 0x2a63b8, 0.035);
-    const ft = BASE.fuelTank, mt = BASE.mixTank;
-    this.stationFuel = new THREE.Vector3(ft.x + 3.3, 1.0, ft.z + 1.85);
-    this.stationMix = new THREE.Vector3(mt.x + 1.6, 1.0, mt.z + 1.3);
+    this.truck = new ServiceTruck(game);
+    // Every service area keeps its own truck in the bay; the one where the
+    // crew works is the live truck.
+    this.parkedTrucks = SITES.map((s) => new ParkedTruck(game, s));
+    this.setSite(MAIN_SITE);
+  }
+
+  // Move the crew (truck, badeco, station hoses) to another service area:
+  // the main base or a secondary farm, each laid out like the base.
+  setSite(site) {
+    this.site = site;
+    const ft = site.fuelTank, mt = site.mixTank, y = site.y0;
+    this.stationFuel = new THREE.Vector3(ft.x + 3.3, y + 1.0, ft.z + 1.85);
+    this.stationMix = new THREE.Vector3(mt.x + 1.6, y + 1.0, mt.z + 1.3);
     this.fuelReel = this.stationFuel.clone();
     this.mixReel = this.stationMix.clone();
-    this.truck = new ServiceTruck(game);
+    if (this.truck.site !== site) this.truck.setSite(site);
+    for (const p of this.parkedTrucks) p.visible = p.site !== site;
     this.walkPlanner = this.truck.makeWalkPlanner();
     this.useTruck = false;
-    this.post = new THREE.Vector3(BASE.crewPost.x, 0, BASE.crewPost.z + 0.3);
+    this.post = new THREE.Vector3(site.crewPost.x, 0, site.crewPost.z + 0.3);
     this.resetAll();
   }
 
@@ -65,10 +77,15 @@ export class GroundService {
     this.pumpOn = false;
   }
 
+  cull(cam) {
+    this.truck.cull(cam);
+    for (const p of this.parkedTrucks) p.cull(cam);
+  }
+
   // Aircraft parked in the service area?
   inZone() {
     const ac = this.game.aircraft;
-    const p = ac.type.servicePad ?? BASE.pad;
+    const p = padOf(this.site, ac.kind);
     return Math.hypot(ac.fm.pos.x - p.x, ac.fm.pos.z - p.z) < p.radius;
   }
   ready() {

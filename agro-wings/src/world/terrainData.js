@@ -3,7 +3,7 @@
 import { fbm, smoothstep, lerp, segDist, clamp } from '../core/math.js';
 import { reliefAt } from './relief.js';
 import {
-  WORLD_HALF, RUNWAY, BASE, FIELDS, CREEK, ROADS, HQ, fieldAt, cropHeight,
+  WORLD_HALF, RUNWAY, BASE, FIELDS, CREEK, ROADS, HQ, fieldAt, cropHeight, FARM_SITES, stripLevel, WATER, pondRadius,
 } from './layout.js';
 
 // Slope exaggeration of the shading normals (visual only).
@@ -20,6 +20,29 @@ function creekDist(x, z) {
     if (s < d) d = s;
   }
   return d;
+}
+
+function polyDist(pts, x, z) {
+  let d = 1e9;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const s = segDist(x, z, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+    if (s < d) d = s;
+  }
+  return d;
+}
+
+// Nearest point of a polyline: distance, segment index, parameter on it.
+const _pn = { d: 0, i: 0, t: 0 };
+function polyNearest(pts, x, z, out) {
+  out.d = 1e9;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+    const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+    const t = clamp(((x - ax) * dx + (z - az) * dz) / l2, 0, 1);
+    const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
+    if (d < out.d) { out.d = d; out.i = i; out.t = t; }
+  }
+  return out;
 }
 
 function rectMask(x, z, x0, x1, z0, z1, fall) {
@@ -39,7 +62,8 @@ function baseHeight(x, z) {
 
 const H0 = baseHeight(-100, -40);
 
-export function rawHeight(x, z) {
+// Natural ground before the farm pads (strip/base platforms, HQ pad).
+function naturalHeight(x, z) {
   let h = baseHeight(x, z) - H0;
   const cd = creekDist(x, z);
   // Rolling country and hills in the outer zones (exactly zero over the farm
@@ -50,13 +74,72 @@ export function rawHeight(x, z) {
   const v = 1 - smoothstep(0, CREEK.valley, cd);
   h -= CREEK.valleyDepth * v * v;
   h -= CREEK.depth * (1 - smoothstep(CREEK.width * 0.5, CREEK.width * 0.5 + 5, cd));
+  // Streams: a shallow valley and the channel, cut below a water level that
+  // only falls downstream.
+  for (const st of WATER.streams) {
+    const q = polyNearest(st.points, x, z, _pn);
+    if (q.d > st.valley || !st.levels) continue;
+    const v2 = 1 - smoothstep(0, st.valley, q.d);
+    h -= st.valleyDepth * v2 * v2;
+    const L = lerp(st.levels[q.i], st.levels[q.i + 1], q.t);
+    // (The channel is widened over the 15.6 m terrain grid so the water reads.)
+    const bed = L - st.depth + (st.depth + 0.9) * smoothstep(st.width * 0.5, st.width * 0.5 + 12, q.d);
+    h = Math.min(h, lerp(bed, h, smoothstep(st.width * 0.5 + 12, st.width * 0.5 + 26, q.d)));
+  }
+  // Ponds: a bowl under the water level, a gentle bank around it.
+  for (const p of WATER.ponds) {
+    const dx = x - p.x, dz = z - p.z;
+    if (Math.abs(dx) > p.r * 2.6 || Math.abs(dz) > p.r * 2.6 || p.level === undefined) continue;
+    const d = Math.hypot(dx, dz) / pondRadius(p, Math.atan2(dz, dx));
+    if (d < 1) h = Math.min(h, p.level - 0.15 - p.depth * (1 - d * d));
+    else if (d < 2.2) h = lerp(Math.min(h, p.level + 0.35 + (d - 1) * 1.2), h, smoothstep(1, 2.2, d));
+  }
+  return h;
+}
+
+// Stream water levels at its points: under the natural ground (with the
+// valley), never rising downstream.
+for (const st of WATER.streams) {
+  const lv = [];
+  for (let i = 0; i < st.points.length; i++) {
+    const [x, z] = st.points[i];
+    let mn = 1e9;
+    for (const [ox, oz] of [[0, 0], [8, 0], [-8, 0], [0, 8], [0, -8]]) mn = Math.min(mn, naturalHeight(x + ox, z + oz));
+    lv.push(Math.min(mn - st.valleyDepth - 0.5, i ? lv[i - 1] : 1e9));
+  }
+  st.levels = lv;
+}
+
+// Pond levels: just under the lowest point of the rim.
+for (const p of WATER.ponds) {
+  let mn = 1e9;
+  for (let a = 0; a < Math.PI * 2; a += 0.1) mn = Math.min(mn, naturalHeight(p.x + Math.cos(a) * pondRadius(p, a) * 1.12, p.z + Math.sin(a) * pondRadius(p, a) * 1.12));
+  p.level = mn - 0.5;
+}
+
+export function rawHeight(x, z) {
+  let h = naturalHeight(x, z);
   // Strip + base: perfectly flat platform with a long natural blend.
   const m = rectMask(x, z, RUNWAY.x0 - 80, RUNWAY.x1 + 60, -160, 45, 220);
   h = lerp(h, 0, m);
   // Farm headquarters pad.
   const hq = rectMask(x, z, HQ.house.x - 70, -920, -430, -190, 90);
   if (hq > 0) h = lerp(h, hqLevel, hq);
+  // Secondary farm strips and service areas: a platform at the site level
+  // (a graded strip rises east), blended into the land around it.
+  for (const s of FARM_SITES) {
+    const r = s.runway;
+    if (x < r.x0 - 340 || x > r.x1 + 300 || z < r.z - 400 || z > r.z + 280) continue;
+    const ms = rectMask(x, z, r.x0 - 80, r.x1 + 40, r.z - 160, r.z + 40, 160);
+    if (ms > 0) h = lerp(h, stripLevel(s, x), ms);
+  }
   return h;
+}
+// Site level: mean natural ground under the strip and its apron.
+for (const s of FARM_SITES) {
+  let sum = 0, n = 0;
+  for (let x = s.runway.x0 - 60; x <= s.runway.x1; x += 20) for (let z = s.runway.z - 140; z <= s.runway.z + 30; z += 20) { sum += naturalHeight(x, z); n++; }
+  s.y0 = Math.round((sum / n) * 10) / 10;
 }
 let hqLevel = 0;
 hqLevel = (() => {
@@ -119,6 +202,14 @@ export class TerrainData {
 
   // Creek water surface (sits below the banks).
   waterLevel(x, z) {
+    for (const p of WATER.ponds) {
+      const dx = x - p.x, dz = z - p.z;
+      if (Math.abs(dx) < p.r * 1.3 && Math.abs(dz) < p.r * 1.3 && Math.hypot(dx, dz) < pondRadius(p, Math.atan2(dz, dx)) * 1.02) return p.level;
+    }
+    for (const st of WATER.streams) {
+      const q = polyNearest(st.points, x, z, _pn);
+      if (q.d < st.width * 0.5 + 10) return lerp(st.levels[q.i], st.levels[q.i + 1], q.t);
+    }
     const cd = creekDist(x, z);
     if (cd > CREEK.width * 0.5 + 6) return -1e9;
     // Bank height approximated from the uncarved terrain.
@@ -138,6 +229,13 @@ export class TerrainData {
     const a = BASE.apron, t = BASE.taxiway;
     if (x >= a.x0 && x <= a.x1 && z >= a.z0 && z <= a.z1) return 'runway';
     if (x >= t.x0 && x <= t.x1 && z >= t.z0 && z <= t.z1) return 'runway';
+    for (const s of FARM_SITES) {
+      const r = s.runway;
+      if (x < r.x0 - 60 || x > r.x1 + 10 || z < r.z - 120 || z > r.z + 20) continue;
+      if (x >= r.x0 && x <= r.x1 && Math.abs(z - r.z) <= r.width / 2) return r.surface === 2 ? 'grass' : 'dirt';
+      const a2 = s.apron, t2 = s.taxiway;
+      if ((x >= a2.x0 && x <= a2.x1 && z >= a2.z0 && z <= a2.z1) || (x >= t2.x0 && x <= t2.x1 && z >= t2.z0 && z <= t2.z1)) return 'dirt';
+    }
     for (const r of ROADS) {
       for (let i = 0; i < r.pts.length - 1; i++) {
         if (segDist(x, z, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < r.w / 2) return 'dirt';
@@ -158,4 +256,4 @@ export class TerrainData {
   }
 }
 
-export { creekDist, clamp };
+export { creekDist, polyDist, clamp };

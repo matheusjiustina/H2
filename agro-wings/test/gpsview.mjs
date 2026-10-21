@@ -53,5 +53,18 @@ await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'chase'; g.r
 await page.screenshot({ path: `${outDir}/hud_gps.png` });
 await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'cockpit'; g.rig.setMode('cockpit', g.aircraft); for (let i = 0; i < 4; i++) g.tick(1 / 60); g.render(); });
 await page.screenshot({ path: `${outDir}/cockpit_gps.png` });
+// Raw unit pages: OPS (on the job), then NAV (ferry to a farm request).
+const dump = async (name, w = 294, h = 226) => {
+  const url = await page.evaluate(([w, h]) => {
+    const g = window.__agro, c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2;
+    const x = c.getContext('2d'); x.scale(2, 2); g.guidance.draw(x, 0, 0, w, h); return c.toDataURL();
+  }, [w, h]);
+  fs.writeFileSync(`${outDir}/${name}.png`, Buffer.from(url.split(',')[1], 'base64'));
+};
+await dump('unit_ops');
+await page.evaluate(() => { const g = window.__agro; g.selectContract('sr-soy'); g.screens.close(); g.aircraft.placeAirborne(-1200, -600, -Math.PI / 2, 120, 50); g.simulate(1, 1 / 30); });
+await dump('unit_nav');
+await page.evaluate(() => { const g = window.__agro; g.setJob(null); g.simulate(0.2, 1 / 30); });
+await dump('unit_nojob');
 console.log('errors', JSON.stringify(errors));
 await browser.close();

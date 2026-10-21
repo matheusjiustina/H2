@@ -6,7 +6,7 @@
 // obstacles cheap and independent from what is drawn.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { FORESTS, CREEK, FIELDS, HQ, BASE, ROADS, RUNWAY } from './layout.js';
+import { FORESTS, CREEK, FIELDS, HQ, BASE, ROADS, RUNWAY, FARM_SITES, WATER, pondRadius } from './layout.js';
 import { reliefWeights } from './relief.js';
 import { rng, fbm, segDist } from '../core/math.js';
 import {
@@ -76,7 +76,7 @@ export function createVegetation(terrain, quality) {
   // numbers against these only, so every tree of the original farm stays
   // exactly where it was. Trees that the outer fields, their pass corridors
   // and the outer roads now claim are removed afterwards (see `cleared`).
-  const FIELDS0 = FIELDS.filter((f) => f.level === 1), ROADS0 = ROADS.filter((rd) => !rd.mesh);
+  const FIELDS0 = FIELDS.filter((f) => f.level === 1 && !f.farm), ROADS0 = ROADS.filter((rd) => !rd.mesh);
   const avoid = (x, z, m = 6) => {
     if (Math.abs(z) < 60 && x > RUNWAY.x0 - 250 && x < RUNWAY.x1 + 250) return true; // strip approach
     if (x > BASE.apron.x0 - 30 && x < BASE.apron.x1 + 30 && z > BASE.apron.z0 - 50 && z < 30) return true;
@@ -89,8 +89,14 @@ export function createVegetation(terrain, quality) {
   // Outer (level 2/3) fields with their run-in corridors along the passes,
   // and the outer access roads: kept clear of trees (low scrub may stay
   // outside the fields themselves).
-  const FIELDS2 = FIELDS.filter((f) => f.level > 1), ROADS2 = ROADS.filter((rd) => rd.mesh);
+  const FIELDS2 = FIELDS.filter((f) => f.level > 1 || f.farm), ROADS2 = ROADS.filter((rd) => rd.mesh);
   const cleared = (x, z, tall = true, m = 6) => {
+    // Secondary farm strips: service area, strip and its approaches.
+    for (const s of FARM_SITES) {
+      const r = s.runway;
+      if (x > s.apron.x0 - 40 && x < s.apron.x1 + 30 && z > s.apron.z0 - 40 && z < r.z + 30) return true;
+      if (Math.abs(z - r.z) < (tall ? 60 : r.width / 2 + 8) && x > r.x0 - (tall ? 300 : 20) && x < r.x1 + (tall ? 300 : 20)) return true;
+    }
     for (const f of FIELDS2) {
       if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
       if (!tall || !f.contract) continue;
@@ -296,15 +302,59 @@ export function createVegetation(terrain, quality) {
     }
   }
 
+  // Marginal vegetation of the other water (own random stream, so the trees
+  // placed above stay where they were): buritis and gallery forest along
+  // the Vale do Rio stream, clumps of trees and scrub around the açudes with
+  // open gaps where the cattle and the roads come down to the water.
+  const rw = rng(4242);
+  for (const st of WATER.streams) {
+    const sp = st.points;
+    for (let i = 0; i < sp.length - 1; i++) {
+      const [ax, az] = sp[i], [bx, bz] = sp[i + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      const nx = -(bz - az) / len, nz = (bx - ax) / len;
+      for (let sd = 0; sd < len; sd += 10) {
+        const t = sd / len, px = ax + (bx - ax) * t, pz = az + (bz - az) * t;
+        for (const side of [-1, 1]) {
+          const off = st.width * 0.5 + 9 + rw() * 32;
+          const x = px + nx * off * side, z = pz + nz * off * side;
+          if (avoid(x, z, 4) || rw() < 0.15) continue;
+          const k = rw();
+          if (k < 0.22) add('buriti', x, z, 0.85 + rw() * 0.3);
+          else if (k < 0.8) { add('mata', x, z, 0.8 + rw() * 0.4); colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + 20 }); }
+          else add('bush', x, z, 0.8 + rw() * 0.6);
+        }
+      }
+    }
+  }
+  for (const p of WATER.ponds) {
+    const n = Math.round(p.r * 0.7);
+    for (let i = 0; i < n; i++) {
+      const a = rw() * Math.PI * 2;
+      // Two open stretches of shore (access), trees in clumps elsewhere.
+      if (Math.sin(a * 2 + p.ph) > 0.55) continue;
+      const d = pondRadius(p, a) * (1.18 + rw() * 0.55);
+      const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+      if (avoid(x, z, 4)) continue;
+      const k = rw();
+      if (k < 0.35) add('bush', x, z, 0.8 + rw() * 0.7);
+      else if (k < 0.55) add('buriti', x, z, 0.8 + rw() * 0.3);
+      else { add('mata', x, z, 0.75 + rw() * 0.45); colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + 18 }); }
+    }
+  }
+
+  // Nothing grows in the açudes, the lake or the stream channels.
+  const inWater = (x, z) => WATER.ponds.some((p) => Math.hypot(x - p.x, z - p.z) < pondRadius(p, Math.atan2(z - p.z, x - p.x)) * 1.08)
+    || WATER.streams.some((st) => st.points.some((q, i) => i < st.points.length - 1 && segDist(x, z, q[0], q[1], st.points[i + 1][0], st.points[i + 1][1]) < st.width * 0.5 + 7));
   // Clear what the outer fields, their pass corridors and the outer roads
   // claim (trees placed by the original farm's random streams included).
   for (let i = trees.length - 1; i >= 0; i--) {
     const t = trees[i];
-    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2)) trees.splice(i, 1);
+    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || inWater(t.x, t.z)) trees.splice(i, 1);
   }
   for (let i = colliders.length - 1; i >= 0; i--) {
     const c = colliders[i];
-    if (!c.box && cleared(c.x, c.z, true, 6)) colliders.splice(i, 1);
+    if (!c.box && (cleared(c.x, c.z, true, 6) || inWater(c.x, c.z))) colliders.splice(i, 1);
   }
 
   // --- build instanced cells ----------------------------------------------
