@@ -7,6 +7,7 @@ import { createTerrain } from './terrain.js';
 import { createRoads } from './roads.js';
 import { createSky } from './sky.js';
 import { createCrops } from './crops.js';
+import { createCropPlants } from './cropPlants.js';
 import { makeNoiseTexture } from '../core/textures.js';
 import { createVegetation, makeTreeCollider } from './vegetation.js';
 import { createStructures } from './structures.js';
@@ -40,6 +41,7 @@ export class World {
     this.visualWind = new THREE.Vector3(0, 0, 3);
     this.crops = await step('Crops', () => createCrops(this.terrain, this.quality));
     this.scene.add(this.crops.group);
+    this.cropPlants = createCropPlants(this.scene, this.terrain, this.quality);
     this.vegetation = await step('Forest', () => createVegetation(this.terrain, this.quality));
     this.scene.add(this.vegetation.group);
     this.crowns = createForestCrowns(this.scene, this.terrain, this.vegetation.atlas, this.quality);
@@ -92,6 +94,7 @@ export class World {
     this.sky.setQuality(q);
     this.atmo.setQuality(q);
     this.crops.setQuality(q);
+    this.cropPlants.setQuality(q);
     this.grass.setQuality(q);
     this.crowns.setQuality(q);
     for (const u of this.updaters) u.setQuality?.(q);
@@ -100,6 +103,7 @@ export class World {
   update(camera, focus, dt, time) {
     this.atmo.update(dt, camera, this.visualWind, time);
     this.sky.update(camera, focus, dt, time);
+    this.cropPlants.update(camera.position, this.terrain.heightAt(camera.position.x, camera.position.z));
     this.crops.update(camera.position);
     this.vegetation.update(camera);
     this.crowns.update(camera, this.terrain.heightAt(camera.position.x, camera.position.z));

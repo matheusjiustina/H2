@@ -22,3 +22,8 @@ float harvestedAt(vec2 p) {
   }
   return 0.0;
 }`;
+
+// Radius (m) of the 3D crop plants around the camera, shared by the plant
+// shader (fade-out), the canopy / fin shaders (fade-in) and the ground shader
+// (soil and straw between the plants instead of the far canopy colour).
+export const CROP_U = { r0: { value: 28 }, cam: { value: new THREE.Vector3() } };

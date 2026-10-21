@@ -217,19 +217,33 @@ export function makeCanopyTop(kind, seed = 5) {
       }
       continue;
     }
-    const spread = kind === 'soy' ? 104 : 92;
-    for (let i = 0; i < 560; i++) {
-      const x = r() * S, y = yc + (r() - 0.5) * spread * (0.6 + r() * 0.4);
-      const l = kind === 'cotton' ? 9 + r() * 10 : 8 + r() * 9;
-      const hue = kind === 'cotton' ? 95 + r() * 14 : 86 + r() * 14;
-      const sat = kind === 'cotton' ? 30 + r() * 12 : 40 + r() * 12;
-      const L = 30 + r() * 16, a1 = r() * Math.PI, a2 = r() * Math.PI;
+    // Soy / cotton rows seen from above: a rounded hedge of leaves (the top
+    // of the row in the sun, its flanks and the gap between rows in shade),
+    // built from trifoliates (soy: three ovate leaflets) or palmate leaves
+    // (cotton: three rounded lobes), as the near 3D plants are.
+    const spread = kind === 'soy' ? 112 : 96;
+    const shade = g.createLinearGradient(0, yc - spread * 0.6, 0, yc + spread * 0.6);
+    shade.addColorStop(0, 'rgba(10,22,6,0)'); shade.addColorStop(0.25, 'rgba(10,22,6,0.75)');
+    shade.addColorStop(0.75, 'rgba(10,22,6,0.75)'); shade.addColorStop(1, 'rgba(10,22,6,0)');
+    put(0, 0, (px, py) => { g.fillStyle = shade; g.fillRect(px, py + yc - spread * 0.6, S, spread * 1.2); });
+    for (let i = 0; i < 620; i++) {
+      const x = r() * S, off = (r() - 0.5) * spread * (0.55 + r() * 0.45), y = yc + off;
+      const top = 1 - Math.abs(off) / (spread * 0.5); // 1 on the row's crest
+      const l = kind === 'cotton' ? 11 + r() * 9 : 8 + r() * 7;
+      const hue = kind === 'cotton' ? 98 + r() * 12 : 86 + r() * 14;
+      const sat = kind === 'cotton' ? 30 + r() * 10 : 40 + r() * 12;
+      const L = 20 + top * 18 + r() * 10, a = r() * Math.PI * 2;
+      const lobes = kind === 'cotton' ? [[0, 1, 0.8], [0.9, 0.8, 0.7], [-0.9, 0.8, 0.7]] : [[0, 1, 0.55], [1.25, 0.8, 0.5], [-1.25, 0.8, 0.5]];
       put(x, y, (px, py) => {
-        // shadow side then lit side
-        g.fillStyle = hsl(hue, sat, L * 0.6);
-        g.beginPath(); g.ellipse(px + 2, py + 2, l * 0.62, l * 0.48, a1, 0, Math.PI * 2); g.fill();
-        g.fillStyle = hsl(hue, sat, L);
-        g.beginPath(); g.ellipse(px - 1, py - 1, l * 0.5, l * 0.38, a2, 0, Math.PI * 2); g.fill();
+        for (const [da, k, w] of lobes) {
+          const aa = a + da, cx = px + Math.cos(aa) * l * 0.45 * k, cy = py + Math.sin(aa) * l * 0.45 * k;
+          g.fillStyle = hsl(hue, sat, L * 0.55);
+          g.beginPath(); g.ellipse(cx + 1.5, cy + 1.5, l * 0.5 * k, l * w * 0.5 * k, aa, 0, Math.PI * 2); g.fill();
+          g.fillStyle = hsl(hue + (r() - 0.5) * 6, sat, L);
+          g.beginPath(); g.ellipse(cx, cy, l * 0.46 * k, l * w * 0.44 * k, aa, 0, Math.PI * 2); g.fill();
+        }
+        g.strokeStyle = hsl(hue - 6, sat - 14, L + 14, 0.5); g.lineWidth = 0.8;
+        g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(a) * l * 0.85, py + Math.sin(a) * l * 0.85); g.stroke();
       });
     }
     if (kind === 'cotton') {

@@ -12,7 +12,7 @@ import { FIELDS, CROPS, cropHeight } from './layout.js';
 import { makeCropCard, makeCanopyTop } from '../core/textures.js';
 import { fbm } from '../core/math.js';
 import { ATMO_U } from './atmosphere.js';
-import { CUT_U, CUT_GLSL } from './cutState.js';
+import { CUT_U, CUT_GLSL, CROP_U } from './cutState.js';
 
 const CANOPY = 0.78; // canopy surface relative to crop height
 const FIN_LO = 0.42, FIN_HI = 1.04;
@@ -30,13 +30,18 @@ function finMaterial(tex, radiusU) {
     s.uniforms.uWind = ATMO_U.wind;
     s.uniforms.uCut = CUT_U.rects;
     s.uniforms.uCutKind = CUT_U.kinds;
+    s.uniforms.uR0 = CROP_U.r0;
     s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uRadius;\nuniform float uTime;\nuniform vec4 uWind;\nattribute float aBase;\n' + CUT_GLSL)
+      .replace('#include <common>', '#include <common>\nuniform float uRadius;\nuniform float uTime;\nuniform vec4 uWind;\nuniform float uR0;\nattribute float aBase;\nvarying float vNearK;\n' + CUT_GLSL)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wpF = modelMatrix * vec4(transformed, 1.0);
         float dF = distance(wpF.xz, cameraPosition.xz);
         // Harvested lanes: the plants are gone (fins collapse to the ground).
         float k = (1.0 - smoothstep(uRadius * 0.62, uRadius, dF)) * (1.0 - harvestedAt(wpF.xz));
+        // Inside the 3D plants' radius the rows are the plants themselves (the
+        // collapsed hedge is dropped, not left as a flat strip at leaf height).
+        vNearK = uR0 > 1.0 ? smoothstep(uR0 * 0.62, uR0 * 0.9, dF) : 1.0;
+        k *= vNearK;
         transformed.y = aBase + (transformed.y - aBase) * k;
         // Plants lean and wave with the shared wind; gusts sweep down the rows.
         float hC = max(transformed.y - aBase, 0.0);
@@ -44,10 +49,12 @@ function finMaterial(tex, radiusU) {
         float gC = 0.55 + 0.45 * sin(phC) * (0.6 + 0.4 * sin(phC * 0.41 + 2.0));
         transformed.xz += uWind.xy * (0.025 + 0.012 * uWind.z) * (0.4 + 0.8 * uWind.w) * gC * hC;`);
     // Self-shadowing inside the crop: darker toward the base of each row.
-    s.fragmentShader = s.fragmentShader.replace('#include <color_fragment>',
-      '#include <color_fragment>\n diffuseColor.rgb *= mix(0.38, 1.05, smoothstep(0.0, 0.95, vMapUv.y));');
+    s.fragmentShader = s.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vNearK;')
+      .replace('#include <color_fragment>',
+        '#include <color_fragment>\n if (vNearK < 0.05) discard;\n diffuseColor.rgb *= mix(0.38, 1.05, smoothstep(0.0, 0.95, vMapUv.y));');
   };
-  m.customProgramCacheKey = () => 'fin-v3';
+  m.customProgramCacheKey = () => 'fin-v5';
   return m;
 }
 
@@ -63,16 +70,23 @@ function canopyMaterial(tex, kind) {
     s.uniforms.uWind = ATMO_U.wind;
     s.uniforms.uCut = CUT_U.rects;
     s.uniforms.uCutKind = CUT_U.kinds;
+    s.uniforms.uR0 = CROP_U.r0;
     s.vertexShader = s.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aField;\nattribute vec4 aInfo;\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvField = aField; vInfo = aInfo; vCWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     s.fragmentShader = s.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;\nuniform float uTime;\nuniform vec4 uWind;\n' + CUT_GLSL)
+      .replace('#include <common>', '#include <common>\nvarying vec4 vField;\nvarying vec4 vInfo;\nvarying vec3 vCWP;\nuniform float uTime;\nuniform vec4 uWind;\nuniform float uR0;\n' + CUT_GLSL)
       .replace('#include <map_fragment>', `#include <map_fragment>
         {
           vec2 p = vCWP.xz;
           // Harvested lanes: no canopy, the stubble on the ground shows.
           if (harvestedAt(p) > 0.5) discard;
+          // Around the camera the 3D plants stand on the soil: the canopy
+          // surface dissolves in (dithered) only toward their radius.
+          if (uR0 > 1.0) {
+            float showC = smoothstep(uR0 * 0.7, uR0 * 0.97, distance(p, cameraPosition.xz));
+            if (showC < fract(sin(dot(floor(p * 7.0), vec2(12.9898, 78.233))) * 43758.5453)) discard;
+          }
           bool ax = vInfo.x < 0.5;
           float along = ax ? p.x : p.y;
           float across = ax ? p.y : p.x;
@@ -95,7 +109,7 @@ function canopyMaterial(tex, kind) {
           diffuseColor.rgb *= 1.0 + wv * min(uWind.z, 7.0) * 0.009 * (0.5 + uWind.w);
         }`);
   };
-  m.customProgramCacheKey = () => 'canopy3-' + kind;
+  m.customProgramCacheKey = () => 'canopy4-' + kind;
   return m;
 }
 
@@ -327,19 +341,28 @@ function buildFins(f, x0, x1, z0, z1, terrain) {
     const start = pos.length / 3;
     // Each row gets its own texture offset so rows don't line up.
     const uOff = ((k * 0.618) % 1) * 4;
+    // A row hedge: two leafy slopes meeting at the row's top (a tent over the
+    // row line), wide as the crop's cover, so from the air and from a pass
+    // the rows have volume and a lit and a shaded flank.
+    const hw = sp * (0.2 + 0.28 * f.growth);
+    const across = alongX ? [0, 1] : [1, 0]; // unit vector across the rows (x, z)
     for (let i = 0; i <= n; i++) {
       const l = l0 + ((l1 - l0) * i) / n;
       const x = alongX ? l : c, z = alongX ? c : l;
-      const g = terrain.heightAt(x, z);
       const u = (l + uOff) / 4;
-      pos.push(x, g + h * FIN_LO, z, x, g + h * FIN_HI, z);
-      uv.push(u, 0.02, u, 1);
-      nrm.push(0, 1, 0, 0, 1, 0);
-      base.push(g + h * (CANOPY - 0.08), g + h * (CANOPY - 0.08));
+      for (const sd of [-1, 0, 1]) {
+        const px = x + across[0] * sd * hw, pz = z + across[1] * sd * hw;
+        const gh = terrain.heightAt(px, pz);
+        pos.push(px, gh + h * (sd ? FIN_LO + 0.1 : FIN_HI), pz);
+        uv.push(u + sd * 0.07, sd ? 0.02 : 1);
+        const ny = h * (FIN_HI - FIN_LO - 0.1), nl = Math.hypot(ny, hw);
+        nrm.push(across[0] * sd * ny / nl * 0.8, sd ? hw / nl : 1, across[1] * sd * ny / nl * 0.8);
+        base.push(gh + h * (CANOPY - 0.08));
+      }
     }
     for (let i = 0; i < n; i++) {
-      const a = start + i * 2;
-      idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+      const a = start + i * 3;
+      idx.push(a, a + 3, a + 1, a + 1, a + 3, a + 4, a + 1, a + 4, a + 2, a + 2, a + 4, a + 5);
     }
   }
   if (!idx.length) return null;

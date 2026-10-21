@@ -1391,3 +1391,42 @@ truck service, work, separate history, replay with every camera) and
   cockpit over corn 4.5 ms, high 2.3 ms vs 2.7 / 4.8 / 3.9 / 2.8 ms before);
   draw calls about +5 % (water, gallery forest, machines when near; the
   farms' service areas are not drawn beyond 2.2 km, machines beyond 1.5 km).
+
+## Crops, soil and forests — realism overhaul
+
+Same fields, crops (soy, corn, cotton; stubble, fallow, pasture), rows,
+growth, coverage, missions and flight model; only how they are drawn changed.
+
+| LOD | Distance (medium) | What draws the field |
+| --- | --- | --- |
+| 0 | < ~14 m | 3D plants (`src/world/cropPlants.js`): soy clumps of branching stems with folded trifoliate leaves, corn with a tapering stalk, 10 arching distichous blades and a tassel, cotton with a reddish stem, long-petioled palmate leaves, a flower and bolls. Leaves are cut-out cards / ribbons from a botanical atlas (veins, two-tone blades). |
+| 1 | ~11–24 m | The same rows with a simplified plant (fewer, wider leaves) at half density; the hand-over is a screen-space dissolve (no pop, no size dip). |
+| 2 | ~20–240 m | Row hedges (`crops.js`): each row a leafy tent as wide as the crop's cover, lit flank and shaded flank. |
+| 3 | beyond | The canopy surface: rows of trifoliate / palmate leaves (or corn blades) seen from above, tramlines, headlands, vigour patches. It dissolves (dithered) near the camera so the plants stand on the soil. |
+
+- Plants follow each field's rows (spacing, axis, tramlines) with a
+  deterministic jitter, yaw, height, width, tone and a few gaps; they stand
+  on the terrain height (relief fields included); harvested lanes have none.
+- One instanced draw per crop variant (two vec4 per plant), 4 m cells
+  generated once and cached, buffers refilled only after the camera moved
+  3–5 m (about 0.2 ms per frame on a 50 m/s pass); plants dissolved by the
+  hand-over collapse in the vertex shader; plant radius 14 / 24 / 34 m
+  (low / medium / high), off above ~90 m; crop shadows on high only.
+- Wind: plants bend downwind with gusts rolling across the field and the
+  leaves flutter (vertex shader, shared wind state). Leaves are translucent
+  against the sun.
+- Soil under the crops: red-brown latossolo with fine grain and clods
+  (bump), straw (palhada) between the rows of no-till soy and corn, clean
+  ridged rows under cotton, the soil shaded along each row and under a
+  closed canopy.
+- Trees: realistic leaf-mass atlas (lobes lit like small spheres), leaf
+  relief, translucency, per-tree tone; 3D crowns over the forests near the
+  camera (`src/world/forestCrowns.js`) instead of a flat block.
+- Validation (SwiftShader container, medium): the 3D plants cost
+  0.16–0.27 ms of CPU per frame on a 10 s, 47 m/s pass at 4 m (game tick
+  1.1–1.6 ms, as before); triangles on the low soy pass 0.75 M → 1.36 M,
+  draw calls +3 (one per crop variant), aerial and high views unchanged;
+  Ipanema soy and R44 cotton autopilot missions unchanged (90 %, 2★),
+  farm flow 15/15, UI 22/22, unit tests 80/80.
+- Look-dev: `node test/cropviews.mjs <out>` (same 12 views before / after;
+  `VIEWS='[["name",{"cam":[x,h,z],"target":[x,h,z]}]]'` for extra views).

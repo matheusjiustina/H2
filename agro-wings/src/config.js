@@ -231,9 +231,9 @@ export const GAME = {
 };
 
 export const QUALITY = {
-  low: { pixelRatio: 0.75, shadow: 1024, shadowRange: 120, cropRadius: 160, treeNear: 350, crownRadius: 260, clouds: 18, nearPlants: false, grassRadius: 45, grassDensity: 0.5, rainDrops: 1200 },
-  medium: { pixelRatio: 1, shadow: 2048, shadowRange: 170, cropRadius: 240, treeNear: 550, crownRadius: 380, clouds: 30, nearPlants: true, grassRadius: 60, grassDensity: 0.8, rainDrops: 2500 },
-  high: { pixelRatio: 1.5, shadow: 4096, shadowRange: 220, cropRadius: 320, treeNear: 800, crownRadius: 520, clouds: 44, nearPlants: true, grassRadius: 75, grassDensity: 1, rainDrops: 4000 },
+  low: { pixelRatio: 0.75, shadow: 1024, shadowRange: 120, cropRadius: 160, cropPlantRadius: 14, cropShadows: false, treeNear: 350, crownRadius: 260, clouds: 18, nearPlants: false, grassRadius: 45, grassDensity: 0.5, rainDrops: 1200 },
+  medium: { pixelRatio: 1, shadow: 2048, shadowRange: 170, cropRadius: 240, cropPlantRadius: 24, cropShadows: false, treeNear: 550, crownRadius: 380, clouds: 30, nearPlants: true, grassRadius: 60, grassDensity: 0.8, rainDrops: 2500 },
+  high: { pixelRatio: 1.5, shadow: 4096, shadowRange: 220, cropRadius: 320, cropPlantRadius: 34, cropShadows: true, treeNear: 800, crownRadius: 520, clouds: 44, nearPlants: true, grassRadius: 75, grassDensity: 1, rainDrops: 4000 },
 };
 
 export const UNITS = { altOffsetM: 320 }; // field elevation above MSL for the altimeter

@@ -10,7 +10,7 @@ import {
 } from './layout.js';
 import { rawHeight } from './terrainData.js';
 import { makeGroundDetail } from '../core/textures.js';
-import { CUT_U, NCUT } from './cutState.js';
+import { CUT_U, NCUT, CROP_U } from './cutState.js';
 
 const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5 };
 
@@ -35,6 +35,7 @@ uniform vec4 uSiteTx[NS];
 uniform vec4 uSiteOff[NS];
 uniform float uWorldHalf;
 uniform vec4 uCut[NCUT];
+uniform float uCropR0;
 uniform vec2 uStream[NSTP];
 uniform vec4 uStreamBox;
 uniform vec4 uPond[NPOND];
@@ -120,11 +121,26 @@ vec3 fieldColor(vec2 p, vec4 info, float edgeIn, vec4 nA, vec4 nB, vec4 nC, vec4
   vec3 soil = mix(vec3(0.160, 0.058, 0.028), vec3(0.230, 0.085, 0.040), nC.r);
   vec3 c;
   if (type < 2.5) {
-    vec3 straw = vec3(0.30, 0.23, 0.11);
-    c = mix(soil, straw, smoothstep(0.45, 0.75, nD.g) * 0.45);
+    // Under soy, corn and cotton: Mato Grosso latossolo (red-brown, finer
+    // and darker where it is moist), straw from the last crop between the
+    // rows on no-till soy and corn, clean earth on the cotton rows; the
+    // plants shade the soil along each row. Far away the green cover of the
+    // canopy takes over; near the camera the 3D plants are the cover.
+    float sp = info.w > 0.0 ? info.w : 0.9;
+    float rowD = abs(fract(coord / sp) - 0.5) * sp; // m from the row line
+    vec3 soilR = mix(vec3(0.26, 0.105, 0.05), vec3(0.40, 0.17, 0.08), smoothstep(0.25, 0.8, nC.r)) * (0.86 + 0.24 * nD.b);
+    float strawK = type < 1.5 ? smoothstep(0.3, 0.75, nD.g * 0.8 + nC.b * 0.4) * 0.8 : 0.1;
+    vec3 straw = mix(vec3(0.40, 0.31, 0.17), vec3(0.58, 0.47, 0.29), nD.r);
+    vec3 ground = mix(soilR, straw, strawK * smoothstep(0.04, 0.16, rowD));
+    float under = exp(-pow(rowD / (sp * (0.16 + 0.22 * info.z)), 2.0));
+    ground *= 1.0 - 0.5 * under * smoothstep(0.0, 0.6, info.z);
+    // A closed canopy keeps the soil in its shade.
+    ground *= 1.0 - 0.38 * smoothstep(0.55, 1.0, info.z);
+    if (type > 1.5) ground = mix(ground, ground * 1.12, (1.0 - under) * smoothstep(0.1, 0.3, rowD) * 0.5); // cotton ridges
     vec3 green = type < 0.5 ? vec3(0.072, 0.150, 0.034) : type < 1.5 ? vec3(0.078, 0.140, 0.034) : vec3(0.075, 0.130, 0.042);
     float cover = smoothstep(0.0, 0.7, info.z);
-    c = mix(c, green * (0.85 + 0.3 * nB.r), cover * mix(0.9, s, fade * (1.0 - info.z * 0.6)));
+    float farK = uCropR0 > 1.0 ? smoothstep(uCropR0 * 0.6, uCropR0 * 0.95, distance(p, cameraPosition.xz)) : 1.0;
+    c = mix(ground, green * (0.85 + 0.3 * nB.r), cover * farK * mix(0.9, s, fade * (1.0 - info.z * 0.6)));
     rough = 0.9;
   } else if (type < 3.5) {
     // Stubble (palhada) after harvest: straw rows over dark soil.
@@ -250,6 +266,8 @@ vec3 terrainColor(vec2 p, out float rough) {
     }
     vec3 fc = fieldColor(p, info, -dmin, nA, nB, nC, nD, rough);
     if (worked > 1.5) fc *= vec3(0.7, 0.64, 0.6);
+    // Soil grain, clods and straw relief close up (bump) on cropped ground.
+    if (info.x < 2.5) fc = soilDetail(fc, det, near, 0.55, 0.25);
     float rough2 = rough;
     // Carreador ring, slightly irregular edge, and a rank grass verge outside it.
     float ringOuter = 7.0 + (nB.g - 0.5) * 2.0;
@@ -371,6 +389,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uSiteOff: { value: FARM_SITES.map((s) => new THREE.Vector4(s.dx, s.dz, s.runway.surface, 0)) },
     uWorldHalf: { value: WORLD_HALF },
     uCut: CUT_U.rects,
+    uCropR0: CROP_U.r0,
     uStream: { value: stp.map((q) => new THREE.Vector2(q[0], q[1])) },
     uStreamBox: { value: new THREE.Vector4(Math.min(...stp.map((q) => q[0])), Math.min(...stp.map((q) => q[1])), Math.max(...stp.map((q) => q[0])), Math.max(...stp.map((q) => q[1]))) },
     uPond: { value: WATER.ponds.map((q) => new THREE.Vector4(q.x, q.z, q.r, q.ph)) },
