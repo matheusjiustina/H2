@@ -1543,6 +1543,15 @@ catch on start, four-blade prop buzz from the geared prop rpm). The
 autopilot's taxi routes were moved a few metres so the 17.7 m span and the
 long tail clear the parked R44 and the mixing station.
 
+**Validation.** Unit tests 93/93 (`npm test`, 13 of them the Dromader's).
+Autopilot soybean contract (`AC=m18 node test/e2e.mjs soy`): service,
+start, taxi, take-off, spraying to 90 %, landing, taxi back to the pad,
+results, no damage; the Ipanema and the AT-502B complete the same mission
+with the adjusted taxi routes. Cost in the same scenes (medium, SwiftShader,
+1280×720), Ipanema / AT-502B / Dromader: chase 424 / 436 / 463 draw calls
+and 1.28 / 1.30 / 1.31 M triangles; cockpit 382 / 392 / 415 calls; at the
+pad 618 / 636 / 672 calls; simulation tick 1.4–1.5 ms for all three.
+
 **Limitations.** Supercharger, mixture and carburettor heat are not
 modelled (the throttle sets manifold pressure, the governor the rpm);
 engine temperatures are a simple first-order model; cylinder-by-cylinder
