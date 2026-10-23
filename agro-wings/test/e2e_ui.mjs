@@ -24,7 +24,8 @@ async function open(viewport, opts = {}) {
 const shot = async (page, name) => {
   await page.evaluate(() => { const g = window.__agro; g.tick(1 / 60); g.render(); });
   await page.waitForTimeout(1500);
-  await page.screenshot({ path: `${outDir}/${name}.png` });
+  // SwiftShader may spend tens of seconds compiling shaders on a new scene.
+  await page.screenshot({ path: `${outDir}/${name}.png`, timeout: 180000 });
 };
 
 const page = await open({ width: 1280, height: 720 });

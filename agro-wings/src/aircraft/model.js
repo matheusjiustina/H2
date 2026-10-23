@@ -961,17 +961,22 @@ export function createAircraftModel(panel, opts = {}) {
   }
 
   // ---------------- spray system ----------------
+  // The boom runs just aft of the trailing edge, low enough to stay under the
+  // flaps' trailing edge at full deflection (30 deg), and its hangers come
+  // down from the fixed wing ahead of the flap hinge, under the flaps' path:
+  // lowered flaps never pass through the boom or its hangers.
   const nozzles = [];
-  const boomZ = WING.le - 0.86 * WING.chord, boomDrop = 0.15;
+  const hingeZ = WING.le - 0.76 * WING.chord;
+  const boomZ = WING.le - WING.chord - 0.03, boomDrop = 0.27;
   for (const side of [1, -1]) {
     const x0 = 0.7, x1 = 5.0;
     const a = [side * x0, wingY(x0) - boomDrop, boomZ], b = [side * x1, wingY(x1) - boomDrop, boomZ];
     add('alu', rod(a, b, 0.024, 12));
     add('alu', ball(b, 0.03, 10));
     add('brass', tx(new THREE.CylinderGeometry(0.012, 0.012, 0.04, 8), b[0] + side * 0.03, b[1], b[2], 0, 0, Math.PI / 2), true);
-    // Streamlined hangers from the wing to the boom.
+    // Streamlined hangers from the wing (ahead of the hinge) to the boom.
     for (const hx of [1.1, 2.2, 3.3, 4.4]) {
-      const top = [side * hx, wingY(hx) - 0.02, boomZ + 0.06], bot = [side * hx, wingY(hx) - boomDrop, boomZ];
+      const top = [side * hx, wingY(hx) - 0.035, hingeZ + 0.15], bot = [side * hx, wingY(hx) - boomDrop, boomZ];
       add('alu', tx(rod(top, bot, 0.016, 10), 0, 0, 0));
       add('dark', tx(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 10), side * hx, wingY(hx) - boomDrop, boomZ, 0, 0, Math.PI / 2), true);
     }

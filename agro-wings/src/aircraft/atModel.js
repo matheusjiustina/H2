@@ -692,8 +692,12 @@ export function createAirTractorModel(panel, opts = {}) {
   }
 
   // ---------------- spray system ----------------
+  // The boom runs just aft of the trailing edge, below the flaps' trailing
+  // edge at full deflection, on hangers from the fixed wing ahead of the flap
+  // hinge (under the flaps' path): lowered flaps never pass through them.
   const nozzles = [];
-  const boomZ = W.le - 0.98 * W.chord, boomDrop = 0.26;
+  const hingeZ = W.le - 0.76 * W.chord;
+  const boomZ = W.le - W.chord - 0.03, boomDrop = 0.3;
   for (const side of [1, -1]) {
     const x0 = 0.85, x1 = 7.05;
     const a = [side * x0, leY(x0) - boomDrop, boomZ], b = [side * x1, leY(x1) - boomDrop, boomZ];
@@ -701,7 +705,7 @@ export function createAirTractorModel(panel, opts = {}) {
     add('alu', ball(b, 0.036, 10));
     add('brass', tx(new THREE.CylinderGeometry(0.014, 0.014, 0.05, 8), b[0] + side * 0.035, b[1], b[2], 0, 0, Math.PI / 2), true);
     for (const hx of [1.4, 2.6, 3.8, 5.0, 6.2]) {
-      const top = [side * hx, leY(hx) - 0.03, boomZ + 0.1], bot = [side * hx, leY(hx) - boomDrop, boomZ];
+      const top = [side * hx, leY(hx) - 0.04, hingeZ + 0.16], bot = [side * hx, leY(hx) - boomDrop, boomZ];
       add('alu', tx(rbox(0.018, 0.001 + Math.hypot(top[1] - bot[1], top[2] - bot[2]), 0.07, 0.008, 0, 0, 0), side * hx, (top[1] + bot[1]) / 2, (top[2] + bot[2]) / 2, Math.atan2(top[2] - bot[2], top[1] - bot[1])));
       add('dark', tx(new THREE.CylinderGeometry(0.036, 0.036, 0.035, 10), side * hx, leY(hx) - boomDrop, boomZ, 0, 0, Math.PI / 2), true);
     }
