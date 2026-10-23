@@ -68,7 +68,9 @@ export class Autopilot {
         if (fm.engine === 'running' && this.pt > 1) { v.engine = false; this.set('taxiOut'); }
         return;
       case 'taxiOut': {
-        this.wp ??= [[-341, -60], [-342, -44], [-350, -33], [-370, -30], [-382, -20], [-383, -6]];
+        // Kept west of the helipad: the Dromader's long tail swings wide in
+        // the turn off the pad and must clear a parked R44's tail rotor.
+        this.wp ??= [[-345, -60], [-347, -44], [-352, -33], [-370, -30], [-382, -20], [-383, -6]];
         if (this._taxi(dt, this.wp, 5)) { this.set('lineup'); }
         return;
       }
@@ -169,9 +171,10 @@ export class Autopilot {
       }
       case 'taxiIn': {
         const x = fm.pos.x;
-        // Slow down on the apron and keep north of the line to the pad: the
-        // left wing passes the mixing station on the way in.
-        this.wp ??= [[Math.min(x, -300), 0], [-378, 0], [-382, -14], [-382, -36, 4], [-378, -50, 3], [-370, -58, 3], [-361, -62, 2.5], [BASE.pad.x, BASE.pad.z, 2.5]];
+        // Slow down on the apron and come to the pad from the south-west: the
+        // left wing passes the mixing station on the way in (the Dromader's
+        // 8.9 m half-span with room to spare).
+        this.wp ??= [[Math.min(x, -300), 0], [-378, 0], [-382, -14], [-382, -36, 4], [-378, -47, 3], [-369, -55, 3], [-360, -60, 2.5], [BASE.pad.x, BASE.pad.z, 2.5]];
         if (this._taxi(dt, this.wp, 6)) this.set('park');
         return;
       }

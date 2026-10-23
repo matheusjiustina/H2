@@ -413,6 +413,8 @@ export class Guidance {
 const THEMES = {
   ipanema: { bg: '#081009', strip: 'rgba(4,10,6,0.82)', main: '#9ff0a4', text: '#cfe9d2', dim: '#5d7563', edge: '#d8f5d0', next: '#ffe14a', good: '#7dff8a', warn: '#ff8a6a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#c9d8a0', fuel: '#e9c24a', load: '#7fc8ff', track: 'rgba(255,255,255,0.12)' },
   at502: { bg: '#0b0905', strip: 'rgba(14,10,4,0.85)', main: '#ffc35a', text: '#ffe6b8', dim: '#7a6a4c', edge: '#ffe2a8', next: '#7fe0ff', good: '#9dff86', warn: '#ff7056', spray: '#7fe0ff', trackOn: 'rgba(127,224,255,0.9)', terrain: '#e8c890', fuel: '#ffb347', load: '#7fe0ff', track: 'rgba(255,220,160,0.14)' },
+  // Dromader: amber-on-black unit of an older install, red accents.
+  m18: { bg: '#0c0806', strip: 'rgba(16,9,5,0.85)', main: '#ffb066', text: '#ffe2c4', dim: '#7d6250', edge: '#ffd9b0', next: '#9df0ff', good: '#a6ff8c', warn: '#ff6a52', spray: '#9df0ff', trackOn: 'rgba(157,240,255,0.9)', terrain: '#e3c49a', fuel: '#ffc24d', load: '#9df0ff', track: 'rgba(255,214,180,0.14)' },
   r44: { bg: '#050a10', strip: 'rgba(4,8,14,0.85)', main: '#8fe3ff', text: '#dff3ff', dim: '#56707e', edge: '#cfeeff', next: '#ffe14a', good: '#86ffb0', warn: '#ff7a6a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#b9d6e6', fuel: '#ffd36a', load: '#8fe3ff', track: 'rgba(200,235,255,0.14)' },
 };
 

@@ -116,7 +116,7 @@ export class ReplayManager {
     tr.push({
       x: fm.pos.x, y: fm.pos.y, z: fm.pos.z, qx: fm.quat.x, qy: fm.quat.y, qz: fm.quat.z, qw: fm.quat.w,
       c0: heli ? fm.cyclicLon : fm.elevator, c1: heli ? fm.cyclicLat : fm.aileron, c2: heli ? fm.pedal : fm.rudder, c3: heli ? fm.collective : fm.flaps,
-      pow: heli ? clamp(o.rotorPct / 100, 0, 1) : clamp(fm.rpm / (ac.A.turbine ? 2200 : 2700), 0, 1),
+      pow: heli ? clamp(o.rotorPct / 100, 0, 1) : clamp(fm.rpm / ac.A.maxRpm, 0, 1),
       spray: g.sprayer.on && g.sprayer.flowNow > 0, ground: o.onGround,
     });
   }
@@ -345,7 +345,7 @@ export class ReplayManager {
       fm.engine = s.pow > 0.05 ? 'running' : 'off';
     } else {
       fm.elevator = s.c0; fm.aileron = s.c1; fm.rudder = s.c2; fm.flaps = s.c3; fm.trim = 0;
-      fm.rpm = s.pow * (ac.A.turbine ? 2200 : 2700);
+      fm.rpm = s.pow * ac.A.maxRpm;
     }
     ac._animate(vdt);
     // Spray plume from the boom while the recorded valve was open.

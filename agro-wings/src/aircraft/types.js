@@ -2,13 +2,15 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, SPRAY, SPRAY_AT502, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, SPRAY, SPRAY_AT502, SPRAY_M18, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createAirTractorModel, AT_SHADOW, atWingY } from './atModel.js';
 import { createTurbinePanel } from './atPanel.js';
 import { createR44Model, R44_SHADOW } from './r44Model.js';
 import { createR44Panel } from './r44Panel.js';
+import { createDromaderModel, M18_SHADOW, m18WingY } from './dromaderModel.js';
+import { createDromaderPanel } from './dromaderPanel.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
 
@@ -95,6 +97,48 @@ export const AIRCRAFT_TYPES = {
     createShadow: () => createContactShadow(AT_SHADOW),
   },
 
+  // Classic radial: PZL M-18B Dromader (FLIGHT_M18: the fixed-wing model's
+  // radial / constant-speed prop branch). Fictional registration.
+  m18: {
+    id: 'm18',
+    slot: '04',
+    label: 'Dromader',
+    reg: 'PR-DMD',
+    name: 'PZL M-18B Dromader',
+    get role() { return t('Classic Radial Agricultural Aircraft'); },
+    get engineName() { return t('PZL-Kalisz ASz-62IR radial · 980 hp'); },
+    get summary() { return t('2,500 L hopper · 712 L fuel · 5,300 kg MTOW'); },
+    flight: FLIGHT_M18,
+    spray: { swath: SPRAY_M18.swath, flow: SPRAY_M18.flow, boom: [7.1, -0.76, -1.26] },
+    work: [[0, -1.92, 1.2], [7.2, -0.78, -1.27], [-7.2, -0.78, -1.27]],
+    collide: [[0, 0.4, 3.35], [8.9, -0.17, 0.0], [-8.9, -0.17, 0.0], [0, 2.29, -5.5], [0, 0.55, -6.2], [0, -1.92, 1.2], [0, 1.7, -1.8], [2.95, 0.59, -5.3], [-2.95, 0.59, -5.3]],
+    wire: [[0, 0.4, 3.35], [8.9, -0.17, 0.0], [-8.9, -0.17, 0.0], [0, 2.29, -5.5], [0, -1.92, 1.2], [4.4, -0.45, -0.3], [-4.4, -0.45, -0.3], [0, 1.7, -1.8]],
+    smoke: [-0.7, -0.47, 0.95], // exhaust stack outlet (right side)
+    wash: [0, -1.3, -2.8],
+    anim: { elev: 0.38, rud: 0.4, ail: 0.36, flap: 0.5, pedalZ: -0.8, propGear: FLIGHT_M18.radial.gear, disc: [420, 1000], wash: [1300, 2100], vib: [800, 2200] },
+    vspeeds: { vs0: 58, vs1: 66, vfe: 100, vne: 138 },
+    camera: { dist: 17.5, height: 4.8, orbit: 26 },
+    audio: { profile: 'radial', blades: 4, propGear: FLIGHT_M18.radial.gear },
+    fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
+    loads: { free: { fuel: 450, hopper: 1300 }, boot: 350 },
+    loadSheet: { bankKt: 100, roll: [139, 3011, 2.0] },
+    service: {
+      // 2" fuel nozzle, 3" hopper quick-fill on the left side behind the wing.
+      rates: { fuel: 7, liquid: 28 },
+      local: { A: [10.0, -2.9], B: [6.0, -2.7], F: [4.0, -2.3], P: [1.4, -2.45] },
+      keepOut: { wing: [8.9, -1.9, 0.8], wingY: m18WingY, fus: [0.72, -1.1, 1.72, -6.25, 2.95], stab: [2.95, 0.48, 0.69, -6.2, -4.5] },
+      veto: 12,
+    },
+    stub: { eye: [0, 1.42, -1.72], fuelFiller: [4.0, -0.46, -0.09], hopperPort: [0.62, -0.25, -2.05] },
+    bounds: [
+      [-0.72, 0.72, -1.1, 1.72, -5.6, 2.95], [-8.9, 8.9, -1.0, 0.0, -1.9, 0.8], [-0.12, 0.12, 0.55, 2.32, -6.25, -4.5],
+      [-2.95, 2.95, 0.48, 0.69, -6.2, -4.5], [-1.95, 1.95, -1.92, -0.9, 0.7, 1.45], [-1.65, 1.65, -1.2, 2.1, 2.9, 3.4],
+    ],
+    createModel: (panel, opts) => createDromaderModel(panel, opts),
+    createPanel: () => createDromaderPanel(),
+    createShadow: () => createContactShadow(M18_SHADOW),
+  },
+
   // Rotary wing: flown by Helicopter (src/aircraft/helicopter.js) with its
   // own physics (HeliModel); everything the game, crew, sprayer, GPS and
   // cameras need comes from the same fields as the airplanes.
@@ -165,5 +209,5 @@ export const AIRCRAFT_TYPES = {
   },
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44'];
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;

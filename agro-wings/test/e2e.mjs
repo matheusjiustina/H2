@@ -49,7 +49,7 @@ const state = () => page.evaluate(() => {
     t: +g.autopilot.t.toFixed(1), phase: g.autopilot.phase, x: +fm.pos.x.toFixed(0), z: +fm.pos.z.toFixed(0),
     agl: +o.agl.toFixed(1), hgt: +ac.workHeight().toFixed(1), kt: +(o.airspeed * 1.944).toFixed(0), eng: fm.engine,
     fuel: +fm.fuel.toFixed(0), hop: +fm.hopper.toFixed(0), mass: +fm.mass.toFixed(0), spray: g.sprayer.on,
-    cov: s ? +(s.coverage * 100).toFixed(1) : null, dmg: +ac.damage.toFixed(1), state: ac.state,
+    cov: s ? +(s.coverage * 100).toFixed(1) : null, dmg: +ac.damage.toFixed(1), state: ac.state, why: ac.crashReason ?? null,
     svc: g.service.state, step: g.service.step?.a || '', money: Math.round(g.career.money),
     results: g.screens.open,
   };

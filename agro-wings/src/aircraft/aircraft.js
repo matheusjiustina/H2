@@ -322,8 +322,27 @@ export class Aircraft {
       this._toast('fuel', this.A.turbine ? t('Flame-out: out of fuel.') : t('Engine stopped: out of fuel.'));
     } else if (e.kind === 'lightoff') {
       this.game.audio?.play('lightoff');
+    } else if (e.kind === 'cough' || e.kind === 'catch') {
+      // Radial start: single cylinders fire with a bang and a puff, then it
+      // catches in a cloud of oily smoke.
+      const d = this.game.camera ? this.game.camera.position.distanceTo(this.rPos) : 0;
+      const vol = this.game.cameraMode === 'cockpit' ? 0.8 : 1 / (1 + Math.max(0, d - 10) / 40);
+      this.game.audio?.play(e.kind === 'cough' ? 'cough' : 'catchRadial', { volume: vol });
+      this._exhaustPuff(e.kind === 'cough' ? 6 : 18);
     }
     this.onEvent?.(e);
+  }
+
+  // Blue-grey smoke from the exhaust stack.
+  _exhaustPuff(n) {
+    const dust = this.game.dust;
+    if (!dust || !this.type.smoke) return;
+    const fm = this.fm;
+    for (let i = 0; i < n; i++) {
+      _v.fromArray(this.type.smoke).applyQuaternion(fm.quat).add(fm.pos);
+      dust.spawn(_v.x, _v.y, _v.z, (Math.random() - 0.5) * 1.2 + this.windVec.x * 0.3, 0.4 + Math.random() * 0.5, (Math.random() - 0.5) * 1.2 + this.windVec.z * 0.3,
+        { life: 2.5 + Math.random() * 1.5, size: 0.45, grow: 3.2, alpha: 0.32, drag: 1.0, gravity: -0.15, color: [0.32, 0.33, 0.36] });
+    }
   }
 
   hurt(n) {
@@ -471,7 +490,7 @@ export class Aircraft {
     m.ailerons[1].rotation.x = fm.aileron * an.ail;
     for (const f of m.flaps) f.rotation.x = -fm.flaps * an.flap;
     // Propeller: blades fade into a disc as rpm rises.
-    m.blades.rotation.z += (fm.rpm / 60) * Math.PI * 2 * dt;
+    m.blades.rotation.z += ((fm.rpm * (an.propGear ?? 1)) / 60) * Math.PI * 2 * dt; // geared radial: prop slower than the crank
     const disc = smoothstep(an.disc[0], an.disc[1], fm.rpm);
     m.disc.material.opacity = disc * 0.85;
     m.disc.rotation.z += dt * 2.3;
@@ -514,6 +533,7 @@ export class Aircraft {
       fuel: fm.fuel, fuelCap: this.A.fuelCapacity, hopper: fm.hopper, hopperCap: this.A.hopperCapacity,
       ...this.type.vspeeds,
       ng: fm.ng, itt: fm.itt, torque: fm.torque, fuelFlow: fm.fuelFlow, throttle: fm.throttle, beta: fm.beta,
+      mp: fm.mp, cht: fm.cht, oilT: fm.oilT, oilP: fm.oilP,
       gLoad: o.gLoad, slip: o.beta, yawRate: -fm.omega.y, onGround: o.onGround, reg: this.type.reg,
       stall: o.stall, spray: !!this.game.sprayer?.on, brake: fm.brake > 0.3 || fm.parkBrake,
       engine: fm.engine, flaps: fm.flaps, hdg: this.headingDeg(), hgt: this.workHeight(), vsFpm: o.vs * FT * 60,
@@ -582,7 +602,7 @@ export class Aircraft {
       ias: o.airspeed * KT * Math.sqrt(o.density / 1.225), gs: o.groundSpeed * KT,
       hgt: this.workHeight(), agl: o.agl, altFt: (fm.pos.y + UNITS.altOffsetM) * FT,
       power: fm.throttle, rpm: fm.rpm, fuel: fm.fuel, hopper: fm.hopper, engine: fm.engine,
-      fuelCap: this.A.fuelCapacity, hopperCap: this.A.hopperCapacity, ng: fm.ng, itt: fm.itt, torque: fm.torque,
+      fuelCap: this.A.fuelCapacity, hopperCap: this.A.hopperCapacity, ng: fm.ng, itt: fm.itt, torque: fm.torque, mp: fm.mp,
       stall: o.stall, onGround: o.onGround, flaps: fm.flaps, brake: fm.brake, parkBrake: fm.parkBrake,
       vs: o.vs, damage: this.damage, mass: fm.mass, hdg: this.headingDeg(), state: this.state, g: o.gLoad,
       trim: this.trimShowT > 0 ? { path: this.cmd.trim || this.assist.trimmed ? this.assist.holdPitch : null, tab: fm.trim } : null,

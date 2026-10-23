@@ -19,6 +19,10 @@ export const BASE = {
   // Second apron spot (south-west) for when the helicopter is flown and both
   // airplanes wait parked.
   parking2: { x: -424, z: -88, heading: Math.PI / 2 },
+  // Third airplane spot (the 17.7 m Dromader fits it), south-east of the
+  // others in front of the hangar, clear of the taxi route and the tanks;
+  // used when the helicopter is flown and all three airplanes wait parked.
+  parking3: { x: -404, z: -100, heading: Math.PI / 2 },
   // Helicopter pad (R44): gravel pad with a painted H at the east end of the
   // apron, clear of the taxi route, the service pad and the fuel slab.
   helipad: { x: -323, z: -48, heading: Math.PI / 2, radius: 6 },
@@ -301,7 +305,7 @@ function makeSite(f) {
     apron: mvr(BASE.apron, dx, dz),
     taxiway: { ...mvr(BASE.taxiway, dx, dz), z1: dz - f.width / 2 },
     hangar: mv(BASE.hangar, dx, dz),
-    pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz),
+    pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz), parking3: mv(BASE.parking3, dx, dz),
     helipad: mv(BASE.helipad, dx, dz),
     fuelTank: mv(BASE.fuelTank, dx, dz), mixTank: mv(BASE.mixTank, dx, dz),
     reservoirs: BASE.reservoirs.map((r) => mv(r, dx, dz)),

@@ -263,11 +263,12 @@ export const FLIGHT_M18 = {
   fuelTankSpanY: 4.0,
 
   // Oleo main legs from the wing centre section, ahead of the wing, and a
-  // steerable tailwheel on its own oleo; ≈ 13° three-point attitude.
+  // steerable tailwheel on a long oleo; ≈ 9.5° three-point attitude (as in
+  // photographs of parked M-18Bs).
   gear: [
     { name: 'mainL', p: [1.74, -1.92, 1.2], k: 300000, c: 30000, travel: 0.26, radius: 0.42, steer: false },
     { name: 'mainR', p: [-1.74, -1.92, 1.2], k: 300000, c: 30000, travel: 0.26, radius: 0.42, steer: false },
-    { name: 'tail', p: [0, -0.55, -4.65], k: 80000, c: 7000, travel: 0.16, radius: 0.18, steer: true },
+    { name: 'tail', p: [0, -0.93, -4.65], k: 80000, c: 7000, travel: 0.16, radius: 0.18, steer: true },
   ],
   brakeMu: 0.4,
   tailSteer: 0.34,
@@ -277,14 +278,14 @@ export const FLIGHT_M18 = {
     { name: 'wingtipR', p: [-8.9, -0.17, 0.0] },
     { name: 'boomL', p: [7.1, -0.66, -1.24] },
     { name: 'boomR', p: [-7.1, -0.66, -1.24] },
-    { name: 'prop', p: [0, -1.27, 2.55] },
-    { name: 'spinner', p: [0, 0.38, 2.95] },
+    { name: 'prop', p: [0, -1.25, 3.0] },
+    { name: 'spinner', p: [0, 0.4, 3.35] },
     { name: 'belly', p: [0, -1.08, 0.3] },
-    { name: 'tail', p: [0, 0.12, -5.8] },
-    { name: 'fin', p: [0, 2.55, -5.75] },
-    { name: 'stabL', p: [2.9, 0.82, -5.6] },
-    { name: 'stabR', p: [-2.9, 0.82, -5.6] },
-    { name: 'roof', p: [0, 2.02, -2.0] },
+    { name: 'tail', p: [0, 0.3, -5.6] },
+    { name: 'fin', p: [0, 2.29, -5.5] },
+    { name: 'stabL', p: [2.9, 0.55, -5.2] },
+    { name: 'stabR', p: [-2.9, 0.55, -5.2] },
+    { name: 'roof', p: [0, 1.7, -1.8] },
   ],
   hardLandingVs: 3.1,
   crashVs: 5.6,

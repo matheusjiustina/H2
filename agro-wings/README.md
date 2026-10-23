@@ -1430,3 +1430,124 @@ growth, coverage, missions and flight model; only how they are drawn changed.
   farm flow 15/15, UI 22/22, unit tests 80/80.
 - Look-dev: `node test/cropviews.mjs <out>` (same 12 views before / after;
   `VIEWS='[["name",{"cam":[x,h,z],"target":[x,h,z]}]]'` for extra views).
+
+## Aircraft 04 — PZL M-18B Dromader (PR-DMD)
+
+A fourth aircraft built from scratch: the classic Polish radial-engined
+crop sprayer. The PR-AGW Ipanema, the AT-502B and the R44 keep their
+configurations (`test/m18.test.mjs` checks their engines and figures; their
+models, panels and service are untouched). The registration PR-DMD is
+fictional; the reference aircraft's registration is not used.
+
+**References.** The side photo of a yellow M-18B, the engine close-up
+(blue nose case, polished collector ring, four-blade prop with yellow tips)
+and the real cockpit photo (two toed-in boards either side of the hopper's
+litre scale, red-knob levers). The video was used only as a look reference
+(paint, cabin and panel); none of its physics, controls, missions or code.
+The fuselage was fitted to the side photo: a flat silhouette of the model,
+rendered from the side and aligned on the wheels, is drawn over the photo
+and the cowl, hopper top, cabin, rear fairing, tail cone, fin and rudder
+were moved until the outlines matched.
+
+**Published figures used** (Jane's via Wikipedia, flugzeuginfo, PZL data;
+the ASz-62IR from the engine's data sheet):
+
+| | |
+| --- | --- |
+| Engine | PZL-Kalisz ASz-62IR-M18, 9-cylinder supercharged radial, 980 hp (731 kW) at 2,200 rpm, 0.687 reduction |
+| Propeller | 4-blade constant speed |
+| Span / length / wing area | 17.70 m / 9.47 m / 40.0 m² |
+| Empty / max take-off | 2,710 kg / 5,300 kg (agricultural) |
+| Hopper / fuel | 2,500 L / 712 L avgas |
+| Stall, flaps down | 108 km/h (58 kt) |
+| Initial climb | ≈ 1,100 ft/min |
+| Working speed | 160–190 km/h |
+
+**Estimated for the game** (not published, or sources disagree; all in
+`FLIGHT_M18` in `src/config.js` with comments): prop diameter 3.3 m; CLmax
+1.49 / 2.06 from the stall speeds; CD0 0.075 and Oswald 0.76 so that the
+climb and a ≈ 122 kt full-power level speed come from one polar; inertias
+scaled from mass and size; static thrust from momentum theory (figure of
+merit 0.62); fuel flow from a radial's ≈ 0.6 lb/hp/h; the governor
+schedule, manifold pressure, CHT, oil temperature and pressure. Payload is
+not hopper volume: with full fuel and pilot the MTOW leaves ≈ 2,000 kg for
+the hopper, so a full 2,500 L of water is over weight (the load sheet says
+so).
+
+**Radial engine** (`FlightModel._radial`, sharing `_propThrust` with the
+PT6): the inertia starter turns the engine slowly; after ≈ 1.6 s and 2.5 s
+single cylinders fire (a cough, a bang and a puff of smoke from the stack)
+and at ≈ 3.2 s it catches in a cloud of smoke. Manifold pressure follows the
+throttle (13 inHg idle → 41.3 inHg take-off); on the fine stop the rpm
+follows power, above ≈ 32 % throttle the governor holds 2,200 rpm and the
+blades coarsen with speed. Power comes from manifold pressure and rpm;
+CHT and oil temperature rise with power and cool with airspeed; oil
+pressure follows rpm; fuel flow runs 24 L/h at idle to 330 L/h at take-off.
+After shutdown the engine runs down over ≈ 10 s. All of these drive the
+cockpit gauges.
+
+**Measured** (`node --test test/m18.test.mjs`):
+
+| check | result | published |
+| --- | --- | --- |
+| three-point attitude | 10.2° | ≈ 10° (photo) |
+| full throttle, static | 2,198 rpm (prop 1,510), 41.3 inHg, 979 hp, 330 L/h, 15.0 kN | 980 hp at 2,200 rpm |
+| ground roll 3,011 / 5,300 kg | 147 m / 460 m | — |
+| climb 4,200 kg at 78 kt | 1,160 ft/min (746 at 5,300 kg) | ≈ 1,100 ft/min |
+| 1 g stall, flaps down, 4,200 kg | 58 kt | 58 kt |
+| level, 4,200 kg | 122 kt full power; 96 kt at 62 % | working 86–103 kt |
+| roll to 60° (loaded, assist) | 1.57 s (heavier than the AT's 1.2 s) | — |
+| balão with 1,500 L | +36 m, no stall | — |
+| dive pull-out, 800 / 1,200 L | lowest 3.2 / 4.0 m, no stall | — |
+| landing | 0.87 m/s touchdown, 250 m roll, no prop strike | — |
+
+**Spray:** 28 nozzles a side on booms that follow the trailing edge (clear
+of the lowered flaps), fan-driven pump; swath 32 m and 5.6 L/s (the same
+dose as the others at its working speed).
+
+**Model** (`src/aircraft/dromaderModel.js`): the exposed nine-cylinder
+radial (finned barrels, heads, push-rod tubes, blue crankcase and nose
+case, governor, ignition ring, polished collector ring) ahead of a small
+cowl with gills, the big exhaust stack down the right side with soot, the
+oil-cooler scoop; the four-blade prop (black, yellow tips with a black
+band, brass clamps) with motion blur from the shared prop disc, geared
+0.687 to the crankshaft; the long hopper bay with its light-grey lid; the
+glazed cabin standing on the fuselage (raked windshield from the hopper
+top, door and triangular rear windows, painted roof band, red beacon, steep
+rear fairing), the slim tail cone, the strut-braced tailplane low on it,
+the tall fin with a big rudder; the long rectangular wing with flaps,
+ailerons, tip caps, lights, walkway and filler; raked oleo main gear and a
+steerable tailwheel. Yellow paint with a black cheat line, the camel badge
+and "PZL M-18B DROMADER" in red, AGRO WINGS lettering, PR-DMD on the tail
+cone, white-over-red tail band. Fine parts sit in a LOD that drops beyond
+95 m.
+
+**Cockpit** (`src/aircraft/dromaderPanel.js`): two toed-in boards with
+Polish labels and metric dials, as in the real aircraft — airspeed km/h,
+attitude, altimeter in metres, turn coordinator, heading, variometer m/s,
+g-meter, flaps, fuel; rpm, manifold pressure, CHT, oil temperature and
+pressure, fuel flow, hopper litres, voltage — every needle from the flight
+model; annunciators; between the boards the hopper's back wall with the
+stencilled litre scale and the live liquid level; the guidance GPS and
+lightbar on the coaming; stick, pedals, throttle and red-knob levers that
+move; the shared pilot seated in this cabin.
+
+**Integration.** `types.js` entry `m18` (slot 04): selection card, office
+list, parking (a third apron spot for when the R44 is flown), crew service
+points and rates for its filler and hopper coupler, collision and wire
+points, load sheet, guidance swath and an amber GPS theme, chase/orbit
+cameras, cockpit vibration, V-speeds and audio profile `radial` (nine
+cylinders, 4.5 firings per revolution, deep exhaust, uneven idle with
+pops, crackle on a closed throttle, inertia-starter whine, coughs and the
+catch on start, four-blade prop buzz from the geared prop rpm). The
+autopilot's taxi routes were moved a few metres so the 17.7 m span and the
+long tail clear the parked R44 and the mixing station.
+
+**Limitations.** Supercharger, mixture and carburettor heat are not
+modelled (the throttle sets manifold pressure, the governor the rpm);
+engine temperatures are a simple first-order model; cylinder-by-cylinder
+firing is an audio effect only. The windshield is a single curved surface
+(the real one has more frames). The proportions were matched to one side
+photo; the plan view and wing section come from published dimensions. The
+cockpit labels are in Polish as on the real aircraft; the rest of the UI
+follows the game language.

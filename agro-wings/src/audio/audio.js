@@ -1,5 +1,6 @@
 // Synthesized audio (Web Audio): piston engine (6-cyl firing frequency from
-// rpm) or PT6 turboprop (compressor whine and gas-generator hum from Ng,
+// rpm; or the Dromader's nine-cylinder radial with its uneven idle, pops,
+// coughs on start and inertia-starter whine) or PT6 turboprop (compressor whine and gas-generator hum from Ng,
 // exhaust roar with power, light-off whoosh), propeller buzz at blade-pass
 // frequency; for the helicopter, main-rotor blade passage (2/rev noise
 // pulses and low "whop", blade slap in descents), tail-rotor buzz and the
@@ -85,6 +86,16 @@ export class GameAudio {
     this.clatGain = ctx.createGain();
     this.clatGain.gain.value = 0;
     this.clat.connect(this.clatBP).connect(this.clatAM).connect(this.clatGain).connect(this.acBus);
+    // Radial lope: two slow, unrelated modulators on the engine level make the
+    // nine-cylinder idle uneven.
+    this.lopeDepth = ctx.createGain();
+    this.lopeDepth.gain.value = 0;
+    this.lopeDepth.connect(this.engGain.gain);
+    this.lope = ctx.createOscillator(); this.lope.type = 'sine'; this.lope.frequency.value = 4;
+    this.lope2 = ctx.createOscillator(); this.lope2.type = 'triangle'; this.lope2.frequency.value = 1.3;
+    const l2 = ctx.createGain(); l2.gain.value = 0.7;
+    this.lope.connect(this.lopeDepth);
+    this.lope2.connect(l2).connect(this.lopeDepth);
     // Propeller buzz at blade-pass frequency.
     this.prop = ctx.createOscillator();
     this.prop.type = 'sawtooth';
@@ -243,7 +254,7 @@ export class GameAudio {
     this.tracGain = ctx.createGain(); this.tracGain.gain.value = 0;
     this.tracOsc.connect(this.tracLP).connect(this.tracGain).connect(this.master);
     this.hangarT = 3;
-    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum, this.truckOsc, this.truckSub, this.tracOsc, this.hMod, this.hTail, this.hWhine]) o.start();
+    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum, this.truckOsc, this.truckSub, this.tracOsc, this.hMod, this.hTail, this.hWhine, this.lope, this.lope2]) o.start();
     this.birdT = 2;
     this.cicT = 0;
     this.cicOn = false;
@@ -269,19 +280,31 @@ export class GameAudio {
     const run = s.engine === 'running' || s.engine === 'cranking';
     const turbo = s.profile === 'turboprop';
     const heli = s.profile === 'heli';
-    const fire = Math.max(1, (rpm / 60) * 3);
+    // Radial (ASz-62IR): nine cylinders, 4.5 firings per crank revolution,
+    // deeper exhaust, geared four-blade prop.
+    const radial = s.profile === 'radial';
+    const fire = Math.max(1, (rpm / 60) * (radial ? 4.5 : 3));
     const on = turbo ? smoothstep(3, 30, s.ng ?? 0) : smoothstep(150, 500, rpm) * (run ? 1 : 0.15);
     const load = clamp(turbo ? s.power ?? 0 : s.throttle, 0, 1);
     const piston = turbo ? 0 : 1;
     this.eng.frequency.setTargetAtTime(fire, t, 0.04);
     this.engSub.frequency.setTargetAtTime(fire / 2, t, 0.04);
-    this.engLP.frequency.setTargetAtTime(220 + 1200 * load + rpm * 0.35, t, 0.08);
+    this.engLP.frequency.setTargetAtTime(radial ? 150 + 800 * load + rpm * 0.28 : 220 + 1200 * load + rpm * 0.35, t, 0.08);
     const dist = s.listenerDist ?? 0;
     const att = s.inside ? 1 : 1 / (1 + dist / 40);
     // The R44's engine sits behind the cabin under the rotor: a little quieter
     // than the airplanes' (the rotor dominates outside).
     const engK = heli ? 0.75 : 1;
-    this.engGain.gain.setTargetAtTime(piston * on * (0.16 + 0.22 * load) * att * engK * (s.rough ? 0.8 + Math.random() * 0.4 : 1), t, k);
+    const crankChug = radial && s.engine === 'cranking' ? 0.07 : 0;
+    this.engGain.gain.setTargetAtTime((piston * on * (radial ? 0.2 + 0.26 * load : 0.16 + 0.22 * load) * engK * (s.rough ? 0.8 + Math.random() * 0.4 : 1) + crankChug) * att, t, k);
+    if (radial) {
+      this.lope.frequency.setTargetAtTime(Math.max(1, rpm / 120), t, 0.1);
+      this.lopeDepth.gain.setTargetAtTime(on * (1 - smoothstep(600, 1500, rpm)) * 0.07 * att, t, 0.1);
+      // Idle pops and the crackle of a closed throttle at high rpm.
+      const chop = (this._lastThr ?? s.throttle) - s.throttle > 0.02 && rpm > 1400;
+      if (s.engine === 'running' && ((rpm < 900 && Math.random() < dt * 0.7) || (chop && Math.random() < 0.5))) this.play('pop', { volume: att * (chop ? 0.9 : 0.6) });
+    } else this.lopeDepth.gain.setTargetAtTime(0, t, 0.1);
+    this._lastThr = s.throttle;
     this.clatMod.frequency.setTargetAtTime(fire, t, 0.04);
     this.clatBP.frequency.setTargetAtTime(600 + rpm * 0.4, t, 0.1);
     this.clatGain.gain.setTargetAtTime(piston * on * (0.05 + 0.06 * load) * att, t, k);
@@ -295,7 +318,7 @@ export class GameAudio {
     this.tHumGain.gain.setTargetAtTime(turbo ? on * (0.05 + 0.04 * load) * att * (s.rough ? 0.8 + Math.random() * 0.4 : 1) : 0, t, k);
     this.tRoarBP.frequency.setTargetAtTime(380 + load * 900, t, 0.1);
     this.tRoarGain.gain.setTargetAtTime(turbo ? on * (0.03 + 0.2 * load) * att : 0, t, k);
-    const bpf = Math.max(1, (rpm / 60) * (turbo ? s.blades ?? 3 : 2));
+    const bpf = Math.max(1, ((rpm * (s.propGear ?? 1)) / 60) * (turbo || radial ? s.blades ?? 3 : 2));
     this.prop.frequency.setTargetAtTime(bpf, t, 0.04);
     this.propBP.frequency.setTargetAtTime(bpf * 3, t, 0.05);
     const pr = turbo ? smoothstep(250, 2200, rpm) : smoothstep(300, 2700, rpm);
@@ -326,8 +349,9 @@ export class GameAudio {
       this.hWhine.frequency.setTargetAtTime(Math.max(30, (s.rotorRpm ?? 0) * 4.1), t, 0.08);
       this.hWhineGain.gain.setTargetAtTime(lvl * (s.inside ? 0.007 : 0.0025) * hAtt, t, k);
     }
-    this.starterGain.gain.setTargetAtTime(s.engine === 'cranking' && !turbo ? 0.08 : 0, t, 0.05);
-    this.starter.frequency.setTargetAtTime(s.engine === 'cranking' ? 160 + rpm * 0.6 : 120, t, 0.2);
+    // The radial's inertia starter: a flywheel whine that rises as it spins up.
+    this.starterGain.gain.setTargetAtTime(s.engine === 'cranking' && !turbo ? (radial ? 0.06 : 0.08) : 0, t, 0.05);
+    this.starter.frequency.setTargetAtTime(s.engine === 'cranking' ? (radial ? 380 + rpm * 2.6 : 160 + rpm * 0.6) : 120, t, radial ? 0.6 : 0.2);
     this.acTone.frequency.setTargetAtTime(s.inside ? 1500 : 7000, t, 0.1);
     this.acBus.gain.setTargetAtTime(s.inside ? 1.5 : 1.1, t, 0.2);
     // Wind
@@ -448,6 +472,20 @@ export class GameAudio {
         // Piston engine catching: a few uneven firing pops, then it runs.
         for (const [d, f] of [[0, 70], [0.14, 62], [0.24, 75], [0.31, 68], [0.37, 80]]) tone(0.11, f, f * 0.6, 0.22, 'sawtooth', d);
         burst(0.5, 160, 0.7, 0.18, 'lowpass', this.brown);
+        break;
+      case 'cough':
+        // One cylinder firing on its own: a bang and a low thud.
+        tone(0.2, 58, 34, 0.32, 'sawtooth');
+        burst(0.45, 130, 0.7, 0.32, 'lowpass', this.brown);
+        break;
+      case 'catchRadial':
+        // The radial catching: a ragged string of bangs settling into a rumble.
+        for (const [d, f] of [[0, 52], [0.08, 61], [0.19, 48], [0.24, 66], [0.33, 55], [0.41, 70], [0.46, 58], [0.53, 74], [0.6, 62]]) tone(0.12, f, f * 0.55, 0.24, 'sawtooth', d);
+        burst(1.1, 150, 0.7, 0.28, 'lowpass', this.brown);
+        break;
+      case 'pop':
+        burst(0.08, 260, 0.8, 0.14, 'lowpass', this.brown);
+        tone(0.06, 85, 50, 0.07, 'sawtooth');
         break;
       case 'lightoff': {
         // Fuel lights in the combustor: a soft rising whoosh.
