@@ -45,6 +45,8 @@ export class FlightModel {
     this.engine = 'off'; this.crankTime = 0; this.rpm = 0; this.roughness = 0;
     // Turboprop state (gas-generator %, ITT °C, torque ft·lb, fuel flow L/h).
     this.ng = 0; this.itt = 30; this.torque = 0; this.fuelFlow = 0; this.shaftPower = 0; this.beta = false;
+    // Radial piston state (manifold pressure inHg, cylinder head and oil °C, oil psi).
+    this.mp = A.radial?.mpAmbient ?? 0; this.cht = 30; this.oilT = 30; this.oilP = 0;
     this.fuel = A.fuelCapacity * 0.6;
     this.hopper = 0;
     this.extraDrag = 0; // spray valve, damage
@@ -94,6 +96,13 @@ export class FlightModel {
       this.ng = engineOn ? T.idleNg + (T.maxNg - T.idleNg) * Math.pow(this.throttle, 0.7) : 0;
       this.itt = engineOn ? 600 : 30;
       this.shaftPower = 0; this.torque = 0; this.fuelFlow = 0; this._tGuess = 0;
+    }
+    if (this.A.radial) {
+      const R = this.A.radial;
+      this.rpm = engineOn ? this.A.maxRpm * 0.95 : 0;
+      this.mp = engineOn ? R.mpIdle + (R.mpMax - R.mpIdle) * this.throttle : R.mpAmbient;
+      this.cht = engineOn ? 175 : 30; this.oilT = engineOn ? 65 : 30; this.oilP = engineOn ? 75 : 0;
+      this.shaftPower = 0; this.fuelFlow = 0; this._tGuess = 0; this._coughs = 0;
     }
     this.brake = 0;
     this.stallWobble = 0;
@@ -145,7 +154,7 @@ export class FlightModel {
     const sigma = rho / 1.225;
     const ceiling = smoothstep(4400, 3000, altMSL);
     let thrust;
-    if (A.turbine) thrust = this._propThrust(u, rho, ceiling);
+    if (A.turbine || A.radial) thrust = this._propThrust(u, rho, ceiling);
     else {
       const S = this.rpm / A.maxRpm;
       const power = A.maxPower * Math.pow(Math.max(S, 0), 1.5) * sigma * ceiling;
@@ -379,6 +388,7 @@ export class FlightModel {
   _engine(dt, env) {
     const A = this.A;
     if (A.turbine) return this._turbine(dt);
+    if (A.radial) return this._radial(dt);
     if (this.engine === 'cranking') {
       this.crankTime += dt;
       this.rpm += (260 - this.rpm) * Math.min(1, dt * 3);
@@ -464,12 +474,74 @@ export class FlightModel {
     this.fuelFlow *= 3600;
   }
 
+  // Supercharged radial with a constant-speed prop (ASz-62IR class). The
+  // throttle sets the manifold pressure; shaft power follows it (boost held
+  // at the altitudes flown here). Below govThrottle the blades sit on the
+  // fine-pitch stop and the rpm rises with power; above it the governor
+  // holds the take-off rpm and the blades take the power. Start: the inertia
+  // starter turns the big prop over slowly, a few cylinders cough, then it
+  // catches. Cylinder head and oil temperatures follow power and cooling air
+  // (prop wash on the ground, airspeed in flight); oil pressure follows rpm.
+  _radial(dt) {
+    const A = this.A, R = A.radial;
+    const u = this.out.airspeed;
+    let mpT = R.mpAmbient, running = false;
+    if (this.engine === 'cranking') {
+      this.crankTime += dt;
+      this.rpm += (R.crankRpm - this.rpm) * Math.min(1, dt * 1.6);
+      // Coughs: single cylinders firing before it catches (smoke, audio).
+      const c = this.crankTime / R.crank;
+      if (this._coughs < 1 && c > 0.5) { this._coughs = 1; this.events.push({ kind: 'cough' }); }
+      if (this._coughs < 2 && c > 0.78) { this._coughs = 2; this.events.push({ kind: 'cough' }); }
+      if (this.crankTime > R.crank) {
+        this._coughs = 0;
+        if (this.fuel > 0) { this.engine = 'running'; this.events.push({ kind: 'catch' }); } else this.engine = 'off';
+      }
+    } else if (this.engine === 'running') {
+      running = true;
+      mpT = R.mpIdle + (R.mpMax - R.mpIdle) * this.throttle;
+    }
+    this.mp += (mpT - this.mp) * Math.min(1, dt * (running ? 2.5 : 1.2));
+    const boost = clamp((this.mp - R.mpIdle) / (R.mpMax - R.mpIdle), 0, 1);
+    // Rpm: fine stop (rising with throttle), governed, or winding down.
+    let rpmT;
+    if (running) {
+      const fine = A.idleRpm + (A.maxRpm - A.idleRpm) * smoothstep(0, R.govThrottle, this.throttle) ** 0.8;
+      rpmT = Math.min(A.maxRpm, Math.max(fine, Math.min(u * 26, A.maxRpm * 0.8)));
+      if (this.roughness > 0) rpmT *= 1 - this.roughness * (0.06 + 0.06 * Math.sin(performance.now() * 0.007));
+    } else if (this.engine === 'cranking') rpmT = this.rpm;
+    else rpmT = this.out.onGround ? 0 : Math.min(u * 20, 900); // windmilling aloft
+    const tau = running ? R.spool : rpmT < this.rpm ? 1.4 : 0.6;
+    this.rpm += (rpmT - this.rpm) * Math.min(1, dt / tau);
+    if (this.rpm < 1) this.rpm = 0;
+    // Shaft power: manifold pressure × rpm (below the governed rpm the engine
+    // cannot make full power), roughness from damage.
+    let frac = 0;
+    if (running) frac = (R.idleFrac + (1 - R.idleFrac) * boost ** 1.15) * clamp(this.rpm / A.maxRpm, 0.3, 1) * (1 - this.roughness * 0.35);
+    this.shaftPower = frac * A.maxPower;
+    const w = Math.max(this.rpm, 300) * Math.PI / 30;
+    this.torque = (this.shaftPower / w) * 0.7376;
+    // Temperatures and oil pressure.
+    const cool = smoothstep(0, 55, u) + (this.out.onGround ? 0.35 * smoothstep(800, 2200, this.rpm) : 0);
+    const chtT = running ? 95 + 165 * frac ** 0.8 - 55 * cool : 30;
+    this.cht += (chtT - this.cht) * Math.min(1, dt / (chtT > this.cht ? 40 : 70));
+    const oilT = running ? 45 + 0.32 * (this.cht - 30) : 30;
+    this.oilT += (oilT - this.oilT) * Math.min(1, dt / 90);
+    const oilPT = this.rpm > 100 ? 25 + 55 * smoothstep(300, 1600, this.rpm) * (1 - 0.15 * smoothstep(60, 95, this.oilT)) : 0;
+    this.oilP += (oilPT - this.oilP) * Math.min(1, dt * 2);
+    // Fuel (avgas, rich at high power) and starvation.
+    this.fuelFlow = running ? A.fuelFlowIdle + (A.fuelFlowFull - A.fuelFlowIdle) * clamp((frac - R.idleFrac) / (1 - R.idleFrac), 0, 1) ** 1.1 : 0;
+    this.fuel = Math.max(0, this.fuel - this.fuelFlow * A.fuelBurnScale * dt);
+    if (running && this.fuel <= 0) { this.engine = 'off'; this.events.push({ kind: 'starved' }); }
+    this.fuelFlow *= 3600;
+  }
+
   // Thrust of the constant-speed prop from shaft power: actuator disc with
   // losses, η·P = T·(V/2 + √(V²/4 + T/2ρA)), solved by Newton from the
   // previous step. η rises from the static figure of merit to the cruise
   // propulsive efficiency. Plus disc drag on the fine stop and beta braking.
   _propThrust(u, rho, ceiling) {
-    const A = this.A, T = A.turbine;
+    const A = this.A, T = A.turbine ?? A.radial;
     const disc = Math.PI * A.propRadius ** 2;
     const P = this.shaftPower * ceiling;
     let t = 0;

@@ -194,6 +194,116 @@ export const SPRAY_AT502 = {
   flow: 6.4,
 };
 
+// ---------------------------------------------------------------------------
+// PZL-Mielec M-18B Dromader (third airplane, fictional registration PR-DMD).
+// Published figures used (Jane's via Wikipedia, flugzeuginfo, PZL data
+// sheets): span 17.70 m; length 9.47 m; height 3.70 m; wing area 40.0 m²;
+// empty 2,710 kg; maximum take-off 5,300 kg (agricultural, restricted
+// category); PZL-Kalisz ASz-62IR-M18 nine-cylinder supercharged radial,
+// 980 hp (731 kW) for take-off at 2,200 rpm, 0.687 reduction gear to a
+// four-blade constant-speed propeller; hopper 2,500 L (2,200 kg dry);
+// fuel 712 L (≈ 510 kg avgas); stall 108 km/h (58 kt) flaps down; initial
+// climb ≈ 1,100 ft/min; working speed 160–190 km/h.
+// Estimated for the game (not published, or sources disagree): the
+// propeller diameter (3.3 m), CLmax 1.49 clean / 2.06 with flaps from the
+// stall speeds, CD0 0.075 with e 0.76 (radial cowl, struts, booms, spreader
+// fairing) so that the climb and a ≈ 130 kt full-power level speed come out
+// of one polar, inertias scaled from mass and size (the heavy radial far
+// forward raises the pitch and yaw inertia), static thrust from momentum
+// theory (figure of merit 0.62), fuel flow from a radial's ≈ 0.6 lb/hp/h at
+// take-off power, the governed rpm schedule, manifold pressure and engine
+// temperatures. Hopper volume is not payload: with full fuel and pilot the
+// MTOW leaves ≈ 2,000 kg for the hopper.
+export const FLIGHT_M18 = {
+  ...FLIGHT,
+  emptyMass: 2710,
+  mtow: 5300,
+  pilotMass: 85,
+  wingArea: 40.0,
+  span: 17.7,
+  chord: 2.33, // mean aerodynamic chord (2.6 m centre section, 1.7 m tips)
+  oswald: 0.76,
+  inertiaEmpty: [14500, 20500, 15000],
+
+  CL0: 0.32, CLa: 5.0, alphaStall: 0.235, alphaStallNeg: -0.2,
+  CD0: 0.075,
+  CDflap: 0.075, CLflap: 0.64,
+  Cm0: 0.04, CmaWB: 0.24, CmaTail: -1.45, Cmq: -17, Cmde: 0.47, Cmflap: -0.065,
+  Clb: -0.085, Clp: -0.52, Clr: 0.11, Clda: 0.074,
+  Cnb: 0.09, Cnr: -0.18, Cndr: 0.074, Cnda: -0.013,
+  CYb: -0.6, CYdr: 0.12,
+
+  engineType: 'radial',
+  maxPower: 731e3, // 980 hp take-off (supercharged: held to the altitudes flown here)
+  propRadius: 1.65,
+  maxRpm: 2200, // crankshaft rpm, governed at take-off power (prop 1,511 rpm)
+  idleRpm: 560,
+  radial: {
+    gear: 0.687, // propeller / crankshaft speed
+    crank: 3.2, // s of starter before the cylinders catch
+    crankRpm: 150, // the inertia starter turns the big prop over slowly
+    govThrottle: 0.32, // throttle above which the governor holds the rpm
+    mpIdle: 13, mpMax: 41.3, mpAmbient: 29.6, // manifold pressure, inHg (1,050 mmHg take-off boost)
+    idleFrac: 0.025, // shaft power at idle
+    govFrac: 0.3, // power fraction at which the blades leave the fine stop
+    etaStatic: 0.62, // static figure of merit of the four-blade prop
+    etaCruise: 0.8, // propulsive efficiency in climb / cruise
+    discDrag: 0.13, // windmilling disc drag on the fine stop (power off)
+    spool: 0.9, // s: rpm response of the governed prop
+  },
+  fuelFlowFull: 330 / 3600, // L/s at take-off power (avgas, rich)
+  fuelFlowIdle: 24 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.72,
+
+  fuelCapacity: 712, // L, two outer-wing tanks
+  hopperCapacity: 2500,
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.1, // the hopper sits over the CG, ahead of the cabin
+  fuelTankSpanY: 4.0,
+
+  // Oleo main legs from the wing centre section, ahead of the wing, and a
+  // steerable tailwheel on its own oleo; ≈ 13° three-point attitude.
+  gear: [
+    { name: 'mainL', p: [1.74, -1.92, 1.2], k: 300000, c: 30000, travel: 0.26, radius: 0.42, steer: false },
+    { name: 'mainR', p: [-1.74, -1.92, 1.2], k: 300000, c: 30000, travel: 0.26, radius: 0.42, steer: false },
+    { name: 'tail', p: [0, -0.55, -4.65], k: 80000, c: 7000, travel: 0.16, radius: 0.18, steer: true },
+  ],
+  brakeMu: 0.4,
+  tailSteer: 0.34,
+
+  hard: [
+    { name: 'wingtipL', p: [8.9, -0.17, 0.0] },
+    { name: 'wingtipR', p: [-8.9, -0.17, 0.0] },
+    { name: 'boomL', p: [7.1, -0.66, -1.24] },
+    { name: 'boomR', p: [-7.1, -0.66, -1.24] },
+    { name: 'prop', p: [0, -1.27, 2.55] },
+    { name: 'spinner', p: [0, 0.38, 2.95] },
+    { name: 'belly', p: [0, -1.08, 0.3] },
+    { name: 'tail', p: [0, 0.12, -5.8] },
+    { name: 'fin', p: [0, 2.55, -5.75] },
+    { name: 'stabL', p: [2.9, 0.82, -5.6] },
+    { name: 'stabR', p: [-2.9, 0.82, -5.6] },
+    { name: 'roof', p: [0, 2.02, -2.0] },
+  ],
+  hardLandingVs: 3.1,
+  crashVs: 5.6,
+
+  wheelPoint: [0, -1.92, 1.2],
+  aglOffset: 1.92,
+  wingDrop: 0.72,
+  assistGain: { pitch: 2.2, roll: 1.7 },
+  assistSpeedScale: 1.25, // stall speed ratio to the PR-AGW at max weight
+};
+
+export const SPRAY_M18 = {
+  // 15 m boom: a swath scaled from the Dromader's real ≈ 25 m the same way
+  // as the others', and the flow that gives the PR-AGW's dose at a 50 m/s
+  // (97 kt) working speed.
+  swath: 32,
+  flow: 5.6,
+};
+
 export const ASSIST = {
   modes: ['off', 'normal', 'high'],
   default: 'normal',

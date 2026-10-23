@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test test/flight.test.mjs test/spray.test.mjs test/at502.test.mjs test/r44.test.mjs test/terrain.test.mjs test/input.test.mjs test/r44power.test.mjs test/i18n.test.mjs test/weather.test.mjs"
+    "test": "node --test test/flight.test.mjs test/spray.test.mjs test/at502.test.mjs test/r44.test.mjs test/terrain.test.mjs test/input.test.mjs test/r44power.test.mjs test/i18n.test.mjs test/weather.test.mjs test/m18.test.mjs"
   },
   "dependencies": {
     "three": "0.185.1"
