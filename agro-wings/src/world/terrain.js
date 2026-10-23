@@ -36,6 +36,7 @@ uniform vec4 uSiteOff[NS];
 uniform float uWorldHalf;
 uniform vec4 uCut[NCUT];
 uniform float uCropR0;
+uniform float uCropTop;
 uniform vec2 uStream[NSTP];
 uniform vec4 uStreamBox;
 uniform vec4 uPond[NPOND];
@@ -139,8 +140,11 @@ vec3 fieldColor(vec2 p, vec4 info, float edgeIn, vec4 nA, vec4 nB, vec4 nC, vec4
     if (type > 1.5) ground = mix(ground, ground * 1.12, (1.0 - under) * smoothstep(0.1, 0.3, rowD) * 0.5); // cotton ridges
     vec3 green = type < 0.5 ? vec3(0.072, 0.150, 0.034) : type < 1.5 ? vec3(0.078, 0.140, 0.034) : vec3(0.075, 0.130, 0.042);
     float cover = smoothstep(0.0, 0.7, info.z);
-    float farK = uCropR0 > 1.0 ? smoothstep(uCropR0 * 0.6, uCropR0 * 0.95, distance(p, cameraPosition.xz)) : 1.0;
-    c = mix(ground, green * (0.85 + 0.3 * nB.r), cover * farK * mix(0.9, s, fade * (1.0 - info.z * 0.6)));
+    float farK = uCropR0 > 1.0 ? smoothstep(uCropR0 * 0.6, uCropR0 * 0.95, distance(vWPos, cameraPosition)) : 1.0;
+    // Seen from above, the gaps between the near plants show their lower
+    // leaves and shade rather than bare soil.
+    float coverK = max(farK, uCropTop * 0.85);
+    c = mix(ground, green * (0.85 + 0.3 * nB.r) * mix(0.75, 1.0, farK), cover * coverK * mix(0.9, s, fade * (1.0 - info.z * 0.6)));
     rough = 0.9;
   } else if (type < 3.5) {
     // Stubble (palhada) after harvest: straw rows over dark soil.
@@ -390,6 +394,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uWorldHalf: { value: WORLD_HALF },
     uCut: CUT_U.rects,
     uCropR0: CROP_U.r0,
+    uCropTop: CROP_U.top,
     uStream: { value: stp.map((q) => new THREE.Vector2(q[0], q[1])) },
     uStreamBox: { value: new THREE.Vector4(Math.min(...stp.map((q) => q[0])), Math.min(...stp.map((q) => q[1])), Math.max(...stp.map((q) => q[0])), Math.max(...stp.map((q) => q[1]))) },
     uPond: { value: WATER.ponds.map((q) => new THREE.Vector4(q.x, q.z, q.r, q.ph)) },
@@ -409,7 +414,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => 'terrain-v4';
+  mat.customProgramCacheKey = () => 'terrain-v5';
   return mat;
 }
 

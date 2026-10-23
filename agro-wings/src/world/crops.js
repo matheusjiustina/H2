@@ -40,7 +40,7 @@ function finMaterial(tex, radiusU) {
         float k = (1.0 - smoothstep(uRadius * 0.62, uRadius, dF)) * (1.0 - harvestedAt(wpF.xz));
         // Inside the 3D plants' radius the rows are the plants themselves (the
         // collapsed hedge is dropped, not left as a flat strip at leaf height).
-        vNearK = uR0 > 1.0 ? smoothstep(uR0 * 0.62, uR0 * 0.9, dF) : 1.0;
+        vNearK = uR0 > 1.0 ? smoothstep(uR0 * 0.62, uR0 * 0.9, distance(wpF.xyz, cameraPosition)) : 1.0;
         k *= vNearK;
         transformed.y = aBase + (transformed.y - aBase) * k;
         // Plants lean and wave with the shared wind; gusts sweep down the rows.
@@ -54,7 +54,7 @@ function finMaterial(tex, radiusU) {
       .replace('#include <color_fragment>',
         '#include <color_fragment>\n if (vNearK < 0.05) discard;\n diffuseColor.rgb *= mix(0.38, 1.05, smoothstep(0.0, 0.95, vMapUv.y));');
   };
-  m.customProgramCacheKey = () => 'fin-v5';
+  m.customProgramCacheKey = () => 'fin-v6';
   return m;
 }
 
@@ -82,10 +82,11 @@ function canopyMaterial(tex, kind) {
           // Harvested lanes: no canopy, the stubble on the ground shows.
           if (harvestedAt(p) > 0.5) discard;
           // Around the camera the 3D plants stand on the soil: the canopy
-          // surface dissolves in (dithered) only toward their radius.
+          // surface dissolves in only toward their radius (3D distance), with
+          // a per-pixel screen-space dither (no blotches seen from above).
           if (uR0 > 1.0) {
-            float showC = smoothstep(uR0 * 0.7, uR0 * 0.97, distance(p, cameraPosition.xz));
-            if (showC < fract(sin(dot(floor(p * 7.0), vec2(12.9898, 78.233))) * 43758.5453)) discard;
+            float showC = smoothstep(uR0 * 0.7, uR0 * 0.97, distance(vCWP, cameraPosition));
+            if (showC < fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard;
           }
           bool ax = vInfo.x < 0.5;
           float along = ax ? p.x : p.y;
@@ -109,7 +110,7 @@ function canopyMaterial(tex, kind) {
           diffuseColor.rgb *= 1.0 + wv * min(uWind.z, 7.0) * 0.009 * (0.5 + uWind.w);
         }`);
   };
-  m.customProgramCacheKey = () => 'canopy4-' + kind;
+  m.customProgramCacheKey = () => 'canopy5-' + kind;
   return m;
 }
 

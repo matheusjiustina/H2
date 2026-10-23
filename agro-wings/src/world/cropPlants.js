@@ -417,7 +417,7 @@ ${CUT_GLSL}
 `;
 const VERT_BODY = /* glsl */ `
   float cY = cos(aInst.w), sY = sin(aInst.w);
-  float dC = distance(aInst.xz, uCam.xz);
+  float dC = distance(aInst.xyz, uCam);
   // Outer radius: plants shrink into the ground. LOD hand-over (dissolve):
   // flag 0 full plant (even), 1 full plant (odd, thinned out first), 2 the
   // simplified plant of the outer ring (half density).
@@ -586,11 +586,11 @@ export function createCropPlants(scene, terrain, quality) {
 
   const cache = new Map();
   let radius = quality.cropPlantRadius ?? 28;
-  let lastX = 1e9, lastZ = 1e9, lastR = -1;
+  let lastX = 1e9, lastZ = 1e9, lastAlt = 1e9;
   // Refills every few metres of travel (not every frame on a low pass): the
   // loaded rings reach that far beyond the visible ones.
   const moveStep = (R0) => Math.max(3, R0 * 0.14);
-  function refill(cam, R0) {
+  function refill(cam, R0, alt) {
     for (const s of slots) s.n = 0;
     const half = CELL * 0.71;
     const mv = moveStep(R0); // the camera may move this far before the next refill
@@ -598,7 +598,7 @@ export function createCropPlants(scene, terrain, quality) {
     const ci0 = Math.floor((cam.x - R) / CELL), ci1 = Math.floor((cam.x + R) / CELL);
     const cj0 = Math.floor((cam.z - R) / CELL), cj1 = Math.floor((cam.z + R) / CELL);
     for (let cj = cj0; cj <= cj1; cj++) for (let ci = ci0; ci <= ci1; ci++) {
-      const d = Math.hypot((ci + 0.5) * CELL - cam.x, (cj + 0.5) * CELL - cam.z);
+      const d = Math.hypot((ci + 0.5) * CELL - cam.x, (cj + 0.5) * CELL - cam.z, alt);
       if (d > R) continue;
       const key = ci + ',' + cj;
       let cell = cache.get(key);
@@ -628,17 +628,19 @@ export function createCropPlants(scene, terrain, quality) {
       for (const s of slots) s.mesh.castShadow = !!q.cropShadows;
     },
     update(cam, ground) {
-      // Plants only while the camera is low enough to see them; the canopy
-      // and the row hedges carry the fields from higher up.
-      const alt = cam.y - ground;
-      const R0 = alt > 90 ? 0 : radius * (1 - Math.max(0, alt - 50) / 40);
+      // The plants live within R0 of the camera in 3D: higher up than that
+      // none is in reach and the canopy and the row hedges carry the fields
+      // (no ring on the ground that grows and shrinks with the camera).
+      const alt = Math.max(0, cam.y - ground), R0 = radius;
       CROP_U.r0.value = R0;
       CROP_U.cam.value.copy(cam);
-      group.visible = R0 > 1;
-      if (!group.visible) { lastR = 0; return; }
-      if (Math.hypot(cam.x - lastX, cam.z - lastZ) < moveStep(R0) && Math.abs(R0 - lastR) < 1) return;
-      lastX = cam.x; lastZ = cam.z; lastR = R0;
-      refill(cam, R0);
+      CROP_U.top.value = Math.min(1, Math.max(0, (alt - 3) / 9));
+      group.visible = alt < R0 + 1;
+      if (!group.visible) { lastAlt = 1e9; return; }
+      const mv = moveStep(R0);
+      if (Math.hypot(cam.x - lastX, cam.z - lastZ) < mv && Math.abs(alt - lastAlt) < mv * 0.5) return;
+      lastX = cam.x; lastZ = cam.z; lastAlt = alt;
+      refill(cam, R0, alt);
     },
     count: () => slots.reduce((a, s) => a + s.n, 0),
     atlas,
