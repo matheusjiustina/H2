@@ -47,8 +47,8 @@ export class CameraRig {
     const dragLook = mouse.buttons & 1;
     if (mouse.wheel) {
       // Scroll up zooms in, down zooms out (limited).
-      if (this.mode === 'cockpit') this.zoom.cockpit = clamp(this.zoom.cockpit * (1 + mouse.wheel * 0.1), 0.35, 1.3);
-      else if (this.mode === 'chase') this.zoom.chase = clamp(this.zoom.chase * (1 + mouse.wheel * 0.1), 0.6, 1.8);
+      if (this.mode === 'cockpit') this.zoom.cockpit = clamp(this.zoom.cockpit * (1 + mouse.wheel * 0.1), 0.35, 1.12);
+      else if (this.mode === 'chase') this.zoom.chase = clamp(this.zoom.chase * (1 + mouse.wheel * 0.1), 0.6, 1.4);
     }
     if (this.mode === 'cockpit') {
       if (dragLook) {
@@ -63,8 +63,6 @@ export class CameraRig {
       const ks = this.shakeScale ?? 1;
       const amp = (eng + ground) * ks + this.shake * 0.02;
       _v.copy(ac.model.eye);
-      // Zoomed out past the default view the head sits back a little.
-      _v.z -= clamp((this.zoom.cockpit - 1) / 0.3, 0, 1) * 0.25;
       if (ac.kind === 'heli') {
         // Two-per-rev shake of the teetering rotor: strongest through
         // translational lift (~15–25 kt), rising again at high speed and in
