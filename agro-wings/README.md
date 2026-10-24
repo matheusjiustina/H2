@@ -1635,3 +1635,49 @@ a little lower than the 203's).
   `SCALE`), 93 unit tests, the soybean autopilot mission. Model 135 meshes,
   87.7 k triangles (was 89.7 k). Known gap: the tail wheel stays at the
   physics point, ~0.35 m aft of the 203's in the photo.
+
+## Air Tractor structure and cockpit from the real aircraft
+
+The AT-502B (PR-AWT) airframe and cockpit were rebuilt from photos of the
+type (front, side and three-quarter views on the ground and spraying; three
+cockpit views) and its published figures (span 15.85 m, length ~10.1 m,
+height 3.12 m, 29×11.0-10 mains) (`src/aircraft/atModel.js`,
+`atPanel.js`).
+
+- **Fuselage**: its own cross-sections (keel superellipse narrowed toward
+  the bottom, a straight wall leaning in, a rounded top with tumblehome)
+  instead of round barrels: a long slab-sided PT6 cowling with a narrow
+  crown, a broad nose bowl with the chin inlet between the landing lights;
+  the hopper section deep but keystone-shaped; the turtle deck a straight
+  line from the canopy to the fin.
+- **Stance**: the wing and belly sit 0.25 m higher on the airframe (belly
+  on the wing's lower surface, ~0.5 m above the tyres instead of level with
+  them) and the long spring legs now run from fairings under the wing root,
+  splayed out to the unchanged wheels. The cowl top line rises ~7° to the
+  windshield, so sitting on its tailwheel the nose is about level, as on the
+  real aircraft; the cabin moved up 0.25 m with it (height in the three-point
+  attitude 3.12 m, the published figure).
+- **Canopy**: a narrow glasshouse set in on a sill ledge (0.94 m at the
+  sill, leaning in to a rounded roof) with the three-piece windshield (flat
+  centre pane between two posts, angled side panes to the A-posts), door and
+  rear posts.
+- **Cockpit**: an arched black panel (shoulders clear of the side panes)
+  with the instruments set 16 mm into it behind bezels — PT6 block on the
+  left, flight instruments in the middle, hopper and flaps on the right,
+  annunciator row, two switch panels and the hopper sight window — under a
+  padded glareshield roll whose top runs forward to the windshield base; the
+  guidance screen and a flow monitor with LED readouts on their own mount
+  turned to the pilot (regions of the same panel canvas); power quadrant on
+  the left console, spray valve and dump handle on the right; yellow airframe
+  inside (walls, tube frame, floor, roof), red seat. Eye point 1.55 m; from
+  the seat the dark, rounded nose shows over the glareshield.
+- **Kept**: flight model, gear contact points, prop and spinner, controls,
+  spray system (the gameplay boom line and working points in `types.js` are
+  unchanged; only the visual booms rose with the wing), servicing, HUD,
+  paint and markings. Crash points, collision boxes and the service
+  keep-outs / stub points that sit on the moved skin follow it.
+- **Validation**: `node test/cockpitviews.mjs <dir> at502` (cockpit from the
+  seat: default, ahead, wide, panel, left/right, parked), `test/atviews.mjs`
+  for the exterior; 93 unit tests; the soybean autopilot mission (90 %
+  coverage, no damage, as before). Model 107.4 k → 116.0 k triangles,
+  129 → 138 meshes; +4 draw calls in the cockpit, +11 outside.

@@ -1932,4 +1932,4 @@ export function createContactShadow(P = SHADOW_PR_AGW) {
 
 
 // Geometry and texture helpers shared with the other aircraft models.
-export { sampleStations, ring, loft, K, airfoil, wingPanel, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, patch, patchEdge, speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV };
+export { sampleStations, ring, loft, K, airfoil, wingPanel, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, patch, patchEdge, grid, speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV };

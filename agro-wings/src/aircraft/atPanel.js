@@ -1,14 +1,44 @@
-// AT-502B instrument panel (canvas texture, live values): grey panel with
-// the flight instruments on the left (airspeed, attitude, altimeter, heading,
-// vertical speed), the PT6A engine stack on the right (torque, ITT, gas
-// generator Ng, prop Np, fuel flow, oil), fuel / hopper / flaps below, the
-// annunciator strip on top, the guidance GPS and the flow monitor. A second
-// texture is the hopper sight gauge on the forward bulkhead.
+// AT-502B instrument panel (canvas texture, live values), laid out after
+// Air Tractor cockpits: a black arched panel with the PT6A engine block on
+// the left (torque, ITT, Ng, prop rpm, fuel, fuel flow, oil), the flight
+// instruments in the middle (airspeed, attitude, altimeter over turn
+// coordinator, heading, vertical speed), hopper quantity and flaps on the
+// right, the annunciator row along the top and two switch panels below
+// (lights / flaps and engine / dispersal) either side of the hopper sight
+// window. The guidance GPS screen and the flow monitor's LED readouts are
+// drawn in their own regions of the same canvas and shown on their own
+// units in the cockpit. A second texture is the hopper sight gauge.
 import { canvas, canvasTexture } from '../core/textures.js';
 import { clamp, rng } from '../core/math.js';
 import { gauge, bezel, needle, altimeter, flapInd, gps, roundRect, glassGlint, drawSightBackground } from './panel.js';
 
-export const AT_PANEL = { W: 1024, H: 512, w: 1.08, h: 0.54 };
+// Canvas regions (px). The panel face is FACE (1024 x 640 px) at K px per
+// metre on the panel plane, so the face is 0.9 m wide; the GPS screen and
+// the flow monitor have their own regions.
+export const AT_PANEL = {
+  W: 1024, H: 1024, K: 1024 / 0.9,
+  FACE: { x: 0, y: 0, w: 1024, h: 640 },
+  GPS: { x: 0, y: 656, w: 400, h: 256 },
+  MON: { x: 416, y: 656, w: 320, h: 168 },
+  // Round instruments [id, x, y, r] (face px): their 3D bezels and recesses
+  // are cut at the same places.
+  inst: [
+    ['torque', 112, 160, 50], ['itt', 228, 160, 50], ['ng', 112, 292, 50], ['prop', 228, 292, 50],
+    ['asi', 368, 158, 58], ['att', 510, 158, 58], ['alt', 652, 158, 58],
+    ['turn', 368, 302, 52], ['hdg', 510, 302, 52], ['vsi', 652, 302, 52],
+    ['fuel', 96, 412, 40], ['ff', 190, 412, 40], ['oil', 284, 412, 40],
+    ['hopper', 796, 170, 46],
+  ],
+  flaps: [896, 176],
+  annun: { x: 254, y: 54, w: 58, h: 24, dx: 65 },
+  // Switch panels [x, y, w, h, title, labels]; toggles in one row.
+  switches: [
+    [178, 480, 278, 120, 'LIGHTS / FLAPS', ['NAV', 'STROBE', 'BEACON', 'LAND', 'WORK', 'FLAP']],
+    [568, 480, 200, 120, 'ENGINE / DISPERSAL', ['BATT', 'GEN', 'IGN', 'VALVE']],
+  ],
+  sight: { x: 474, y: 470, w: 76, h: 158 },
+};
+const instAt = Object.fromEntries(AT_PANEL.inst.map(([id, x, y, r]) => [id, [x, y, r]]));
 
 export function createTurbinePanel() {
   const c = canvas(AT_PANEL.W, AT_PANEL.H);
@@ -40,60 +70,62 @@ export function createTurbinePanel() {
     sightTex.needsUpdate = true;
   };
   drawSight(0, 1893);
+  const at = (id) => instAt[id];
   return {
     canvas: c, texture: tex, sightTexture: sightTex,
     draw(d) {
       g.drawImage(bg, 0, 0);
       annunciators(g, d);
+      switchToggles(g, d);
       // Flight instruments.
-      gauge(g, 92, 158, 64, {
+      gauge(g, ...at('asi'), {
         label: 'AIRSPEED', unit: 'KNOTS', min: 0, max: 200, value: d.ias, major: 20, minor: 5,
         arcs: [[d.vs0, d.vfe, '#e8e8e8', 90], [d.vs1, 140, '#3fb24a', 98], [140, d.vne, '#f0c020', 98], [d.vne, 200, '#d0362a', 98]],
       });
-      attitude(g, 236, 158, 64, d.pitch, d.bank, d.slip);
-      altimeter(g, 380, 158, 64, d.altFt);
-      heading(g, 236, 308, 56, d.hdg);
-      gauge(g, 380, 308, 56, {
+      attitude(g, ...at('att'), d.pitch, d.bank, d.slip);
+      altimeter(g, ...at('alt'), d.altFt);
+      turn(g, ...at('turn'), d.yawRate, d.slip);
+      heading(g, ...at('hdg'), d.hdg);
+      gauge(g, ...at('vsi'), {
         label: 'VERTICAL SPEED', unit: 'x100 FT/MIN', min: -20, max: 20, value: d.vsFpm / 100, major: 5, minor: 1, sweep: 320, arcs: [],
       });
-      turn(g, 92, 308, 56, d.yawRate, d.slip);
-      // PT6A engine stack.
+      // PT6A engine block.
       const run = d.engine !== 'off' || d.ng > 1;
-      gauge(g, 520, 158, 54, {
+      gauge(g, ...at('torque'), {
         label: 'TORQUE', unit: 'FT-LB x100', min: 0, max: 22, value: d.torque / 100, major: 4, minor: 1,
         arcs: [[0, 17.9, '#3fb24a', 98], [17.9, 22, '#d0362a', 98]],
       });
-      gauge(g, 646, 158, 54, {
+      gauge(g, ...at('itt'), {
         label: 'ITT', unit: '°C x100', min: 0, max: 11, value: d.itt / 100, major: 2, minor: 0.5,
         arcs: [[4, 6.95, '#3fb24a', 98], [6.95, 10.9, '#f0c020', 98], [10.9, 11, '#d0362a', 98]],
       });
-      gauge(g, 520, 308, 54, {
+      gauge(g, ...at('ng'), {
         label: 'Ng', unit: '% RPM', min: 0, max: 110, value: d.ng, major: 20, minor: 5,
         arcs: [[52, 101.5, '#3fb24a', 98], [101.5, 110, '#d0362a', 98]],
       });
-      gauge(g, 646, 308, 54, {
+      gauge(g, ...at('prop'), {
         label: 'PROP', unit: 'RPM x100', min: 0, max: 26, value: d.rpm / 100, major: 4, minor: 1,
         arcs: [[16, 22, '#3fb24a', 98], [22, 26, '#d0362a', 98]],
       });
-      // Fuel, oil, hopper, flaps.
-      gauge(g, 72, 428, 40, {
+      gauge(g, ...at('fuel'), {
         label: 'FUEL', unit: 'L x100', min: 0, max: Math.ceil(d.fuelCap / 100), value: d.fuel / 100, major: 2, minor: 1, sweep: 240,
         arcs: [[0, (d.fuelCap * 0.15) / 100, '#d0362a', 98]],
       });
-      gauge(g, 172, 428, 40, {
+      gauge(g, ...at('ff'), {
         label: 'FUEL FLOW', unit: 'L/H x10', min: 0, max: 30, value: d.fuelFlow / 10, major: 10, minor: 2, sweep: 240, arcs: [],
       });
       const oilP = run ? clamp(20 + d.ng * 0.85, 0, 120) : 0;
-      gauge(g, 272, 428, 40, {
+      gauge(g, ...at('oil'), {
         label: 'OIL PSI', unit: '', min: 0, max: 140, value: oilP, major: 40, minor: 10, sweep: 240,
         arcs: [[85, 105, '#3fb24a', 98], [0, 40, '#d0362a', 98]],
       });
-      gauge(g, 372, 428, 40, {
+      gauge(g, ...at('hopper'), {
         label: 'HOPPER', unit: 'L x100', min: 0, max: 20, value: d.hopper / 100, major: 5, minor: 1, sweep: 240, arcs: [], needle: '#9fd8ff',
       });
-      flapInd(g, 470, 432, d.flaps);
-      gps(g, 712, 18, 296, 268, d.gps);
-      flowMonitor(g, 728, 318, d);
+      flapInd(g, ...AT_PANEL.flaps, d.flaps);
+      const G = AT_PANEL.GPS;
+      gps(g, G.x, G.y, G.w, G.h, d.gps);
+      flowMonitor(g, AT_PANEL.MON, d);
       tex.needsUpdate = true;
       if (Math.abs(d.hopper - lastHopper) > 1.5) { lastHopper = d.hopper; drawSight(d.hopper, d.hopperCap); }
     },
@@ -101,47 +133,74 @@ export function createTurbinePanel() {
 }
 
 function drawBackground(g) {
-  const W = AT_PANEL.W, H = AT_PANEL.H;
-  const grd = g.createLinearGradient(0, 0, 0, H);
-  // Black-anodised panel, as in Air Tractor cockpits.
-  grd.addColorStop(0, '#202326');
-  grd.addColorStop(0.08, '#2a2e32');
-  grd.addColorStop(1, '#25282c');
-  g.fillStyle = grd;
+  const { W, H, FACE } = AT_PANEL;
+  g.fillStyle = '#0d0f11';
   g.fillRect(0, 0, W, H);
-  const sh = g.createLinearGradient(0, 0, 0, 30);
-  sh.addColorStop(0, 'rgba(0,0,0,0.6)');
+  // Black-anodised panel, as in Air Tractor cockpits: fine brushed grain,
+  // a soft shadow under the glareshield.
+  const grd = g.createLinearGradient(0, 0, 0, FACE.h);
+  grd.addColorStop(0, '#16181b');
+  grd.addColorStop(0.1, '#202326');
+  grd.addColorStop(1, '#1b1e21');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, FACE.w, FACE.h);
+  const sh = g.createLinearGradient(0, 0, 0, 46);
+  sh.addColorStop(0, 'rgba(0,0,0,0.7)');
   sh.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = sh;
-  g.fillRect(0, 0, W, 30);
+  g.fillRect(0, 0, FACE.w, 46);
   const r = rng(91);
   for (let i = 0; i < 2600; i++) {
     const v = r() < 0.5 ? 255 : 0;
-    g.fillStyle = `rgba(${v},${v},${v},${0.02 + r() * 0.03})`;
-    g.fillRect(r() * W, r() * H, 1 + r() * 30, 1);
+    g.fillStyle = `rgba(${v},${v},${v},${0.015 + r() * 0.025})`;
+    g.fillRect(r() * FACE.w, r() * FACE.h, 1 + r() * 30, 1);
   }
-  // Sub-panels: flight block, engine block, lower strip.
-  g.strokeStyle = 'rgba(150,160,170,0.35)'; g.lineWidth = 2;
-  g.strokeRect(14, 84, 438, 296);
-  g.strokeRect(462, 84, 242, 296);
-  g.strokeRect(14, 388, 530, 82);
+  // Scuffs round the instruments, where hands reach.
+  for (let i = 0; i < 70; i++) {
+    g.strokeStyle = `rgba(150,150,150,${0.03 + r() * 0.05})`; g.lineWidth = 1;
+    const x = 60 + r() * 900, y = 90 + r() * 480;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 30, y + (r() - 0.5) * 8); g.stroke();
+  }
+  // Instrument clusters: engine block, flight block, lower row.
+  g.strokeStyle = 'rgba(150,160,170,0.22)'; g.lineWidth = 2;
+  roundRect(g, 46, 92, 248, 268, 10); g.stroke();
+  roundRect(g, 300, 88, 420, 278, 10); g.stroke();
+  roundRect(g, 46, 366, 300, 92, 10); g.stroke();
   g.fillStyle = '#c3c9cf';
-  g.font = 'bold 10px Arial'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-  g.fillText('PT6A-34AG', 470, 98);
-  g.fillText('PR-AWT', 22, 98);
-  g.font = '9px Arial';
-  g.fillText('VNE 155 KIAS · MÁX. TORQUE 1790 FT-LB · ITT 695 °C', 140, 80);
-  g.fillText('NÃO DECOLAR COM O HOPPER ABERTO', 712, 432);
-  // Screws.
+  g.font = 'bold 11px Arial'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.fillText('PT6A-34AG', 170, 106);
+  g.font = 'bold 10px Arial';
+  g.fillText('PR-AWT · AT-502B', 510, 84);
+  // Placards (white on black, as on the real panel).
+  const placard = (x, y, w, h, lines) => {
+    g.fillStyle = '#e6e8e9'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#111'; g.font = 'bold 8px Arial'; g.textAlign = 'center';
+    lines.forEach((t, i) => g.fillText(t, x + w / 2, y + 11 + i * 10));
+  };
+  placard(744, 228, 120, 34, ['VNE 155 KIAS', 'MÁX. TORQUE 1790 FT-LB']);
+  placard(370, 382, 210, 24, ['NÃO DECOLAR COM O HOPPER ABERTO']);
+  placard(600, 382, 120, 24, ['ITT MÁX. 695 °C']);
+  // Switch panels: raised plates with labels (the toggles are drawn live).
+  for (const [x, y, w, h, title, labels] of AT_PANEL.switches) {
+    g.fillStyle = '#121416';
+    roundRect(g, x, y, w, h, 8); g.fill();
+    g.strokeStyle = 'rgba(190,196,202,0.35)'; g.lineWidth = 1.5;
+    roundRect(g, x + 4, y + 4, w - 8, h - 8, 6); g.stroke();
+    g.fillStyle = '#d6dadd'; g.font = 'bold 10px Arial'; g.textAlign = 'center';
+    g.fillText(title, x + w / 2, y + 20);
+    g.font = 'bold 9px Arial';
+    labels.forEach((t, i) => g.fillText(t, x + ((i + 0.5) * w) / labels.length, y + 98));
+    g.fillStyle = '#5a6168';
+    for (const [sx, sy] of [[x + 9, y + 9], [x + w - 9, y + 9], [x + 9, y + h - 9], [x + w - 9, y + h - 9]]) { g.beginPath(); g.arc(sx, sy, 3, 0, Math.PI * 2); g.fill(); }
+  }
+  // Hopper sight window frame (the gauge itself is 3D, behind a cut-out).
+  const S = AT_PANEL.sight;
+  g.fillStyle = '#c3c9cf'; g.font = 'bold 9px Arial'; g.textAlign = 'center';
+  g.fillText('HOPPER', S.x + S.w / 2, S.y - 6);
+  // Panel screws.
   g.fillStyle = '#5a6168';
-  const screw = (x, y) => { g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); };
-  for (const x of [16, 190, 360, 530, 700, 870, 1008]) { screw(x, 22); screw(x, 500); }
-  for (const y of [140, 260, 380]) { screw(8, y); screw(1016, y); }
-  // Switch strip labels.
-  const sw = ['BATT', 'GEN', 'IGN', 'START', 'B. COMB', 'NAV', 'STROBE', 'BEACON', 'VÁLVULA', 'GPS'];
-  g.fillStyle = '#c3c9cf';
-  g.font = 'bold 9px Arial'; g.textAlign = 'center';
-  sw.forEach((t, i) => g.fillText(t, 586 + i * 43, 456));
+  const screw = (x, y) => { g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#2a2e32'; g.fillRect(x - 3, y - 0.6, 6, 1.2); g.fillStyle = '#5a6168'; };
+  for (const [x, y] of [[300, 26], [724, 26], [44, 172], [980, 172], [44, 470], [980, 470], [190, 626], [834, 626]]) screw(x, y);
 }
 
 function annunciators(g, d) {
@@ -156,29 +215,41 @@ function annunciators(g, d) {
     ['BRAKE', d.brake, '#ffb020'],
     ['SPRAY', d.spray, '#3dff7a'],
   ];
+  const A = AT_PANEL.annun;
   items.forEach(([t, on, col], i) => {
-    const x = 30 + i * 84, y = 34, w = 74, h = 30;
-    g.fillStyle = '#121518';
+    const x = A.x + i * A.dx, y = A.y, w = A.w, h = A.h;
+    g.fillStyle = '#0b0d0f';
     roundRect(g, x - 3, y - 3, w + 6, h + 6, 5); g.fill();
     const base = { '#ff3b2a': '#4a1712', '#ffb020': '#4d3a10', '#3dff7a': '#173d22' }[col];
     g.fillStyle = on ? col : base;
     roundRect(g, x, y, w, h, 3); g.fill();
     g.fillStyle = on ? '#111' : 'rgba(255,255,255,0.28)';
-    g.font = 'bold 12px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = 'bold 10px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(t, x + w / 2, y + h / 2 + 1);
   });
-  // Switch toggles (live where they mean something).
-  const on = [true, d.engine === 'running', d.engine !== 'off', d.engine === 'cranking', true, true, true, true, d.spray, true];
-  on.forEach((v, i) => {
-    const x = 586 + i * 43, y = 482;
-    g.fillStyle = '#d7dadc';
-    g.beginPath(); g.arc(x, y, 8, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#7d848b';
-    g.beginPath(); g.arc(x, y, 5.5, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#e8eaec'; g.lineWidth = 4.5; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + (v ? -15 : 15)); g.stroke();
-    g.lineCap = 'butt';
-  });
+}
+
+// Toggle switches on the switch panels (live where they mean something).
+function switchToggles(g, d) {
+  const live = {
+    BATT: true, GEN: d.engine === 'running', IGN: d.engine === 'cranking', VALVE: d.spray,
+    NAV: true, STROBE: d.engine !== 'off', BEACON: d.engine !== 'off', LAND: false, WORK: false, FLAP: d.flaps > 0.05,
+  };
+  g.textBaseline = 'alphabetic';
+  for (const [x, y, w, , , labels] of AT_PANEL.switches) {
+    labels.forEach((t, i) => {
+      const cx = x + ((i + 0.5) * w) / labels.length, cy = y + 58;
+      g.fillStyle = '#c9cdd0';
+      g.beginPath(); g.arc(cx, cy, 8, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#6d747b';
+      g.beginPath(); g.arc(cx, cy, 5.5, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#e8eaec'; g.lineWidth = 4.5; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy + (live[t] ? -16 : 16)); g.stroke();
+      g.lineCap = 'butt';
+      g.fillStyle = '#9aa1a8'; g.font = '8px Arial'; g.textAlign = 'center';
+      g.fillText('ON', cx, y + 34);
+    });
+  }
 }
 
 // Attitude indicator: sky/ground ball moved by pitch, rolled by bank, fixed
@@ -285,21 +356,30 @@ function turn(g, x, y, r, yawRate, slip) {
   glassGlint(g, x, y, r);
 }
 
-function flowMonitor(g, x, y, d) {
-  g.fillStyle = '#16191c';
-  g.fillRect(x - 6, y - 6, 132, 92);
-  g.fillStyle = '#071008';
-  g.fillRect(x, y, 120, 80);
-  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-  g.font = 'bold 15px monospace';
-  g.fillStyle = d.spray ? '#7fd0ff' : '#4a6a7a';
-  g.fillText(`${d.spray ? (d.flow * 60).toFixed(0) : '0'} L/m`, x + 8, y + 22);
-  g.fillStyle = '#9ff0a4';
-  g.fillText(`H ${d.hgt < 99 ? d.hgt.toFixed(1) : '--'}m`, x + 8, y + 44);
-  g.fillText(`${Math.round(d.hopper)} L`, x + 8, y + 66);
-  g.font = '9px monospace';
-  g.fillStyle = '#6f8a74';
-  g.fillText('FLOW', x + 84, y + 76);
+// Flow monitor (the box under the guidance screen): three rows of red LED
+// readouts — flow, height over the crop, hopper — with their labels.
+function flowMonitor(g, R, d) {
+  const { x, y, w, h } = R;
+  g.fillStyle = '#121416';
+  g.fillRect(x, y, w, h);
+  const rows = [
+    ['L/MIN', d.spray ? (d.flow * 60).toFixed(0) : '0', d.spray],
+    ['ALT m', d.hgt < 99 ? d.hgt.toFixed(1) : '--', true],
+    ['HOPPER L', String(Math.round(d.hopper)), true],
+  ];
+  g.textBaseline = 'middle';
+  rows.forEach(([lab, val, on], i) => {
+    const ry = y + 14 + i * 52;
+    g.fillStyle = '#050505';
+    roundRect(g, x + 12, ry, w - 110, 40, 4); g.fill();
+    g.fillStyle = on ? '#ff3a26' : '#4a1410';
+    g.font = 'bold 30px monospace'; g.textAlign = 'right';
+    g.fillText(val, x + w - 108, ry + 21);
+    g.fillStyle = 'rgba(255,60,40,0.08)';
+    g.fillRect(x + 12, ry, w - 110, 20);
+    g.fillStyle = '#c9ced3'; g.font = 'bold 12px Arial'; g.textAlign = 'left';
+    g.fillText(lab, x + w - 90, ry + 20);
+  });
   void needle;
 }
 
