@@ -1,22 +1,86 @@
-// Instrument panel drawn on a canvas texture from live simulation values.
-// Layout after a real Ipanema panel: light grey aluminium, warning lamps on
-// top, a 3x2 block of round gauges, compass, switch rows, and a big guidance
-// GPS in a black bezel on the right. A second small texture is the hopper
-// sight window under the panel (level graduations + live liquid level).
+// Instrument panel of the PR-AGW (EMB-202A Ipanema) on a canvas texture.
+// Light grey aluminium; annunciator lamps on top; a 3x2 block of flight and
+// engine instruments with an engine column beside it; a switch strip with the
+// magneto key, the flap indicator and the boom pressure gauge; a SATLOC-style
+// guidance unit (AGRONAV M3) with a flow monitor under it on the right.
+// The round instruments are 3D in the cockpit (model.js): recessed cans with
+// bezels, glass and 3D needles. This canvas holds their dial faces (drawn
+// once into the static layer) and the live parts that are flat on a real
+// panel: lamps, the GPS screen and the LCD readouts. readings(d) turns the
+// telemetry into the needle angles, the turn coordinator, the ball, the
+// switch and key positions that model.js applies.
+// A second small texture is the hopper sight window under the panel (level
+// graduations + live liquid level).
 import { canvas, canvasTexture } from '../core/textures.js';
-import { clamp, rng } from '../core/math.js';
+import { clamp, rng, smoothstep } from '../core/math.js';
+import { FLIGHT, SPRAY } from '../config.js';
+
+const TAU = Math.PI * 2;
+const SWEEP = [Math.PI * 0.75, Math.PI * 2.25]; // 270° engine-gauge sweep
+
+// Layout in canvas pixels (1024 x 512 = 0.96 x 0.48 m of panel).
+export const IPA_PANEL = {
+  W: 1024, H: 512,
+  gauges: {
+    asi: { x: 110, y: 150, r: 60 }, tach: { x: 255, y: 150, r: 60 }, map: { x: 400, y: 150, r: 60 },
+    alt: { x: 110, y: 300, r: 60 }, tc: { x: 255, y: 300, r: 60 }, vsi: { x: 400, y: 300, r: 60 },
+    oilP: { x: 538, y: 100, r: 40 }, oilT: { x: 538, y: 196, r: 40 }, fuel: { x: 538, y: 292, r: 40 },
+    psi: { x: 548, y: 447, r: 38 },
+  },
+  // Needle -> [gauge, length (x r), width (x r), layer (0 = nearest the dial)].
+  needles: {
+    asi: ['asi', 0.86, 0.075, 0], tach: ['tach', 0.86, 0.075, 0], map: ['map', 0.86, 0.075, 0],
+    alt10k: ['alt', 0.92, 0.03, 0], alt1000: ['alt', 0.56, 0.13, 1], alt100: ['alt', 0.88, 0.07, 2],
+    vsi: ['vsi', 0.86, 0.075, 0], oilP: ['oilP', 0.84, 0.085, 0], oilT: ['oilT', 0.84, 0.085, 0],
+    fuel: ['fuel', 0.84, 0.085, 0], psi: ['psi', 0.84, 0.085, 0],
+  },
+  lamps: [[175, 34, 'STALL', '#ff3b2a'], [220, 34, 'ÓLEO', '#ff3b2a'], [265, 34, 'COMB.', '#ffb020'], [310, 34, 'FREIO', '#ffb020'], [355, 34, 'SPRAY', '#3dff7a']],
+  toggles: [[122, 'BAT'], [159, 'ALT'], [196, 'B.COMB'], [233, 'NAV'], [270, 'STROBE'], [307, 'FARÓIS'], [344, 'VÁLV.'], [381, 'GPS']].map(([x, t]) => ({ x, y: 458, t })),
+  key: { x: 60, y: 452 },
+  flap: { x: 452, y: 450 },
+  gps: { x: 625, y: 16, w: 380, h: 300 },
+  screen: { x: 643, y: 32, w: 344, h: 218 },
+  lcd: { x: 642, y: 364, w: 356, h: 132 },
+  sight: { cap: 900, step: 50 },
+};
+
+// Dial scales: value range and the canvas angles of its ends (radians,
+// 0 = 3 o'clock, clockwise; canvas y points down).
+const SCALES = {
+  asi: { min: 0, max: 160, a0: -Math.PI / 2 + 0.1, a1: -Math.PI / 2 + 0.1 + TAU * 0.9 },
+  tach: { min: 0, max: 30, a0: SWEEP[0], a1: SWEEP[1] },
+  map: { min: 10, max: 35, a0: SWEEP[0], a1: SWEEP[1] },
+  alt: { min: 0, max: 1000, a0: -Math.PI / 2, a1: Math.PI * 1.5 },
+  vsi: { min: -20, max: 20, a0: Math.PI - (175 * Math.PI) / 180, a1: Math.PI + (175 * Math.PI) / 180 },
+  oilP: { min: 0, max: 120, a0: SWEEP[0], a1: SWEEP[1] },
+  oilT: { min: 40, max: 140, a0: SWEEP[0], a1: SWEEP[1] },
+  fuel: { min: 0, max: 260, a0: SWEEP[0], a1: SWEEP[1] },
+  psi: { min: 0, max: 60, a0: SWEEP[0], a1: SWEEP[1] },
+};
+const angOf = (sc, v) => sc.a0 + ((clamp(v, sc.min, sc.max) - sc.min) / (sc.max - sc.min)) * (sc.a1 - sc.a0);
+const KEY_ANG = { off: -2.25, r: -1.8, l: -1.35, both: -0.9, start: -0.42 };
 
 export function createPanel() {
-  const c = canvas(1024, 512);
+  const L = IPA_PANEL;
+  const c = canvas(L.W, L.H);
   const tex = canvasTexture(c, { aniso: 8 });
   const g = c.getContext('2d');
-  const bg = canvas(1024, 512);
-  drawBackground(bg.getContext('2d'));
+  const bg = canvas(L.W, L.H);
+  const bgg = bg.getContext('2d');
+  // The static layer (plate, placards, dial faces) depends on the type's
+  // limits (V-speeds, tank size); it is redrawn if they change.
+  let bgKey = '';
+  const ensureBg = (d) => {
+    const k = [d.vs0, d.vs1, d.vfe, d.vne, d.fuelCap].join();
+    if (k === bgKey) return;
+    bgKey = k;
+    drawIpaBackground(bgg, d);
+  };
   const sc = canvas(256, 448);
   const sightTex = canvasTexture(sc, { aniso: 4 });
   const sg = sc.getContext('2d');
   const sightBg = canvas(256, 448);
-  drawSightBackground(sightBg.getContext('2d'));
+  drawSightBackground(sightBg.getContext('2d'), L.sight.cap, L.sight.step);
   let lastHopper = -1;
   const drawSight = (hopper, cap) => {
     sg.drawImage(sightBg, 0, 0);
@@ -36,84 +100,258 @@ export function createPanel() {
     sg.strokeRect(7, 7, 242, 434);
     sightTex.needsUpdate = true;
   };
-  drawSight(0, 900);
-  return {
-    canvas: c, texture: tex, sightTexture: sightTex,
+  drawSight(0, L.sight.cap);
+  const DEF = { vs0: 48, vs1: 55, vfe: 95, vne: 140, fuelCap: 260 };
+  const panel = {
+    canvas: c, texture: tex, sightTexture: sightTex, layout: L,
     draw(d) {
+      ensureBg(d);
       g.drawImage(bg, 0, 0);
-      lamps(g, d);
-      gauge(g, 95, 178, 54, {
-        label: 'OIL', unit: '°C   PSI', min: 0, max: 100, value: d.engine === 'running' ? 35 + 45 * clamp(d.rpm / 2700, 0, 1) : 0, major: 25, minor: 12.5, sweep: 240,
-        arcs: [[30, 85, '#3fb24a', 98], [85, 100, '#d0362a', 98]],
-      });
-      gauge(g, 255, 178, 82, {
-        label: 'AIRSPEED', unit: 'KNOTS', min: 0, max: 160, value: d.ias, major: 20, minor: 5,
-        arcs: [[d.vs0, d.vfe, '#e8e8e8', 90], [d.vs1, 125, '#3fb24a', 98], [125, 145, '#f0c020', 98], [145, 160, '#d0362a', 98]],
-      });
-      gauge(g, 445, 178, 82, {
-        label: 'RPM', unit: 'x100', min: 0, max: 30, value: d.rpm / 100, major: 5, minor: 1,
-        arcs: [[7, 27, '#3fb24a', 98], [27, 30, '#d0362a', 98]],
-      });
-      compass(g, 598, 92, d.hdg);
-      gauge(g, 598, 212, 48, {
-        label: 'HOPPER', unit: 'x100 L', min: 0, max: d.hopperCap / 100, value: d.hopper / 100, major: 3, minor: 1, sweep: 240,
-        arcs: [], needle: '#9fd8ff',
-      });
-      gauge(g, 95, 348, 54, {
-        label: 'FUEL', unit: 'LITERS', min: 0, max: d.fuelCap, value: d.fuel, major: 65, minor: 32.5, sweep: 240,
-        arcs: [[0, d.fuelCap * 0.15, '#d0362a', 98]],
-      });
-      altimeter(g, 255, 348, 82, d.altFt);
-      gauge(g, 445, 348, 82, {
-        label: 'VERTICAL SPEED', unit: 'x100 FT/MIN', min: -20, max: 20, value: d.vsFpm / 100, major: 5, minor: 1, sweep: 320,
-        arcs: [],
-      });
-      flapInd(g, 598, 312, d.flaps);
-      switches(g, d);
-      gps(g, 672, 22, 330, 300, d.gps);
-      digital(g, 690, 344, d);
+      lampsIpa(g, d);
+      flapInd(g, L.flap.x, L.flap.y, d.flaps);
+      gpsUnit(g, d.gps);
+      lcd(g, d);
       tex.needsUpdate = true;
       if (Math.abs(d.hopper - lastHopper) > 0.8) { lastHopper = d.hopper; drawSight(d.hopper, d.hopperCap); }
     },
+    readings,
   };
+  // Not blank before the first cockpit frame (seen through the windshield).
+  ensureBg(DEF);
+  g.drawImage(bg, 0, 0);
+  flapInd(g, L.flap.x, L.flap.y, 0);
+  gpsUnit(g, null);
+  return panel;
 }
 
-function drawBackground(g) {
-  const grd = g.createLinearGradient(0, 0, 0, 512);
-  grd.addColorStop(0, '#9aa3ab');
-  grd.addColorStop(0.08, '#aab3bb');
-  grd.addColorStop(1, '#a1aab2');
+// Telemetry -> instrument state (angles in canvas radians).
+function readings(d) {
+  const run = d.engine === 'running', crank = d.engine === 'cranking';
+  const rpm = d.rpm;
+  // Manifold pressure from the ambient (altitude) and the throttle opening.
+  const amb = 29.92 * Math.exp(-(Math.max(0, d.altFt) * 0.3048) / 8400);
+  const map = run ? amb - (amb - 11.5) * (1 - clamp(d.throttle, 0, 1)) ** 1.3 * clamp(rpm / 1200, 0.6, 1.2) : crank ? amb - 4 : amb;
+  // Oil pressure rises with rpm; oil warm while running.
+  const oilP = run ? 25 + 55 * smoothstep(600, 2300, rpm) : crank ? 12 : 0;
+  const oilT = run ? 72 + 16 * clamp(rpm / FLIGHT.maxRpm, 0, 1) : 34;
+  const psi = d.spray && d.flow > 0 ? 40 * clamp(d.flow / SPRAY.flow, 0, 1.3) : 0;
+  const alt = Math.max(0, d.altFt);
+  const S = SCALES;
+  const a = {
+    asi: angOf(S.asi, d.ias), tach: angOf(S.tach, rpm / 100), map: angOf(S.map, map),
+    alt100: S.alt.a0 + ((alt % 1000) / 1000) * TAU, alt1000: S.alt.a0 + ((alt % 10000) / 10000) * TAU, alt10k: S.alt.a0 + ((alt % 100000) / 100000) * TAU,
+    vsi: angOf(S.vsi, d.vsFpm / 100), oilP: angOf(S.oilP, oilP), oilT: angOf(S.oilT, oilT),
+    fuel: angOf({ ...S.fuel, max: d.fuelCap || 260 }, d.fuel), psi: angOf(S.psi, psi),
+  };
+  // Turn coordinator: the aircraft symbol tilts 20° at standard rate (3°/s);
+  // the ball runs out to the side the skid throws it.
+  const tc = clamp(d.yawRate / 0.0524, -1.6, 1.6) * 0.349;
+  const G = IPA_PANEL.gauges.tc, R = G.r * 1.15, phi = d.onGround ? 0 : clamp(d.slip * 4, -0.33, 0.33);
+  const ball = [G.x + Math.sin(phi) * R, G.y + G.r * 0.5 - R * (1 - Math.cos(phi))];
+  const master = d.engine !== 'off' || !d.onGround;
+  const toggles = [master, run, crank || (run && d.onGround), master, master && run, false, !!d.spray, master];
+  const key = d.engine === 'off' ? KEY_ANG.off : crank ? KEY_ANG.start : KEY_ANG.both;
+  return { a, tc, ball, toggles, key, master, mixture: run || crank ? 1 : 0, prop: run || crank ? 1 : 0.15 };
+}
+
+function drawIpaBackground(g, d) {
+  const L = IPA_PANEL, W = L.W, H = L.H;
+  // Light grey aluminium, a little darker under the glareshield.
+  const grd = g.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#8e979f');
+  grd.addColorStop(0.1, '#a9b2ba');
+  grd.addColorStop(1, '#a0a9b1');
   g.fillStyle = grd;
-  g.fillRect(0, 0, 1024, 512);
-  // Shadow under the padded glareshield.
-  const sh = g.createLinearGradient(0, 0, 0, 34);
-  sh.addColorStop(0, 'rgba(0,0,0,0.55)');
+  g.fillRect(0, 0, W, H);
+  const sh = g.createLinearGradient(0, 0, 0, 40);
+  sh.addColorStop(0, 'rgba(0,0,0,0.6)');
   sh.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = sh;
-  g.fillRect(0, 0, 1024, 34);
-  // Brushed texture + scuffs.
+  g.fillRect(0, 0, W, 40);
+  // Brushed texture + scuffs and finger marks round the switches.
   const r = rng(77);
   for (let i = 0; i < 2600; i++) {
     const v = r() < 0.5 ? 255 : 0;
     g.fillStyle = `rgba(${v},${v},${v},${0.02 + r() * 0.03})`;
-    g.fillRect(r() * 1024, r() * 512, 1 + r() * 30, 1);
+    g.fillRect(r() * W, r() * H, 1 + r() * 30, 1);
   }
-  // Sub-panel seam for the switch strip and the GPS cut-out.
-  g.strokeStyle = 'rgba(40,46,52,0.55)'; g.lineWidth = 2;
-  g.strokeRect(30, 430, 620, 74);
-  // Screws round the edges.
+  for (let i = 0; i < 40; i++) {
+    g.fillStyle = `rgba(40,40,40,${0.03 + r() * 0.04})`;
+    g.beginPath(); g.ellipse(100 + r() * 320, 430 + r() * 60, 6 + r() * 10, 4 + r() * 6, r() * 3, 0, TAU); g.fill();
+  }
+  // Sub-panel seams (switch strip, engine column) and screws.
+  g.strokeStyle = 'rgba(40,46,52,0.5)'; g.lineWidth = 2;
+  g.strokeRect(24, 392, 592, 112);
+  g.beginPath(); g.moveTo(486, 40); g.lineTo(486, 392); g.stroke();
   g.fillStyle = '#3b4148';
-  const screw = (x, y) => { g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); };
-  for (const x of [16, 180, 345, 512, 680, 850, 1008]) { screw(x, 30); screw(x, 498); }
-  for (const y of [140, 260, 380]) { screw(16, y); screw(1008, y); }
+  const screw = (x, y) => {
+    g.fillStyle = '#3b4148'; g.beginPath(); g.arc(x, y, 4.5, 0, TAU); g.fill();
+    g.strokeStyle = '#7d858c'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x - 3, y); g.lineTo(x + 3, y); g.stroke();
+  };
+  for (const x of [14, 170, 330, 486, 612, 1010]) { screw(x, 22); screw(x, 500); }
+  for (const y of [140, 260, 380]) { screw(14, y); screw(1010, y); }
+  for (const [x, y] of [[32, 400], [608, 400], [32, 496], [608, 496]]) screw(x, y);
   // Placards.
   g.fillStyle = '#1f252b';
-  g.font = 'bold 11px Arial';
-  g.textAlign = 'left';
-  g.fillText('PR-AGW', 36, 30);
-  g.font = '9px Arial';
-  g.fillText('NÃO DECOLAR COM O HOPPER ABERTO', 36, 424);
-  g.fillText('MANOBRAS ACROBÁTICAS PROIBIDAS', 360, 424);
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.font = 'bold 12px Arial';
+  g.fillText('PR-AGW', 30, 32);
+  g.font = 'bold 9px Arial';
+  g.fillText('EMB-202A', 30, 46);
+  const placard = (x, y, w, h, lines, fill = '#e9e6dc', ink = '#1d1f22') => {
+    g.fillStyle = fill; g.fillRect(x, y, w, h);
+    g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    g.fillStyle = ink; g.font = 'bold 8px Arial'; g.textAlign = 'center';
+    lines.forEach((t, i) => g.fillText(t, x + w / 2, y + 11 + i * 10));
+    g.textAlign = 'left';
+  };
+  placard(30, 371, 168, 16, ['NÃO DECOLAR COM O HOPPER ABERTO'], '#c8261b', '#fff4ea');
+  placard(210, 371, 170, 16, ['MANOBRAS ACROBÁTICAS PROIBIDAS']);
+  placard(394, 362, 86, 26, ['VNE 140 KT', 'VA 105 KT']);
+  // Dial faces.
+  const G = L.gauges, S = SCALES;
+  const vne = d.vne ?? 140;
+  dialFace(g, G.asi, S.asi, { major: 20, minor: 5, from: 40, label: ['KNOTS'], labelY: [0.36],
+    arcs: [[d.vs0, d.vfe, '#f2f2ee', 0.68], [d.vs1, vne * 0.82, '#3fb24a', 0.8], [vne * 0.82, vne, '#f0c020', 0.8]], red: [vne] });
+  dialFace(g, G.tach, S.tach, { major: 5, minor: 1, label: ['RPM', 'x100'], labelY: [0.3, 0.44], arcs: [[21, 27, '#3fb24a', 0.8]], red: [27] });
+  {
+    // Hour meter.
+    const t = G.tach;
+    g.fillStyle = '#000'; g.fillRect(t.x - 22, t.y + 0.58 * t.r - 8, 44, 15);
+    g.fillStyle = '#e6e6e0'; g.font = 'bold 11px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('3472.6', t.x, t.y + 0.58 * t.r);
+  }
+  dialFace(g, G.map, S.map, { major: 5, minor: 1, label: ['MANIFOLD', 'PRESS', 'IN.HG'], labelY: [0.24, 0.38, 0.52], arcs: [[15, 25, '#3fb24a', 0.8]], red: [] });
+  dialFace(g, G.alt, { min: 0, max: 10, a0: S.alt.a0, a1: S.alt.a1 }, { major: 1, minor: 0.2, wrap: true, label: ['ALT', '100 FEET'], labelY: [-0.32, 0.4], arcs: [], red: [] });
+  {
+    const t = G.alt;
+    g.fillStyle = '#000'; g.fillRect(t.x + 0.3 * t.r, t.y - 7, 26, 14);
+    g.fillStyle = '#e6e6e0'; g.font = 'bold 10px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('29.92', t.x + 0.3 * t.r + 13, t.y);
+  }
+  tcFace(g, G.tc);
+  dialFace(g, G.vsi, S.vsi, { major: 5, minor: 1, abs: true, fmt: (v) => String(Math.abs(v) / 10).replace(/^0\./, '.'), label: ['VERTICAL SPEED', '1000 FT/MIN'], labelY: [-0.3, 0.32], arcs: [], red: [],
+    extra: (x, y, r) => { g.fillStyle = '#b9bcb6'; g.font = `bold ${Math.round(r * 0.12)}px Arial`; g.fillText('UP', x - r * 0.42, y - r * 0.5); g.fillText('DN', x - r * 0.42, y + r * 0.52); } });
+  dialFace(g, G.oilP, S.oilP, { major: 40, minor: 20, label: ['ÓLEO', 'PSI'], labelY: [0.32, 0.5], arcs: [[0, 25, '#d0362a', 0.82], [60, 90, '#3fb24a', 0.82]], red: [100] });
+  dialFace(g, G.oilT, S.oilT, { major: 20, minor: 10, label: ['ÓLEO', '°C'], labelY: [0.32, 0.5], arcs: [[60, 118, '#3fb24a', 0.82]], red: [118] });
+  const cap = d.fuelCap || 260;
+  dialFace(g, G.fuel, { ...S.fuel, max: cap }, { major: cap / 4, minor: cap / 8, fmt: (v) => ['E', '¼', '½', '¾', 'F'][Math.round((v / cap) * 4)], label: ['COMB.', 'LITROS'], labelY: [0.32, 0.5], arcs: [[0, cap * 0.12, '#d0362a', 0.82]], red: [] });
+  dialFace(g, G.psi, S.psi, { major: 20, minor: 5, label: ['BARRA', 'PSI'], labelY: [0.32, 0.5], arcs: [[25, 45, '#3fb24a', 0.82]], red: [55] });
+  // Switch strip: magneto key, toggles with their labels, breakers.
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1f252b';
+  {
+    const k = L.key;
+    g.fillStyle = '#23272c'; g.beginPath(); g.arc(k.x, k.y, 22, 0, TAU); g.fill();
+    g.fillStyle = '#c9ced3'; g.beginPath(); g.arc(k.x, k.y, 18, 0, TAU); g.fill();
+    g.fillStyle = '#1f252b'; g.font = 'bold 8px Arial';
+    for (const [t, a] of [['OFF', KEY_ANG.off], ['R', KEY_ANG.r], ['L', KEY_ANG.l], ['BOTH', KEY_ANG.both], ['START', KEY_ANG.start]]) {
+      g.fillText(t, k.x + Math.cos(a) * 31, k.y + Math.sin(a) * 31);
+    }
+    g.font = 'bold 9px Arial'; g.fillText('MAGNETOS', k.x, k.y + 36);
+  }
+  for (const t of L.toggles) {
+    g.fillStyle = '#1f252b'; g.font = 'bold 8px Arial';
+    g.fillText(t.t, t.x, t.y - 34);
+    g.font = '7px Arial';
+    g.fillText('ON', t.x, t.y - 22);
+    g.fillText('OFF', t.x, t.y + 24);
+    g.fillStyle = '#2b3036'; g.beginPath(); g.arc(t.x, t.y, 9, 0, TAU); g.fill();
+    g.fillStyle = '#8d949b'; g.beginPath(); g.arc(t.x, t.y, 6.5, 0, TAU); g.fill();
+  }
+  g.fillStyle = '#c8261b'; g.fillRect(L.toggles[6].x - 15, L.toggles[6].y - 44, 30, 3);
+  for (let i = 0; i < 9; i++) {
+    const x = 120 + i * 30, y = 492;
+    g.fillStyle = '#16191c'; g.beginPath(); g.arc(x, y, 5.5, 0, TAU); g.fill();
+    g.fillStyle = '#3a3f45'; g.beginPath(); g.arc(x, y, 3.5, 0, TAU); g.fill();
+  }
+  g.fillStyle = '#1f252b'; g.font = '7px Arial';
+  g.fillText('CIRCUIT BREAKERS', 240, 482);
+  // Lamp housings and labels (the light itself is live, lampsIpa()).
+  for (const [x, y, t] of L.lamps) {
+    g.fillStyle = '#1a1d20'; g.beginPath(); g.arc(x, y, 15, 0, TAU); g.fill();
+    g.fillStyle = '#1f252b'; g.font = 'bold 8px Arial'; g.fillText(t, x, y + 23);
+  }
+  // Guidance unit and flow monitor recesses.
+  roundRect(g, L.gps.x - 4, L.gps.y - 4, L.gps.w + 8, L.gps.h + 8, 16); g.fillStyle = '#2a2f35'; g.fill();
+  roundRect(g, L.lcd.x - 6, L.lcd.y - 6, L.lcd.w + 12, L.lcd.h + 12, 8); g.fillStyle = '#16191c'; g.fill();
+}
+
+// Static dial face: black can, arcs, graduations, numbers, legend. No needle
+// (the needles are 3D) and no glint (the 3D glass reflects).
+function dialFace(g, G, sc, o) {
+  const { x, y, r } = G;
+  const ang = (v) => sc.a0 + ((v - sc.min) / (sc.max - sc.min)) * (sc.a1 - sc.a0);
+  const face = g.createRadialGradient(x, y - r * 0.3, r * 0.1, x, y, r + 6);
+  face.addColorStop(0, '#16181a');
+  face.addColorStop(1, '#050606');
+  g.fillStyle = face;
+  g.beginPath(); g.arc(x, y, r + 6, 0, TAU); g.fill();
+  for (const [v0, v1, col, rr] of o.arcs) {
+    if (!(v1 > v0)) continue;
+    g.strokeStyle = col; g.lineWidth = Math.max(3.5, r * 0.075);
+    g.beginPath(); g.arc(x, y, rr * r, ang(clamp(v0, sc.min, sc.max)), ang(clamp(v1, sc.min, sc.max))); g.stroke();
+  }
+  for (const v of o.red) {
+    const a = ang(clamp(v, sc.min, sc.max));
+    g.strokeStyle = '#d82a1f'; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(x + Math.cos(a) * r * 0.7, y + Math.sin(a) * r * 0.7); g.lineTo(x + Math.cos(a) * r * 0.96, y + Math.sin(a) * r * 0.96); g.stroke();
+  }
+  g.strokeStyle = '#ecebe4'; g.fillStyle = '#ecebe4';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `bold ${Math.round(r * (r > 50 ? 0.19 : 0.22))}px Arial`;
+  const n = Math.round((sc.max - sc.min) / o.minor);
+  for (let i = 0; i <= n; i++) {
+    const v = sc.min + i * o.minor;
+    if (o.wrap && i === n) break;
+    const a = ang(v);
+    const major = Math.abs(((v - sc.min) / o.major) - Math.round((v - sc.min) / o.major)) < 1e-6;
+    const r0 = r * (major ? 0.78 : 0.86);
+    g.lineWidth = major ? 2.6 : 1.3;
+    g.beginPath(); g.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); g.lineTo(x + Math.cos(a) * r * 0.95, y + Math.sin(a) * r * 0.95); g.stroke();
+    if (major && v >= (o.from ?? -Infinity)) {
+      const t = o.fmt ? o.fmt(v) : String(Math.round(o.abs ? Math.abs(v) : v));
+      if (t !== undefined) g.fillText(t, x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.6);
+    }
+  }
+  g.font = `${Math.round(r * 0.12)}px Arial`;
+  g.fillStyle = '#b9bcb6';
+  o.label.forEach((t, i) => g.fillText(t, x, y + r * o.labelY[i]));
+  o.extra?.(x, y, r);
+}
+
+// Turn coordinator face: wing-level and standard-rate marks, the inclinometer
+// tube (the aircraft symbol and the ball are 3D).
+function tcFace(g, G) {
+  const { x, y, r } = G;
+  g.fillStyle = '#0a0b0c';
+  g.beginPath(); g.arc(x, y, r + 6, 0, TAU); g.fill();
+  // Wings level (0, π) and standard-rate marks (a wingtip 20° down).
+  g.strokeStyle = '#ecebe4'; g.lineWidth = 3;
+  for (const t of [0, Math.PI, 0.349, Math.PI - 0.349]) {
+    g.beginPath(); g.moveTo(x + Math.cos(t) * r * 0.74, y + Math.sin(t) * r * 0.74); g.lineTo(x + Math.cos(t) * r * 0.92, y + Math.sin(t) * r * 0.92); g.stroke();
+  }
+  g.fillStyle = '#ecebe4'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `bold ${Math.round(r * 0.16)}px Arial`;
+  g.fillText('L', x - r * 0.56, y + r * 0.5);
+  g.fillText('R', x + r * 0.56, y + r * 0.5);
+  g.font = `${Math.round(r * 0.11)}px Arial`;
+  g.fillStyle = '#b9bcb6';
+  g.fillText('TURN COORDINATOR', x, y - r * 0.45);
+  g.fillText('2 MIN', x, y + r * 0.82);
+  // Inclinometer: curved glass tube with two wire marks.
+  const R = r * 1.15, cy = y + r * 0.5 - R;
+  g.strokeStyle = 'rgba(210,225,220,0.55)'; g.lineWidth = r * 0.17; g.lineCap = 'round';
+  g.beginPath(); g.arc(x, cy, R, Math.PI / 2 - 0.36, Math.PI / 2 + 0.36); g.stroke();
+  g.strokeStyle = 'rgba(25,30,28,0.9)'; g.lineWidth = r * 0.13;
+  g.beginPath(); g.arc(x, cy, R, Math.PI / 2 - 0.35, Math.PI / 2 + 0.35); g.stroke();
+  g.lineCap = 'butt';
+  g.strokeStyle = '#ecebe4'; g.lineWidth = 1.6;
+  for (const s of [-1, 1]) {
+    const t = Math.PI / 2 + s * 0.08;
+    g.beginPath(); g.moveTo(x + Math.cos(t) * (R - r * 0.09), cy + Math.sin(t) * (R - r * 0.09)); g.lineTo(x + Math.cos(t) * (R + r * 0.09), cy + Math.sin(t) * (R + r * 0.09)); g.stroke();
+  }
+  g.fillStyle = '#b9bcb6'; g.font = `${Math.round(r * 0.085)}px Arial`;
+  g.fillText('NO PITCH INFORMATION', x, y + r * 0.66);
 }
 
 function bezel(g, x, y, r) {
@@ -252,71 +490,100 @@ function flapInd(g, x, y, flaps) {
   g.fillRect(x - 31, y - 9 + flaps * 39, 14, 5);
 }
 
-function lamps(g, d) {
-  const items = [
-    ['STALL', d.stall > 0.5, '#ff3b2a'],
-    ['ENG', d.engine !== 'running', d.engine === 'cranking' ? '#ffb020' : '#ff3b2a'],
-    ['FUEL', d.fuel < d.fuelCap * 0.15, '#ffb020'],
-    ['BRAKE', d.brake, '#ffb020'],
-    ['SPRAY', d.spray, '#3dff7a'],
-  ];
-  items.forEach(([t, on, col], i) => {
-    const x = 210 + i * 44, y = 52;
-    g.fillStyle = '#1a1d20';
-    g.beginPath(); g.arc(x, y, 15, 0, Math.PI * 2); g.fill();
-    const base = { '#ff3b2a': '#7a1d16', '#ffb020': '#7a5310', '#3dff7a': '#1d5a2c' }[col];
-    g.fillStyle = on ? col : base;
+// Annunciator lamps (the domed lenses over them are 3D).
+function lampsIpa(g, d) {
+  const on = [d.stall > 0.5, d.engine !== 'running', d.fuel < d.fuelCap * 0.15, d.brake, d.spray];
+  const base = { '#ff3b2a': '#5e1a14', '#ffb020': '#5e4210', '#3dff7a': '#17452a' };
+  IPA_PANEL.lamps.forEach(([x, y, , col], i) => {
+    g.fillStyle = on[i] ? col : base[col];
     g.beginPath(); g.arc(x, y, 11, 0, Math.PI * 2); g.fill();
-    if (on) {
-      const halo = g.createRadialGradient(x, y, 4, x, y, 22);
-      halo.addColorStop(0, col + 'aa');
+    if (on[i]) {
+      const halo = g.createRadialGradient(x, y, 3, x, y, 15);
+      halo.addColorStop(0, '#ffffffcc');
+      halo.addColorStop(0.35, col + 'ff');
       halo.addColorStop(1, col + '00');
       g.fillStyle = halo;
-      g.beginPath(); g.arc(x, y, 22, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(x, y, 15, 0, Math.PI * 2); g.fill();
     }
-    g.fillStyle = 'rgba(255,255,255,0.35)';
-    g.beginPath(); g.arc(x - 4, y - 4, 3.5, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#1f252b'; g.font = 'bold 9px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(t, x, y + 24);
   });
 }
 
-function switches(g, d) {
-  const items = [
-    ['MAGNETO', d.engine !== 'off'], ['BATT', true], ['ALTERN', d.engine === 'running'], ['B. COMB', true],
-    ['NAV', true], ['STROBE', true], ['FARÓIS', false], ['BOMBA', true], ['VÁLVULA', d.spray], ['GPS', true],
-  ];
-  items.forEach(([t, on], i) => {
-    const x = 62 + i * 59, y = 478;
-    g.fillStyle = '#1f252b'; g.font = 'bold 9px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(t, x, 446);
-    g.fillStyle = '#d7dadc';
-    g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#7d848b';
-    g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#e8eaec'; g.lineWidth = 5; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + (on ? -17 : 17)); g.stroke();
-    g.lineCap = 'butt';
-    if (t === 'VÁLVULA') { g.fillStyle = '#c8261b'; g.fillRect(x - 13, y - 26, 26, 3); }
+// SATLOC-style guidance unit face: rugged bezel, the live guidance screen,
+// soft keys and the status LEDs.
+function gpsUnit(g, s) {
+  const { x, y, w, h } = IPA_PANEL.gps, S = IPA_PANEL.screen;
+  const body = g.createLinearGradient(0, y, 0, y + h);
+  body.addColorStop(0, '#2a2e33');
+  body.addColorStop(1, '#17191c');
+  g.fillStyle = body;
+  roundRect(g, x, y, w, h, 14); g.fill();
+  g.strokeStyle = '#3a4047'; g.lineWidth = 2;
+  roundRect(g, x + 4, y + 4, w - 8, h - 8, 11); g.stroke();
+  g.fillStyle = '#050806';
+  roundRect(g, S.x - 5, S.y - 5, S.w + 10, S.h + 10, 6); g.fill();
+  g.fillStyle = '#0a0f0b';
+  g.fillRect(S.x, S.y, S.w, S.h);
+  g.save();
+  g.beginPath(); g.rect(S.x, S.y, S.w, S.h); g.clip();
+  if (s && s.draw) s.draw(g, S.x, S.y, S.w, S.h);
+  else {
+    g.fillStyle = '#3d6e8a'; g.font = 'bold 30px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('AGRONAV', S.x + S.w / 2, S.y + S.h / 2 - 8);
+    g.font = '12px Arial'; g.fillStyle = '#6c8796';
+    g.fillText('M3 · DGPS GUIDANCE', S.x + S.w / 2, S.y + S.h / 2 + 20);
+  }
+  g.restore();
+  // Brand, soft keys, LEDs.
+  const by = S.y + S.h + 16;
+  g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.fillStyle = '#e9ecef'; g.font = 'bold 19px Arial';
+  g.fillText('AGRONAV', x + 22, by + 8);
+  g.fillStyle = '#ff8a1c'; g.font = 'bold 15px Arial';
+  g.fillText('M3', x + 112, by + 8);
+  const on = !!s;
+  [['GPS', on ? '#3dff7a' : '#17452a'], ['DIF', on ? '#3dff7a' : '#17452a']].forEach(([t, col], i) => {
+    const lx = x + 22 + i * 34, ly = by + 30;
+    g.fillStyle = col; g.beginPath(); g.arc(lx, ly, 4, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#9aa1a8'; g.font = '8px Arial'; g.fillText(t, lx + 7, ly);
+  });
+  ['MENU', '◄', '►', 'A/B', 'OK'].forEach((t, i) => {
+    const kx = x + 168 + i * 40, ky = by - 4;
+    g.fillStyle = '#0f1113';
+    roundRect(g, kx, ky, 34, 28, 6); g.fill();
+    g.fillStyle = '#3b4047';
+    roundRect(g, kx + 2, ky + 2, 30, 23, 5); g.fill();
+    g.fillStyle = '#e3e6e8'; g.font = 'bold 10px Arial'; g.textAlign = 'center';
+    g.fillText(t, kx + 17, ky + 14);
+    g.textAlign = 'left';
   });
 }
 
-function digital(g, x, y, d) {
-  g.fillStyle = '#16191c';
-  g.fillRect(x - 6, y - 6, 300, 144);
-  g.fillStyle = '#071008';
-  g.fillRect(x, y, 288, 132);
+// Flow monitor / engine data LCD under the guidance unit.
+function lcd(g, d) {
+  const { x, y, w, h } = IPA_PANEL.lcd;
+  const run = d.engine === 'running';
+  const lg = g.createLinearGradient(0, y, 0, y + h);
+  lg.addColorStop(0, '#0d170f');
+  lg.addColorStop(1, '#071008');
+  g.fillStyle = lg;
+  g.fillRect(x, y, w, h);
+  const ff = run ? FLIGHT.fuelFlowFull * (0.22 + 0.78 * clamp(d.throttle, 0, 1)) * (d.rpm / FLIGHT.maxRpm) * 3600 : 0;
+  const psi = d.spray && d.flow > 0 ? 40 * clamp(d.flow / SPRAY.flow, 0, 1.3) : 0;
   g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-  g.font = 'bold 20px monospace';
+  g.font = 'bold 19px monospace';
   g.fillStyle = '#9ff0a4';
   g.fillText(`HDG ${String(Math.round(d.hdg) % 360).padStart(3, '0')}°`, x + 12, y + 28);
-  g.fillText(`HGT ${d.hgt < 99 ? d.hgt.toFixed(1) : '--'} m`, x + 150, y + 28);
-  g.fillText(`VS  ${(d.vsFpm >= 0 ? '+' : '') + Math.round(d.vsFpm / 10) * 10}`, x + 12, y + 62);
+  g.fillText(`HGT ${d.hgt < 99 ? d.hgt.toFixed(1) : '--'} m`, x + 186, y + 28);
+  g.fillText(`VS ${(d.vsFpm >= 0 ? '+' : '') + Math.round(d.vsFpm / 10) * 10}`, x + 12, y + 60);
+  g.fillText(`FF ${ff.toFixed(0).padStart(3, ' ')} L/h`, x + 186, y + 60);
   g.fillStyle = d.spray ? '#7fd0ff' : '#4a6a7a';
-  g.fillText(`FLOW ${d.spray ? (d.flow * 60).toFixed(0) : '0'} L/min`, x + 12, y + 96);
-  g.font = '12px monospace';
+  g.fillText(`FLOW ${d.spray ? (d.flow * 60).toFixed(0) : '0'} L/min`, x + 12, y + 90);
+  g.fillText(`${psi.toFixed(0).padStart(2, ' ')} PSI`, x + 236, y + 90);
+  g.font = '11px monospace';
   g.fillStyle = '#6f8a74';
-  g.fillText('FLOW MONITOR', x + 12, y + 122);
+  g.fillText('FLOW MONITOR · ENGINE DATA', x + 12, y + 118);
+  g.fillStyle = 'rgba(255,255,255,0.04)';
+  g.fillRect(x, y, w, h / 2);
 }
 
 function gps(g, x, y, w, h, s) {
