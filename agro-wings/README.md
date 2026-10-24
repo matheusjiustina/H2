@@ -1591,3 +1591,47 @@ autopilot mission pass for both).
   Model 120 → 135 meshes, 78.8 k → 89.7 k triangles; small cockpit parts
   drawn within 7 m only; +15–18 draw calls in close and cockpit views,
   slightly fewer from farther away. Look-dev: `node test/ipaviews.mjs`.
+
+## Ipanema geometry from the real airframe
+
+The Ipanema's airframe was rebuilt from measurements instead of being
+reshaped by eye (`src/aircraft/model.js`). Reference: a true side photo of
+an EMB-203 (same fuselage, nose, belly and tail as the 202A), scaled by the
+7.43 m overall length and placed on the physics main-wheel point; a PR-AGW
+render, a cowl close-up and an in-flight photo for the nose, cabin and plan
+view. The aircraft stays an EMB-202A (two-blade prop, no 203 winglets, roof
+a little lower than the 203's).
+
+- **Fuselage**: every station is its own superellipse section (half-width,
+  shoulder, belly, top, upper/lower exponents), so the sides are flat and
+  the roof and belly turn at real corners instead of a tube. Hopper section
+  1.06 m wide × 1.17 m deep (was 1.14 × 1.34); spinner tip 2.0 m ahead of the
+  main wheels (was 2.6 m) and 2.77 m ahead of the origin (was 3.35); the
+  belly is flat at −0.40 m, ~1 m above the ground parked (it hung 0.35 m
+  lower); the rear fuselage stays deep and slab-sided to the rudder post.
+- **Nose**: IO-540 cowl barely larger than the spinner at its lip (0.60 ×
+  0.42 m), top line rising steadily to the windshield base, two round inlets
+  beside a polished conical spinner, oil-cooler scoop, exhaust stubs.
+- **Cabin**: the lower fuselage keeps the hopper's section and is cut at the
+  window sill; the canopy sections start exactly on that cut, so the glass,
+  frames and roof meet the skin without steps. Windshield from the hopper
+  top (z −0.29) to the roof rail (z −0.73), roof crown 1.12 m, one side
+  window per side bounded only by the real frames (A-pillar, window frame,
+  roof rail, C-pillar and the sill tube, which now sits on the sill instead
+  of crossing the glass 11 cm above it). Cockpit, pilot and eye point moved
+  with the cabin (eye at z −1.12, 0.92 m); its walls and cage stay inside
+  the skin.
+- **Tail and wing**: fin, rudder, stabiliser and elevators re-placed on the
+  photo (stabiliser LE z −3.42, rudder post z −3.96, fin top 1.38 m); wing
+  root raised 0.22 m to the measured low-wing position; dorsal fillet, wing
+  fillets and gear legs re-fitted to the new skin.
+- **Kept**: flight model, gear contact points (three wheels on the ground
+  as before), engine, controls, spray, servicing, weight/fuel, cameras,
+  HUD, instruments, paint and PR-AGW identity. The crash points, collision
+  boxes, boom height, service keep-outs and stub points that sit on the
+  skin follow the new surface (`FLIGHT.hard`, `types.js`).
+- **Validation**: the side silhouette overlaid on the reference photo
+  (`test/acviews.mjs` side/front/rear/top/3-4/cabin/ground views at
+  `SCALE`), 93 unit tests, the soybean autopilot mission. Model 135 meshes,
+  87.7 k triangles (was 89.7 k). Known gap: the tail wheel stays at the
+  physics point, ~0.35 m aft of the 203's in the photo.

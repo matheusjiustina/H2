@@ -64,19 +64,19 @@ export const FLIGHT = {
 
   // Points that must never touch anything (crash / damage detection).
   hard: [
-    { name: 'wingtipL', p: [5.85, 0.05, -0.05] },
-    { name: 'wingtipR', p: [-5.85, 0.05, -0.05] },
+    { name: 'wingtipL', p: [5.85, 0.27, -0.05] },
+    { name: 'wingtipR', p: [-5.85, 0.27, -0.05] },
     // Booms hang under the trailing edge and follow the 6° dihedral.
-    { name: 'boomL', p: [4.9, -0.22, -0.95] },
-    { name: 'boomR', p: [-4.9, -0.22, -0.95] },
-    { name: 'prop', p: [0, -1.05, 3.05] },
-    { name: 'spinner', p: [0, 0.05, 3.35] },
-    { name: 'belly', p: [0, -0.72, 0.4] },
-    { name: 'tail', p: [0, 0.15, -4.25] },
-    { name: 'fin', p: [0, 1.75, -4.0] },
-    { name: 'stabL', p: [1.8, 0.35, -3.75] },
-    { name: 'stabR', p: [-1.8, 0.35, -3.75] },
-    { name: 'roof', p: [0, 1.35, 0.1] },
+    { name: 'boomL', p: [4.9, 0.0, -0.95] },
+    { name: 'boomR', p: [-4.9, 0.0, -0.95] },
+    { name: 'prop', p: [0, -0.87, 2.37] },
+    { name: 'spinner', p: [0, 0.2, 2.75] },
+    { name: 'belly', p: [0, -0.45, 0.4] },
+    { name: 'tail', p: [0, -0.3, -4.2] },
+    { name: 'fin', p: [0, 1.38, -4.3] },
+    { name: 'stabL', p: [1.8, 0.16, -3.8] },
+    { name: 'stabR', p: [-1.8, 0.16, -3.8] },
+    { name: 'roof', p: [0, 1.12, -1.1] },
   ],
 
   // Damage thresholds (m/s at contact).

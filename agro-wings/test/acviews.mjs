@@ -1,5 +1,6 @@
 // Look-dev for one aircraft parked at the pad (and one in-flight chase view):
-// side, front / rear three-quarter, top, low front, engine close-up, cockpit
+// side, front / rear three-quarter, top, low front, engine close-up, straight
+// front and rear, cabin close-up, wheels on the ground, cockpit
 // (pilot's eye) and panel close-up, flaps down. Cameras are given in the
 // aircraft's own frame (x left wing, y up, z nose) so the same views work
 // for every type.
@@ -10,6 +11,8 @@ import fs from 'node:fs';
 const outDir = process.argv[2] || 'ac-views';
 const acId = process.argv[3] || 'm18';
 const only = process.argv[4]?.split(',');
+// SCALE=0.7 brings the outside cameras closer (smaller aircraft).
+const SC = +process.env.SCALE || 1;
 fs.mkdirSync(outDir, { recursive: true });
 const url = process.env.AGRO_URL || 'http://localhost:4173/';
 const browser = await chromium.launch({
@@ -39,11 +42,19 @@ const views = [
   ['top', [0.01, 22, -1.5], [0, 0, -1.5], 55, 0],
   ['lowFront', [-2.5, -0.6, 8.5], [0, 0.5, 0], 55, 0],
   ['engine', [-1.8, 0.9, 4.3], [0, 0.4, 2.0], 45, 0],
+  // Straight front and rear at about eye height (the cameras are in the
+  // tail-down body frame).
+  ['front', [0, -1.2, 7.4], [0, 0.3, 0], 84, 0],
+  ['rear', [0, 6, -26], [0, 0.6, -1.5], 32, 0],
+  ['cabin', [-2.8, 1.6, 1.0], [0, 0.7, -0.8], 45, 0],
+  ['ground', [-13, -0.7, -1.5], [0, -0.7, -1.5], 36, 0],
+  ['left34', [7.2, 0.7, 6.8], [0, 0.15, -0.8], 34, 0],
   ['flapsDown', [-6, 1.6, -7], [-3, -0.6, -1], 45, 1],
   ['cockpit', 'eye', [0, 1.1, 6], 70, 0],
   ['panel', 'eye', [0, -0.3, 1.0], 50, 0],
 ].filter(([n]) => !only || only.includes(n));
-for (const [name, c, tg, fov, flaps] of views) {
+for (let [name, c, tg, fov, flaps] of views) {
+  if (c !== 'eye') c = c.map((v, i) => tg[i] + (v - tg[i]) * SC);
   const info = await page.evaluate(({ c, tg, fov, flaps, name }) => {
     const g = window.__agro;
     const ac = g.aircraft;
