@@ -1560,3 +1560,34 @@ firing is an audio effect only. The windshield is a single curved surface
 photo; the plan view and wing section come from published dimensions. The
 cockpit labels are in Polish as on the real aircraft; the rest of the UI
 follows the game language.
+
+## Visual rebuilds — AT-502B exterior and Ipanema
+
+Visual only: flight models, paint, registrations, collision and service
+points and the model interfaces are unchanged (unit tests and the soybean
+autopilot mission pass for both).
+
+- **AT-502B (PR-AWT)** (`src/aircraft/atModel.js`): taller, narrower cabin
+  under a rounded painted roof, raked windshield with a centre post, framed
+  glazing (painted outside, grey inside) with door and rear posts, hinges
+  and handle; turtle deck straight off the roof with a dorsal fillet; deeper
+  belly with a flanged cast gatebox, dump handle and boarding step; slimmer
+  PT6 nose with a screened chin intake, cowl landing lights and a long
+  pointed spinner; thicker spring-steel gear legs with root fairings. Model
+  96.6 k → 107 k triangles, one mesh fewer; 1–2 fewer draw calls per view.
+  Look-dev: `node test/atviews.mjs`.
+- **Ipanema EMB-202A (PR-AGW)** (`src/aircraft/model.js`, `panel.js`):
+  one continuous canopy (raked one-piece windshield with centre post, door
+  and rear quarter windows, crowned roof into the turtle deck) with painted
+  frames, rubber seals, hinges and handle; wider flat-faced IO-540 cowl with
+  twin inlets; swept fin with a dorsal fillet; two-blade prop; softer
+  upturned wingtips. Cockpit: grey aluminium panel with recessed 3D
+  instruments behind bezels and glass whose needles follow the flight model
+  (airspeed, rpm, manifold pressure, three-hand altimeter, turn coordinator,
+  VSI, oil, fuel, boom pressure), switches, magneto key, mixture and prop
+  levers, the guidance GPS in an AGRONAV-style housing with a sun hood and a
+  flow/engine-data display, padded glareshield, magnetic compass. Shared
+  helpers keep their signatures (used by the AT-502B, R44 and Dromader).
+  Model 120 → 135 meshes, 78.8 k → 89.7 k triangles; small cockpit parts
+  drawn within 7 m only; +15–18 draw calls in close and cockpit views,
+  slightly fewer from farther away. Look-dev: `node test/ipaviews.mjs`.
