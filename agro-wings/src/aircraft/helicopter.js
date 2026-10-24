@@ -177,7 +177,7 @@ export class Helicopter {
     // Helicopter controls through the type's mapping onto the game actions.
     const C = this.type.controls;
     const dn = (k) => (input.isDown(C[k]) ? 1 : 0);
-    let pitch = dn('cyclicAft') - dn('cyclicForward') - this.yoke.y;
+    let pitch = dn('cyclicAft') - dn('cyclicForward') + this.yoke.y;
     let roll = dn('cyclicRight') - dn('cyclicLeft') + this.yoke.x;
     let yaw = dn('pedalRight') - dn('pedalLeft');
     if (v.active) { pitch += v.pitch; roll += v.roll; yaw += v.yaw; }
@@ -197,7 +197,6 @@ export class Helicopter {
     this.target.leverRate = clamp(rate, -1, 1);
     let lv = this.lever + rate * dt * (opts.assist === 'off' ? 0.32 : this.fm.powerModel === 'power' ? 0.9 : 0.55); // quicker lever with the assist (the power model: 0.9/s, the power answers at once)
     if (v.throttle !== null && v.throttle !== undefined) lv = v.throttle;
-    if (m.wheel && opts.cameraMode !== 'orbit') lv -= m.wheel * 0.03;
     this.lever = clamp(lv, 0, 1);
     // Longitudinal cyclic trim (used with the assist off).
     if (input.isDown(C.trimAft)) fm.trim = clamp(fm.trim - dt * 0.25, -0.6, 0.6);

@@ -20,6 +20,9 @@ export class CameraRig {
     this.look = { yaw: 0, pitch: -0.3 };
     this.chaseOff = { yaw: 0, pitch: 0 };
     this.orbit = { yaw: 2.3, pitch: 0.22, dist: 16 };
+    // Scroll zoom (1 = default view): cockpit field of view / head position,
+    // chase distance.
+    this.zoom = { cockpit: 1, chase: 1 };
     this.shake = 0;
     this.initialized = false;
   }
@@ -42,6 +45,11 @@ export class CameraRig {
     ac.model.pilot.visible = this.mode !== 'cockpit';
     ac.model.cockpit.visible = true;
     const dragLook = mouse.buttons & 1;
+    if (mouse.wheel) {
+      // Scroll up zooms in, down zooms out (limited).
+      if (this.mode === 'cockpit') this.zoom.cockpit = clamp(this.zoom.cockpit * (1 + mouse.wheel * 0.1), 0.35, 1.3);
+      else if (this.mode === 'chase') this.zoom.chase = clamp(this.zoom.chase * (1 + mouse.wheel * 0.1), 0.6, 1.8);
+    }
     if (this.mode === 'cockpit') {
       if (dragLook) {
         this.look.yaw = clamp(this.look.yaw - mouse.dx * 1.6, -2.6, 2.6);
@@ -55,6 +63,8 @@ export class CameraRig {
       const ks = this.shakeScale ?? 1;
       const amp = (eng + ground) * ks + this.shake * 0.02;
       _v.copy(ac.model.eye);
+      // Zoomed out past the default view the head sits back a little.
+      _v.z -= clamp((this.zoom.cockpit - 1) / 0.3, 0, 1) * 0.25;
       if (ac.kind === 'heli') {
         // Two-per-rev shake of the teetering rotor: strongest through
         // translational lift (~15–25 kt), rising again at high speed and in
@@ -73,7 +83,7 @@ export class CameraRig {
       cam.quaternion.copy(quat).multiply(FLIP);
       _e.set(this.look.pitch, this.look.yaw, 0, 'YXZ');
       cam.quaternion.multiply(_q.setFromEuler(_e));
-      this._fov(70, dt);
+      this._fov(70 * this.zoom.cockpit, dt);
     } else if (this.mode === 'chase') {
       const fwd = _v.set(0, 0, 1).applyQuaternion(quat);
       // Follow the flight path when flying (shows where you are going),
@@ -98,9 +108,9 @@ export class CameraRig {
       _v.copy(this.chaseDir).applyAxisAngle(Y, this.chaseOff.yaw);
       // Smooth the camera offset relative to the aircraft (not its world
       // position), so the camera does not fall behind at spraying speed.
-      const dist = C.dist + smoothstep(30, 60, sp) * 1.5;
+      const dist = (C.dist + smoothstep(30, 60, sp) * 1.5) * this.zoom.chase;
       const off = _v2.copy(_v).multiplyScalar(-dist);
-      off.y += C.height + this.chaseOff.pitch * 8;
+      off.y += C.height * this.zoom.chase + this.chaseOff.pitch * 8;
       if (!this.initialized) this.chaseOffset.copy(off);
       else this.chaseOffset.lerp(off, 1 - Math.exp(-5 * dt));
       this.chasePos.copy(pos).add(this.chaseOffset);

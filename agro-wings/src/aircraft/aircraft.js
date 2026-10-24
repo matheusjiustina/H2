@@ -180,7 +180,7 @@ export class Aircraft {
     }
     const v = input.virtual;
     const gp = input.gamepad;
-    let pitch = (input.isDown('pitchUp') ? 1 : 0) - (input.isDown('pitchDown') ? 1 : 0) - this.yoke.y;
+    let pitch = (input.isDown('pitchUp') ? 1 : 0) - (input.isDown('pitchDown') ? 1 : 0) + this.yoke.y;
     let roll = (input.isDown('rollRight') ? 1 : 0) - (input.isDown('rollLeft') ? 1 : 0) + this.yoke.x;
     let yaw = (input.isDown('yawRight') ? 1 : 0) - (input.isDown('yawLeft') ? 1 : 0);
     if (v.active) { pitch += v.pitch; roll += v.roll; yaw += v.yaw; }
@@ -201,7 +201,6 @@ export class Aircraft {
     if (input.isDown('throttleDown')) thr -= dt * 0.55;
     if (gp) thr += (gp.throttleUp - gp.throttleDown) * dt * 0.6;
     if (v.throttle !== null && v.throttle !== undefined) thr = v.throttle;
-    if (m.wheel && opts.cameraMode !== 'orbit') thr -= m.wheel * 0.05;
     fm.throttle = clamp(thr, 0, 1);
     // Flaps
     const notch = FLAP_NOTCHES.reduce((b, n) => (Math.abs(n - fm.flapsCmd) < Math.abs(b - fm.flapsCmd) ? n : b), 0);
