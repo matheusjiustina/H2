@@ -1671,6 +1671,23 @@ side photo of the EMB-203 and the orange 202 in flight, a ground photo of the
   windshield top 1.13 m, rear frame 1.14 m (were 1.16 / 1.10 / 1.10). The
   cockpit, eye point, panel and pilot are unchanged; the crash point on
   the roof follows the skin.
+- **Cabin, windshield and rear contour** (fourth pass, measured on a true
+  side photo of an EMB-203 with the model's silhouette overlaid, aligned on
+  the spinner tip and the rudder's top): roof crown 1.215 m and flat to
+  z −1.25 (was 1.20, falling from −0.99); windshield top 1.17 m at
+  z −0.70 (was 1.13 at −0.73) and its base on the hopper top 2.5 cm higher
+  (0.795 m), so the glass stands more upright (~44°) above the cowl line,
+  bowed out a little more. Behind the cabin the roof now ends in a short
+  shoulder at the rear frame (1.12 m) and the deck falls in a nearly
+  straight ramp (1.0 m at −1.62, 0.885 m at −1.78, 0.695 m at −2.08) easing
+  to 0.38 m at the fin root, instead of a broad rounded hump; the deck
+  keeps the cabin's rounder section there (no filling out behind the
+  cabin). The upper contour now matches the photo within ~2 cm from the
+  windshield to the fin; fin, rudder and tailplane already matched (rudder
+  trailing edge and height on the photo, fin leading edge within ~8 cm)
+  and are unchanged. The cockpit eye point (0.96 m) is unchanged; checked
+  from the seat ahead, wide, panel, left, right, up and behind: no frame or
+  roof in the way, no clipping. Roof crash point follows the skin.
 - **Tail wheel and stance**: the physics tail point moved from behind the
   rudder (z −4.55) to under it (z −4.30, y −0.82), on a leaf spring from a
   bracket under the tail cone; the three-point attitude is 6.3° (was 10.8°),

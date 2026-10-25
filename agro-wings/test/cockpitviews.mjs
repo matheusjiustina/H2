@@ -39,6 +39,9 @@ const views = [
   ['right', 'air', -0.95, -0.25, 1],
   ['ground', 'pad', 0, -0.02, 1],
   ['groundWide', 'pad', 0, -0.12, 1.12],
+  ['up', 'air', 0, 0.75, 1.12],
+  ['backL', 'air', 2.2, 0.1, 1.12],
+  ['backR', 'air', -2.2, 0.1, 1.12],
 ].filter(([n]) => !only || only.includes(n));
 for (const [name, where, yaw, pitch, zoom] of views) {
   const info = await page.evaluate(({ where, yaw, pitch, zoom }) => {

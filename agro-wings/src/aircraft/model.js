@@ -47,23 +47,25 @@ const K = (z, hw, ys, yb, yt, pU, pL) => ({ z, hw, ys, yb, yt, pU, pL });
 const FWD_KEYS = [
   K(2.33, 0.3, 0.17, -0.04, 0.38, 2.7, 2.6), K(2.2, 0.32, 0.15, -0.09, 0.405, 2.8, 2.7),
   K(1.9, 0.355, 0.11, -0.17, 0.445, 3.1, 3.0), K(1.4, 0.415, 0.06, -0.23, 0.505, 3.4, 3.2),
-  K(0.8, 0.475, -0.02, -0.29, 0.6, 3.8, 3.4), K(0.2, 0.51, -0.12, -0.35, 0.69, 4.1, 3.6),
-  K(-0.29, 0.53, -0.19, -0.4, 0.77, 4.2, 3.6),
+  K(0.8, 0.475, -0.02, -0.29, 0.6, 3.8, 3.4), K(0.2, 0.51, -0.12, -0.35, 0.7, 4.1, 3.6),
+  K(-0.29, 0.53, -0.19, -0.4, 0.795, 4.2, 3.6),
 ];
 const FWD_END = FWD_KEYS[FWD_KEYS.length - 1];
 // Cabin: the lower fuselage keeps the hopper's section and is cut 30° above
 // the sides (the window sill); the glazed cabin closes it above.
-const CAB_KEYS = [FWD_END, K(-0.8, 0.53, -0.19, -0.4, 0.77, 4.2, 3.6), K(-1.45, 0.53, -0.19, -0.39, 0.77, 4.2, 3.6)];
+const CAB_KEYS = [FWD_END, K(-0.8, 0.53, -0.19, -0.4, 0.795, 4.2, 3.6), K(-1.45, 0.53, -0.19, -0.39, 0.795, 4.2, 3.6)];
 const CAB_Z = -1.45; // cabin rear frame, start of the rear fuselage
-// Rear fuselage (true side view of the 203 on the belly line): the turtle
-// deck falls off the cabin roof in a concave sweep to ~0.37 m at the fin
-// root and runs on nearly level to the rudder post; the belly stays flat;
+// Rear fuselage (true side views of the 203): the roof ends in a short
+// shoulder at the cabin's rear frame, the turtle deck then falls in a nearly
+// straight ramp (~35°) and eases out to ~0.38 m at the fin root, running on
+// nearly level to the rudder post; behind the cabin the deck keeps the
+// cabin's rounded section instead of filling out; the belly stays flat;
 // seen from above the sides taper steadily from the cabin's rear frame to
 // the rudder post, so the tail cone stays deep but slender.
 const AFT_KEYS = [
-  K(-1.45, 0.53, -0.19, -0.39, 1.14, 4.2, 3.6), K(-1.78, 0.49, -0.15, -0.385, 0.92, 4.0, 3.5),
-  K(-2.08, 0.44, -0.12, -0.38, 0.71, 3.8, 3.4), K(-2.52, 0.36, -0.08, -0.37, 0.48, 3.5, 3.3),
-  K(-3.0, 0.28, -0.04, -0.36, 0.37, 3.3, 3.1), K(-3.5, 0.195, 0.0, -0.35, 0.33, 3.1, 2.9),
+  K(-1.45, 0.53, -0.19, -0.39, 1.12, 4.2, 3.6), K(-1.62, 0.51, -0.17, -0.387, 1.0, 3.3, 3.5),
+  K(-1.78, 0.49, -0.15, -0.385, 0.885, 3.3, 3.5), K(-2.08, 0.44, -0.12, -0.38, 0.695, 3.3, 3.4),
+  K(-2.52, 0.36, -0.08, -0.37, 0.5, 3.3, 3.3), K(-3.0, 0.28, -0.04, -0.36, 0.38, 3.2, 3.1), K(-3.5, 0.195, 0.0, -0.35, 0.33, 3.1, 2.9),
   K(-3.85, 0.125, 0.02, -0.335, 0.3, 2.9, 2.7), K(-3.97, 0.05, 0.02, -0.3, 0.26, 2.6, 2.5),
 ];
 const AFT_MORPH = -2.3; // the cabin's section has become the plain rear section here
@@ -91,8 +93,9 @@ const SILL_Y = FWD_END.ys + (FWD_END.yt - FWD_END.ys) * Math.sin(SILL_A) ** (2 /
 // and the roof is narrower than the fuselage, as on the real cabin.
 const CAN_P = 2.8;
 const CANOPY = [
-  K(-0.29, SILL_X, SILL_Y, 0, 0.9, CAN_P, 2), K(-0.73, SILL_X, SILL_Y, 0, 1.13, CAN_P, 2),
-  K(-0.99, SILL_X, SILL_Y, 0, 1.2, CAN_P, 2), K(-1.32, SILL_X, SILL_Y, 0, 1.18, CAN_P, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.14, CAN_P, 2),
+  K(-0.29, SILL_X, SILL_Y, 0, 0.93, CAN_P, 2), K(-0.7, SILL_X, SILL_Y, 0, 1.17, CAN_P, 2),
+  K(-0.99, SILL_X, SILL_Y, 0, 1.215, CAN_P, 2), K(-1.25, SILL_X, SILL_Y, 0, 1.21, CAN_P, 2),
+  K(-1.37, SILL_X, SILL_Y, 0, 1.18, CAN_P, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.12, CAN_P, 2),
 ];
 // Canopy angle of the roof rail (top of the side windows, ~70 % of the way
 // from the sill to the crown).
@@ -101,7 +104,7 @@ const RAIL = Math.asin(0.704 ** (CAN_P / 2));
 // (1): the superellipse rises steeply off the sill, so equal angle steps
 // are not equal heights.
 const railA = (v) => Math.asin(Math.min(1, (v * Math.sin(RAIL) ** (2 / CAN_P)) ** (CAN_P / 2)));
-const WS_TOP = -0.73, WS_BOT = FWD_END.z; // windshield top (at the rail) and base
+const WS_TOP = -0.7, WS_BOT = FWD_END.z; // windshield top (at the rail) and base
 const WIN_GAP = 0.13; // painted strip between the A-pillar and the side window
 const canSec = (z) => {
   const c = CANOPY;
@@ -948,7 +951,7 @@ export function createAircraftModel(panel, opts = {}) {
     R[0] = -R[0];
     const p = [0, 1, 2].map((k) => (1 - v) * B[k] + v * T[k] + (1 - u) * Lp[k] + u * R[k]
       - ((1 - u) * (1 - v) * b0[k] + u * (1 - v) * b1[k] + (1 - u) * v * t0[k] + u * v * t1[k]));
-    const bl = 0.025 * Math.sin(Math.PI * u) * Math.sin(Math.PI * v) + off;
+    const bl = 0.045 * Math.sin(Math.PI * u) * Math.sin(Math.PI * v) + off; // one-piece glass, bowed out
     return [p[0] + WSN.x * bl, p[1] + WSN.y * bl, p[2] + WSN.z * bl];
   };
   // Side window (left; mirrored for the right) from just behind the A-pillar

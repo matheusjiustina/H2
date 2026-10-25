@@ -77,7 +77,7 @@ export const FLIGHT = {
     { name: 'fin', p: [0, 1.38, -4.3] },
     { name: 'stabL', p: [1.8, 0.16, -3.8] },
     { name: 'stabR', p: [-1.8, 0.16, -3.8] },
-    { name: 'roof', p: [0, 1.19, -1.1] },
+    { name: 'roof', p: [0, 1.21, -1.1] },
   ],
 
   // Damage thresholds (m/s at contact).
