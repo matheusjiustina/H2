@@ -1688,6 +1688,23 @@ side photo of the EMB-203 and the orange 202 in flight, a ground photo of the
   and are unchanged. The cockpit eye point (0.96 m) is unchanged; checked
   from the seat ahead, wide, panel, left, right, up and behind: no frame or
   roof in the way, no clipping. Roof crash point follows the skin.
+- **Windshield base, cabin volume, deep tail cone** (fifth pass, same
+  side-photo overlay plus close views matching the owner's screenshots):
+  the windshield glass used to wrap down the sides to the window sills,
+  ~25 cm below the cowl line; its lower edge now runs nearly level across
+  the hopper top (the corners 4.5 cm lower than the centre) and the patch
+  below the corners is painted skin (dark inside). The cabin section is
+  less rounded (side windows more upright, the roof wider) and the roof
+  crown is 1.25 m (windshield top 1.20 m). The rear fuselage was ~12 cm
+  shallower at the bottom than the photo and its lower section V-shaped,
+  so the tail cone looked pinched underneath: the belly now drops a little
+  behind the wing (−0.47/−0.485 m behind the cabin, rising to −0.385 m
+  at the fin) and the rear sections are flat-sided with a flat bottom
+  (wider keel, shoulder kept low) right to the rudder post; the bottom
+  matches the photo within ~2 cm from the fin forward to z −2.1. Tail
+  wheel bracket moved down onto the new skin; fin, rudder, tailplane,
+  wings, gear, physics and the cockpit eye point unchanged. Checked from
+  the seat (11 views): no frame or roof in the way, no clipping.
 - **Tail wheel and stance**: the physics tail point moved from behind the
   rudder (z −4.55) to under it (z −4.30, y −0.82), on a leaf spring from a
   bracket under the tail cone; the three-point attitude is 6.3° (was 10.8°),

@@ -53,20 +53,24 @@ const FWD_KEYS = [
 const FWD_END = FWD_KEYS[FWD_KEYS.length - 1];
 // Cabin: the lower fuselage keeps the hopper's section and is cut 30° above
 // the sides (the window sill); the glazed cabin closes it above.
-const CAB_KEYS = [FWD_END, K(-0.8, 0.53, -0.19, -0.4, 0.795, 4.2, 3.6), K(-1.45, 0.53, -0.19, -0.39, 0.795, 4.2, 3.6)];
+const CAB_KEYS = [FWD_END, K(-0.8, 0.53, -0.19, -0.43, 0.795, 4.2, 3.6), K(-1.45, 0.53, -0.19, -0.47, 0.795, 4.2, 3.6)];
 const CAB_Z = -1.45; // cabin rear frame, start of the rear fuselage
 // Rear fuselage (true side views of the 203): the roof ends in a short
 // shoulder at the cabin's rear frame, the turtle deck then falls in a nearly
 // straight ramp (~35°) and eases out to ~0.38 m at the fin root, running on
 // nearly level to the rudder post; behind the cabin the deck keeps the
-// cabin's rounded section instead of filling out; the belly stays flat;
+// cabin's section instead of filling out; the belly drops a little behind
+// the wing (the rear fuselage is deeper than the wing root) and rises gently
+// to the tail, the tail cone a flat-sided, flat-bottomed box right to the
+// rudder post;
 // seen from above the sides taper steadily from the cabin's rear frame to
 // the rudder post, so the tail cone stays deep but slender.
 const AFT_KEYS = [
-  K(-1.45, 0.53, -0.19, -0.39, 1.12, 4.2, 3.6), K(-1.62, 0.51, -0.17, -0.387, 1.0, 3.3, 3.5),
-  K(-1.78, 0.49, -0.15, -0.385, 0.885, 3.3, 3.5), K(-2.08, 0.44, -0.12, -0.38, 0.695, 3.3, 3.4),
-  K(-2.52, 0.36, -0.08, -0.37, 0.5, 3.3, 3.3), K(-3.0, 0.28, -0.04, -0.36, 0.38, 3.2, 3.1), K(-3.5, 0.195, 0.0, -0.35, 0.33, 3.1, 2.9),
-  K(-3.85, 0.125, 0.02, -0.335, 0.3, 2.9, 2.7), K(-3.97, 0.05, 0.02, -0.3, 0.26, 2.6, 2.5),
+  K(-1.45, 0.53, -0.19, -0.47, 1.14, 4.2, 3.6), K(-1.62, 0.51, -0.17, -0.48, 1.02, 3.6, 3.6),
+  K(-1.78, 0.49, -0.15, -0.485, 0.895, 3.5, 3.7), K(-2.08, 0.44, -0.13, -0.485, 0.7, 3.4, 3.9),
+  K(-2.52, 0.36, -0.12, -0.47, 0.5, 3.3, 4.2), K(-3.0, 0.28, -0.12, -0.44, 0.38, 3.2, 4.5),
+  K(-3.5, 0.205, -0.1, -0.415, 0.33, 3.1, 4.6),
+  K(-3.85, 0.14, -0.08, -0.385, 0.3, 2.9, 4.5), K(-3.97, 0.075, -0.06, -0.34, 0.26, 2.6, 3.8),
 ];
 const AFT_MORPH = -2.3; // the cabin's section has become the plain rear section here
 // Top line of the turtle deck (the fin flag is kept above it).
@@ -91,11 +95,11 @@ const SILL_X = FWD_END.hw * Math.cos(SILL_A) ** (2 / FWD_END.pU);
 const SILL_Y = FWD_END.ys + (FWD_END.yt - FWD_END.ys) * Math.sin(SILL_A) ** (2 / FWD_END.pU);
 // Section exponent of the canopy: the side windows lean in from the sill
 // and the roof is narrower than the fuselage, as on the real cabin.
-const CAN_P = 2.8;
+const CAN_P = 3.6;
 const CANOPY = [
-  K(-0.29, SILL_X, SILL_Y, 0, 0.93, CAN_P, 2), K(-0.7, SILL_X, SILL_Y, 0, 1.17, CAN_P, 2),
-  K(-0.99, SILL_X, SILL_Y, 0, 1.215, CAN_P, 2), K(-1.25, SILL_X, SILL_Y, 0, 1.21, CAN_P, 2),
-  K(-1.37, SILL_X, SILL_Y, 0, 1.18, CAN_P, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.12, CAN_P, 2),
+  K(-0.29, SILL_X, SILL_Y, 0, 0.95, CAN_P, 2), K(-0.7, SILL_X, SILL_Y, 0, 1.2, CAN_P, 2),
+  K(-0.99, SILL_X, SILL_Y, 0, 1.25, CAN_P, 2), K(-1.25, SILL_X, SILL_Y, 0, 1.245, CAN_P, 2),
+  K(-1.37, SILL_X, SILL_Y, 0, 1.21, CAN_P, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.14, CAN_P, 2),
 ];
 // Canopy angle of the roof rail (top of the side windows, ~70 % of the way
 // from the sill to the crown).
@@ -932,8 +936,8 @@ export function createAircraftModel(panel, opts = {}) {
   spinnerMesh.castShadow = true;
 
   // ---------------- cabin ----------------
-  // Raked one-piece windshield with a centre post standing on the hopper
-  // top, one side window each side (no extra bars) behind a painted strip,
+  // Raked one-piece windshield standing on the hopper top, one side window
+  // each side (no extra bars) behind a painted strip,
   // a crowned roof flowing into the turtle deck. Frames: painted tubes
   // outside, black rubber seals along the glass, dark grey tubes inside.
   const roof = canSec(-0.99).yt;
@@ -954,10 +958,38 @@ export function createAircraftModel(panel, opts = {}) {
     const bl = 0.045 * Math.sin(Math.PI * u) * Math.sin(Math.PI * v) + off; // one-piece glass, bowed out
     return [p[0] + WSN.x * bl, p[1] + WSN.y * bl, p[2] + WSN.z * bl];
   };
+  // The glass's lower edge runs nearly level across the hopper top (the
+  // windshield stands above the cowl line, as on the real aircraft); below
+  // its lower corners the patch is painted skin down to the sills.
+  // glassV(u): the patch's v at which the glass begins.
+  const GLASS_LOW = FWD_END.yt - 0.045;
+  const gvCache = new Map();
+  const glassV = (u) => {
+    const key = Math.round(u * 1e4);
+    if (gvCache.has(key)) return gvCache.get(key);
+    const target = GLASS_LOW + (FWD_END.yt - GLASS_LOW) * (1 - (2 * u - 1) ** 2);
+    let lo = 0, hi = 0.9;
+    if (wsPt(u, 0)[1] >= target) hi = 0;
+    else for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (wsPt(u, m)[1] >= target) hi = m; else lo = m; }
+    gvCache.set(key, hi);
+    return hi;
+  };
+  const wsGlass = (u, w, off = 0) => wsPt(u, lerp(glassV(u), 1, w), off);
+  {
+    // Only where there is skin (the centre of the base is glass right down
+    // to the hopper top): from each sill to the last u with glassV > 0.
+    let uS = 0;
+    while (uS < 0.5 && glassV(uS) > 0) uS += 0.005;
+    for (const [u0, u1] of [[0, uS], [1 - uS, 1]]) {
+      const f = (off) => (u, w) => { const uu = lerp(u0, u1, u); return wsPt(uu, glassV(uu) * w, off); };
+      add('livery', liveryUV(tagged(grid(f(0), 10, 3, inside))));
+      add('frameIn', tagged(flipWinding(grid(f(-0.006), 10, 3, inside))));
+    }
+  }
   // Side window (left; mirrored for the right) from just behind the A-pillar
   // to the C-pillar; painted strip ahead of it and skin behind it.
   const winPt = (u, v, off = 0) => { const a = railA(v); return canPt(lerp(winZ(a), cPillarZ(a), u), a, off); };
-  const glassG = [grid((u, v) => wsPt(u, v), 16, 10)];
+  const glassG = [grid((u, v) => wsGlass(u, v), 24, 10)];
   for (const sx of [1, -1]) {
     glassG.push(grid(mirror(winPt, sx), 14, 8));
     add('livery', liveryUV(tagged(grid(mirror((u, v) => { const a = railA(v); return canPt(lerp(pillarZ(a), winZ(a), u), a); }, sx), 2, 8, inside))));
@@ -982,9 +1014,9 @@ export function createAircraftModel(panel, opts = {}) {
   };
   const seal = (pts) => add('rubber', tube(pts, 0.0065, pts.length, 4), true);
   frame((t, o) => wsPt(t, 1, o), 0.028, 20);
-  frame((t, o) => wsPt(t, 0, o), 0.022, 20);
+  frame((t, o) => wsGlass(t, 0, o), 0.024, 24); // the glass's lower frame
   seal(line((t) => wsPt(t, 0.975, 0.004), 20)(0));
-  seal(line((t) => wsPt(t, 0.03, 0.004), 20)(0));
+  seal(line((t) => wsGlass(t, 0.03, 0.004), 24)(0));
   for (const sx of [1, -1]) {
     const S = (f) => (t, o) => { const p = f(t, o); return [p[0] * sx, p[1], p[2]]; };
     frame(S((t, o) => canPt(pillarZ(railA(t)), railA(t), o)), 0.03, 14); // A-pillar
@@ -1006,7 +1038,7 @@ export function createAircraftModel(panel, opts = {}) {
       pts.push(pts[0]);
       seal(pts);
     }
-    seal(line((t) => { const p = wsPt(sx > 0 ? 0.025 : 0.975, 0.03 + t * 0.94, 0.004); return p; }, 12)(0));
+    seal(line((t) => wsGlass(sx > 0 ? 0.025 : 0.975, 0.03 + t * 0.94, 0.004), 12)(0));
     // Door (the window bay is the door): handle and hinges, window latch
     // inside (red).
     const dh = secXY(FWD_END, SILL_A - 0.12);
@@ -1254,8 +1286,8 @@ export function createAircraftModel(panel, opts = {}) {
     const fz = cfg.p[2] + 0.1, fy = cfg.p[1] + R + 0.085;
     // Tapered leaf spring from a bracket under the tail cone, just ahead of
     // the rudder post, back and down to the steerable fork under the rudder.
-    add('dark', tx(new RoundedBoxGeometry(0.09, 0.05, 0.16, 2, 0.012), 0, -0.3, -3.8));
-    add('dark', bar([0, -0.31, -3.8], [0, fy + 0.02, fz], 0.06, 0.016));
+    add('dark', tx(new RoundedBoxGeometry(0.09, 0.05, 0.16, 2, 0.012), 0, -0.38, -3.8));
+    add('dark', bar([0, -0.39, -3.8], [0, fy + 0.02, fz], 0.06, 0.016));
     add('dark', tx(new THREE.CylinderGeometry(0.03, 0.03, 0.07, 12), 0, fy + 0.03, fz));
     const fork = new THREE.Group();
     fork.position.set(0, fy, fz);
