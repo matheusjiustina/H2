@@ -53,15 +53,15 @@ const FWD_END = FWD_KEYS[FWD_KEYS.length - 1];
 // the sides (the window sill); the glazed cabin closes it above.
 const CAB_KEYS = [FWD_END, K(-0.8, 0.53, -0.19, -0.4, 0.77, 4.2, 3.6), K(-1.45, 0.53, -0.19, -0.39, 0.77, 4.2, 3.6)];
 const CAB_Z = -1.45; // cabin rear frame, start of the rear fuselage
-// Rear fuselage: the turtle deck falls off the cabin roof in a concave sweep
-// down to a slender tail cone, whose top carries the tailplane and the fin
-// (side photos of the 202/203); the belly stays flat; the tail cone ends at
-// the rudder post.
+// Rear fuselage (true side view of the 203 on the belly line): the turtle
+// deck falls off the cabin roof in a concave sweep to ~0.37 m at the fin
+// root and runs on nearly level to the rudder post; the belly stays flat;
+// the slab sides keep their width and depth to a deep, boxy tail cone.
 const AFT_KEYS = [
-  K(-1.45, 0.53, -0.19, -0.39, 1.1, 4.2, 3.6), K(-1.75, 0.51, -0.15, -0.385, 0.9, 4.0, 3.5),
-  K(-2.08, 0.47, -0.13, -0.38, 0.57, 3.8, 3.4), K(-2.52, 0.38, -0.1, -0.37, 0.33, 3.3, 3.2),
-  K(-3.0, 0.28, -0.07, -0.36, 0.21, 2.9, 3.0), K(-3.5, 0.18, -0.05, -0.35, 0.165, 2.7, 2.8),
-  K(-3.85, 0.1, -0.04, -0.33, 0.14, 2.5, 2.6), K(-3.97, 0.03, -0.04, -0.28, 0.1, 2.5, 2.5),
+  K(-1.45, 0.53, -0.19, -0.39, 1.1, 4.2, 3.6), K(-1.78, 0.515, -0.15, -0.385, 0.9, 4.0, 3.5),
+  K(-2.08, 0.49, -0.12, -0.38, 0.71, 3.8, 3.4), K(-2.52, 0.42, -0.08, -0.37, 0.48, 3.5, 3.3),
+  K(-3.0, 0.34, -0.04, -0.36, 0.37, 3.3, 3.1), K(-3.5, 0.25, 0.0, -0.35, 0.33, 3.1, 2.9),
+  K(-3.85, 0.17, 0.02, -0.335, 0.3, 2.9, 2.7), K(-3.97, 0.07, 0.02, -0.3, 0.26, 2.6, 2.5),
 ];
 const AFT_MORPH = -2.3; // the cabin's section has become the plain rear section here
 // Top line of the turtle deck (the fin flag is kept above it).
@@ -270,7 +270,7 @@ function liveryTextures(reg) {
     // Stripes: navy band with the rising check at the wing root, gold
     // pinstripe and a thin navy line under it.
     const band = (cl, hh, off = 0) => cl.map(([z, y], i) => [z, y + off + hh[i]]).concat(cl.map(([z, y], i) => [z, y + off - hh[i]]).reverse());
-    const cl = [[2.4, 0.0], [1.2, -0.07], [0.35, -0.11], [-0.55, 0.06], [-1.6, 0.11], [-2.8, 0.03], [-3.98, -0.03]];
+    const cl = [[2.4, 0.0], [1.2, -0.07], [0.35, -0.11], [-0.55, 0.06], [-1.6, 0.12], [-2.8, 0.13], [-3.98, 0.12]];
     poly(band(cl, [0.06, 0.065, 0.065, 0.055, 0.045, 0.032, 0.016]), NAVY);
     const cl2 = cl.slice(0, 5);
     poly(band(cl2, [0.013, 0.013, 0.012, 0.011, 0.009], -0.115), '#ffd23c');
@@ -284,7 +284,7 @@ function liveryTextures(reg) {
       path(g, [[-2.95, 2.0], [-4.75, 2.0], ...edge.slice().reverse()]); g.closePath(); g.clip();
       g.fillStyle = '#079a3d';
       g.fillRect(0, oy, LV.W, LV.H / 2);
-      const zc = -4.12, yc = 0.86;
+      const zc = -4.12, yc = 0.9;
       poly([[zc + 0.36, yc], [zc, yc + 0.28], [zc - 0.36, yc], [zc, yc - 0.28]], '#fedf00');
       const [cx, cy] = P(zc, yc);
       g.fillStyle = '#002776';
@@ -297,7 +297,7 @@ function liveryTextures(reg) {
     // Panel seams with rivet rows (colour + relief).
     const seams = [
       [[2.05, -0.2], [2.05, 0.45]], [[1.25, -0.3], [1.25, 0.52]], [[WS_BOT, -0.42], [WS_BOT, 0.78]],
-      [[CAB_Z, -0.42], [CAB_Z, 1.1]], [[-2.6, -0.4], [-2.6, 0.36]], [[-3.45, -0.38], [-3.45, 0.17]],
+      [[CAB_Z, -0.42], [CAB_Z, 1.1]], [[-2.6, -0.4], [-2.6, 0.5]], [[-3.45, -0.38], [-3.45, 0.36]],
       [[2.3, 0.2], [1.25, 0.2]], [[1.25, -0.27], [WS_BOT, -0.27]], [[CAB_Z, -0.28], [-3.45, -0.27]],
     ];
     for (const s of seams) {
@@ -1076,7 +1076,7 @@ export function createAircraftModel(panel, opts = {}) {
   // the rudder (cut back clear of it); an upright fin with a curved dorsal
   // fillet and a big rudder on a vertical hinge whose trailing edge leans
   // forward toward the bottom of the tail cone.
-  const STAB_Y = 0.08, HINGE_Z = -3.96;
+  const STAB_Y = 0.1, HINGE_Z = -3.96;
   const stabStations = [
     { x: 0.08, y: STAB_Y, le: -3.42, chord: 0.87 }, { x: 1.2, y: STAB_Y + 0.01, le: -3.47, chord: 0.79 },
     { x: 1.78, y: STAB_Y + 0.02, le: -3.52, chord: 0.71 }, { x: 1.87, y: STAB_Y + 0.022, le: -3.55, chord: 0.62 }, { x: 1.92, y: STAB_Y + 0.023, le: -3.6, chord: 0.5 },
@@ -1115,15 +1115,15 @@ export function createAircraftModel(panel, opts = {}) {
     g.computeVertexNormals();
     return g;
   };
-  // Straight leading edge swept ~25° from the tail cone top to the tip,
+  // Straight leading edge swept ~35° from the dorsal fillet to the tip,
   // where the rudder's top carries on to the full height.
-  const FIN_LE = [[0.05, -3.32], [0.15, -3.37], [0.5, -3.537], [0.9, -3.727], [1.15, -3.846], [1.3, -3.915], [1.36, -3.942]];
+  const FIN_LE = [[0.2, -3.16], [0.38, -3.27], [0.57, -3.39], [0.9, -3.62], [1.15, -3.795], [1.3, -3.9], [1.36, -3.942]];
   const finSt = FIN_LE.map(([h, le]) => [h, le, (le - HINGE_Z) / 0.62]);
   add('livery', liveryUV(tagged(vfin(airfoil(0, 0.62, 0.105, 0, 0.4, 12), finSt))));
   // Dorsal fillet rising off the turtle deck into the fin's leading edge.
   add('livery', liveryUV(tagged(loft(sampleStations([
-    K(-2.85, 0.008, 0.235, 0.225, 0.245, 2.2, 2.2), K(-3.05, 0.028, 0.21, 0.19, 0.27, 2.2, 2.2), K(-3.2, 0.04, 0.2, 0.17, 0.31, 2.2, 2.2),
-    K(-3.35, 0.046, 0.2, 0.16, 0.36, 2.2, 2.2), K(-3.5, 0.046, 0.2, 0.16, 0.42, 2.2, 2.2),
+    K(-2.72, 0.01, 0.37, 0.36, 0.385, 2.2, 2.2), K(-2.92, 0.03, 0.36, 0.34, 0.41, 2.2, 2.2), K(-3.08, 0.043, 0.36, 0.33, 0.455, 2.2, 2.2),
+    K(-3.25, 0.05, 0.37, 0.33, 0.52, 2.2, 2.2), K(-3.43, 0.05, 0.38, 0.33, 0.62, 2.2, 2.2),
   ], 20), 12, null))));
   // Rudder trailing edge: 4.66 m aft at the top, 4.48 m at the bottom (below
   // the tail cone).

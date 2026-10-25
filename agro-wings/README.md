@@ -1645,15 +1645,19 @@ side photo of the EMB-203 and the orange 202 in flight, a ground photo of the
 
 - **Cabin**: windshield top 1.10 m and roof crown 1.16 m (were 1.05 / 1.12),
   so the roof line runs on from the windshield without a dip.
-- **Rear fuselage**: the turtle deck now falls off the cabin in a concave
-  sweep to a slender tail cone (0.57 m at z −2.08, 0.21 m at z −3.0; it ran
-  nearly level at 0.40 m before), which carries the tailplane (now at
-  0.08 m) and the fin on its top, as on the real aircraft.
-- **Empennage**: the fin rises from the cone top with a straight leading
-  edge swept ~25° (root z −3.32, tip z −3.94, 1.36 m) and a small dorsal
-  fillet; the rudder runs from below the cone (trailing edge 4.48 m aft) to
-  1.43 m (4.66 m aft). Exposed fin height 1.3 m instead of 1.0 m. The navy
-  band, flag and registration follow the lower tail.
+- **Rear fuselage**: measured again on the clean true side view of the
+  203 (belly line as datum): the turtle deck falls off the cabin in a
+  concave sweep to ~0.37 m at the fin root (0.71 m at z −2.08, 0.48 m at
+  z −2.52) and runs on nearly level to the rudder post; the slab sides keep
+  more width to the tail (0.34 m half-width at z −3.0, 0.25 m at −3.5), so
+  the tail cone stays deep and boxy instead of tapering to a point. (A
+  first pass had lowered the deck to 0.21 m from a misread photo; that made
+  the tail thin and low and is undone.)
+- **Empennage**: the fin rises out of a longer dorsal fillet with a
+  straight leading edge swept ~35° (z −3.39 at 0.57 m, tip z −3.94 at
+  1.36 m), as on the photo; the rudder runs from below the cone (trailing
+  edge 4.48 m aft) to 1.43 m (4.66 m aft); tailplane at 0.10 m on the
+  cone. The navy band, flag and registration follow the tail.
 - **Tail wheel and stance**: the physics tail point moved from behind the
   rudder (z −4.55) to under it (z −4.30, y −0.82), on a leaf spring from a
   bracket under the tail cone; the three-point attitude is 6.3° (was 10.8°),
