@@ -1700,6 +1700,15 @@ height 3.12 m, 29×11.0-10 mains) (`src/aircraft/atModel.js`,
   windshield, so sitting on its tailwheel the nose is about level, as on the
   real aircraft; the cabin moved up 0.25 m with it (height in the three-point
   attitude 3.12 m, the published figure).
+- **Behind the cabin** (second pass): the turtle deck was one straight ramp
+  from the roof (1.89 m at z −1.5) to the tail, which made the airframe
+  look short and wedge-shaped. It is now two regions of one skin, as on the
+  real aircraft: a curved cabin fairing that rolls off the roof and falls
+  steeply to about the window sill (1.08 m at z −2.55), then a long upper
+  deck running nearly level (~5° to the fuselage line, 1.0 m at z −3.3,
+  0.87 m at z −4.5) to the fin, the tail cone keeping its depth to the
+  rudder post. The dorsal fillet and the blue fin paint follow the new deck;
+  cabin, fin, tail position, wing, gear and physics are unchanged.
 - **Canopy**: a narrow glasshouse set in on a sill ledge (0.94 m at the
   sill, leaning in to a rounded roof) with the three-piece windshield (flat
   centre pane between two posts, angled side panes to the A-posts), door and
