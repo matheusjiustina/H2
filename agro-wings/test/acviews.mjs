@@ -11,7 +11,8 @@ import fs from 'node:fs';
 const outDir = process.argv[2] || 'ac-views';
 const acId = process.argv[3] || 'm18';
 const only = process.argv[4]?.split(',');
-// SCALE=0.7 brings the outside cameras closer (smaller aircraft).
+// SCALE=0.7 brings the outside cameras closer (smaller aircraft). VIEWS adds
+// views as JSON in the same form ([name, camera, target, fov, flaps], ...).
 const SC = +process.env.SCALE || 1;
 fs.mkdirSync(outDir, { recursive: true });
 const url = process.env.AGRO_URL || 'http://localhost:4173/';
@@ -52,7 +53,7 @@ const views = [
   ['flapsDown', [-6, 1.6, -7], [-3, -0.6, -1], 45, 1],
   ['cockpit', 'eye', [0, 1.1, 6], 70, 0],
   ['panel', 'eye', [0, -0.3, 1.0], 50, 0],
-].filter(([n]) => !only || only.includes(n));
+].concat(JSON.parse(process.env.VIEWS || '[]')).filter(([n]) => !only || only.includes(n));
 for (let [name, c, tg, fov, flaps] of views) {
   if (c !== 'eye') c = c.map((v, i) => tg[i] + (v - tg[i]) * SC);
   const info = await page.evaluate(({ c, tg, fov, flaps, name }) => {

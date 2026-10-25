@@ -40,12 +40,14 @@ const WING_SPAN_UV = 6.2; // metres of half-span mapped to u = 0..1
 // to the tail under an upright fin.
 const K = (z, hw, ys, yb, yt, pU, pL) => ({ z, hw, ys, yb, yt, pU, pL });
 // Nose: the IO-540 cowl is barely larger than the spinner at its lip (two
-// round cooling inlets beside the spinner), then opens out over the engine;
-// the hopper top continues the cowl's top line up to the windshield base.
+// round cooling inlets beside the spinner), then opens out over the engine
+// and the hopper, widest at the cabin (in plan the body is a long taper from
+// the cabin to the spinner and to the tail); the hopper top continues the
+// cowl's top line up to the windshield base.
 const FWD_KEYS = [
   K(2.33, 0.3, 0.17, -0.04, 0.38, 2.7, 2.6), K(2.2, 0.32, 0.15, -0.09, 0.405, 2.8, 2.7),
-  K(1.9, 0.37, 0.11, -0.17, 0.445, 3.1, 3.0), K(1.4, 0.44, 0.06, -0.23, 0.505, 3.4, 3.2),
-  K(0.8, 0.5, -0.02, -0.29, 0.6, 3.8, 3.4), K(0.2, 0.52, -0.12, -0.35, 0.69, 4.1, 3.6),
+  K(1.9, 0.355, 0.11, -0.17, 0.445, 3.1, 3.0), K(1.4, 0.415, 0.06, -0.23, 0.505, 3.4, 3.2),
+  K(0.8, 0.475, -0.02, -0.29, 0.6, 3.8, 3.4), K(0.2, 0.51, -0.12, -0.35, 0.69, 4.1, 3.6),
   K(-0.29, 0.53, -0.19, -0.4, 0.77, 4.2, 3.6),
 ];
 const FWD_END = FWD_KEYS[FWD_KEYS.length - 1];
@@ -56,12 +58,13 @@ const CAB_Z = -1.45; // cabin rear frame, start of the rear fuselage
 // Rear fuselage (true side view of the 203 on the belly line): the turtle
 // deck falls off the cabin roof in a concave sweep to ~0.37 m at the fin
 // root and runs on nearly level to the rudder post; the belly stays flat;
-// the slab sides keep their width and depth to a deep, boxy tail cone.
+// seen from above the sides taper steadily from the cabin's rear frame to
+// the rudder post, so the tail cone stays deep but slender.
 const AFT_KEYS = [
-  K(-1.45, 0.53, -0.19, -0.39, 1.1, 4.2, 3.6), K(-1.78, 0.515, -0.15, -0.385, 0.9, 4.0, 3.5),
-  K(-2.08, 0.49, -0.12, -0.38, 0.71, 3.8, 3.4), K(-2.52, 0.42, -0.08, -0.37, 0.48, 3.5, 3.3),
-  K(-3.0, 0.34, -0.04, -0.36, 0.37, 3.3, 3.1), K(-3.5, 0.25, 0.0, -0.35, 0.33, 3.1, 2.9),
-  K(-3.85, 0.17, 0.02, -0.335, 0.3, 2.9, 2.7), K(-3.97, 0.07, 0.02, -0.3, 0.26, 2.6, 2.5),
+  K(-1.45, 0.53, -0.19, -0.39, 1.14, 4.2, 3.6), K(-1.78, 0.49, -0.15, -0.385, 0.92, 4.0, 3.5),
+  K(-2.08, 0.44, -0.12, -0.38, 0.71, 3.8, 3.4), K(-2.52, 0.36, -0.08, -0.37, 0.48, 3.5, 3.3),
+  K(-3.0, 0.28, -0.04, -0.36, 0.37, 3.3, 3.1), K(-3.5, 0.195, 0.0, -0.35, 0.33, 3.1, 2.9),
+  K(-3.85, 0.125, 0.02, -0.335, 0.3, 2.9, 2.7), K(-3.97, 0.05, 0.02, -0.3, 0.26, 2.6, 2.5),
 ];
 const AFT_MORPH = -2.3; // the cabin's section has become the plain rear section here
 // Top line of the turtle deck (the fin flag is kept above it).
@@ -84,15 +87,20 @@ const aftTop = (z) => {
 const SILL_A = Math.PI / 6;
 const SILL_X = FWD_END.hw * Math.cos(SILL_A) ** (2 / FWD_END.pU);
 const SILL_Y = FWD_END.ys + (FWD_END.yt - FWD_END.ys) * Math.sin(SILL_A) ** (2 / FWD_END.pU);
+// Section exponent of the canopy: the side windows lean in from the sill
+// and the roof is narrower than the fuselage, as on the real cabin.
+const CAN_P = 2.8;
 const CANOPY = [
-  K(-0.29, SILL_X, SILL_Y, 0, 0.88, 4.2, 2), K(-0.73, SILL_X, SILL_Y, 0, 1.1, 4.2, 2),
-  K(-0.99, SILL_X, SILL_Y, 0, 1.16, 4.2, 2), K(-1.32, SILL_X, SILL_Y, 0, 1.14, 4.2, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.1, 4.2, 2),
+  K(-0.29, SILL_X, SILL_Y, 0, 0.9, CAN_P, 2), K(-0.73, SILL_X, SILL_Y, 0, 1.13, CAN_P, 2),
+  K(-0.99, SILL_X, SILL_Y, 0, 1.2, CAN_P, 2), K(-1.32, SILL_X, SILL_Y, 0, 1.18, CAN_P, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.14, CAN_P, 2),
 ];
-const RAIL = 0.5; // canopy angle of the roof rail (top of the side windows)
+// Canopy angle of the roof rail (top of the side windows, ~70 % of the way
+// from the sill to the crown).
+const RAIL = Math.asin(0.704 ** (CAN_P / 2));
 // Canopy angle at height fraction v between the sill (0) and the roof rail
 // (1): the superellipse rises steeply off the sill, so equal angle steps
 // are not equal heights.
-const railA = (v) => Math.asin(Math.min(1, (v * Math.sin(RAIL) ** (2 / 4.2)) ** (4.2 / 2)));
+const railA = (v) => Math.asin(Math.min(1, (v * Math.sin(RAIL) ** (2 / CAN_P)) ** (CAN_P / 2)));
 const WS_TOP = -0.73, WS_BOT = FWD_END.z; // windshield top (at the rail) and base
 const WIN_GAP = 0.13; // painted strip between the A-pillar and the side window
 const canSec = (z) => {

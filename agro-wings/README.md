@@ -1658,6 +1658,19 @@ side photo of the EMB-203 and the orange 202 in flight, a ground photo of the
   1.36 m), as on the photo; the rudder runs from below the cone (trailing
   edge 4.48 m aft) to 1.43 m (4.66 m aft); tailplane at 0.10 m on the
   cone. The navy band, flag and registration follow the tail.
+- **Plan view and cabin height** (third pass): the body was nearly
+  parallel-sided from the wing leading edge to well behind the cabin and
+  the canopy a box as wide as the fuselage, so from above it read wide and
+  blocky. Now the cabin is the widest station and the body tapers both
+  ways: forward over the hopper and cowl (half-width 0.475 m at z 0.8,
+  0.415 m at 1.4) and aft from the cabin's rear frame (0.49 m at z −1.78,
+  0.44 m at −2.08, 0.36 m at −2.52, 0.28 m at −3.0, 0.195 m at −3.5). The
+  canopy section is rounder (exponent 2.8 instead of 4.2): the side windows
+  lean in from the sill and the roof is ~12 cm narrower at the rails, with
+  the window top kept at 70 % of the cabin height. Roof crown 1.20 m,
+  windshield top 1.13 m, rear frame 1.14 m (were 1.16 / 1.10 / 1.10). The
+  cockpit, eye point, panel and pilot are unchanged; the crash point on
+  the roof follows the skin.
 - **Tail wheel and stance**: the physics tail point moved from behind the
   rudder (z −4.55) to under it (z −4.30, y −0.82), on a leaf spring from a
   bracket under the tail cone; the three-point attitude is 6.3° (was 10.8°),
