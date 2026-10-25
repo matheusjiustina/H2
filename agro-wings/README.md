@@ -1705,6 +1705,21 @@ side photo of the EMB-203 and the orange 202 in flight, a ground photo of the
   wheel bracket moved down onto the new skin; fin, rudder, tailplane,
   wings, gear, physics and the cockpit eye point unchanged. Checked from
   the seat (11 views): no frame or roof in the way, no clipping.
+- **Cabin height and the glareshield from the seat** (sixth pass): the
+  cabin now stands clearly above the photo's 203 (roof crown 1.32 m,
+  rear frame 1.22 m), with a long raked windshield (top at z −0.88, 1.28 m,
+  ~29° from the horizontal) and the side windows' top rail at 74 % of the
+  cabin height, so the canopy reads tall and angled when parked; the
+  turtle deck starts from the higher rear frame. From the seat the hood
+  over the panel used to stop ~4 cm short of the windshield's lower frame,
+  so the painted (orange) frame and hopper top showed between them: the
+  hood is now 10 cm deep, its top runs level just above the glass's lower
+  frame and drops under the raked glass to the windshield base (as on the
+  real 202), the inner side of the frame is dark, and the panel stays on
+  the airframe (top 0.70 m) while the seat, pilot and eye ride 6 cm higher
+  (eye 1.02 m) under the taller roof. Lightbar and compass on the hood's
+  roll. Checked from the seat in 11 views (no frame or roof in the way, no
+  clipping, nothing orange between the hood and the glass).
 - **Tail wheel and stance**: the physics tail point moved from behind the
   rudder (z −4.55) to under it (z −4.30, y −0.82), on a leaf spring from a
   bracket under the tail cone; the three-point attitude is 6.3° (was 10.8°),

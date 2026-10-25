@@ -66,8 +66,8 @@ const CAB_Z = -1.45; // cabin rear frame, start of the rear fuselage
 // seen from above the sides taper steadily from the cabin's rear frame to
 // the rudder post, so the tail cone stays deep but slender.
 const AFT_KEYS = [
-  K(-1.45, 0.53, -0.19, -0.47, 1.14, 4.2, 3.6), K(-1.62, 0.51, -0.17, -0.48, 1.02, 3.6, 3.6),
-  K(-1.78, 0.49, -0.15, -0.485, 0.895, 3.5, 3.7), K(-2.08, 0.44, -0.13, -0.485, 0.7, 3.4, 3.9),
+  K(-1.45, 0.53, -0.19, -0.47, 1.22, 4.2, 3.6), K(-1.62, 0.51, -0.17, -0.48, 1.08, 3.6, 3.6),
+  K(-1.78, 0.49, -0.15, -0.485, 0.94, 3.5, 3.7), K(-2.08, 0.44, -0.13, -0.485, 0.725, 3.4, 3.9),
   K(-2.52, 0.36, -0.12, -0.47, 0.5, 3.3, 4.2), K(-3.0, 0.28, -0.12, -0.44, 0.38, 3.2, 4.5),
   K(-3.5, 0.205, -0.1, -0.415, 0.33, 3.1, 4.6),
   K(-3.85, 0.14, -0.08, -0.385, 0.3, 2.9, 4.5), K(-3.97, 0.075, -0.06, -0.34, 0.26, 2.6, 3.8),
@@ -97,18 +97,18 @@ const SILL_Y = FWD_END.ys + (FWD_END.yt - FWD_END.ys) * Math.sin(SILL_A) ** (2 /
 // and the roof is narrower than the fuselage, as on the real cabin.
 const CAN_P = 3.6;
 const CANOPY = [
-  K(-0.29, SILL_X, SILL_Y, 0, 0.95, CAN_P, 2), K(-0.7, SILL_X, SILL_Y, 0, 1.2, CAN_P, 2),
-  K(-0.99, SILL_X, SILL_Y, 0, 1.25, CAN_P, 2), K(-1.25, SILL_X, SILL_Y, 0, 1.245, CAN_P, 2),
-  K(-1.37, SILL_X, SILL_Y, 0, 1.21, CAN_P, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.14, CAN_P, 2),
+  K(-0.29, SILL_X, SILL_Y, 0, 0.98, CAN_P, 2), K(-0.88, SILL_X, SILL_Y, 0, 1.28, CAN_P, 2),
+  K(-1.02, SILL_X, SILL_Y, 0, 1.315, CAN_P, 2), K(-1.2, SILL_X, SILL_Y, 0, 1.32, CAN_P, 2),
+  K(-1.33, SILL_X, SILL_Y, 0, 1.295, CAN_P, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.22, CAN_P, 2),
 ];
-// Canopy angle of the roof rail (top of the side windows, ~70 % of the way
+// Canopy angle of the roof rail (top of the side windows, ~74 % of the way
 // from the sill to the crown).
-const RAIL = Math.asin(0.704 ** (CAN_P / 2));
+const RAIL = Math.asin(0.74 ** (CAN_P / 2));
 // Canopy angle at height fraction v between the sill (0) and the roof rail
 // (1): the superellipse rises steeply off the sill, so equal angle steps
 // are not equal heights.
 const railA = (v) => Math.asin(Math.min(1, (v * Math.sin(RAIL) ** (2 / CAN_P)) ** (CAN_P / 2)));
-const WS_TOP = -0.7, WS_BOT = FWD_END.z; // windshield top (at the rail) and base
+const WS_TOP = -0.88, WS_BOT = FWD_END.z; // windshield top (at the rail) and base
 const WIN_GAP = 0.13; // painted strip between the A-pillar and the side window
 const canSec = (z) => {
   const c = CANOPY;
@@ -145,7 +145,7 @@ const railFrac = (a) => {
 // and the C-pillar leaning forward at the back of the side window.
 const pillarZ = (a) => WS_BOT + (WS_TOP - WS_BOT) * railFrac(a);
 const winZ = (a) => pillarZ(a) - WIN_GAP;
-const cPillarZ = (a) => -1.36 + 0.05 * railFrac(a);
+const cPillarZ = (a) => -1.4 + 0.11 * railFrac(a);
 // Top line ahead of the windshield (for the dark hopper deck in the livery).
 const deckTop = (z) => {
   const pts = FWD_KEYS.slice().reverse().map((k) => [k.z, k.yt]);
@@ -155,10 +155,10 @@ const deckTop = (z) => {
   }
   return pts[pts.length - 1][1];
 };
-// Cockpit interior, pilot and eye sit this far from where the panel layout
-// was drawn (moved back with the cabin; the seat, eye and panel ride 4 cm
-// lower than drawn under the cabin roof).
-const COCKPIT_OFF = new THREE.Vector3(0, -0.04, -0.62);
+// Cockpit interior, pilot and eye sit this far from where they were drawn
+// (moved back with the cabin and 2 cm up under its roof); the instrument
+// panel and glareshield stay on the airframe under the windshield.
+const COCKPIT_OFF = new THREE.Vector3(0, 0.02, -0.62);
 
 function sampleStations(keys, per) {
   const out = [];
@@ -1014,7 +1014,14 @@ export function createAircraftModel(panel, opts = {}) {
   };
   const seal = (pts) => add('rubber', tube(pts, 0.0065, pts.length, 4), true);
   frame((t, o) => wsPt(t, 1, o), 0.028, 20);
-  frame((t, o) => wsGlass(t, 0, o), 0.024, 24); // the glass's lower frame
+  frame((t, o) => wsGlass(t, 0, o), 0.024, 24, false); // the glass's lower frame
+  {
+    // Dark over the side of the tube that faces the seat (the pilot sees no
+    // paint over the glareshield).
+    const eye = new THREE.Vector3(0, 1.0, -0.5).add(COCKPIT_OFF), q = new THREE.Vector3();
+    const pts = line((t) => wsGlass(t, 0, 0.0084), 24)(0).map((p) => { q.set(...p); const e = eye.clone().sub(q).normalize(); return [p[0] + e.x * 0.011, p[1] + e.y * 0.011, p[2] + e.z * 0.011]; });
+    add('frameIn', tube(pts, 0.0265, 24, 8));
+  }
   seal(line((t) => wsPt(t, 0.975, 0.004), 20)(0));
   seal(line((t) => wsGlass(t, 0.03, 0.004), 24)(0));
   for (const sx of [1, -1]) {
@@ -1486,7 +1493,7 @@ export function createAircraftModel(panel, opts = {}) {
   // follows the windshield's lower frame (the hopper top's crown, falling
   // to the sills), so the plate's top edge is level in the middle and rounds
   // down into the corners.
-  const PT = 0.74, PB = PT - 0.48;
+  const PT = 0.7 - COCKPIT_OFF.y, PB = PT - 0.48; // panel top 0.70 m on the airframe
   const PX = (px) => 0.48 - px * ps, PY = (py) => PT - py * ps;
   const ZP = 0.335, PD = 0.016;
   const gsU = [];
@@ -1626,18 +1633,23 @@ export function createAircraftModel(panel, opts = {}) {
   // Black padded glareshield: its top runs under the windshield's lower
   // frame from sill to sill and overhangs the panel by 5 cm with a padded
   // roll; its underside closes down onto the plate's arched top edge.
-  const gsLip = ZP - 0.05;
+  // The hood is 10 cm deep: its top runs level just above the glass's lower
+  // frame (hiding it from the seat) and drops under the raked glass to the
+  // windshield base; a padded roll at the lip.
+  const gsLip = ZP - 0.1;
+  const WSK = (wsT(0.5)[1] - wsB(0.5)[1]) / (WS_BOT - WS_TOP); // windshield rise per metre aft
+  const zWB = WS_BOT - COCKPIT_OFF.z; // windshield base in the cockpit frame
+  const hoodTop = (x, z) => Math.min(gsY(x) + 0.032, gsY(x) + (zWB - z) * WSK - 0.012);
   {
     const arc = (u) => { const [x] = wsB(0.015 + 0.97 * u); return x * 0.975; };
-    addC('pad', grid((u, v) => { const x = arc(u); return [x, gsY(x) - 0.012 - 0.008 * (1 - v), lerp(gsLip, ZP + 0.045, v)]; }, 32, 3, [0, 0.4, 0.37]));
-    addC('pad', grid((u, v) => { const x = arc(u); return [x, lerp(gsY(x) - 0.04, plateTop(x) + 0.002, v), lerp(gsLip + 0.004, ZP - 0.001, v)]; }, 32, 2, [0, 0.95, 0.5]));
-    addC('pad', tube(line((t) => { const x = arc(0.02 + 0.96 * t); return [x, gsY(x) - 0.03, gsLip + 0.004]; }, 32)(0), 0.018, 48, 10));
-    addC('dark', tx(new THREE.BoxGeometry(0.04, 0.016, 0.03), 0, gsY(0) - 0.014, gsLip + 0.004)); // lightbar bracket
+    addC('pad', grid((u, v) => { const x = arc(u), z = lerp(gsLip, zWB - 0.004, v); return [x, hoodTop(x, z), z]; }, 32, 6, [0, 0.4, 0.37]));
+    addC('pad', grid((u, v) => { const x = arc(u); return [x, lerp(hoodTop(x, gsLip) - 0.034, plateTop(x) + 0.002, v), lerp(gsLip + 0.004, ZP - 0.001, v)]; }, 32, 2, [0, 0.95, 0.5]));
+    addC('pad', tube(line((t) => { const x = arc(0.02 + 0.96 * t); return [x, hoodTop(x, gsLip) - 0.017, gsLip + 0.004]; }, 32)(0), 0.018, 48, 10));
   }
   // Lightbar (swath guidance LEDs) on the glareshield's roll, clear of the
   // raked glass.
   const lightbar = new THREE.Group();
-  lightbar.position.set(0, gsY(0) + 0.006, gsLip - 0.005);
+  lightbar.position.set(0, hoodTop(0, gsLip) + 0.006, gsLip - 0.012);
   const leds = [];
   for (let i = -7; i <= 7; i++) {
     const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.008), new THREE.MeshBasicMaterial({ color: 0x222222 }));
@@ -1652,7 +1664,7 @@ export function createAircraftModel(panel, opts = {}) {
   // lens, lubber line, foot.
   const cardMat = new THREE.MeshStandardMaterial({ roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0.12 });
   cardMat.map = cardMat.emissiveMap = compassCardTexture();
-  const CPX = -0.24, CPY = gsY(-0.24) + 0.022, CPZ = gsLip - 0.06;
+  const CPX = -0.24, CPY = hoodTop(-0.24, gsLip) + 0.01, CPZ = gsLip - 0.03;
   const compassCard = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.022, 40, 1, true), cardMat);
   compassCard.position.set(CPX, CPY, CPZ - 0.032);
   near.add(compassCard);
