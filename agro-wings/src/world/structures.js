@@ -475,13 +475,11 @@ function buildService(B, M, group, H) {
   // Drums by the mix station.
   for (let i = 0; i < 5; i++) B.cyl(0.29, 0.29, 0.88, i % 2 ? M.blue : M.white, mt.x + 3 + (i % 3) * 0.62, 0.44, mt.z - 1.4 + Math.floor(i / 3) * 0.62, 14);
   // Parking marks on the pad: painted circle + T line (concrete pad).
-  // Service spot marked like a farm strip: white tyres at the corners and a
-  // painted stop board, aircraft parks on the compacted red earth.
+  // Service spot marked like a farm strip: a row of half-buried white tyres
+  // behind the parked tail; the aircraft parks on the compacted red earth.
   const pad = BASE.pad;
   const tyre = new THREE.TorusGeometry(0.42, 0.16, 10, 22);
-  for (const [dx, dz] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) B.add(tyre, M.white, pad.x + dx, 0.12, pad.z + dz, 0, Math.PI / 2);
-  B.box(0.1, 1.2, 0.1, M.wood, pad.x + 9, 0.6, pad.z);
-  B.box(0.06, 0.6, 1.2, M.yellow, pad.x + 9, 1.3, pad.z);
+  for (const [dx, dz] of BASE.padMarks) B.add(tyre, M.white, pad.x + dx, 0.1, pad.z + dz, Math.PI / 2);
   B.collider(ft.x - 3.2, ft.x + 3.6, ft.z - 1.2, ft.z + 1.8, 2.6, 'fuel tank');
   B.collider(mt.x - 1.2, mt.x + 2.0, mt.z - 1.2, mt.z + 1.4, 3.6, 'mix tank');
 }

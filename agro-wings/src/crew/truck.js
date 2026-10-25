@@ -119,10 +119,9 @@ export class ServiceTruck {
     const mvp = (p) => ({ x: p.x + dx, z: p.z + dz });
     const cp = mvp(BASE.crewPost), pad = mvp(BASE.pad);
     statics.push({ x0: cp.x - 2.3, x1: cp.x + 2.3, z0: cp.z - 1.7, z1: cp.z + 1.7 }); // crew shade
-    statics.push({ x0: pad.x + 8.6, x1: pad.x + 9.4, z0: pad.z - 0.8, z1: pad.z + 0.8 }); // stop board
-    // Small props the truck used to drive over: the pad's corner tyres, the
+    // Small props the truck used to drive over: the pad's marker tyres, the
     // drums by the mixing station, the extinguisher stand at the fuel slab.
-    for (const [ddx, ddz] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) statics.push({ x0: pad.x + ddx - 0.6, x1: pad.x + ddx + 0.6, z0: pad.z + ddz - 0.6, z1: pad.z + ddz + 0.6 });
+    for (const [ddx, ddz] of BASE.padMarks) statics.push({ x0: pad.x + ddx - 0.6, x1: pad.x + ddx + 0.6, z0: pad.z + ddz - 0.6, z1: pad.z + ddz + 0.6 });
     const mt = mvp(BASE.mixTank), ft = mvp(BASE.fuelTank);
     statics.push({ x0: mt.x + 2.2, x1: mt.x + 4.9, z0: mt.z - 2.2, z1: mt.z + 0.8 }); // drums
     statics.push({ x0: ft.x - 5.4, x1: ft.x - 3.8, z0: ft.z + 0.9, z1: ft.z + 2.5 }); // extinguisher
