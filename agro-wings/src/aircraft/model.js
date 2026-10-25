@@ -109,7 +109,7 @@ const RAIL = Math.asin(0.74 ** (CAN_P / 2));
 // are not equal heights.
 const railA = (v) => Math.asin(Math.min(1, (v * Math.sin(RAIL) ** (2 / CAN_P)) ** (CAN_P / 2)));
 const WS_TOP = -0.88, WS_BOT = FWD_END.z; // windshield top (at the rail) and base
-const WIN_GAP = 0.13; // painted strip between the A-pillar and the side window
+const WIN_GAP = 0.035; // the side window starts right behind the A-pillar
 const canSec = (z) => {
   const c = CANOPY;
   if (z >= c[0].z) return c[0];
@@ -1004,13 +1004,14 @@ export function createAircraftModel(panel, opts = {}) {
   add('livery', liveryUV(tagged(loft(roofSt, 20, fusAO, [RAIL, Math.PI - RAIL]))));
   const headliner = tagged(flipWinding(loft(roofSt.map((s) => ({ ...s, hw: s.hw - 0.018, yt: s.yt - 0.018 })), 20, null, [RAIL - 0.05, Math.PI - RAIL + 0.05])));
   // Frames: a line on the canopy f(t, off) -> point, swept as a painted tube
-  // (outside), a dark tube (inside) and, where `seal` gives the glass side
-  // of the frame, a rubber strip.
+  // standing on the skin outside and a slimmer dark tube inside (the pilot
+  // sees only the dark side, as on the real cabin), and, where `seal` gives
+  // the glass side of the frame, a rubber strip.
   const line = (f, n = 16) => (off) => { const out = []; for (let i = 0; i <= n; i++) out.push(f(i / n, off)); return out; };
   const frame = (f, r = 0.024, n = 16, inner = true) => {
     const L = line(f, n);
-    add('paint', tube(L(r * 0.35), r, n, 8));
-    if (inner) add('frameIn', tube(L(-r * 0.45), r * 0.62, n, 6));
+    add('paint', tube(L(r * 0.85), r * 0.9, n, 8));
+    if (inner) add('frameIn', tube(L(-r * 0.15), r * 0.55, n, 6));
   };
   const seal = (pts) => add('rubber', tube(pts, 0.0065, pts.length, 4), true);
   frame((t, o) => wsPt(t, 1, o), 0.028, 20);
@@ -1028,11 +1029,10 @@ export function createAircraftModel(panel, opts = {}) {
     const S = (f) => (t, o) => { const p = f(t, o); return [p[0] * sx, p[1], p[2]]; };
     frame(S((t, o) => canPt(pillarZ(railA(t)), railA(t), o)), 0.03, 14); // A-pillar
     frame(S((t, o) => canPt(lerp(WS_TOP, CAB_Z, t), RAIL, o)), 0.024, 20); // roof rail
-    frame(S((t, o) => canPt(winZ(railA(t)), railA(t), o)), 0.02, 10); // window front frame
     frame(S((t, o) => canPt(cPillarZ(railA(t)), railA(t), o)), 0.026, 10); // C-pillar
     frame(S((t, o) => canPt(lerp(WS_BOT - 0.01, CAB_Z - 0.01, t), 0, o)), 0.024, 20); // sill (the window's lower edge)
-    for (const [u, v] of [[0, 0], [0, 1], [1, 0], [1, 1]]) add('paint', ball(mirror(winPt, sx)(u, v), 0.028, 10));
-    add('paint', ball(S((t, o) => canPt(pillarZ(railA(t)), railA(t), o))(1, 0), 0.034, 10));
+    for (const [u, v] of [[0, 0], [0, 1], [1, 0], [1, 1]]) add('paint', ball(mirror((uu, vv) => winPt(uu, vv, 0.024), sx)(u, v), 0.026, 10));
+    add('paint', ball(S((t, o) => canPt(pillarZ(railA(t)), railA(t), o))(1, 0.026), 0.03, 10));
     // Seal round the window glass.
     {
       const pts = [];
