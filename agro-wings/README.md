@@ -1746,3 +1746,23 @@ height 3.12 m, 29×11.0-10 mains) (`src/aircraft/atModel.js`,
   for the exterior; 93 unit tests; the soybean autopilot mission (90 %
   coverage, no damage, as before). Model 107.4 k → 116.0 k triangles,
   129 → 138 meshes; +4 draw calls in the cockpit, +11 outside.
+
+## Wing surfaces: inward-facing faces fixed (all aircraft)
+
+The wings, wing tips, tailplanes, elevators, flaps and ailerons of every
+aircraft looked hollow from some angles: the top skin vanished, the inside
+of the lower skin showed through with odd sawtooth shading, and fittings on
+the wing seemed to float. Cause: the shared panel builder `wingPanel`
+(`src/aircraft/model.js`, also used by the AT-502B, M-18B and R44 models)
+wound every triangle clockwise seen from outside, end caps included, and
+these materials cull back faces, so the outward-facing skin was the one
+dropped. It now winds faces outward on both wings and closes the profile
+ring, which also closes the hinge face of each flap and aileron (it was
+open). The fins and rudders, built by mirroring a panel (x/y swap), get
+their winding flipped back (`flipWinding`, now exported). Checked with a
+diagnostic render (both sides drawn, front faces green, back faces red)
+from above, below, the sides, the tips and the root on the Ipanema,
+AT-502B, M-18B and R44: no back face is visible from outside apart from the
+deliberately double-sided prop disc, glass and headliner. Same draw calls;
+two more triangles per panel segment. 93 unit tests and the soybean
+autopilot mission on the Ipanema, AT-502B and M-18B pass (no damage).

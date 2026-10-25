@@ -599,17 +599,23 @@ function wingPanel(stations, prof, side = 1, ao = null) {
       col.push(g, g, g);
     });
   });
+  // Faces wound counter-clockwise seen from outside (the materials cull back
+  // faces): the profile runs over the top from the leading edge and back
+  // underneath, so (span, chord) quads turn the other way on the right wing.
+  // The ring is closed (the last point joins the first), which also closes
+  // the hinge face of a flap or aileron profile that starts aft of the nose.
   for (let si = 0; si < stations.length - 1; si++) {
-    for (let k = 0; k < n - 1; k++) {
-      const a = si * n + k, b = a + 1, c = a + n, d = c + 1;
-      if (side > 0) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d);
+    for (let k = 0; k < n; k++) {
+      const a = si * n + k, b = si * n + ((k + 1) % n), c = a + n, d = b + n;
+      if (side > 0) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
     }
   }
-  const cap = (si, flip) => {
+  // End caps: the root faces inboard, the outer end outboard.
+  const cap = (si, outer) => {
     const base = si * n;
     for (let k = 1; k < n - 1; k++) {
       const tri = [base, base + k, base + k + 1];
-      if ((side > 0) !== flip) idx.push(tri[0], tri[2], tri[1]); else idx.push(...tri);
+      if ((side > 0) === outer) idx.push(tri[0], tri[2], tri[1]); else idx.push(...tri);
     }
   };
   cap(0, false);
@@ -1120,8 +1126,8 @@ export function createAircraftModel(panel, opts = {}) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
       p.setXYZ(i, y, x, z);
     }
-    g.computeVertexNormals();
-    return g;
+    // Swapping x and y mirrors the panel: turn its faces back outward.
+    return flipWinding(g);
   };
   // Straight leading edge swept ~35° from the dorsal fillet to the tip,
   // where the rudder's top carries on to the full height.
@@ -1968,4 +1974,4 @@ export function createContactShadow(P = SHADOW_PR_AGW) {
 
 
 // Geometry and texture helpers shared with the other aircraft models.
-export { sampleStations, ring, loft, K, airfoil, wingPanel, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, patch, patchEdge, grid, speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV };
+export { sampleStations, ring, loft, K, airfoil, wingPanel, flipWinding, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, patch, patchEdge, grid, speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV };

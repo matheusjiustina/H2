@@ -28,7 +28,7 @@ import { canvas, canvasTexture } from '../core/textures.js';
 import { rng, clamp, smoothstep, lerp } from '../core/math.js';
 import { FLIGHT_M18 } from '../config.js';
 import {
-  sampleStations, ring, loft, K, airfoil, wingPanel, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, patch, patchEdge,
+  sampleStations, ring, loft, K, airfoil, wingPanel, flipWinding, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, patch, patchEdge,
   speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV, buildPilot,
 } from './model.js';
 import { M18_PANEL, M18_HOPPER } from './dromaderPanel.js';
@@ -734,8 +734,8 @@ export function createDromaderModel(panel, opts = {}) {
     const g = wingPanel(sts.map(([h, le, c]) => ({ x: h, y: 0, le, chord: c })), prof, 1);
     const p = g.attributes.position;
     for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getY(i), p.getX(i), p.getZ(i));
-    g.computeVertexNormals();
-    return g;
+    // Swapping x and y mirrors the panel: turn its faces back outward.
+    return flipWinding(g);
   };
   const RUD = 0.51;
   add('livery', liveryUV(tagged(vfin(airfoil(0, RUD - 0.01, 0.11, 0, 0.4, 12), finSt))));

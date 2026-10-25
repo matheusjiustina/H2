@@ -26,7 +26,7 @@ import { canvas, canvasTexture } from '../core/textures.js';
 import { rng, clamp, smoothstep, lerp } from '../core/math.js';
 import { FLIGHT_AT502 } from '../config.js';
 import {
-  sampleStations, loft, K, airfoil, wingPanel, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, grid,
+  sampleStations, loft, K, airfoil, wingPanel, flipWinding, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, grid,
   speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV, buildPilot,
 } from './model.js';
 import { AT_PANEL } from './atPanel.js';
@@ -789,8 +789,8 @@ export function createAirTractorModel(panel, opts = {}) {
     const g = wingPanel(sts.map(([h, le, c]) => ({ x: h, y: 0, le, chord: c })), prof, 1);
     const p = g.attributes.position;
     for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getY(i), p.getX(i), p.getZ(i));
-    g.computeVertexNormals();
-    return g;
+    // Swapping x and y mirrors the panel: turn its faces back outward.
+    return flipWinding(g);
   };
   add('livery', liveryUV(tagged(vfin(airfoil(0, 0.64, 0.11, 0, 0.4, 12), finSt))));
   // Dorsal fillet: rises out of the turtle deck into the fin leading edge.
