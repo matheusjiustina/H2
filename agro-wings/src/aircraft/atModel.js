@@ -326,7 +326,7 @@ function liveryTextures(reg) {
       g.fillText(str, 0, 0);
       g.restore();
     };
-    text(-3.1, 0.82, reg, 0.3, INK);
+    text(-3.05, 0.27, reg, 0.22, INK); // on the flat side under the cheat line
     text(1.15, 0.72, 'AGRO WINGS', 0.12, BLUE, 'italic bold');
     text(-0.75, 0.9, 'AVIAÇÃO AGRÍCOLA', 0.04, INK, 'bold');
     text(-5.36, 1.6, 'AT-502B', 0.11, WHITE, 'italic bold');
