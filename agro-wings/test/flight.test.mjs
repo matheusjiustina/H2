@@ -41,7 +41,7 @@ test('parked aircraft rests on three wheels without drifting', () => {
   sim.step(120 * 10);
   const a = sim.att();
   assert.ok(fm.pos.distanceTo(p0) < 0.05, `drift ${fm.pos.distanceTo(p0)}`);
-  assert.ok(deg(a.pitch) > 8 && deg(a.pitch) < 13, `three-point pitch ${deg(a.pitch)}`);
+  assert.ok(deg(a.pitch) > 5 && deg(a.pitch) < 10, `three-point pitch ${deg(a.pitch)}`);
   assert.equal(fm.out.wheelsOnGround, 3);
 });
 

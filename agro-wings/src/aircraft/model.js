@@ -53,14 +53,15 @@ const FWD_END = FWD_KEYS[FWD_KEYS.length - 1];
 // the sides (the window sill); the glazed cabin closes it above.
 const CAB_KEYS = [FWD_END, K(-0.8, 0.53, -0.19, -0.4, 0.77, 4.2, 3.6), K(-1.45, 0.53, -0.19, -0.39, 0.77, 4.2, 3.6)];
 const CAB_Z = -1.45; // cabin rear frame, start of the rear fuselage
-// Rear fuselage: the top falls steeply off the cabin roof, then runs nearly
-// level to the fin; the belly stays flat; the tail cone ends at the rudder
-// post.
+// Rear fuselage: the turtle deck falls off the cabin roof in a concave sweep
+// down to a slender tail cone, whose top carries the tailplane and the fin
+// (side photos of the 202/203); the belly stays flat; the tail cone ends at
+// the rudder post.
 const AFT_KEYS = [
-  K(-1.45, 0.53, -0.19, -0.39, 1.06, 4.2, 3.6), K(-1.78, 0.51, -0.15, -0.385, 0.92, 4.0, 3.5),
-  K(-2.08, 0.47, -0.12, -0.38, 0.76, 3.8, 3.4), K(-2.52, 0.38, -0.08, -0.37, 0.47, 3.4, 3.2),
-  K(-3.0, 0.28, -0.03, -0.36, 0.4, 3.0, 3.0), K(-3.5, 0.18, 0.0, -0.35, 0.36, 2.8, 2.8),
-  K(-3.85, 0.1, 0.02, -0.33, 0.33, 2.6, 2.6), K(-3.97, 0.03, 0.02, -0.28, 0.28, 2.5, 2.5),
+  K(-1.45, 0.53, -0.19, -0.39, 1.1, 4.2, 3.6), K(-1.75, 0.51, -0.15, -0.385, 0.9, 4.0, 3.5),
+  K(-2.08, 0.47, -0.13, -0.38, 0.57, 3.8, 3.4), K(-2.52, 0.38, -0.1, -0.37, 0.33, 3.3, 3.2),
+  K(-3.0, 0.28, -0.07, -0.36, 0.21, 2.9, 3.0), K(-3.5, 0.18, -0.05, -0.35, 0.165, 2.7, 2.8),
+  K(-3.85, 0.1, -0.04, -0.33, 0.14, 2.5, 2.6), K(-3.97, 0.03, -0.04, -0.28, 0.1, 2.5, 2.5),
 ];
 const AFT_MORPH = -2.3; // the cabin's section has become the plain rear section here
 // Top line of the turtle deck (the fin flag is kept above it).
@@ -84,8 +85,8 @@ const SILL_A = Math.PI / 6;
 const SILL_X = FWD_END.hw * Math.cos(SILL_A) ** (2 / FWD_END.pU);
 const SILL_Y = FWD_END.ys + (FWD_END.yt - FWD_END.ys) * Math.sin(SILL_A) ** (2 / FWD_END.pU);
 const CANOPY = [
-  K(-0.29, SILL_X, SILL_Y, 0, 0.86, 4.2, 2), K(-0.73, SILL_X, SILL_Y, 0, 1.05, 4.2, 2),
-  K(-0.99, SILL_X, SILL_Y, 0, 1.12, 4.2, 2), K(-1.32, SILL_X, SILL_Y, 0, 1.09, 4.2, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.06, 4.2, 2),
+  K(-0.29, SILL_X, SILL_Y, 0, 0.88, 4.2, 2), K(-0.73, SILL_X, SILL_Y, 0, 1.1, 4.2, 2),
+  K(-0.99, SILL_X, SILL_Y, 0, 1.16, 4.2, 2), K(-1.32, SILL_X, SILL_Y, 0, 1.14, 4.2, 2), K(CAB_Z, SILL_X, SILL_Y, 0, 1.1, 4.2, 2),
 ];
 const RAIL = 0.5; // canopy angle of the roof rail (top of the side windows)
 // Canopy angle at height fraction v between the sill (0) and the roof rail
@@ -140,8 +141,9 @@ const deckTop = (z) => {
   return pts[pts.length - 1][1];
 };
 // Cockpit interior, pilot and eye sit this far from where the panel layout
-// was drawn (moved back and down with the cabin).
-const COCKPIT_OFF = new THREE.Vector3(0, -0.08, -0.62);
+// was drawn (moved back with the cabin; the seat, eye and panel ride 4 cm
+// lower than drawn under the cabin roof).
+const COCKPIT_OFF = new THREE.Vector3(0, -0.04, -0.62);
 
 function sampleStations(keys, per) {
   const out = [];
@@ -268,7 +270,7 @@ function liveryTextures(reg) {
     // Stripes: navy band with the rising check at the wing root, gold
     // pinstripe and a thin navy line under it.
     const band = (cl, hh, off = 0) => cl.map(([z, y], i) => [z, y + off + hh[i]]).concat(cl.map(([z, y], i) => [z, y + off - hh[i]]).reverse());
-    const cl = [[2.4, 0.0], [1.2, -0.07], [0.35, -0.11], [-0.55, 0.06], [-1.6, 0.13], [-2.8, 0.18], [-3.98, 0.21]];
+    const cl = [[2.4, 0.0], [1.2, -0.07], [0.35, -0.11], [-0.55, 0.06], [-1.6, 0.11], [-2.8, 0.03], [-3.98, -0.03]];
     poly(band(cl, [0.06, 0.065, 0.065, 0.055, 0.045, 0.032, 0.016]), NAVY);
     const cl2 = cl.slice(0, 5);
     poly(band(cl2, [0.013, 0.013, 0.012, 0.011, 0.009], -0.115), '#ffd23c');
@@ -278,11 +280,11 @@ function liveryTextures(reg) {
     {
       g.save();
       const edge = [];
-      for (let z = -2.95; z >= -4.75; z -= 0.05) edge.push([z, z < -3.97 ? -0.4 : Math.max(0.44, aftTop(z) + 0.035)]);
+      for (let z = -2.95; z >= -4.75; z -= 0.05) edge.push([z, z < -3.97 ? -0.4 : aftTop(z) + 0.035]);
       path(g, [[-2.95, 2.0], [-4.75, 2.0], ...edge.slice().reverse()]); g.closePath(); g.clip();
       g.fillStyle = '#079a3d';
       g.fillRect(0, oy, LV.W, LV.H / 2);
-      const zc = -4.13, yc = 0.95;
+      const zc = -4.12, yc = 0.86;
       poly([[zc + 0.36, yc], [zc, yc + 0.28], [zc - 0.36, yc], [zc, yc - 0.28]], '#fedf00');
       const [cx, cy] = P(zc, yc);
       g.fillStyle = '#002776';
@@ -295,8 +297,8 @@ function liveryTextures(reg) {
     // Panel seams with rivet rows (colour + relief).
     const seams = [
       [[2.05, -0.2], [2.05, 0.45]], [[1.25, -0.3], [1.25, 0.52]], [[WS_BOT, -0.42], [WS_BOT, 0.78]],
-      [[CAB_Z, -0.42], [CAB_Z, 1.1]], [[-2.6, -0.4], [-2.6, 0.5]], [[-3.45, -0.38], [-3.45, 0.4]],
-      [[2.3, 0.2], [1.25, 0.2]], [[1.25, -0.27], [WS_BOT, -0.27]], [[CAB_Z, -0.28], [-3.45, -0.25]],
+      [[CAB_Z, -0.42], [CAB_Z, 1.1]], [[-2.6, -0.4], [-2.6, 0.36]], [[-3.45, -0.38], [-3.45, 0.17]],
+      [[2.3, 0.2], [1.25, 0.2]], [[1.25, -0.27], [WS_BOT, -0.27]], [[CAB_Z, -0.28], [-3.45, -0.27]],
     ];
     for (const s of seams) {
       line(g, s, 'rgba(70,35,0,0.3)', 2);
@@ -343,7 +345,7 @@ function liveryTextures(reg) {
       g.fillText(str, 0, 0);
       g.restore();
     };
-    text(-2.45, 0.02, reg, 0.25, NAVY);
+    text(-2.4, -0.1, reg, 0.22, NAVY);
     text(1.05, 0.22, 'AGRO WINGS', 0.08, NAVY, 'italic bold');
     text(-1.55, 0.36, 'AVIAÇÃO AGRÍCOLA', 0.033, NAVY, 'bold');
     text(0.75, -0.2, 'NO STEP', 0.028, 'rgba(30,30,30,0.7)', 'bold');
@@ -966,8 +968,6 @@ export function createAircraftModel(panel, opts = {}) {
   frame((t, o) => wsPt(t, 0, o), 0.022, 20);
   seal(line((t) => wsPt(t, 0.975, 0.004), 20)(0));
   seal(line((t) => wsPt(t, 0.03, 0.004), 20)(0));
-  // Centre post (wire-cutter strut) in the glass.
-  add('frameIn', tube(line((t) => wsPt(0.5, 0.02 + t * 0.96, -0.004), 8)(0), 0.013, 16, 8));
   for (const sx of [1, -1]) {
     const S = (f) => (t, o) => { const p = f(t, o); return [p[0] * sx, p[1], p[2]]; };
     frame(S((t, o) => canPt(pillarZ(railA(t)), railA(t), o)), 0.03, 14); // A-pillar
@@ -998,11 +998,10 @@ export function createAircraftModel(panel, opts = {}) {
     add('steel', tx(new THREE.CylinderGeometry(0.014, 0.014, 0.03, 8), sx * (dh[0] - 0.006), dh[1], -1.18, 0, 0, Math.PI / 2), true);
     for (const hz of [-0.82, -1.25]) { const hp = canPt(hz, RAIL, 0.02); add('steel', tx(new THREE.CylinderGeometry(0.011, 0.011, 0.07, 8), sx * hp[0], hp[1], hz, 0, 0, Math.PI / 2), true); }
   }
-  // Wire cutter ahead of the windshield, deflector cable roof -> fin top,
+  // Wire-cutter blade on the roof, deflector cable roof -> fin top,
   // roof antennas (VHF whip, DGPS puck).
-  add('steel', rod([0, deckTop(0.0) + 0.01, 0.0], [0, roof + 0.13, -0.68], 0.016, 8));
   add('steel', tx(new THREE.BoxGeometry(0.018, 0.26, 0.06), 0, roof + 0.1, -0.69, 0.62));
-  add('steel', rod([0, roof + 0.02, -1.0], [0, 1.4, -3.86], 0.006, 5));
+  add('steel', rod([0, roof + 0.02, -1.0], [0, 1.4, -3.93], 0.006, 5));
   add('dark', tx(new THREE.SphereGeometry(0.06, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, roof - 0.004, -1.12, 0, 0, 0, [1, 0.45, 1]), true);
   add('steel', rod([0.18, roof - 0.02, -1.15], [0.18, roof + 0.32, -1.45], 0.005, 5), true);
 
@@ -1077,7 +1076,7 @@ export function createAircraftModel(panel, opts = {}) {
   // the rudder (cut back clear of it); an upright fin with a curved dorsal
   // fillet and a big rudder on a vertical hinge whose trailing edge leans
   // forward toward the bottom of the tail cone.
-  const STAB_Y = 0.14, HINGE_Z = -3.96;
+  const STAB_Y = 0.08, HINGE_Z = -3.96;
   const stabStations = [
     { x: 0.08, y: STAB_Y, le: -3.42, chord: 0.87 }, { x: 1.2, y: STAB_Y + 0.01, le: -3.47, chord: 0.79 },
     { x: 1.78, y: STAB_Y + 0.02, le: -3.52, chord: 0.71 }, { x: 1.87, y: STAB_Y + 0.022, le: -3.55, chord: 0.62 }, { x: 1.92, y: STAB_Y + 0.023, le: -3.6, chord: 0.5 },
@@ -1116,17 +1115,20 @@ export function createAircraftModel(panel, opts = {}) {
     g.computeVertexNormals();
     return g;
   };
-  const FIN_LE = [[0.36, -3.5], [0.75, -3.56], [1.0, -3.62], [1.25, -3.71], [1.36, -3.77], [1.385, -3.8]];
+  // Straight leading edge swept ~25° from the tail cone top to the tip,
+  // where the rudder's top carries on to the full height.
+  const FIN_LE = [[0.05, -3.32], [0.15, -3.37], [0.5, -3.537], [0.9, -3.727], [1.15, -3.846], [1.3, -3.915], [1.36, -3.942]];
   const finSt = FIN_LE.map(([h, le]) => [h, le, (le - HINGE_Z) / 0.62]);
   add('livery', liveryUV(tagged(vfin(airfoil(0, 0.62, 0.105, 0, 0.4, 12), finSt))));
   // Dorsal fillet rising off the turtle deck into the fin's leading edge.
   add('livery', liveryUV(tagged(loft(sampleStations([
-    K(-2.95, 0.012, 0.41, 0.38, 0.425, 2.2, 2.2), K(-3.15, 0.035, 0.42, 0.37, 0.47, 2.2, 2.2), K(-3.33, 0.045, 0.45, 0.36, 0.56, 2.2, 2.2),
-    K(-3.47, 0.045, 0.5, 0.36, 0.68, 2.2, 2.2), K(-3.56, 0.04, 0.55, 0.36, 0.8, 2.2, 2.2),
+    K(-2.85, 0.008, 0.235, 0.225, 0.245, 2.2, 2.2), K(-3.05, 0.028, 0.21, 0.19, 0.27, 2.2, 2.2), K(-3.2, 0.04, 0.2, 0.17, 0.31, 2.2, 2.2),
+    K(-3.35, 0.046, 0.2, 0.16, 0.36, 2.2, 2.2), K(-3.5, 0.046, 0.2, 0.16, 0.42, 2.2, 2.2),
   ], 20), 12, null))));
-  // Rudder trailing edge: 4.66 m aft at the top, 4.36 m at the bottom.
-  const rudTE = (h) => -4.36 - (h + 0.3) * 0.178;
-  const rudSt = [-0.3, 0.1, 0.5, 0.9, 1.2, 1.36, 1.39].map((h) => { const c = (HINGE_Z - rudTE(h)) / 0.38; return [h, HINGE_Z + 0.62 * c, c]; });
+  // Rudder trailing edge: 4.66 m aft at the top, 4.48 m at the bottom (below
+  // the tail cone).
+  const rudTE = (h) => -4.48 - (h + 0.3) * 0.104;
+  const rudSt = [-0.3, 0.1, 0.5, 0.9, 1.2, 1.38, 1.43].map((h) => { const c = (HINGE_Z - rudTE(h)) / 0.38; return [h, HINGE_Z + 0.62 * c, c]; });
   const rudGeo = liveryUV(tagged(vfin(airfoil(0.63, 1, 0.045, 0, 0.4, 5), rudSt)));
   const rudTab = tagged(tx(new THREE.BoxGeometry(0.012, 0.26, 0.08), 0, 0.25, rudTE(0.25) + 0.035));
   const rudder = new THREE.Group();
@@ -1233,8 +1235,10 @@ export function createAircraftModel(panel, opts = {}) {
     const g = new THREE.Group();
     const R = 0.135;
     const fz = cfg.p[2] + 0.1, fy = cfg.p[1] + R + 0.085;
-    // Tapered leaf spring from the tail post to the steerable fork.
-    add('dark', bar([0, -0.3, -3.8], [0, fy + 0.02, fz], 0.06, 0.016));
+    // Tapered leaf spring from a bracket under the tail cone, just ahead of
+    // the rudder post, back and down to the steerable fork under the rudder.
+    add('dark', tx(new RoundedBoxGeometry(0.09, 0.05, 0.16, 2, 0.012), 0, -0.3, -3.8));
+    add('dark', bar([0, -0.31, -3.8], [0, fy + 0.02, fz], 0.06, 0.016));
     add('dark', tx(new THREE.CylinderGeometry(0.03, 0.03, 0.07, 12), 0, fy + 0.03, fz));
     const fork = new THREE.Group();
     fork.position.set(0, fy, fz);
@@ -1386,8 +1390,8 @@ export function createAircraftModel(panel, opts = {}) {
   for (const sx of [1, -1]) {
     addC('interior', tx(new THREE.BoxGeometry(0.03, 0.78, 1.24), sx * 0.47, 0.15, -0.2)); // side walls, below the sill
     addC('interior', tx(new RoundedBoxGeometry(0.13, 0.09, 0.8, 2, 0.02), sx * 0.43, 0.42, -0.18)); // side consoles
-    addP('red', tx(new THREE.BoxGeometry(0.014, 0.055, 0.024), sx * 0.47, 0.8, -0.03)); // window latch
-    addP('red', tx(new THREE.BoxGeometry(0.03, 0.012, 0.012), sx * 0.46, 0.825, -0.03));
+    addC('red', tx(new THREE.BoxGeometry(0.014, 0.055, 0.024), sx * 0.47, 0.76, -0.03)); // window latch
+    addC('red', tx(new THREE.BoxGeometry(0.03, 0.012, 0.012), sx * 0.46, 0.785, -0.03));
   }
   // Tubular cage visible inside (light grey tubes, rounded joints).
   for (const [a, b] of [
@@ -1429,11 +1433,28 @@ export function createAircraftModel(panel, opts = {}) {
   // instruments, 16 mm deep; the dial faces sit at the back of the holes.
   const PL = panel.layout ?? IPA_PANEL, G = PL.gauges;
   const ps = 0.96 / PL.W;
-  const PX = (px) => 0.48 - px * ps, PY = (py) => 0.68 - py * ps;
+  // The layout's top edge sits just under the glareshield; the glareshield
+  // follows the windshield's lower frame (the hopper top's crown, falling
+  // to the sills), so the plate's top edge is level in the middle and rounds
+  // down into the corners.
+  const PT = 0.74, PB = PT - 0.48;
+  const PX = (px) => 0.48 - px * ps, PY = (py) => PT - py * ps;
   const ZP = 0.335, PD = 0.016;
+  const gsU = [];
+  for (let i = 0; i <= 64; i++) { const [x, y] = wsB(i / 64); gsU.push([x, y - COCKPIT_OFF.y]); }
+  // Height of the windshield's lower frame (cockpit frame) at x.
+  const gsY = (x) => {
+    const ax = Math.min(Math.abs(x), gsU[0][0]);
+    for (let i = 1; i <= 32; i++) {
+      const [x1, y1] = gsU[i], [x0, y0] = gsU[i - 1];
+      if (ax >= x1) return y0 + ((ax - x0) / (x1 - x0)) * (y1 - y0);
+    }
+    return gsU[32][1];
+  };
+  const plateTop = (x) => Math.min(PT, gsY(x) - 0.045);
   const panelUV = (g) => {
     const p = g.attributes.position, uv = new Float32Array(p.count * 2);
-    for (let i = 0; i < p.count; i++) { uv[i * 2] = (0.48 - p.getX(i)) / 0.96; uv[i * 2 + 1] = (p.getY(i) - 0.2) / 0.48; }
+    for (let i = 0; i < p.count; i++) { uv[i * 2] = (0.48 - p.getX(i)) / 0.96; uv[i * 2 + 1] = (p.getY(i) - PB) / 0.48; }
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     return g;
   };
@@ -1443,8 +1464,9 @@ export function createAircraftModel(panel, opts = {}) {
   let panelMesh;
   {
     const r0 = 0.03, sh = new THREE.Shape();
-    sh.moveTo(-0.48 + r0, 0.2); sh.lineTo(0.48 - r0, 0.2); sh.quadraticCurveTo(0.48, 0.2, 0.48, 0.2 + r0);
-    sh.lineTo(0.48, 0.68); sh.lineTo(-0.48, 0.68); sh.lineTo(-0.48, 0.2 + r0); sh.quadraticCurveTo(-0.48, 0.2, -0.48 + r0, 0.2);
+    sh.moveTo(-0.48 + r0, PB); sh.lineTo(0.48 - r0, PB); sh.quadraticCurveTo(0.48, PB, 0.48, PB + r0);
+    for (let i = 0; i <= 48; i++) { const x = 0.48 - (0.96 * i) / 48; sh.lineTo(x, plateTop(x)); }
+    sh.lineTo(-0.48, PB + r0); sh.quadraticCurveTo(-0.48, PB, -0.48 + r0, PB);
     for (const g of Object.values(G)) { const h = new THREE.Path(); h.absarc(PX(g.x), PY(g.y), (g.r + 4) * ps, 0, Math.PI * 2, true); sh.holes.push(h); }
     const plate = new THREE.ExtrudeGeometry(sh, { depth: PD, bevelEnabled: false, curveSegments: 32 });
     plate.translate(0, 0, ZP);
@@ -1551,18 +1573,22 @@ export function createAircraftModel(panel, opts = {}) {
   addP('gloss', tx(new THREE.BoxGeometry(0.2, 0.33, 0.012), -0.17, 0.0, 0.428));
   for (const [x, y] of [[-0.075, 0.155], [-0.265, 0.155], [-0.075, -0.155], [-0.265, -0.155]]) addP('steel', tx(new THREE.CylinderGeometry(0.004, 0.004, 0.004, 8), x, y, 0.42, Math.PI / 2));
   // Firewall under the panel.
-  addC('interior', tx(new THREE.BoxGeometry(0.96, 0.52, 0.03), 0, -0.02, 0.445));
-  // Black padded glareshield over the panel (hood, padded roll, cheeks).
+  addC('interior', tx(new THREE.BoxGeometry(0.96, 0.58, 0.03), 0, 0.01, 0.445));
+  // Black padded glareshield: its top runs under the windshield's lower
+  // frame from sill to sill and overhangs the panel by 5 cm with a padded
+  // roll; its underside closes down onto the plate's arched top edge.
+  const gsLip = ZP - 0.05;
   {
-    const hoodPt = (u, v) => { const cr = Math.sin(Math.PI * u); return [0.495 - 0.99 * u, lerp(0.704 + 0.018 * cr, 0.642 + 0.014 * cr, v), lerp(0.298, 0.446, v)]; };
-    addC('pad', grid(hoodPt, 16, 4, [0, 0.4, 0.37]));
-    addC('pad', tube(line((t) => { const p = hoodPt(t, 0); return [p[0], p[1] - 0.013, p[2] + 0.003]; }, 16)(0), 0.02, 32, 10));
-    for (const sx of [1, -1]) addC('pad', tx(new RoundedBoxGeometry(0.022, 0.06, 0.15, 2, 0.008), sx * 0.488, 0.664, 0.372));
-    addC('dark', tx(new THREE.BoxGeometry(0.04, 0.02, 0.02), 0, 0.716, 0.398)); // lightbar bracket
+    const arc = (u) => { const [x] = wsB(0.015 + 0.97 * u); return x * 0.975; };
+    addC('pad', grid((u, v) => { const x = arc(u); return [x, gsY(x) - 0.012 - 0.008 * (1 - v), lerp(gsLip, ZP + 0.045, v)]; }, 32, 3, [0, 0.4, 0.37]));
+    addC('pad', grid((u, v) => { const x = arc(u); return [x, lerp(gsY(x) - 0.04, plateTop(x) + 0.002, v), lerp(gsLip + 0.004, ZP - 0.001, v)]; }, 32, 2, [0, 0.95, 0.5]));
+    addC('pad', tube(line((t) => { const x = arc(0.02 + 0.96 * t); return [x, gsY(x) - 0.03, gsLip + 0.004]; }, 32)(0), 0.018, 48, 10));
+    addC('dark', tx(new THREE.BoxGeometry(0.04, 0.016, 0.03), 0, gsY(0) - 0.014, gsLip + 0.004)); // lightbar bracket
   }
-  // Lightbar (swath guidance LEDs) at the base of the centre post.
+  // Lightbar (swath guidance LEDs) on the glareshield's roll, clear of the
+  // raked glass.
   const lightbar = new THREE.Group();
-  lightbar.position.set(0, 0.735, 0.395);
+  lightbar.position.set(0, gsY(0) + 0.006, gsLip - 0.005);
   const leds = [];
   for (let i = -7; i <= 7; i++) {
     const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.008), new THREE.MeshBasicMaterial({ color: 0x222222 }));
@@ -1572,17 +1598,19 @@ export function createAircraftModel(panel, opts = {}) {
   }
   lightbar.add(new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.032, 0.03, 2, 0.006), M.dark));
   cockpit.add(lightbar);
-  // Magnetic compass on the windshield centre post: vertical card behind a
-  // domed lens, lubber line, bracket to the post.
+  // Magnetic compass on the glareshield's roll, right of centre (the
+  // one-piece windshield has no centre post): vertical card behind a domed
+  // lens, lubber line, foot.
   const cardMat = new THREE.MeshStandardMaterial({ roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0.12 });
   cardMat.map = cardMat.emissiveMap = compassCardTexture();
+  const CPX = -0.24, CPY = gsY(-0.24) + 0.022, CPZ = gsLip - 0.06;
   const compassCard = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.022, 40, 1, true), cardMat);
-  compassCard.position.set(0, 1.05, -0.042);
+  compassCard.position.set(CPX, CPY, CPZ - 0.032);
   near.add(compassCard);
-  addP('gloss', tx(new RoundedBoxGeometry(0.078, 0.056, 0.05, 2, 0.012), 0, 1.055, -0.01));
-  addP('gloss', rod([0, 1.06, 0.01], [0, 1.07, 0.025], 0.007, 8));
-  addP('lens', tx(new THREE.SphereGeometry(0.03, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2), 0, 1.05, -0.036, 0, 0, 0, [1, 0.82, 1.15]));
-  addP('red', tx(new THREE.BoxGeometry(0.0016, 0.026, 0.002), 0, 1.05, -0.07));
+  addP('gloss', tx(new RoundedBoxGeometry(0.078, 0.056, 0.05, 2, 0.012), CPX, CPY + 0.005, CPZ));
+  addP('gloss', tx(new THREE.CylinderGeometry(0.012, 0.018, 0.02, 10), CPX, CPY - 0.028, CPZ));
+  addP('lens', tx(new THREE.SphereGeometry(0.03, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2), CPX, CPY, CPZ - 0.026, 0, 0, 0, [1, 0.82, 1.15]));
+  addP('red', tx(new THREE.BoxGeometry(0.0016, 0.026, 0.002), CPX, CPY, CPZ - 0.06));
   // Stick: rubber boot, shaft, ergonomic black grip with hat switch and trigger.
   const stick = new THREE.Group();
   stick.position.set(0, -0.22, -0.12);

@@ -38,8 +38,8 @@ export const IPA_PANEL = {
   toggles: [[122, 'BAT'], [159, 'ALT'], [196, 'B.COMB'], [233, 'NAV'], [270, 'STROBE'], [307, 'FARÓIS'], [344, 'VÁLV.'], [381, 'GPS']].map(([x, t]) => ({ x, y: 458, t })),
   key: { x: 60, y: 452 },
   flap: { x: 452, y: 450 },
-  gps: { x: 625, y: 16, w: 380, h: 300 },
-  screen: { x: 643, y: 32, w: 344, h: 218 },
+  gps: { x: 615, y: 80, w: 330, h: 270 },
+  screen: { x: 631, y: 96, w: 298, h: 186 },
   lcd: { x: 642, y: 364, w: 356, h: 132 },
   sight: { cap: 900, step: 50 },
 };
@@ -195,9 +195,9 @@ function drawIpaBackground(g, d) {
   g.fillStyle = '#1f252b';
   g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   g.font = 'bold 12px Arial';
-  g.fillText('PR-AGW', 30, 32);
+  g.fillText('PR-AGW', 420, 36);
   g.font = 'bold 9px Arial';
-  g.fillText('EMB-202A', 30, 46);
+  g.fillText('EMB-202A', 420, 50);
   const placard = (x, y, w, h, lines, fill = '#e9e6dc', ink = '#1d1f22') => {
     g.fillStyle = fill; g.fillRect(x, y, w, h);
     g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
@@ -547,13 +547,13 @@ function gpsUnit(g, s) {
     g.fillStyle = '#9aa1a8'; g.font = '8px Arial'; g.fillText(t, lx + 7, ly);
   });
   ['MENU', '◄', '►', 'A/B', 'OK'].forEach((t, i) => {
-    const kx = x + 168 + i * 40, ky = by - 4;
+    const kx = x + w - 182 + i * 34, ky = by - 4;
     g.fillStyle = '#0f1113';
-    roundRect(g, kx, ky, 34, 28, 6); g.fill();
+    roundRect(g, kx, ky, 30, 28, 6); g.fill();
     g.fillStyle = '#3b4047';
-    roundRect(g, kx + 2, ky + 2, 30, 23, 5); g.fill();
-    g.fillStyle = '#e3e6e8'; g.font = 'bold 10px Arial'; g.textAlign = 'center';
-    g.fillText(t, kx + 17, ky + 14);
+    roundRect(g, kx + 2, ky + 2, 26, 23, 5); g.fill();
+    g.fillStyle = '#e3e6e8'; g.font = 'bold 9px Arial'; g.textAlign = 'center';
+    g.fillText(t, kx + 15, ky + 14);
     g.textAlign = 'left';
   });
 }

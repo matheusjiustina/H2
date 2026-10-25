@@ -1636,6 +1636,45 @@ a little lower than the 203's).
   87.7 k triangles (was 89.7 k). Known gap: the tail wheel stays at the
   physics point, ~0.35 m aft of the 203's in the photo.
 
+## Ipanema finalization — cabin, tail, stance and cockpit
+
+A second pass on the Ipanema against the confirmed reference airframe (true
+side photo of the EMB-203 and the orange 202 in flight, a ground photo of the
+203 for the tail wheel, two cockpit photos) (`src/aircraft/model.js`,
+`panel.js`, `src/config.js`).
+
+- **Cabin**: windshield top 1.10 m and roof crown 1.16 m (were 1.05 / 1.12),
+  so the roof line runs on from the windshield without a dip.
+- **Rear fuselage**: the turtle deck now falls off the cabin in a concave
+  sweep to a slender tail cone (0.57 m at z −2.08, 0.21 m at z −3.0; it ran
+  nearly level at 0.40 m before), which carries the tailplane (now at
+  0.08 m) and the fin on its top, as on the real aircraft.
+- **Empennage**: the fin rises from the cone top with a straight leading
+  edge swept ~25° (root z −3.32, tip z −3.94, 1.36 m) and a small dorsal
+  fillet; the rudder runs from below the cone (trailing edge 4.48 m aft) to
+  1.43 m (4.66 m aft). Exposed fin height 1.3 m instead of 1.0 m. The navy
+  band, flag and registration follow the lower tail.
+- **Tail wheel and stance**: the physics tail point moved from behind the
+  rudder (z −4.55) to under it (z −4.30, y −0.82), on a leaf spring from a
+  bracket under the tail cone; the three-point attitude is 6.3° (was 10.8°),
+  so the fin top stands about level with the cabin roof parked, as in the
+  photos, and the tail sits higher off the ground. Main gear unchanged.
+- **Cockpit**: no centre post (the windshield is one piece) and no exterior
+  wire-cutter rod across the glass; the black padded glareshield follows the
+  windshield's lower frame from sill to sill and overhangs the panel by 5 cm;
+  the panel plate rose 10 cm with it and its top edge is level in the middle
+  and rounds down into the corners. Lightbar on the glareshield's roll,
+  magnetic compass moved there (right of centre). The guidance unit is
+  smaller and lower (clear of the rounded corner). The cockpit sits 4 cm
+  higher under the raised roof (eye 0.96 m at z −1.12); from the seat the
+  dark hopper deck and the spinner show over the glareshield.
+- **Kept**: flight model (apart from the tail contact point), main gear,
+  engine, controls, spray, HUD, servicing, paint and PR-AGW identity.
+- **Validation**: 93 unit tests (three-point attitude test now 5–10°), the
+  soybean autopilot mission with the Ipanema (2 stars, no damage), cockpit
+  views (`node test/cockpitviews.mjs <dir> ipanema`) and side / rear / 3-4
+  views against the photos.
+
 ## Air Tractor structure and cockpit from the real aircraft
 
 The AT-502B (PR-AWT) airframe and cockpit were rebuilt from photos of the

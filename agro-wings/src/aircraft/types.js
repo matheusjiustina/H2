@@ -46,7 +46,7 @@ export const AIRCRAFT_TYPES = {
       keepOut: { wing: [6.0, -1.0, 0.95], wingY, fus: [0.56, -0.45, 1.15, -4.7, 2.8], stab: [1.95, 0.05, 0.25, -4.3, -3.4] },
       veto: 9,
     },
-    stub: { eye: [0, 0.92, -1.12], fuelFiller: [2.4, 0.0, -0.4], hopperPort: [0.56, -0.12, -1.1] },
+    stub: { eye: [0, 0.96, -1.12], fuelFiller: [2.4, 0.0, -0.4], hopperPort: [0.56, -0.12, -1.1] },
     // Body-frame boxes [x0, x1, y0, y1, z0, z1] another aircraft can hit.
     bounds: [
       [-0.56, 0.56, -0.45, 1.15, -4.7, 2.8], [-6.1, 6.1, -0.58, 0.72, -0.9, 0.9], [-0.1, 0.1, 0.35, 1.42, -4.7, -3.3],
