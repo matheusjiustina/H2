@@ -1065,7 +1065,6 @@ export function createAircraftModel(panel, opts = {}) {
   add('steel', tx(new THREE.BoxGeometry(0.03, 0.025, 0.05), wcBase[0], wcBase[1] - 0.01, wcBase[2]));
   add('steel', rod(wcTip, [0, 1.4, -3.93], 0.005, 6));
   add('dark', tx(new THREE.SphereGeometry(0.06, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, roof - 0.004, -1.12, 0, 0, 0, [1, 0.45, 1]), true);
-  add('steel', rod([0.18, roof - 0.02, -1.15], [0.18, roof + 0.32, -1.45], 0.005, 5), true);
 
   // ---------------- wing ----------------
   const leY = (x) => wingY(x);
