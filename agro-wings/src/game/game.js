@@ -204,6 +204,10 @@ export class Game {
     this.aircraft = next;
     this.aircraftId = id;
     next.parked = false;
+    // A parked aircraft far from the camera was hidden (distance cull):
+    // the one now flown is always drawn.
+    next.model.root.visible = true;
+    if (next.contactShadow) next.contactShadow.visible = true;
     next.onSimStep = (h) => this.sprayer.step(h);
     next.onEvent = (e) => this._acEvent(e);
     next.placeAtPad();
@@ -565,7 +569,11 @@ export class Game {
       if (this.replay.active) this.replay.update(pdt, mouse);
       else this.rig.update(pdt, ac, this.playing && !this.controlsLocked ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
       // Parked aircraft: drawn only within 1.2 km (a few pixels beyond that).
+      // The flown aircraft is never culled (it may have been hidden while
+      // it waited parked far away).
+      if (!this.replay.active) ac.model.root.visible = true;
       for (const p of this._parked) {
+        if (p === ac) continue;
         const d = this.camera.position.distanceTo(p.rPos);
         p.model.root.visible = d < 1200;
         if (p.contactShadow) p.contactShadow.visible = d < 400;

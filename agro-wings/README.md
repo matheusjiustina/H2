@@ -2123,3 +2123,14 @@ so those indications read N/S. The wiper is static. The swoosh, the
 windshield and the fin were matched to photographs, not drawings. The
 cockpit switches are visual except where a simulated system exists
 (spray valve, power and condition levers through the existing controls).
+
+## Fix — aircraft missing after a change from the menu
+
+Parked aircraft are not drawn beyond 1.2 km from the camera. When one of
+them was hidden that way (the flown aircraft had gone far from the base)
+and was then chosen from the menu, nothing showed it again: it flew
+invisible until it was re-selected near the base. The aircraft made active
+is now shown when it is activated, and the flown aircraft is never culled
+(each frame). `test/fleetswitch.mjs` flies each aircraft far away, goes
+back to the menu, picks every other one and starts it in the air and on
+the ground (40 changes): 40 hidden before the fix, none after.
