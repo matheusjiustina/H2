@@ -1004,31 +1004,50 @@ sectors take over — never a permanently opaque disc. The tail rotor blurs
 to a light disc at its higher speed.
 
 **Cockpit** (`src/aircraft/r44Panel.js` faces, `src/aircraft/r44Cockpit.js`
-3D instruments), laid out after the Robinson panel:
-- **Pod**: a tombstone-shaped shell with a visor lip and the guidance
-  lightbar on top. Across the top runs a row of ten domed warning lamps:
-  OIL, MR TEMP, MR CHIP, TR CHIP, STARTER ON, CLUTCH, LOW FUEL, LOW RPM,
-  ROTOR BRAKE and SPRAY.
-- **Upper instrument row**: VSI, attitude, airspeed (with the green/yellow
-  arcs and red line), and the dual tachometer (engine and rotor needles,
-  green band 101–102 %).
-- **Lower row**: altimeter (three needles and a Kollsman window),
-  directional gyro and manifold pressure.
-- **Placards**: "NO ACROBATIC MANEUVERS…" and the registration.
-- **Pedestal**:
-  - clock and carb-air gauges;
-  - the engine cluster: ammeter, oil temperature and pressure, CHT, fuel,
-    ag tank;
-  - the ALT / OIL / GOV OFF lamps;
-  - the switch row (NAV, STROBE, the guarded CLUTCH, ALT, BATT, PUMP,
-    VALVE), with toggles that follow the aircraft's state;
-  - the key, the air-temperature LED, the guidance GPS, COM and XPDR.
-- **Live parts**: the needles, the attitude ball, the heading card, the
-  lamps and the toggles are real 3D parts moved every frame in the cockpit
-  view. The dial faces are textures drawn once, so nothing is repainted
-  per frame; only the GPS screen is redrawn, at 15 Hz.
-  - Cockpit view on SwiftShader: 390 draw calls against 340 before, but
-    5.0 ms per frame against 6.2 ms.
+3D instruments), rebuilt after a frontal photo of a Raven II panel and three
+photos from the right seat:
+- **Pod**: the R44 outline traced on the frontal photo (`podOutline()`): a
+  broad, slightly domed top, large rounded ears at the upper corners, the
+  sides drawn in steeply to a bottom about two thirds as wide that sits on
+  the pedestal. It is a moulded shell 15 cm deep, a rounded rim standing
+  proud of the recessed face, a rolled hood lip from ear to ear and the
+  slim guidance lightbar on the hood. Matte black materials.
+- **Instruments**, in the photo's two rows:
+  - top: the blank position with the moulded R44 cap, altimeter (three
+    needles, Kollsman window), attitude, airspeed (green / yellow arcs,
+    red line) and the dual tachometer (engine and rotor);
+  - bottom: VSI, directional gyro, turn coordinator (the symbol rolls with
+    the rate of turn, the ball rides with the slip) and manifold pressure.
+  - Each one is a 3D case set into the face: black barrel, bezel ring,
+    dial set back inside it, 3D needles and glass with a soft reflection;
+    knobs on the altimeter, the attitude and the DG.
+- **Lamps**: the photo's row (CLUTCH, MR TEMP, MR CHIP, CARBON MONOXIDE |
+  STARTER ON, TR CHIP, LOW FUEL, LOW RPM) and FULL THROTTLE beside the
+  manifold pressure, small domed lenses in bezels. Only the ones the game
+  simulates ever light, and only from its state (clutch engaging, starter,
+  fuel below 10 %, low rotor rpm, power at the limit); the others stay
+  dark — there are no random failures.
+- **Placards**: "DO NOT EXCEED 110 KIAS EXCEPT IN SMOOTH AIR" and the
+  registration.
+- **Pedestal**: a deep sloped box with raised module plates:
+  - the lamp row (FUEL FILTER, AUX FUEL PUMP, ALT, ENG FIRE, OIL, GOV OFF);
+  - hour meter and clock; the engine cluster (oil temperature and
+    pressure, CHT, ammeter) and the ag tank and fuel gauges; "R44 Raven II";
+  - BRAKE and SPRAY lamps; the switch row (NAV LTS, STROBE, the CLUTCH
+    switch under its red guard, ALT, MASTER BATTERY, PUMP, VALVE) with
+    toggles that follow the aircraft's state; the magneto key;
+  - the avionics stack: audio panel, the guidance GPS, transponder and COM.
+- **Tablet**: a navigation tablet on an arm at the right ear of the pod,
+  turned toward the right seat, showing the same guidance screen as the GPS.
+- **Live parts**: needles, attitude ball, heading card, turn coordinator,
+  lamps and toggles are 3D and set every frame from the simulation in the
+  cockpit view. The faces are drawn once; only the GPS screen is redrawn,
+  at 15 Hz.
+- **Camera**: the pilot's eye in the right seat, looking 20° down with a
+  64° field of view, so the pod and the top of the pedestal fill the lower
+  part of the frame (`camera.cockpitPitch` / `cockpitFov` of the type).
+- **Cost**: two to four draw calls more than the previous pod in the
+  cockpit view (see the R44 cockpit validation below).
 - **Controls and cabin**:
   - the Robinson T-bar cyclic in satin black, on a pivot housing with the
     yellow "LOW-G PUSHOVERS PROHIBITED" placard;
@@ -1064,6 +1083,38 @@ autopilot (`src/game/heliAutopilot.js`) flies through the player's inputs
 with the high assist: service, start, lift-off, transit, passes with
 hover turnarounds at the field ends, return over obstacles, landing on
 the H, shut-down, rotor run-down and the next service.
+
+### R44 cockpit reconstruction (validation)
+
+Only the R44 cockpit changed (`r44Panel.js`, `r44Cockpit.js`, the pod /
+lightbar placement in `r44Model.js`, the R44's `cockpitPitch` / `cockpitFov`
+in `types.js`); the exterior, rotors, flight model, controls, the other
+aircraft and their cameras, the scenery, missions and sounds are untouched.
+
+| # | Test | Result |
+|---|------|--------|
+| 01 | front | pod outline, two instrument rows, lamp row and pedestal compared with the frontal Raven II photo (`node test/cockpitviews.mjs out r44 panel`) |
+| 02 | pilot view | `test/r44cockpit.mjs`: parked, running, hover, level, turn — pod and top of the pedestal in the lower part of the frame |
+| 03 | contour | traced outline: domed top, ears, sides drawn in to a bottom ~⅔ as wide |
+| 04 | pedestal | look-down view: lamp row, cluster, switches with the red clutch guard, key, avionics |
+| 05 | instruments | needles follow the flight model (26 → 86 kt: ASI −2.3 rad, altimeter −1.9 rad); lamps: cold → ALT only, flying → none, low rotor → LOW RPM, low fuel → LOW FUEL, same result on every update |
+| 06 | cyclic | T-bar unchanged, moves with the cyclic (look-down view) |
+| 07 | camera | 16:9, 4:3, 21:9; eye clearance 27.6 cm (dev server; nothing closer than 12 cm) |
+| 08 | side views | looking left / right from the seat |
+| 09 | exterior | `node test/acviews.mjs out r44 side,front34,front`: the pod stays inside the bubble; chase view unchanged |
+| 10 | performance | below |
+
+Performance (SwiftShader, 960×540, medium, R44 at 6 m over the corn, same
+scene before and after, two runs each):
+
+| | before | after |
+|---|---|---|
+| cockpit view, median frame (render) | 11.6 / 12.1 ms | 14.6 / 11.9 ms |
+| cockpit view draw calls | 482 | 465 (pitch 20° down, FOV 64°) |
+| same fixed camera (`cockpitviews` default / wide / panel) | 430 / 444 / 317 | 434 / 449 / 322 |
+| cockpit meshes / triangles | 108 / 23,052 | 113 / 45,179 |
+| geometries / textures in memory | 780 / 53 | 771 / 54 |
+| JS heap | 377–388 MB | 376–380 MB |
 
 ### Validation (R44 build)
 

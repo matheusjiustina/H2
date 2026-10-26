@@ -208,7 +208,7 @@ export const AIRCRAFT_TYPES = {
     wash: [0, -1.2, -1],
     anim: { vib: [1500, 2700] },
     vspeeds: { vne: 130 },
-    camera: { dist: 14, height: 3.9, orbit: 17, noseOnly: true },
+    camera: { dist: 14, height: 3.9, orbit: 17, noseOnly: true, cockpitPitch: -0.36, cockpitFov: 64 },
     // Control layer: helicopter controls -> the game's (rebindable) actions,
     // and the labels the Controls screen shows for them (null: not used).
     controls: {

@@ -26,7 +26,7 @@ import { canvas, canvasTexture } from '../core/textures.js';
 import { rng, clamp, smoothstep, lerp } from '../core/math.js';
 import { FLIGHT_R44 } from '../config.js';
 import { sampleStations, ring, loft, K, airfoil, wingPanel, tagged, tx, rod, tube, ball, rbox, lathe, orangePeel, ribTexture, buildPilot } from './model.js';
-import { POD as POD_FACE } from './r44Panel.js';
+import { POD_OUT } from './r44Panel.js';
 import { createR44Instruments } from './r44Cockpit.js';
 
 const A = FLIGHT_R44;
@@ -885,18 +885,18 @@ export function createR44Model(panel, opts = {}) {
   inst.con.quaternion.setFromEuler(new THREE.Euler(0.31, 0, 0)).multiply(flip);
   cockpit.add(inst.group);
   const panelMesh = inst.pod;
-  // Guidance lightbar on the pod's visor.
+  // Guidance lightbar: a slim bar sitting on the pod's hood.
   const lightbar = new THREE.Group();
-  lightbar.position.set(0, POD_FACE.h / 2 + 0.03, -0.035);
+  lightbar.position.set(0, POD_OUT.top + 0.018, -0.04);
   lightbar.rotation.y = Math.PI;
   const leds = [];
   for (let i = -7; i <= 7; i++) {
-    const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.008), new THREE.MeshBasicMaterial({ color: 0x222222 }));
-    led.position.set(-i * 0.0155, 0, -0.016);
+    const led = new THREE.Mesh(new THREE.BoxGeometry(0.0095, 0.011, 0.006), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+    led.position.set(-i * 0.0122, 0, -0.0125);
     lightbar.add(led);
     leds.push(led);
   }
-  lightbar.add(new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.032, 0.03, 2, 0.006), M.dark));
+  lightbar.add(new THREE.Mesh(new RoundedBoxGeometry(0.205, 0.026, 0.024, 2, 0.005), M.dark));
   inst.pod.add(lightbar);
   // Overhead: rotor-brake handle (red) and the mixture/carb knobs on the pod.
   const brake = new THREE.Group();
@@ -1094,7 +1094,7 @@ export function createR44Model(panel, opts = {}) {
   return {
     root, M,
     rotor, disc, tail, blades, tailBlades: tBlades,
-    stick: cyclic, cyclic, collective, pedals, throttle, leds, panelMesh,
+    stick: cyclic, cyclic, collective, pedals, throttle, leds, panelMesh, inst,
     nozzles, pilot, cockpit, glassMesh,
     eye: new THREE.Vector3(...o3(0, 0.98, -0.42)),
     fuelFiller: new THREE.Vector3(0.44, 0.56, -0.86),
