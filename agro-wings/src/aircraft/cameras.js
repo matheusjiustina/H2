@@ -47,7 +47,7 @@ export class CameraRig {
     const dragLook = mouse.buttons & 1;
     if (mouse.wheel) {
       // Scroll up zooms in, down zooms out (limited).
-      if (this.mode === 'cockpit') this.zoom.cockpit = clamp(this.zoom.cockpit * (1 + mouse.wheel * 0.1), 0.35, 1.12);
+      if (this.mode === 'cockpit') this.zoom.cockpit = clamp(this.zoom.cockpit * (1 + mouse.wheel * 0.1), 0.35, 1.7);
       else if (this.mode === 'chase') this.zoom.chase = clamp(this.zoom.chase * (1 + mouse.wheel * 0.1), 0.6, 1.4);
     }
     if (this.mode === 'cockpit') {
