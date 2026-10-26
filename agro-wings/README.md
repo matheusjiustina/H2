@@ -1962,8 +1962,10 @@ and 6 shaft orders, ½-order modulation (~24 Hz), and a 1–4 kHz band that rise
 with power. Pass: Doppler shift ~148 → 127 Hz. The dominant peaks are orders
 of the crank, so they are not read as rpm directly.
 
-**Layers.** A starter (whine, gear rasp, chug at three compressions per
-revolution of the simulated cranking rpm); B catch (individual firings
+**Layers.** A starter (a heavy starter-motor growl at ~85–120 Hz and a low
+thump per compression, as in the reference's 46–60 / 80–130 Hz weight, with
+the whine and gear rasp above it; three compressions per revolution of the
+simulated cranking rpm); B catch (individual firings
 scheduled from the rpm, level flare, misfires while it settles, last cough
 and the crank rocking back at shutdown, afterfire when the throttle is chopped
 at high rpm); C/D/E three harmonic spectra on the engine-cycle frequency

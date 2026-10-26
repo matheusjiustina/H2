@@ -2,9 +2,10 @@
 // opposed, four-stroke) driving a two-blade fixed-pitch Hartzell, synthesized
 // in layers that follow the flight model rather than one loop re-pitched:
 //
-//   A starter      — starter-motor whine (~850 Hz, as in the reference start
-//                    video), gear rasp and the chug of each compression stroke
-//                    loading it, at the cranking speed the simulation reports
+//   A starter      — heavy starter-motor growl (~85–120 Hz) and a low thump per
+//                    compression stroke (the weight of the reference start sits
+//                    at 46–60 and 80–130 Hz), the whine (~850 Hz) and gear rasp
+//                    above it, at the cranking speed the simulation reports
 //   B catch        — the first individual firings, scheduled one by one from
 //                    the rpm as the engine catches, then a short level flare and
 //                    the odd misfire while it settles
@@ -176,7 +177,7 @@ export class IpanemaEngineSound {
     this.propInt = this._g(0.4);
     this.propBus.connect(this.propExt).connect(this.extIn);
     this.propBus.connect(this.propInt).connect(this.intIn);
-    this.stBus = this._g(1);
+    this.stBus = this._g(0.45); // the start is about half the settled idle level (reference)
     this.stBus.connect(this.extIn);
     const stIntK = this._g(1.3); // the starter is right behind the panel
     this.stBus.connect(stIntK).connect(this.intIn);
@@ -287,11 +288,31 @@ export class IpanemaEngineSound {
     // The engine being turned over: air pumped through the cylinders, a dull
     // chug per compression stroke.
     const ch = this._noise(brown);
-    const chLP = this._f('lowpass', 220, 0.8);
+    const chLP = this._f('lowpass', 320, 0.8);
     this.chAM = this._g(0);
     this.comp.connect(this.chAM.gain);
     this.chGain = this._g(0);
     ch.connect(chLP).connect(this.chAM).connect(this.chGain).connect(this.stBus);
+    // The body of the start (the reference has its weight at 46–60 Hz and
+    // 80–130 Hz): the heavy starter motor and Bendix growl, pitch sagging on
+    // each compression, and a low thump as each cylinder is pushed over.
+    this.stLow = this._osc(null, 'sawtooth');
+    this.stLow.frequency.value = 110;
+    this.stLowPitch = this._g(0);
+    this.comp.connect(this.stLowPitch).connect(this.stLow.frequency);
+    const stLowLP = this._f('lowpass', 420, 0.9);
+    const stLowAM = this._g(0.75);
+    const stLowDepth = this._g(0.25);
+    this.comp.connect(stLowDepth).connect(stLowAM.gain);
+    this.stLowGain = this._g(0);
+    this.stLow.connect(stLowLP).connect(stLowAM).connect(this.stLowGain).connect(this.stBus);
+    this.thump = this._osc(null, 'triangle');
+    this.thump.frequency.value = 52;
+    const thAM = this._g(0.5);
+    const thDepth = this._g(0.5);
+    this.comp.connect(thDepth).connect(thAM.gain);
+    this.thGain = this._g(0);
+    this.thump.connect(thAM).connect(this.thGain).connect(this.stBus);
 
     // G cabin-only: airframe buzz at the firing order.
     const bz = this._noise(brown);
@@ -361,13 +382,13 @@ export class IpanemaEngineSound {
     if (this.oneShots.size > 24) return;
     const o = ctx.createOscillator();
     o.type = 'triangle';
-    const f0 = 52 + 18 * this.r();
+    const f0 = 40 + 14 * this.r();
     o.frequency.setValueAtTime(f0 * this.dop, when);
-    o.frequency.exponentialRampToValueAtTime(30, when + 0.12);
+    o.frequency.exponentialRampToValueAtTime(24, when + 0.2);
     const og = ctx.createGain();
     og.gain.setValueAtTime(0.0001, when);
-    og.gain.linearRampToValueAtTime(0.5 * level, when + 0.004);
-    og.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
+    og.gain.linearRampToValueAtTime(0.7 * level, when + 0.005);
+    og.gain.exponentialRampToValueAtTime(0.0001, when + 0.24);
     const n = ctx.createBufferSource();
     n.buffer = this._bangBuf ??= (() => {
       const len = Math.floor(ctx.sampleRate * 0.25), b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
@@ -375,12 +396,12 @@ export class IpanemaEngineSound {
       return b;
     })();
     const nf = ctx.createBiquadFilter();
-    nf.type = 'bandpass'; nf.frequency.value = 500 + 1400 * bright; nf.Q.value = 0.8;
+    nf.type = 'bandpass'; nf.frequency.value = 260 + 1400 * bright; nf.Q.value = 0.7;
     const ng = ctx.createGain();
     ng.gain.value = 0.55 * level;
     o.connect(og).connect(this.engBus);
     n.connect(nf).connect(ng).connect(this.engBus);
-    o.start(when); o.stop(when + 0.2);
+    o.start(when); o.stop(when + 0.28);
     n.start(when); n.stop(when + 0.25);
     const rec = { o, n, nodes: [og, nf, ng] };
     this.oneShots.add(rec);
@@ -461,7 +482,7 @@ export class IpanemaEngineSound {
           this.firePhase -= 1;
           const hitP = 0.35 + 0.5 * p;
           if (this.r() < hitP) {
-            this._bang(t + 0.01 + this.r() * 0.012, (0.55 + 0.45 * this.r()) * (1 - 0.6 * p), 0.4);
+            this._bang(t + 0.01 + this.r() * 0.012, (0.55 + 0.45 * this.r()) * (1 - 0.6 * p), 0.15);
             this.catchN++;
           }
         }
@@ -524,10 +545,15 @@ export class IpanemaEngineSound {
       const eng = st === IPA.STARTER_ACTIVE ? 1 : 0.6;
       this.stOsc.frequency.setTargetAtTime(560 + 300 * sstep(0, 260, rpm), t, 0.12);
       this.stMesh.frequency.setTargetAtTime(1120 + 600 * sstep(0, 260, rpm), t, 0.12);
-      this.stGain.gain.setTargetAtTime(0.16 * eng, t, 0.04);
-      this.stNGain.gain.setTargetAtTime(0.6 * eng, t, 0.05);
-      this.chGain.gain.setTargetAtTime(0.22 * sstep(10, 120, rpm), t, 0.08);
-      this.compPitch.gain.setTargetAtTime(-45, t, 0.1);
+      const turn = sstep(10, 120, rpm);
+      this.stGain.gain.setTargetAtTime(0.13 * eng, t, 0.04);
+      this.stNGain.gain.setTargetAtTime(0.65 * eng, t, 0.05);
+      this.chGain.gain.setTargetAtTime(0.22 * turn, t, 0.08);
+      this.compPitch.gain.setTargetAtTime(-20, t, 0.1);
+      this.stLow.frequency.setTargetAtTime(85 + 35 * sstep(0, 260, rpm), t, 0.15);
+      this.stLowPitch.gain.setTargetAtTime(-14, t, 0.1);
+      this.stLowGain.gain.setTargetAtTime(0.2 * eng, t, 0.05);
+      this.thGain.gain.setTargetAtTime(0.16 * turn, t, 0.06);
     } else {
       // Disengaged: the unloaded motor freewheels up for an instant, then
       // spins down.
@@ -542,6 +568,9 @@ export class IpanemaEngineSound {
       }
       this.stNGain.gain.setTargetAtTime(0, t, 0.06);
       this.chGain.gain.setTargetAtTime(0, t, 0.06);
+      this.stLowGain.gain.setTargetAtTime(0, t, 0.12);
+      this.thGain.gain.setTargetAtTime(0, t, 0.05);
+      this.stLowPitch.gain.setTargetAtTime(0, t, 0.1);
       this.compPitch.gain.setTargetAtTime(0, t, 0.1);
     }
     this._wasCranking = cranking;
