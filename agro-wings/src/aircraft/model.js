@@ -1056,8 +1056,14 @@ export function createAircraftModel(panel, opts = {}) {
   }
   // Wire-cutter blade on the roof, deflector cable roof -> fin top,
   // roof antennas (VHF whip, DGPS puck).
-  add('steel', tx(new THREE.BoxGeometry(0.018, 0.26, 0.06), 0, roof + 0.1, -0.69, 0.62));
-  add('steel', rod([0, roof + 0.02, -1.0], [0, 1.4, -3.93], 0.006, 5));
+  // Wire cutter: a steel rod up the middle of the windshield, ~5 cm in
+  // front of the glass, from the hood to ~0.2 m above the roof; the
+  // deflector cable runs from its tip to the fin top. Seen from the seat.
+  const wcBase = [0, FWD_END.yt + 0.04, WS_BOT + 0.03], wcTip = [0, roof + 0.21, -1.08];
+  add('steel', rod(wcBase, wcTip, 0.0065, 8));
+  add('steel', tx(new THREE.SphereGeometry(0.011, 8, 6), ...wcTip));
+  add('steel', tx(new THREE.BoxGeometry(0.03, 0.025, 0.05), wcBase[0], wcBase[1] - 0.01, wcBase[2]));
+  add('steel', rod(wcTip, [0, 1.4, -3.93], 0.005, 6));
   add('dark', tx(new THREE.SphereGeometry(0.06, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, roof - 0.004, -1.12, 0, 0, 0, [1, 0.45, 1]), true);
   add('steel', rod([0.18, roof - 0.02, -1.15], [0.18, roof + 0.32, -1.45], 0.005, 5), true);
 
