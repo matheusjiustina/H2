@@ -36,7 +36,7 @@ export const AIRCRAFT_TYPES = {
     anim: { elev: 0.35, rud: 0.42, ail: 0.33, flap: 0.52, pedalZ: 0.42, disc: [380, 900], wash: [1500, 2600], vib: [1500, 2700] },
     vspeeds: { vs0: 48, vs1: 55, vfe: 95, vne: 140 },
     camera: { dist: 12.5, height: 3.7, orbit: 19 },
-    audio: { profile: 'piston', blades: 3 },
+    audio: { profile: 'ipanema', blades: 2 },
     fuel: { get name() { return t('ethanol'); }, price: GAME.fuelPrice },
     loads: { free: { fuel: 220, hopper: 500 }, boot: 120 },
     loadSheet: { bankKt: 90, roll: [140, 1303, 2.9] },

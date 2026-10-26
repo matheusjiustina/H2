@@ -13,6 +13,7 @@ import { Guidance } from '../spray/guidance.js';
 import { CoverageOverlay } from '../spray/overlay.js';
 import { GroundService } from '../crew/service.js';
 import { GameAudio } from '../audio/audio.js';
+import { ipanemaAudioState } from '../audio/ipanemaEngine.js';
 import { HUD } from '../ui/hud.js';
 import { Screens, money } from '../ui/screens.js';
 import { TouchControls } from '../ui/touch.js';
@@ -742,6 +743,9 @@ export class Game {
       tractor: this.world.farm.root.visible ? 1 / (1 + this.camera.position.distanceTo(this.world.farm.root.position) / 25) * (this.camera.position.distanceTo(this.world.farm.root.position) < 500 ? 1 : 0) : 0,
       hangar: Math.max(0, 1 - Math.hypot(this.camera.position.x - BASE.hangar.x, this.camera.position.z - BASE.hangar.z) / 45) * (this.cameraMode === 'cockpit' && ac.fm.engine === 'running' ? 0.3 : 1),
       truck: this.service.truck?.audioState(this.camera.position),
+      ipa: ac.type.audio.profile === 'ipanema'
+        ? ipanemaAudioState({ fm, acPos: ac.rPos, camPos: this.camera.position, camInv: this.camera.matrixWorldInverse.elements, inside: this.cameraMode === 'cockpit' && this.playing, dt })
+        : null,
     });
   }
 

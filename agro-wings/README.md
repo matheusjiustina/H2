@@ -1943,3 +1943,73 @@ How it is built:
   spray, wind or crew move, and compiles no new shader; the previous build
   shows similar one-off stalls (~8 s) on its first airborne frame. Not seen
   in the farm flows or the view renders; not checked on a GPU here.
+
+## Ipanema engine sound — layered IO-540
+
+The Ipanema (EMB-202A, Lycoming IO-540, six cylinders flat, two-blade
+fixed-pitch Hartzell) has its own engine sound, `src/audio/ipanemaEngine.js`,
+on the game's single AudioContext (audio profile `ipanema`). Every other
+aircraft keeps its sound unchanged. Everything is synthesized: no audio from
+the reference videos is embedded, and no loop is just re-pitched.
+
+**Reference analysis** (three recordings: start-up, take-off, landing/take-off
+pass; RMS, 1/1-octave bands, peak picking, envelope modulation). Start-up:
+starter whine ~850 Hz with compression pulses at 4–7 Hz, catch at +5 s with a
+level flare ~1.4× the settled idle, then idle with firing at ~33 Hz and
+harmonics at 67/100/199 Hz (≈650–670 rpm: firing = rpm/20). Take-off: firing
+order dominant (145–151 Hz in the recording, with Doppler), strong 4, 4.5, 5
+and 6 shaft orders, ½-order modulation (~24 Hz), and a 1–4 kHz band that rises
+with power. Pass: Doppler shift ~148 → 127 Hz. The dominant peaks are orders
+of the crank, so they are not read as rpm directly.
+
+**Layers.** A starter (whine, gear rasp, chug at three compressions per
+revolution of the simulated cranking rpm); B catch (individual firings
+scheduled from the rpm, level flare, misfires while it settles, last cough
+and the crank rocking back at shutdown, afterfire when the throttle is chopped
+at high rpm); C/D/E three harmonic spectra on the engine-cycle frequency
+(rpm/120 — so the ½ orders of a six are there), equal-power crossfaded by rpm
+and load: low idle, mid, high power; plus exhaust blat and the open-throttle
+rasp, both gated by the firing pulses, and the valve-train tick; F propeller
+(blade-pass tone rpm/30, blade-modulated whoosh ∝ rpm³, tip-Mach rasp as the
+2.2 m blades approach M 0.9 at 2700 rpm); G cabin path (low shelf, 95 Hz
+airframe resonance, two low-passes and a high shelf for firewall/canopy, a
+structural buzz at the firing order). Exterior path: high-pass, air-absorption
+low-pass with distance, PannerNode (inverse distance, emitter on the
+aircraft in camera space) and a mild Doppler (60 % of the physical shift,
+clamped ±10 %) from the aircraft and camera velocities. Inside/outside
+crossfade over ~0.3 s; the sources never restart.
+
+**State machine.** OFF → START_REQUESTED (until the crank turns) →
+STARTER_ACTIVE (while the flight model cranks) → CATCH (flight model
+running, until the rpm nears idle) → IDLE_STABILIZATION (until the rpm stops
+moving) → RUNNING; SHUTDOWN → OFF on cut-off. All transitions are read from
+the flight model's engine state and rpm, which also spin the propeller.
+Inputs (`ipanemaAudioState`): engine state, rpm, throttle, power fraction,
+camera, emitter position in listener space, distance, closing speed —
+never airspeed as rpm.
+
+**Tests.** `node test/ipanema_audio.mjs [outDir]` renders the engine offline
+(OfflineAudioContext, 30 Hz control steps driven by a copy of the piston
+engine dynamics) for off/start/idle/throttle up/full/throttle down/shutdown
+(outside and cockpit), a 50 m/s flyby and an aircraft switch; writes WAVs and
+checks silence when off, after shutdown and after switching, the state
+order, no clipping, bounded one-shots and no node growth.
+`AGRO_URL=http://localhost:4173/ node test/ipanema_audio_game.mjs` checks the
+same in the game (start sequence, cockpit crossfade without restart, high
+layer at full throttle, silence on switching aircraft, nothing duplicated on
+coming back, shutdown).
+
+Rendered vs reference (bands relative to the loudest, 31 Hz…8 kHz):
+idle 31/63/125/250/500/1k/2k/4k = −6/0/−2/−11/−10/−11/−12/−16 dB against
+−20/0/−3/−11/−8/−10/−19/−19 dB; full power centroid ~1.05 kHz against
+~0.96 kHz. The phone recordings lose everything below ~60 Hz, the game keeps
+more of it.
+
+**Limits.** The simulation cranks for 1.3 s toward 260 rpm (the real start
+takes ~5 s at ~100–150 rpm), so the starter phase is shorter and its
+compression chug faster than in the video; the sound follows the simulation
+rather than a fixed recording. The simulated rpm does not overshoot on the
+catch; the flare is a level effect only. A match with the recordings is
+spectral and statistical, not sample-exact; real IO-540 samples (start, idle,
+run-up, take-off, flyby, cabin) would allow a hybrid sample + synthesis
+version.

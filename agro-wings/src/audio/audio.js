@@ -7,8 +7,10 @@
 // main-gearbox whine, all from the simulated rotor speed; wind, wheel rumble,
 // spray hiss,
 // stall horn, starter, one-shots, and a quiet rural ambience at the base
-// (cicadas, birds, breeze). Nothing is loaded from files.
+// (cicadas, birds, breeze). The Ipanema has its own layered engine model
+// (ipanemaEngine.js). Nothing is loaded from files.
 import { clamp, smoothstep } from '../core/math.js';
+import { IpanemaEngineSound } from './ipanemaEngine.js';
 
 function noiseBuffer(ctx, seconds = 2, color = 'white') {
   const n = Math.floor(ctx.sampleRate * seconds);
@@ -254,6 +256,9 @@ export class GameAudio {
     this.tracGain = ctx.createGain(); this.tracGain.gain.value = 0;
     this.tracOsc.connect(this.tracLP).connect(this.tracGain).connect(this.master);
     this.hangarT = 3;
+    // The Ipanema's own layered engine (src/audio/ipanemaEngine.js), on the
+    // same context; silent unless the Ipanema is flown.
+    this.ipa = new IpanemaEngineSound(ctx, this.master, { white: this.white, pink: this.pink, brown: this.brown });
     for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum, this.truckOsc, this.truckSub, this.tracOsc, this.hMod, this.hTail, this.hWhine, this.lope, this.lope2]) o.start();
     this.birdT = 2;
     this.cicT = 0;
@@ -286,7 +291,11 @@ export class GameAudio {
     const fire = Math.max(1, (rpm / 60) * (radial ? 4.5 : 3));
     const on = turbo ? smoothstep(3, 30, s.ng ?? 0) : smoothstep(150, 500, rpm) * (run ? 1 : 0.15);
     const load = clamp(turbo ? s.power ?? 0 : s.throttle, 0, 1);
-    const piston = turbo ? 0 : 1;
+    // The Ipanema has its own engine sound; the generic piston layers stay
+    // for the other piston aircraft.
+    const ipa = s.profile === 'ipanema';
+    this.ipa.update(dt, s.ipa, ipa);
+    const piston = turbo || ipa ? 0 : 1;
     this.eng.frequency.setTargetAtTime(fire, t, 0.04);
     this.engSub.frequency.setTargetAtTime(fire / 2, t, 0.04);
     this.engLP.frequency.setTargetAtTime(radial ? 150 + 800 * load + rpm * 0.28 : 220 + 1200 * load + rpm * 0.35, t, 0.08);
@@ -324,9 +333,9 @@ export class GameAudio {
     const pr = turbo ? smoothstep(250, 2200, rpm) : smoothstep(300, 2700, rpm);
     // A turboprop's prop gets much louder as the governor loads the blades.
     const pl = turbo ? 0.35 + 1.1 * load : 0.6 + 0.6 * load;
-    this.propGain.gain.setTargetAtTime(heli ? 0 : pr * (s.inside ? 0.04 : 0.12) * att * pl, t, k);
+    this.propGain.gain.setTargetAtTime(heli || ipa ? 0 : pr * (s.inside ? 0.04 : 0.12) * att * pl, t, k);
     this.propNBP.frequency.setTargetAtTime(150 + rpm * 0.25, t, 0.1);
-    this.propNGain.gain.setTargetAtTime(heli ? 0 : pr * pr * (s.inside ? 0.08 : 0.2) * att * (turbo ? 0.6 + 0.8 * load : 1), t, k);
+    this.propNGain.gain.setTargetAtTime(heli || ipa ? 0 : pr * pr * (s.inside ? 0.08 : 0.2) * att * (turbo ? 0.6 + 0.8 * load : 1), t, k);
     // Helicopter rotor system (follows the rotor, not the engine: it keeps
     // turning after shutdown and spins up slowly through the clutch).
     {
@@ -350,7 +359,7 @@ export class GameAudio {
       this.hWhineGain.gain.setTargetAtTime(lvl * (s.inside ? 0.007 : 0.0025) * hAtt, t, k);
     }
     // The radial's inertia starter: a flywheel whine that rises as it spins up.
-    this.starterGain.gain.setTargetAtTime(s.engine === 'cranking' && !turbo ? (radial ? 0.06 : 0.08) : 0, t, 0.05);
+    this.starterGain.gain.setTargetAtTime(s.engine === 'cranking' && !turbo && !ipa ? (radial ? 0.06 : 0.08) : 0, t, 0.05);
     this.starter.frequency.setTargetAtTime(s.engine === 'cranking' ? (radial ? 380 + rpm * 2.6 : 160 + rpm * 0.6) : 120, t, radial ? 0.6 : 0.2);
     this.acTone.frequency.setTargetAtTime(s.inside ? 1500 : 7000, t, 0.1);
     this.acBus.gain.setTargetAtTime(s.inside ? 1.5 : 1.1, t, 0.2);
