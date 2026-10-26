@@ -1815,3 +1815,127 @@ AT-502B, M-18B and R44: no back face is visible from outside apart from the
 deliberately double-sided prop disc, glass and headliner. Same draw calls;
 two more triangles per panel segment. 93 unit tests and the soybean
 autopilot mission on the Ipanema, AT-502B and M-18B pass (no damage).
+
+## Airstrips expansion — eight Brazilian farm strips
+
+The map grows from 8 × 8 km to 12 × 12 km (`WORLD_HALF` 6000; the terrain
+grid stays 15.6 m: 768 × 768 cells, 750 m chunks with the same LOD steps).
+The original 8 × 8 km country is untouched — heights, fields, trees, strips
+and missions are the same, checked point by point against the previous
+build. The new outer ring carries eight farms, each with its own strip,
+service area, local truck and badeco, requests in the office computer and
+its own land, all built on the existing systems (`FARMS` / `SITES` in
+`src/world/layout.js`, the farm contracts, the office, the crew follow).
+
+| Farm | Where | Strip | Land, surroundings | Difficulty | Aircraft |
+| --- | --- | --- | --- | --- | --- |
+| Fazenda Horizonte | north | 720 × 24 m red earth, level | flat cerrado farmland, big soy/corn blocks, silos, big shed | ★☆☆☆☆ | all |
+| Fazenda Dois Lagos | north-west | 560 × 16 m red earth, −1.2 % eastbound | gentle swells, two açudes (one off the east end), farmhouse, corral, pier | ★★★☆☆ | all |
+| Fazenda Serra do Cedro | north-east | 540 × 16 m gravel, +3.6 % eastbound, 1.2 % cross slope | the land climbs east into hills, stepped soy, corn on the ridge, boulders by the strip, stakes | ★★★★☆ | Ipanema, AT-502B, R44 |
+| Fazenda Mata Alta | far west | 440 × 14 m rough red earth, −1 % | cut through tall native forest (trees 34 m from the centreline); the talhões are clearings walled in along their passes, with 150–230 m at each end to drop in and pull up over the trees; threshold tyres only, rustic shed | ★★★★★ | Ipanema, R44 |
+| Sítio Ipê Amarelo | east | 400 × 13 m red earth, −2 % | small cerrado farm, yellow ipês round the house, whitewashed stones | ★★★☆☆ | Ipanema, R44 |
+| Fazenda Vale Verde | south-east | 500 × 16 m mown grass, +1 %, tilted 2 % to the creek | strip cut into the valley side above the Córrego Vale Verde, soy and corn on both slopes, a dam downstream | ★★★★☆ | Ipanema, AT-502B, R44 |
+| Fazenda Terra Vermelha | south | 580 × 20 m red earth, slight cross slope | big Mato Grosso farm: six silos, dryer, two big sheds, huge cotton/soy | ★★★☆☆ | all |
+| Fazenda Chapada dos Ventos | south-west | 520 × 18 m pale sand, cross slope | on a plateau 42 m above the plain with a 300 m escarpment, wind turbines, radio mast, gusty wind (×1.45 mean, ×2.2 gusts) | ★★★★★ | Ipanema, AT-502B, R44 |
+
+How it is built:
+
+- **Terrain** (`src/world/relief.js` `ringReliefAt`): zero inside the old
+  map, faded in over 400 m and out again at the map edge. Region zones set
+  the land: calm swells on the flat farms, rolling ground at Dois Lagos, a
+  21 m ramp plus hills at Serra do Cedro, a 24 m valley along the creek at
+  Vale Verde, the warped rounded plateau at Chapada. The strips are graded
+  platforms (`stripLevel(site, x, z)`: grade along, bank across, both only
+  past the first 100 m so the service area stays level); on the outer farms
+  the platform level is fitted along the grade, so a sloping strip follows
+  its hillside (cut/fill under 14 m) instead of standing on a fill. No
+  floating strips: the strip *is* the terrain the wheels and the renderer
+  read. The creek now runs to both map edges.
+- **Strips**: two new surfaces in the ground shader (rough red earth with
+  grass tufts, chapada sand), both rolling like grass; markers per farm
+  (tyres, white stakes, whitewashed stones, threshold rows only); a third
+  windsock on the windy plateau; threshold boards share their materials.
+- **Scenery** (`buildProp` in `src/world/structures.js`): silos, dryer, big
+  sheds with machines, farmhouses, water towers, corrals, a pier and boat on
+  the açude, boulders, a forest shack, fuel drums, a lattice radio mast and
+  wind turbines with turning rotors — all with colliders, all outside the
+  truck's planning yard, the strips, talhões and roads (unit-tested).
+- **Vegetation**: everything in the outer ring — its forest blocks, the
+  creek's new stretches, the new stream and açudes, isolated trees, cerrado
+  clumps, scrub, termite mounds, gallery woods in the valleys — draws from
+  its own random stream, after the original map's, so no original tree
+  moves (checked instance by instance against the previous build: 29,688
+  trees and 4,599 obstacles identical; one tree gives way to a new road and
+  the new roads get their verge scrub). Tall trees are cleared 60 m from a
+  strip's centreline (34 m at Mata Alta, whose talhões keep the forest up to
+  their edges). Adjoining ring blocks close their roofs without a seam (a
+  side against another block is not an edge), trees buried where blocks
+  overlap are dropped, and forest roofs are merged per 3 km region (culled
+  per region). Farm parked trucks are built when the camera first comes
+  within 2.5 km.
+- **Roads**: seven access roads (draped ribbons, grade under 10 %) from the
+  farm yards to the farm network or off the map — Chapada's comes down its
+  escarpment. Mata Alta is reached by air only.
+- **Requests** (`src/game/farmContracts.js`): fourteen new ones from the
+  farmers, with message, conditions and tips. Pay per hectare follows the
+  farm's difficulty (≈280 / 360 / 450 / 560 / 680 R$/ha for 1–5, +40 per
+  terrain level, a little more for corn and cotton) and the bonus rises
+  with it (4,000 → 9,500).
+- **Office** (`src/ui/office.js`): requests grouped by farm, easiest first,
+  each card with the farmer, distance and direction from the base and from
+  you, crop, area, terrain level, strip, difficulty stars, the aircraft the
+  strip takes and the expected credit. Every farm strip has its own office:
+  stopped on the ground at any site you can read and accept the next
+  request there (`officeSite()`), so jobs follow one another with no flight
+  back to the base; aircraft are still changed at the main base. A strip
+  refuses an aircraft it is not cleared for (`stripAllows`).
+- **Maps**: 12 km base map at 1536 px, farm pins in each farm's colour with
+  a ring round the farm of the accepted request; the full map frames the
+  aircraft with its job (or the base).
+- **Wind**: `windFactorAt` raises the mean wind and the gusts within 2 km of
+  the Chapada strip (flight model wind, felt in the aircraft and windsocks);
+  a "windy" weather tendency there.
+
+### Validation (airstrips build)
+
+- `npm test`: 101/101 — adds `test/farms.test.mjs`: the eight strips and
+  their identities, no floating strip (strip = terrain, level service area,
+  cut/fill under 14 m), the old map's relief untouched, every farm's
+  requests and their talhões, pay rising with difficulty, aircraft
+  clearance, scenery clear of strips / talhões / roads / the truck yard,
+  the plateau wind, and a **take-off from every strip with each airplane it
+  takes**, at the heaviest recommended load, downhill where graded: lift-off
+  after 34–65 % of the strip (Ipanema 258–369 m, AT-502B 185–225 m,
+  M-18B 187–199 m).
+- Terrain: 331,776 samples over the original 8 × 8 km identical to the
+  previous build.
+- Browser, `node test/stripflow.mjs <out>` (all eight farms, Ipanema): crew
+  and office follow to the strip, the farm office lists its requests and
+  one is accepted on the spot, the local truck loads the recommended fuel
+  and liquid, the talhão is sprayed to completion (98–99 %), handed in at
+  that farm and paid (R$ 8.5–17.7 k), the save keeps money, completions
+  and the farm history; Mata Alta refuses the AT-502B. 52/52.
+- Regression: `farmflow` (the three earlier farms, office, replay) 15/15;
+  the hands-off soybean job on the main farm by the test autopilot: 2★ as
+  before.
+- `node test/stripviews.mjs <out> [ids]`: pad, wide and final-approach
+  views of each farm (no page errors).
+- Generation in Node: terrain grid 0.73 s (previous build 0.62 s for a
+  grid 2.25× smaller), vegetation 1.24 s (0.80 s) after exact quick rejects
+  (creek and stream bounding boxes, zone circumcircles, plateau bounds) and
+  a 200 m grid for the outer roads.
+- `perf.mjs` (SwiftShader, so render times are not GPU figures), low:
+  game-logic tick per frame unchanged within noise (base 0.96 / 0.79 ms,
+  low soy pass 3.1 / 4.2, cockpit over corn 1.8 / 1.9, high 1.4 / 1.05);
+  draw calls in the original map +3 % (626 / 608: forest roofs per region,
+  long road ribbons), triangles −5 % (750 m terrain chunks). At the farms:
+  Mata Alta 896 calls (forest all round), Chapada 721. Terrain fragments
+  of the original map test only its own talhões and strips (outer pixels
+  only the ring's). JS heap after load ~310 MB (250 MB before).
+- Open point (software renderer only): in one scripted `perf.mjs`
+  sequence, a single frame about ten frames after the airborne aircraft is
+  teleported over the Chapada takes minutes under SwiftShader. It needs the
+  aircraft model visible but none of the farm scenery, terrain, vegetation,
+  spray, wind or crew move, and compiles no new shader; the previous build
+  shows similar one-off stalls (~8 s) on its first airborne frame. Not seen
+  in the farm flows or the view renders; not checked on a GPU here.

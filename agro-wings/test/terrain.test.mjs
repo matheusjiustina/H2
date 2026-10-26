@@ -34,7 +34,7 @@ test('runway, base, hangar, headquarters and every spawn spot stay level', () =>
 test('secondary farm strips and service areas sit on level platforms', () => {
   for (const s of FARM_SITES) {
     const r = s.runway;
-    for (let x = r.x0; x <= r.x1; x += 20) for (const z of [r.z - r.width / 2, r.z, r.z + r.width / 2]) assert.ok(Math.abs(rawHeight(x, z) - stripLevel(s, x)) < 1e-3, `${s.id} strip ${x},${z}`);
+    for (let x = r.x0; x <= r.x1; x += 20) for (const z of [r.z - r.width / 2, r.z, r.z + r.width / 2]) assert.ok(Math.abs(rawHeight(x, z) - stripLevel(s, x, z)) < 1e-3, `${s.id} strip ${x},${z}`);
     for (const p of [s.pad, s.helipad, s.fuelTank, s.mixTank, s.crewPost, s.truck, s.hangar, ...s.reservoirs]) {
       assert.ok(Math.abs(rawHeight(p.x, p.z) - s.y0) < 1e-3, `${s.id} at ${p.x},${p.z}`);
     }

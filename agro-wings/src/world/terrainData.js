@@ -1,7 +1,7 @@
 // Terrain heights and surface types. Pure JS (no three.js) so the flight model
 // and tests can query the exact same triangulated surface the renderer draws.
 import { fbm, smoothstep, lerp, segDist, clamp } from '../core/math.js';
-import { reliefAt } from './relief.js';
+import { reliefAt, ringReliefAt } from './relief.js';
 import {
   WORLD_HALF, RUNWAY, BASE, FIELDS, CREEK, ROADS, HQ, fieldAt, cropHeight, FARM_SITES, stripLevel, WATER, pondRadius,
 } from './layout.js';
@@ -9,7 +9,7 @@ import {
 // Slope exaggeration of the shading normals (visual only).
 export const RELIEF_SHADE = 1.9;
 
-export const GRID_N = 512; // cells per side
+export const GRID_N = 768; // cells per side
 export const CELL = (WORLD_HALF * 2) / GRID_N; // 15.625 m
 
 function creekDist(x, z) {
@@ -62,13 +62,21 @@ function baseHeight(x, z) {
 
 const H0 = baseHeight(-100, -40);
 
+// Bounding boxes for quick rejects: beyond them the creek's relief fade,
+// valley and channel, or a stream's valley, are exactly zero.
+const CREEK_X = [Math.min(...CREEK.points.map((p) => p[0])) - 480, Math.max(...CREEK.points.map((p) => p[0])) + 480];
+for (const st of WATER.streams) {
+  const xs = st.points.map((p) => p[0]), zs = st.points.map((p) => p[1]);
+  st.box = [Math.min(...xs) - st.valley, Math.max(...xs) + st.valley, Math.min(...zs) - st.valley, Math.max(...zs) + st.valley];
+}
+
 // Natural ground before the farm pads (strip/base platforms, HQ pad).
 function naturalHeight(x, z) {
   let h = baseHeight(x, z) - H0;
-  const cd = creekDist(x, z);
+  const cd = x < CREEK_X[0] || x > CREEK_X[1] ? 1e9 : creekDist(x, z);
   // Rolling country and hills in the outer zones (exactly zero over the farm
   // core). The creek keeps a calm floodplain through them.
-  const rel = reliefAt(x, z);
+  const rel = reliefAt(x, z) + ringReliefAt(x, z);
   if (rel !== 0) h += rel * smoothstep(110, 480, cd);
   // Creek valley + channel.
   const v = 1 - smoothstep(0, CREEK.valley, cd);
@@ -77,6 +85,8 @@ function naturalHeight(x, z) {
   // Streams: a shallow valley and the channel, cut below a water level that
   // only falls downstream.
   for (const st of WATER.streams) {
+    const b = st.box;
+    if (x < b[0] || x > b[1] || z < b[2] || z > b[3]) continue;
     const q = polyNearest(st.points, x, z, _pn);
     if (q.d > st.valley || !st.levels) continue;
     const v2 = 1 - smoothstep(0, st.valley, q.d);
@@ -130,15 +140,18 @@ export function rawHeight(x, z) {
   for (const s of FARM_SITES) {
     const r = s.runway;
     if (x < r.x0 - 340 || x > r.x1 + 300 || z < r.z - 400 || z > r.z + 280) continue;
-    const ms = rectMask(x, z, r.x0 - 80, r.x1 + 40, r.z - 160, r.z + 40, 160);
-    if (ms > 0) h = lerp(h, stripLevel(s, x), ms);
+    const ms = rectMask(x, z, r.x0 - 80, r.x1 + 40, r.z - 160, r.z + 40, s.farm.blend ?? 160);
+    if (ms > 0) h = lerp(h, stripLevel(s, x, z), ms);
   }
   return h;
 }
-// Site level: mean natural ground under the strip and its apron.
+// Site level: mean natural ground under the strip and its apron (outer-ring
+// farms: fitted along the strip's grade and bank, so a sloping strip follows
+// its hillside instead of standing on a long fill).
 for (const s of FARM_SITES) {
   let sum = 0, n = 0;
-  for (let x = s.runway.x0 - 60; x <= s.runway.x1; x += 20) for (let z = s.runway.z - 140; z <= s.runway.z + 30; z += 20) { sum += naturalHeight(x, z); n++; }
+  const tilt = s.farm.ring ? { ...s, y0: 0 } : null;
+  for (let x = s.runway.x0 - 60; x <= s.runway.x1; x += 20) for (let z = s.runway.z - 140; z <= s.runway.z + 30; z += 20) { sum += naturalHeight(x, z) - (tilt ? stripLevel(tilt, x, z) : 0); n++; }
   s.y0 = Math.round((sum / n) * 10) / 10;
 }
 let hqLevel = 0;
@@ -232,7 +245,8 @@ export class TerrainData {
     for (const s of FARM_SITES) {
       const r = s.runway;
       if (x < r.x0 - 60 || x > r.x1 + 10 || z < r.z - 120 || z > r.z + 20) continue;
-      if (x >= r.x0 && x <= r.x1 && Math.abs(z - r.z) <= r.width / 2) return r.surface === 2 ? 'grass' : 'dirt';
+      // Grass, rough red earth and loose chapada sand roll like grass.
+      if (x >= r.x0 && x <= r.x1 && Math.abs(z - r.z) <= r.width / 2) return r.surface === 2 || r.surface >= 4 ? 'grass' : 'dirt';
       const a2 = s.apron, t2 = s.taxiway;
       if ((x >= a2.x0 && x <= a2.x1 && z >= a2.z0 && z <= a2.z1) || (x >= t2.x0 && x <= t2.x1 && z >= t2.z0 && z <= t2.z1)) return 'dirt';
     }
@@ -256,4 +270,4 @@ export class TerrainData {
   }
 }
 
-export { creekDist, polyDist, clamp };
+export { creekDist, polyDist, clamp, naturalHeight };

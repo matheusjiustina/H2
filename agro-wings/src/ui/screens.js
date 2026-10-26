@@ -425,13 +425,17 @@ export class Screens {
       if (this.open !== 'map') return;
       const ac = g.aircraft.fm.pos;
       const job = g.job;
-      let cx = ac.x * 0.5 + 400, cz = ac.z * 0.5, range = 1900;
+      // Frame the aircraft with the job's talhões (or with the base): the
+      // farms of the outer ring are up to 7 km away.
+      let x0 = Math.min(ac.x, 0), x1 = Math.max(ac.x, 800), z0 = Math.min(ac.z, -400), z1 = Math.max(ac.z, 400), minR = 1900;
       if (job) {
         const f = job.fields;
-        cx = (Math.min(...f.map((x) => x.x0)) + Math.max(...f.map((x) => x.x1))) / 2 * 0.6 + ac.x * 0.4;
-        cz = (Math.min(...f.map((x) => x.z0)) + Math.max(...f.map((x) => x.z1))) / 2 * 0.6 + ac.z * 0.4;
-        range = 1200;
+        x0 = Math.min(ac.x, ...f.map((q) => q.x0)); x1 = Math.max(ac.x, ...f.map((q) => q.x1));
+        z0 = Math.min(ac.z, ...f.map((q) => q.z0)); z1 = Math.max(ac.z, ...f.map((q) => q.z1));
+        minR = 1200;
       }
+      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      const range = Math.min(6000, Math.max(minR, Math.max(x1 - x0, z1 - z0) / 2 + 500));
       drawMap(c.getContext('2d'), c.width, c.height, g.hud.base, g, { cx, cz, range, labelPx: 30 });
       requestAnimationFrame(draw);
     };

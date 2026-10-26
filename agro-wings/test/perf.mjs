@@ -14,11 +14,19 @@ const views = {
   lowSoy: `g.aircraft.placeAirborne(300, -280, Math.PI/2, 4, 46 * (g.aircraft.A.assistSpeedScale ?? 1)); g.sprayer.on = true; g.aircraft.fm.hopper = 500; g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
   cockpitCorn: `g.aircraft.placeAirborne(-200, 470, Math.PI/2, 6, 46 * (g.aircraft.A.assistSpeedScale ?? 1)); g.cameraMode='cockpit'; g.rig.setMode('cockpit', g.aircraft);`,
   high: `g.aircraft.placeAirborne(500, 0, Math.PI/2, 400, 50); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
+  // Outer-ring farms (airstrips expansion); on an older build without them
+  // these fall back to the base pad.
+  farmForest: `const s = g.sites.find((x) => x.id === 'mataalta'); if (s) { g.service.setSite(s); g.aircraft.placeAtPad(s); } else g.aircraft.placeAtPad(); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
+  farmPlateau: `const s = g.sites.find((x) => x.id === 'chapada'); if (s) g.aircraft.placeAirborne(s.runway.x0 - 600, s.runway.z, Math.PI/2, 60, 45); else g.aircraft.placeAirborne(-1000, 0, Math.PI/2, 60, 45); g.cameraMode='chase'; g.rig.setMode('chase', g.aircraft);`,
 };
-for (const q of ['low', 'medium', 'high']) {
+for (const q of (process.env.Q || 'low,medium,high').split(',')) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  page.setDefaultTimeout(600000);
+  const t0 = Date.now();
   await page.goto(url + '?q=' + q, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null, { timeout: 180000 });
+  await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null, { timeout: 300000 });
+  const heap = await page.evaluate(() => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null));
+  console.log(q.padEnd(7), 'load', ((Date.now() - t0) / 1000).toFixed(1), 's', 'heap', heap, 'MB');
   // AC=at502 measures with the Air Tractor flown (the other aircraft parked).
   if (process.env.AC) await page.evaluate((id) => window.__agro.selectAircraft(id), process.env.AC);
   for (const [name, setup] of Object.entries(views)) {

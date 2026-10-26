@@ -126,3 +126,90 @@ export function terrainLevel(x, z) {
   if (w.roll > 0.35 || w.hill > 0.1) return 2;
   return 1;
 }
+
+// ---------------------------------------------------------------------------
+// Outer ring (airstrips expansion): the land between the original 8 x 8 km
+// farm country and the 12 x 12 km map edge. Zero inside |x|, |z| < 4000 (the old map), so
+// everything above stays bit-for-bit, and zero again at the map edge (the
+// horizon ring continues from flat farmland). Each farm region gets its own
+// land: gentle swells, the Serra do Cedro hills climbing east, the Vale
+// Verde valley along its creek and the Chapada dos Ventos plateau with its
+// escarpment. (The strips sit on graded platforms, see terrainData.)
+export const RING = { inner: 4000, fadeIn: 4400, fadeOut: 5500, edge: 5950 };
+
+// Regions: c centre, r semi-axes, rot rotation; roll = scale of the swells.
+export const RING_ZONES = {
+  horizonte: { c: [400, -5300], r: [2100, 1200], rot: 0, roll: 0.15, name: 'Planície do Horizonte' },
+  doislagos: { c: [-4650, -4250], r: [1300, 1000], rot: 0.2, roll: 0.7, name: 'Coxilhas dos Lagos' },
+  serradocedro: { c: [4850, -4750], r: [1250, 1050], rot: -0.25, roll: 0.5, name: 'Serra do Cedro' },
+  mataalta: { c: [-4900, 850], r: [1100, 1500], rot: 0, roll: 0.35, name: 'Mata Alta' },
+  ipeamarelo: { c: [5000, -650], r: [1000, 1300], rot: 0, roll: 0.3, name: 'Cerrado do Ipê' },
+  valeverde: { c: [5050, 4650], r: [1150, 1150], rot: 0, roll: 0.45, name: 'Vale Verde' },
+  terravermelha: { c: [-500, 5300], r: [2100, 1050], rot: 0, roll: 0.18, name: 'Terra Vermelha' },
+  chapada: { c: [-4700, 5150], r: [1250, 1000], rot: 0, roll: 0.25, name: 'Chapada dos Ventos' },
+};
+const RING_ROLL = 0.72; // swells between the farm regions
+
+// Serra do Cedro: the land climbs east across the strip and breaks into hills.
+const CEDRO_RAMP = { x0: 4150, x1: 5050, rise: 21 };
+// Vale Verde: valley floor along the creek (z of the thalweg), side height.
+const VALLEY = { z: 4745, half: 820, depth: 24, fall: 0.004 };
+// Chapada dos Ventos: plateau outline (rounded rectangle), height, escarpment.
+const PLATEAU = { x0: -6400, x1: -3620, z0: 4470, z1: 6400, round: 260, height: 42, scarp: 300 };
+
+function ringMask(x, z) {
+  const m = Math.max(Math.abs(x), Math.abs(z));
+  if (m <= RING.inner || m >= RING.edge) return 0;
+  return smoothstep(RING.inner, RING.fadeIn, m) * (1 - smoothstep(RING.fadeOut, RING.edge, m));
+}
+
+// Zones as a list with their rotation precomputed (cheap per-point loop).
+const ZONE_LIST = Object.entries(RING_ZONES).map(([id, zn]) => ({ id, ...zn, cs: Math.cos(zn.rot), sn: Math.sin(zn.rot), rmax2: Math.max(...zn.r) ** 2 }));
+
+function zoneW(zn, x, z, inner = 0.35) {
+  const dx = x - zn.c[0], dz = z - zn.c[1];
+  if (dx * dx + dz * dz >= zn.rmax2) return 0; // outside the ellipse's circumcircle
+  const u = (dx * zn.cs + dz * zn.sn) / zn.r[0], v = (-dx * zn.sn + dz * zn.cs) / zn.r[1];
+  return 1 - smoothstep(inner, 1, Math.hypot(u, v));
+}
+
+// Plateau weight: 0 below the escarpment, 1 on the top (warped outline).
+export function plateauWeight(x, z) {
+  const p = PLATEAU;
+  // Beyond the escarpment foot even with the outline's warp (±110 m): flat.
+  if (x > p.x1 + p.scarp / 2 + 120 || z < p.z0 - p.scarp / 2 - 120) return 0;
+  const wx = x + 110 * valueNoise(x / 900 + 3.3, z / 900 - 7.1), wz = z + 110 * valueNoise(x / 900 - 4.4, z / 900 + 2.2);
+  const qx = Math.max(p.x0 + p.round - wx, 0, wx - (p.x1 - p.round)), qz = Math.max(p.z0 + p.round - wz, 0, wz - (p.z1 - p.round));
+  const sd = Math.hypot(qx, qz) - p.round; // < 0 inside
+  return 1 - smoothstep(-p.scarp / 2, p.scarp / 2, sd);
+}
+
+// Relief height of the outer ring at (x, z), metres.
+export function ringReliefAt(x, z) {
+  const m = ringMask(x, z);
+  if (m <= 0) return 0;
+  // Swell scale: the regions set their own (flat farms calm, the lakes rolling).
+  let roll = RING_ROLL, wCedro = 0, wVale = 0;
+  for (const zn of ZONE_LIST) {
+    const wk = zoneW(zn, x, z);
+    if (wk <= 0) continue;
+    roll = lerp(roll, zn.roll, wk);
+    if (zn.id === 'serradocedro') wCedro = wk; else if (zn.id === 'valeverde') wVale = wk;
+  }
+  let h = waves(ROLL_WAVES, x + 9100, z - 6300) * ROLL_SCALE * roll;
+  // Serra do Cedro: ramp up to the east plus the hill waves.
+  if (wCedro > 0) {
+    const r = CEDRO_RAMP;
+    h += wCedro * (r.rise * smoothstep(r.x0, r.x1, x) + waves(HILL_WAVES, x - 2400, z + 1900) * 1.25);
+  }
+  // Vale Verde: valley sides rise away from the creek; the floor falls west.
+  if (wVale > 0) {
+    const v = VALLEY;
+    const d = Math.abs(z - v.z - 40 * Math.sin(x / 520));
+    h += wVale * (v.depth * (smoothstep(0, v.half, d) - 0.5) + (x - 5000) * v.fall);
+  }
+  // Chapada dos Ventos: the plateau, with the escarpment on its north and east.
+  const pw = plateauWeight(x, z);
+  if (pw > 0) h = lerp(h, PLATEAU.height + h * 0.35, pw);
+  return h * m;
+}

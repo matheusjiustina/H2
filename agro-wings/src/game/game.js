@@ -21,7 +21,7 @@ import { Tutorial } from './tutorial.js';
 import { ReplayManager } from './replay.js';
 import { WeatherCycle } from '../world/weatherCycle.js';
 import { GroundMarks } from '../world/groundMarks.js';
-import { BASE, POWERLINE, CONTRACT_FIELDS, MAIN_SITE, SITES, nearestSite, siteById } from '../world/layout.js';
+import { BASE, POWERLINE, CONTRACT_FIELDS, MAIN_SITE, SITES, nearestSite, siteById, stripAllows } from '../world/layout.js';
 import { smoothstep } from '../core/math.js';
 import { Autopilot } from './autopilot.js';
 import { HeliAutopilot } from './heliAutopilot.js';
@@ -241,6 +241,16 @@ export class Game {
     return Math.hypot(fm.pos.x - BASE.hangar.x, fm.pos.z - BASE.hangar.z) < 260 && fm.out.onGround && fm.out.groundSpeed < 0.5;
   }
 
+  // On the ground and stopped at a farm office (the main base's hangar or a
+  // farm strip's service area): the site, else null. Requests are accepted
+  // there, so one job follows another without a flight back to the base.
+  officeSite() {
+    const fm = this.aircraft.fm;
+    if (!fm.out.onGround || fm.out.groundSpeed >= 0.5) return null;
+    for (const s of SITES) if (Math.hypot(fm.pos.x - s.hangar.x, fm.pos.z - s.hangar.z) < 260) return s;
+    return null;
+  }
+
   // Service area the ground crew works in (main base or a secondary farm).
   get site() { return this.service?.site ?? MAIN_SITE; }
   get sites() { return SITES; }
@@ -327,9 +337,14 @@ export class Game {
 
   selectContract(id) {
     const job = this.career.job(id);
+    const farm = job.c.farm ? siteById(job.c.farm) : null;
+    // A short or narrow strip only takes the aircraft it is cleared for.
+    if (farm && !stripAllows(farm.farm, this.aircraftId)) {
+      this.toast(t('{0} does not take the {1}: change aircraft at the main base.', farm.farm.name, this.aircraft.type.reg));
+      return;
+    }
     this.setJob(job);
     this.screens.close();
-    const farm = job.c.farm ? siteById(job.c.farm) : null;
     if (farm && this.site !== farm) {
       const p = this.aircraft.fm.pos;
       const km = Math.hypot(farm.pad.x - p.x, farm.pad.z - p.z) / 1000;
@@ -612,7 +627,8 @@ export class Game {
   _interact() {
     if (!this._atPadStopped() || this.service.busy()) return;
     if (this.mode === 'career') {
-      if (!this.job) return this.screens.board();
+      // At a farm strip the local office lists that region's requests.
+      if (!this.job) return this.site.main ? this.screens.board() : this.screens.office('requests');
       if (this.job.complete()) return this.handIn();
       return this.screens.loadSheet(this.job);
     }
@@ -646,13 +662,13 @@ export class Game {
     if (ac.stuck) return this.hud.setPrompt(t('Aircraft stuck — {0} tow back to the pad', k('reset')), () => this.resetAircraft('pad'));
     if (this._atPadStopped() && !this.service.busy()) {
       if (this.mode === 'career') {
-        if (!this.job) return this.hud.setPrompt(this.site.main ? t('{0} Service orders · {1} Office computer', k('interact'), k('office')) : t('{0} Service orders', k('interact')), () => this._interact());
+        if (!this.job) return this.hud.setPrompt(this.site.main ? t('{0} Service orders · {1} Office computer', k('interact'), k('office')) : t('{0} Farm office — requests', k('interact')), () => this._interact());
         if (this.job.complete()) return this.hud.setPrompt(t('{0} Hand in the job', k('interact')), () => this._interact());
         return this.hud.setPrompt(t('{0} Load sheet — call the badeco', k('interact')), () => this._interact());
       }
       return this.hud.setPrompt(t('{0} Service (fuel &amp; liquid)', k('interact')), () => this._interact());
     }
-    if (this.mode === 'career' && fm.engine === 'off' && !this._rotorTurning() && this.atMainBase() && !this.service.busy()) return this.hud.setPrompt(t('{0} Office computer (requests from other farms)', k('office')), () => this.screens.office());
+    if (this.mode === 'career' && fm.engine === 'off' && !this._rotorTurning() && this.officeSite() && !this.service.busy()) return this.hud.setPrompt(t('{0} Office computer (requests from other farms)', k('office')), () => this.screens.office());
     if (fm.engine === 'off' && this._rotorTurning() && fm.out.onGround) return this.hud.setPrompt(t('Rotor running down ({0} %) — crew waits for it to stop', Math.round(fm.out.rotorPct)));
     const pw = ac.kind === 'heli' && fm.powerModel === 'power';
     if (fm.engine === 'off' && fm.out.onGround && !this.service.busy()) return this.hud.setPrompt(ac.kind === 'heli' ? t(pw ? 'Power down, hold {0} to start' : 'Collective down, hold {0} to start', k('engine')) : t('Hold {0} to start the engine', k('engine')));

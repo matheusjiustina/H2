@@ -2,7 +2,7 @@
 // power line and creek water. Static parts are merged per material.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BASE, RUNWAY, HQ, FENCES, POWERLINE, CREEK, FARM_SITES } from './layout.js';
+import { BASE, RUNWAY, HQ, FENCES, POWERLINE, CREEK, FARM_SITES, WATER } from './layout.js';
 import { canvas, canvasTexture, makeLabel } from '../core/textures.js';
 import { rng } from '../core/math.js';
 import { pickup, tractor, sprayer, harvester, ibc, drumPallet, officeContainer } from './vehicles.js';
@@ -178,7 +178,7 @@ export function createStructures(terrain, scene) {
   const group = new THREE.Group();
   group.name = 'structures';
   const B = new Builder(M);
-  const dyn = { windsocks: [], gates: [] };
+  const dyn = { windsocks: [], gates: [], turbines: [] };
   const H = (x, z) => terrain.heightAt(x, z);
 
   dyn.hangar = buildHangar(B, M, group);
@@ -198,9 +198,17 @@ export function createStructures(terrain, scene) {
     group, M, colliders: B.colliders, wires,
     hangar: dyn.hangar,
     update(dt, time, wind, ctx) {
-      for (const ws of dyn.windsocks) ws.update(dt, time, wind);
-      // A farm's service area is a few pixels beyond ~2.2 km: not drawn.
-      if (ctx?.cam) for (const s of dyn.sites) s.group.visible = Math.hypot(ctx.cam.x - s.x, ctx.cam.z - s.z) < 2200;
+      for (const ws of dyn.windsocks) if (ws.root?.visible !== false) ws.update(dt, time, wind);
+      for (const tb of dyn.turbines) if (tb.root.visible) tb.rotor.rotation.z += dt * tb.rpm * (0.7 + 0.3 * Math.min(1.6, Math.hypot(wind.x, wind.z) / 5));
+      // A farm's service area is a few pixels beyond ~2.2 km: not drawn (the
+      // tall wind turbines stay in sight out to 6 km).
+      if (ctx?.cam) {
+        for (const s of dyn.sites) {
+          const d = Math.hypot(ctx.cam.x - s.x, ctx.cam.z - s.z);
+          s.group.visible = d < 2200;
+          if (s.far) s.far.visible = d < 6000;
+        }
+      }
       if (ctx) dyn.hangar.update(dt, ctx);
     },
   };
@@ -564,22 +572,35 @@ function buildVehicles(B, M, H) {
   B.cyl(0.11, 0.11, 0.62, M.red, ft.x - 4.6, 0.62, ft.z + 1.82, 14);
 }
 
-function buildStripMarks(B, M, group, H, R) {
+// Edge markers of a strip: white tyres (default), white-painted stakes,
+// whitewashed stones, or only the threshold rows ('ends': a forest strip).
+const BOARD_MAT = {};
+function buildStripMarks(B, M, group, H, R, marks = 'tyres') {
   // Half-buried white tyres along the edges, rows across each threshold.
   const tyre = new THREE.TorusGeometry(0.42, 0.16, 10, 22);
+  const stake = new THREE.BoxGeometry(0.1, 0.8, 0.1);
+  const stone = new THREE.DodecahedronGeometry(0.34, 0);
   const z = R.z, hw = R.width / 2;
-  const step = R === RUNWAY ? 50 : 40;
-  for (let x = R.x0; x <= R.x1 + 0.1; x += step) {
-    for (const s of [-1, 1]) B.add(tyre, M.white, x, H(x, z + s * (hw + 1.2)) + 0.1, z + s * (hw + 1.2));
+  const step = R === RUNWAY ? 50 : marks === 'stones' ? 30 : 40;
+  const edge = (x, zz, ry = 0) => {
+    const y = H(x, zz);
+    if (marks === 'stakes') { B.add(stake, M.white, x, y + 0.4, zz); B.add(stake, M.red, x, y + 0.86, zz, 0, 0, 0, 1, 0.15, 1); } else if (marks === 'stones') B.add(stone, M.white, x, y + 0.08, zz, ry * 3.1, 0.3, 0, 1.3, 0.6, 1.1);
+    else B.add(tyre, M.white, x, y + 0.1, zz, ry);
+  };
+  if (marks !== 'ends') {
+    for (let x = R.x0; x <= R.x1 + 0.1; x += step) {
+      for (const s of [-1, 1]) edge(x, z + s * (hw + 1.2));
+    }
   }
   for (const tx of [R.x0 + 3, R.x1 - 3]) {
     const n = Math.floor(hw / 2.6);
-    for (let k = -n; k <= n; k++) if (Math.abs(k) > 1) B.add(tyre, M.white, tx, H(tx, z + k * 2.6) + 0.1, z + k * 2.6, Math.PI / 2);
+    for (let k = -n; k <= n; k++) if (Math.abs(k) > 1) (marks === 'ends' ? B.add(tyre, M.white, tx, H(tx, z + k * 2.6) + 0.1, z + k * 2.6, Math.PI / 2) : edge(tx, z + k * 2.6, Math.PI / 2));
   }
   // Threshold boards "09" (west end) and "27" (east end).
   for (const [x, txt] of [[R.x0 - 6, '09'], [R.x1 + 6, '27']]) {
     const y = H(x, z + hw + 6);
-    const board = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6), new THREE.MeshStandardMaterial({ map: makeLabel(txt, { w: 256, h: 170, font: 'bold 120px Arial' }), roughness: 0.6, side: THREE.DoubleSide }));
+    BOARD_MAT[txt] ??= new THREE.MeshStandardMaterial({ map: makeLabel(txt, { w: 256, h: 170, font: 'bold 120px Arial' }), roughness: 0.6, side: THREE.DoubleSide });
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6), BOARD_MAT[txt]);
     board.position.set(x, y + 1.6, z + hw + 6);
     board.rotation.y = Math.PI / 2;
     group.add(board);
@@ -594,6 +615,11 @@ function buildStripMarks(B, M, group, H, R) {
 // farm sign, a pickup, windsocks and the strip markings.
 function buildFarmSite(B, M, group, H, site, dyn) {
   const B2 = new Builder(M);
+  // root: everything of the site, hidden far away; g2: the base layout moved
+  // to the site; marks: strip markers and windsocks in world coordinates.
+  const root = new THREE.Group();
+  root.name = 'site-root-' + site.id;
+  group.add(root);
   const g2 = new THREE.Group();
   g2.name = 'site-' + site.id;
   const flat = () => 0;
@@ -602,14 +628,20 @@ function buildFarmSite(B, M, group, H, site, dyn) {
   const pk = BASE.pickup;
   pickup(B2, M, pk.x, 0, pk.z, pk.heading + 0.3);
   B2.collider(pk.x - 2.6, pk.x + 2.6, pk.z - 2.6, pk.z + 2.6, 2.1, 'pickup');
-  // Open machinery shed (galpão): steel columns, gable roof, earth floor.
-  const h = BASE.hangar, w = 20, d = 14, hh = 6;
-  for (const cx of [-w / 2, -w / 6, w / 6, w / 2]) for (const cz of [-d / 2, d / 2]) B2.box(0.25, hh, 0.25, M.steel, h.x + cx, hh / 2, h.z + cz);
-  B2.box(w, 0.35, 0.25, M.steel, h.x, hh - 0.18, h.z + d / 2);
-  B2.box(w, 0.35, 0.25, M.steel, h.x, hh - 0.18, h.z - d / 2);
-  B2.box(w, hh * 0.55, 0.1, M.metalWall, h.x, hh * 0.275, h.z - d / 2, 0, 4);
-  gableRoof(B2, M.metalRoof, h.x, hh, h.z, d, w, 1.8, Math.PI / 2, 0.8);
-  B2.collider(h.x - w / 2 - 0.5, h.x + w / 2 + 0.5, h.z - d / 2 - 0.5, h.z + d / 2 + 0.5, hh + 1.9, 'shed');
+  // Open machinery shed (galpão): steel columns, gable roof, earth floor; a
+  // rustic wooden one on the small farms, a big one on the large farms.
+  const kind = site.farm.shed ?? 'steel';
+  const h = BASE.hangar;
+  const [w, d, hh] = kind === 'big' ? [30, 16, 7.5] : kind === 'wood' ? [16, 10, 4.6] : [20, 14, 6];
+  const post = kind === 'wood' ? M.woodDark : M.steel;
+  for (const cx of [-w / 2, -w / 6, w / 6, w / 2]) for (const cz of [-d / 2, d / 2]) B2.box(kind === 'wood' ? 0.3 : 0.25, hh, kind === 'wood' ? 0.3 : 0.25, post, h.x + cx, hh / 2, h.z + cz);
+  B2.box(w, 0.35, 0.25, post, h.x, hh - 0.18, h.z + d / 2);
+  B2.box(w, 0.35, 0.25, post, h.x, hh - 0.18, h.z - d / 2);
+  if (kind !== 'wood') B2.box(w, hh * 0.55, 0.1, M.metalWall, h.x, hh * 0.275, h.z - d / 2, 0, 4);
+  else for (let i = 0; i < 9; i++) B2.box(w / 9 - 0.05, hh * 0.5, 0.06, M.wood, h.x - w / 2 + (i + 0.5) * (w / 9), hh * 0.25, h.z - d / 2);
+  gableRoof(B2, M.metalRoof, h.x, hh, h.z, d, w, kind === 'big' ? 2.4 : 1.8, Math.PI / 2, 0.8);
+  B2.collider(h.x - w / 2 - 0.5, h.x + w / 2 + 0.5, h.z - d / 2 - 0.5, h.z + d / 2 + 0.5, hh + 2.5, 'shed');
+  if (kind === 'big') tractor(B2, M, h.x + 6, 0, h.z + 1, 0);
   // Drum pallets and IBC stock under the shed.
   drumPallet(B2, M, h.x - 6, 0, h.z - 3, 0.1, [M.blue, M.white, M.blue, M.blue]);
   ibc(B2, M, h.x - 2.5, 0, h.z - 4, 0);
@@ -624,15 +656,174 @@ function buildFarmSite(B, M, group, H, site, dyn) {
   g2.add(sign);
   B2.box(0.12, 2.0, 0.12, M.wood, ax - 1.9, 1.0, az - 0.05);
   B2.box(0.12, 2.0, 0.12, M.wood, ax + 1.9, 1.0, az - 0.05);
+  // The farm's own buildings and scenery (heights from the terrain: the
+  // props off the platform stand on the natural ground).
+  const far = new THREE.Group();
+  far.name = 'site-far-' + site.id;
+  const Hl = (x, z) => H(x + site.dx, z + site.dz) - site.y0;
+  for (const [pk2, px, pz, rot = 0] of site.farm.props ?? []) buildProp(B2, M, g2, Hl, pk2, px, pz, rot, site, far, dyn);
   B2.build(g2);
   g2.position.set(site.dx, site.y0, site.dz);
-  group.add(g2);
+  root.add(g2);
+  if (far.children.length) { far.position.copy(g2.position); group.add(far); }
   for (const c of B2.colliders) {
     B.colliders.push({ ...c, x0: c.x0 + site.dx, x1: c.x1 + site.dx, z0: c.z0 + site.dz, z1: c.z1 + site.dz, top: c.top + site.y0, ...(c.bottom !== undefined ? { bottom: c.bottom + site.y0 } : {}) });
   }
-  buildStripMarks(B, M, group, H, site.runway);
-  for (const w of site.windsocks) dyn.windsocks.push(buildWindsock(B, M, group, w.x, H(w.x, w.z), w.z));
-  return { group: g2, x: site.pad.x, z: site.pad.z };
+  const B3 = new Builder(M);
+  buildStripMarks(B3, M, root, H, site.runway, site.farm.marks);
+  for (const w of site.windsocks) {
+    const ws = buildWindsock(B3, M, root, w.x, H(w.x, w.z), w.z); // (the aircraft's wind already carries the local factor)
+    ws.root = root;
+    dyn.windsocks.push(ws);
+  }
+  B3.build(root);
+  for (const tb of dyn.turbines) tb.root ??= far;
+  return { group: root, far: far.children.length ? far : null, x: site.pad.x, z: site.pad.z };
+}
+
+// One piece of farm scenery at (x, z) of the site's frame (y from Hl).
+function buildProp(B, M, g, Hl, kind, x, z, rot, site, far, dyn) {
+  const y = Hl(x, z);
+  const cs = Math.cos(rot), sn = Math.sin(rot);
+  const at = (lx, lz) => [x + lx * cs + lz * sn, z - lx * sn + lz * cs];
+  switch (kind) {
+    case 'silo': {
+      B.cyl(5.5, 5.5, 14, M.galv, x, y + 7, z, 28);
+      B.add(new THREE.ConeGeometry(5.7, 3.2, 28), M.galv, x, y + 15.6, z);
+      B.box(0.12, 14, 0.5, M.steel, x + 5.6, y + 7, z); // ladder
+      B.collider(x - 5.8, x + 5.8, z - 5.8, z + 5.8, y + 18, 'silo');
+      break;
+    }
+    case 'dryer': {
+      B.box(4, 22, 4, M.galv, x, y + 11, z, 0, 4);
+      B.box(1, 30, 1, M.steel, x + 4, y + 15, z);
+      B.box(3, 2.4, 3, M.steel, x, y + 23.2, z);
+      B.collider(x - 2.5, x + 5, z - 2.5, z + 2.5, y + 30, 'dryer');
+      break;
+    }
+    case 'bigShed': {
+      const w = 40, d = 18, hh = 8;
+      for (let i = 0; i <= 5; i++) for (const dz of [-d / 2, d / 2]) B.box(0.35, hh, 0.35, M.steel, x - w / 2 + (i * w) / 5, y + hh / 2, z + dz);
+      B.box(w, hh, 0.1, M.metalWall, x, y + hh / 2, z - d / 2, 0, 4);
+      gableRoof(B, M.metalRoof, x, y + hh, z, d, w, 2.4, Math.PI / 2, 0.8);
+      B.box(w, 0.2, d, M.concrete, x, y + 0.1, z, 0, 4);
+      harvester(B, M, x + 8, y, z + 1, 0);
+      sprayer(B, M, x - 9, y, z + 1.5, 0);
+      B.collider(x - w / 2 - 1, x + w / 2 + 1, z - d / 2 - 1, z + d / 2 + 1, y + hh + 3, 'shed');
+      break;
+    }
+    case 'house': {
+      // Farmhouse: plastered walls, clay-tile roof, front veranda.
+      B.box(12, 3, 8, M.wall, x, y + 1.5, z, rot, 3);
+      const [fx, fz] = at(0, 1.4), [rx, rz] = at(0, 1.2);
+      B.box(12.4, 0.3, 11, M.concrete, fx, y + 0.1, fz, rot);
+      for (let i = 0; i < 4; i++) { const [px, pz] = at(-5.4 + i * 3.6, 5.6); B.box(0.2, 2.7, 0.2, M.wall, px, y + 1.45, pz, rot); }
+      gableRoof(B, M.roofTile, rx, y + 3, rz, 11, 12.4, 2.2, Math.PI / 2 + rot, 0.7);
+      for (let i = 0; i < 3; i++) { const [px, pz] = at(-4 + i * 4, 4.02); B.box(1.3, 1.1, 0.08, M.blueDark, px, y + 1.7, pz, rot); }
+      const [dx2, dz2] = at(1.8, 4.03);
+      B.box(1.0, 2.1, 0.08, M.woodDark, dx2, y + 1.1, dz2, rot);
+      B.collider(x - 7.5, x + 7.5, z - 7.5, z + 7.5, y + 6, 'house');
+      break;
+    }
+    case 'tower': {
+      // Water tower: four steel legs and a tank.
+      for (const [ox, oz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]]) B.box(0.18, 9, 0.18, M.steel, x + ox, y + 4.5, z + oz);
+      for (const hy of [3, 6]) { B.box(2.8, 0.1, 0.1, M.steel, x, y + hy, z - 1.3); B.box(2.8, 0.1, 0.1, M.steel, x, y + hy, z + 1.3); }
+      B.cyl(1.7, 1.7, 2.6, M.blue, x, y + 10.3, z, 18);
+      B.add(new THREE.ConeGeometry(1.8, 0.7, 18), M.blue, x, y + 11.95, z);
+      B.collider(x - 2, x + 2, z - 2, z + 2, y + 12.4, 'water tower');
+      break;
+    }
+    case 'corral': {
+      for (let i = 0; i <= 10; i++) for (const oz of [-12, 12]) B.box(0.15, 1.6, 0.15, M.wood, x - 15 + i * 3, Hl(x - 15 + i * 3, z + oz) + 0.8, z + oz);
+      for (let i = 0; i <= 8; i++) for (const ox of [-15, 15]) B.box(0.15, 1.6, 0.15, M.wood, x + ox, Hl(x + ox, z - 12 + i * 3) + 0.8, z - 12 + i * 3);
+      for (const oz of [-12, 12]) for (const yy of [0.6, 1.1, 1.5]) B.box(30, 0.12, 0.06, M.wood, x, (Hl(x - 15, z + oz) + Hl(x + 15, z + oz)) / 2 + yy, z + oz, 0);
+      for (const ox of [-15, 15]) for (const yy of [0.6, 1.1, 1.5]) B.box(0.06, 0.12, 24, M.wood, x + ox, (Hl(x + ox, z - 12) + Hl(x + ox, z + 12)) / 2 + yy, z);
+      B.collider(x - 15.5, x + 15.5, z - 12.5, z + 12.5, y + 1.8, 'corral');
+      break;
+    }
+    case 'pier': case 'boat': {
+      // On the nearest açude: a wooden pier from the bank, a small boat.
+      const wx = x + site.dx, wz = z + site.dz;
+      const p = WATER.ponds.reduce((a, b) => (Math.hypot(b.x - wx, b.z - wz) < Math.hypot(a.x - wx, a.z - wz) ? b : a));
+      const wl = p.level - site.y0;
+      if (kind === 'pier') {
+        B.box(2.2, 0.12, 14, M.wood, x, wl + 0.55, z + 4);
+        for (let i = 0; i < 5; i++) for (const ox of [-1, 1]) B.box(0.16, 2.6, 0.16, M.woodDark, x + ox, wl - 0.7, z - 2 + i * 3.2);
+      } else {
+        B.box(1.3, 0.45, 3.8, M.alu, x, wl + 0.12, z, rot);
+        B.box(1.1, 0.06, 0.3, M.wood, x, wl + 0.3, z, rot);
+      }
+      break;
+    }
+    case 'boulder': {
+      const r = rng(Math.round(x * 7 + z * 13));
+      const g2 = new THREE.DodecahedronGeometry(1.6, 0);
+      for (let i = 0; i < 3; i++) {
+        const ox = (r() - 0.5) * 3, oz = (r() - 0.5) * 3, sc = 0.6 + r() * 0.6;
+        B.add(g2, M.concrete, x + ox, Hl(x + ox, z + oz) + 0.5 * sc, z + oz, r() * 6, r(), 0, 1.3 * sc, 0.8 * sc, 1.1 * sc);
+      }
+      B.collider(x - 3, x + 3, z - 3, z + 3, y + 1.8, 'boulder');
+      break;
+    }
+    case 'shack': {
+      // Rustic wooden hut with a lean-to roof.
+      B.box(6, 2.6, 4, M.wood, x, y + 1.3, z, rot, 2);
+      B.box(6.8, 0.1, 5.2, M.metalRoof, x, y + 2.85, z, rot);
+      B.box(0.9, 1.9, 0.06, M.woodDark, x + 1.2, y + 0.95, z + 2.03, rot);
+      B.collider(x - 3.6, x + 3.6, z - 2.8, z + 2.8, y + 3.2, 'shack');
+      break;
+    }
+    case 'drums': {
+      const mats = [M.blue, M.red, M.blue, M.white, M.blue, M.red];
+      mats.forEach((m, i) => B.cyl(0.29, 0.29, 0.88, m, x + (i % 3) * 0.64, y + 0.44, z + Math.floor(i / 3) * 0.64, 12));
+      B.collider(x - 0.4, x + 1.7, z - 0.4, z + 1.1, y + 1, 'drums');
+      break;
+    }
+    case 'mast': {
+      // Lattice radio mast, red and white bands, warning light on top.
+      const H0 = 40;
+      for (let k = 0; k < 10; k++) {
+        const m = k % 2 ? M.white : M.red, y0 = y + k * (H0 / 10), sh = 0.6 - k * 0.03;
+        for (const [ox, oz] of [[-sh, -sh], [sh, -sh], [0, sh]]) B.box(0.09, H0 / 10, 0.09, m, x + ox, y0 + H0 / 20, z + oz);
+        B.box(sh * 2, 0.06, 0.06, m, x, y0 + 0.2, z - sh);
+      }
+      B.add(new THREE.SphereGeometry(0.25, 8, 6), M.red, x, y + H0 + 0.2, z);
+      B.collider(x - 1, x + 1, z - 1, z + 1, y + H0 + 0.5, 'radio mast');
+      break;
+    }
+    case 'turbine': {
+      // Wind turbine: tower, nacelle facing the prevailing east wind,
+      // turning three-blade rotor. Kept in sight from far (group 'far').
+      const T = 62, R = 27;
+      const tg = new THREE.Group();
+      tg.position.set(x, y, z);
+      tg.rotation.y = -Math.PI / 2; // rotor (local -z) towards the east
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.8, T, 16), M.white);
+      tower.position.y = T / 2;
+      const nac = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.8, 8), M.white);
+      nac.position.set(0, T + 1.2, -1.5);
+      const rotor = new THREE.Group();
+      rotor.position.set(0, T + 1.2, -5.8);
+      const hub = new THREE.Mesh(new THREE.SphereGeometry(1.3, 12, 8), M.white);
+      rotor.add(hub);
+      for (let i = 0; i < 3; i++) {
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(1.4, R, 0.3), M.white);
+        blade.geometry.translate(0, R / 2 + 0.8, 0);
+        blade.rotation.z = (i * Math.PI * 2) / 3;
+        rotor.add(blade);
+      }
+      rotor.rotation.z = rot + x * 0.01;
+      for (const m of [tower, nac, hub]) m.castShadow = true;
+      tg.add(tower, nac, rotor);
+      far.add(tg);
+      dyn.turbines.push({ rotor, rpm: 1.6 + (Math.abs(x) % 7) * 0.05, root: null });
+      B.collider(x - 2, x + 2, z - 2, z + 2, y + T + 3, 'wind turbine');
+      B.collider(x + 4, x + 7.5, z - R - 1, z + R + 1, y + T + R + 2, 'turbine rotor', y + T - R - 2);
+      break;
+    }
+    default: break;
+  }
 }
 
 function buildHQ(B, M, group, H) {

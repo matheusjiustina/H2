@@ -25,6 +25,8 @@ const LEAN = {
   dry: { clear: 2, rain: 0.3, overcast: 0.6 },
   humid: { rain: 2.4, overcast: 1.6, clear: 0.7 },
   mist: { mist: 3, overcast: 1.2 },
+  // Exposed plateau: the wind clears the sky and blows the mist away.
+  windy: { clear: 1.6, partly: 1.3, mist: 0.2, rain: 0.6 },
 };
 const MORNING = new Set(['dawn', 'morning']);
 export const TIME_STAGE = 360; // s per time-of-day stage when time passes

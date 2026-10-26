@@ -2,7 +2,10 @@
 // World axes: +X east, -Z north, +Y up. Units: metres. The strip runs 09/27
 // along X with the operations base at its west end.
 
-export const WORLD_HALF = 4000; // detailed terrain extent (8 x 8 km)
+// Detailed terrain extent: 12 x 12 km. The original 8 x 8 km farm country
+// sits in the middle unchanged; the outer ring carries the farms added with
+// the airstrips expansion (FARMS below).
+export const WORLD_HALF = 6000;
 export const FAR_HALF = 24000; // horizon ring
 
 export const RUNWAY = { x0: -400, x1: 400, z: 0, width: 24, shoulder: 10 };
@@ -130,16 +133,50 @@ FIELDS.push(
   field('SA-02B', 'soy', -2000, -1820, 3180, 3300, 0.9, 'x', { contract: 'sa-soy', farm: 'serraazul', level: 3 }),
   field('SA-03', 'pasture', -3380, -3020, 3700, 3940, 1, 'x', { farm: 'serraazul', level: 3 }),
 );
+// --- airstrips expansion: the eight outer farms' talhões ------------------
+FIELDS.push(
+  // Fazenda Horizonte (north, flat cerrado farmland): big blocks beside the strip.
+  field('HZ-01', 'soy', -200, 760, -5150, -4830, 0.9, 'x', { contract: 'hz-soy', farm: 'horizonte', level: 1 }),
+  field('HZ-02', 'corn', 840, 1400, -5140, -4840, 0.95, 'x', { contract: 'hz-corn', farm: 'horizonte', level: 1 }),
+  field('HZ-03', 'soy', 150, 1100, -5760, -5420, 0.7, 'x', { farm: 'horizonte', level: 1 }),
+  field('HZ-04', 'cotton', -900, -200, -5750, -5420, 0.8, 'x', { farm: 'horizonte', level: 1 }),
+  // Fazenda Dois Lagos (north-west, gentle swells, two açudes).
+  field('DL-01', 'soy', -5050, -4500, -4015, -3775, 0.9, 'x', { contract: 'dl-soy', farm: 'doislagos', level: 2 }),
+  field('DL-02', 'corn', -4310, -3900, -4640, -4380, 0.9, 'x', { contract: 'dl-corn', farm: 'doislagos', level: 2 }),
+  field('DL-03', 'soy', -5600, -5150, -4200, -3900, 0.6, 'x', { farm: 'doislagos', level: 2 }),
+  // Fazenda Serra do Cedro (north-east hills): stepped soybean on the slope, corn beyond the east end.
+  field('SC-01A', 'soy', 4300, 4760, -4520, -4300, 0.9, 'x', { contract: 'sc-soy', farm: 'serradocedro', level: 3 }),
+  field('SC-01B', 'soy', 4300, 4560, -4300, -4180, 0.9, 'x', { contract: 'sc-soy', farm: 'serradocedro', level: 3 }),
+  field('SC-02', 'corn', 4980, 5400, -4900, -4640, 0.95, 'x', { contract: 'sc-corn', farm: 'serradocedro', level: 3 }),
+  // Fazenda Mata Alta (far west, clearing in dense forest).
+  field('MA-01', 'soy', -4700, -4380, 780, 1060, 0.9, 'x', { contract: 'ma-soy', farm: 'mataalta', level: 1 }),
+  field('MA-02', 'corn', -5250, -4950, 420, 640, 0.95, 'x', { contract: 'ma-corn', farm: 'mataalta', level: 1 }),
+  // Fazenda Ipê Amarelo (east, small cerrado property).
+  field('IA-01', 'corn', 5130, 5520, -820, -500, 0.95, 'x', { contract: 'ia-corn', farm: 'ipeamarelo', level: 1 }),
+  field('IA-02', 'soy', 4620, 4980, -555, -380, 0.8, 'x', { farm: 'ipeamarelo', level: 1 }),
+  // Fazenda Vale Verde (south-east valley): contour-farmed slopes either side.
+  field('VV-01', 'soy', 4650, 5100, 4800, 5050, 0.9, 'x', { contract: 'vv-soy', farm: 'valeverde', level: 2 }),
+  field('VV-02', 'corn', 4700, 5150, 3970, 4170, 0.95, 'x', { contract: 'vv-corn', farm: 'valeverde', level: 2 }),
+  // Fazenda Terra Vermelha (south, big Mato Grosso farm).
+  field('TV-01', 'cotton', -1000, -260, 5360, 5780, 0.9, 'x', { contract: 'tv-cotton', farm: 'terravermelha', level: 1 }),
+  field('TV-02', 'soy', -90, 760, 4950, 5560, 0.9, 'z', { contract: 'tv-soy', farm: 'terravermelha', level: 1 }),
+  field('TV-03', 'soy', -1700, -940, 4880, 5250, 0.8, 'x', { farm: 'terravermelha', level: 1 }),
+  field('TV-04', 'cotton', -1700, -1080, 5320, 5800, 0.7, 'x', { farm: 'terravermelha', level: 1 }),
+  // Fazenda Chapada dos Ventos (south-west, up on the chapada).
+  field('CV-01', 'soy', -4300, -3850, 5060, 5320, 0.9, 'x', { contract: 'cv-soy', farm: 'chapada', level: 1 }),
+  field('CV-02', 'pasture', -4880, -4420, 5120, 5380, 1, 'x', { farm: 'chapada', level: 1 }),
+);
 for (const f of FIELDS) f.level ??= 1;
 
 export const CONTRACT_FIELDS = FIELDS.filter((f) => f.contract);
 
 // Creek polyline (north -> south), meandering between the cotton fields.
 export const CREEK = {
+  // (It crosses the outer ring to the edge of the map at both ends.)
   points: [
-    [1580, -4200], [1620, -3000], [1700, -2200], [1640, -1500], [1660, -900],
+    [1490, -6100], [1545, -5100], [1580, -4200], [1620, -3000], [1700, -2200], [1640, -1500], [1660, -900],
     [1630, -420], [1665, -120], [1640, 140], [1680, 420], [1620, 900],
-    [1680, 1500], [1600, 2300], [1660, 3200], [1600, 4200],
+    [1680, 1500], [1600, 2300], [1660, 3200], [1600, 4200], [1650, 5100], [1590, 6100],
   ],
   width: 9,
   depth: 2.2,
@@ -157,19 +194,30 @@ export const WATER = {
       name: 'Córrego do Vale', width: 6, depth: 1.6, valley: 70, valleyDepth: 2.6,
       points: [[3990, 2490], [3780, 2460], [3570, 2425], [3420, 2470], [3200, 2505], [2960, 2480], [2720, 2430], [2480, 2350], [2250, 2335], [2000, 2330], [1790, 2310], [1615, 2295]],
     },
+    {
+      // Small creek along the floor of the Vale Verde valley, south of the strip.
+      name: 'Córrego Vale Verde', ring: true, width: 5, depth: 1.3, valley: 55, valleyDepth: 1.8,
+      points: [[5900, 4790], [5700, 4770], [5500, 4730], [5300, 4745], [5100, 4720], [4900, 4740], [4700, 4715], [4500, 4730], [4300, 4760], [4150, 4810]],
+    },
   ],
   ponds: [
     { name: 'Açude Santa Rita', x: -2760, z: -640, r: 60, depth: 2.4, ph: 0.7 },
     { name: 'Lagoa da Serra', x: -3050, z: 2760, r: 95, depth: 3.2, ph: 2.1 },
     { name: 'Açude da sede', x: -800, z: -420, r: 38, depth: 2.0, ph: 4.0 },
     { name: 'Açude do sul', x: 900, z: 1550, r: 50, depth: 2.2, ph: 5.3 },
+    // The two açudes of Fazenda Dois Lagos, beside the strip and off its east end.
+    { name: 'Lago de Cima', ring: true, x: -4760, z: -4078, r: 36, depth: 2.0, ph: 1.4 },
+    { name: 'Lago de Baixo', ring: true, x: -4130, z: -4245, r: 34, depth: 1.8, ph: 3.3 },
+    // Small dam where the Vale Verde creek leaves the valley.
+    { name: 'Represa do Vale Verde', ring: true, x: 4070, z: 4850, r: 62, depth: 2.6, ph: 0.4 },
   ],
 };
 // Radius of a pond's shoreline towards angle a.
 export const pondRadius = (p, a) => p.r * (1 + 0.16 * Math.sin(2 * a + p.ph) + 0.09 * Math.sin(3 * a + p.ph * 1.7));
 
 // Forest blocks (legal reserve) and tree belts. kind: 'mata' (dense native),
-// 'eucalyptus' (planted windbreak), 'riparian' (along the creek).
+// 'eucalyptus' (planted windbreak), 'riparian' (along the creek). ring: a
+// block of the outer ring (airstrips expansion).
 export const FORESTS = [
   { kind: 'mata', x0: -2500, x1: -1600, z0: -1700, z1: 300 },
   { kind: 'mata', x0: -260, x1: 220, z0: 652, z1: 688 }, // tree line along the south edge of the corn
@@ -179,6 +227,30 @@ export const FORESTS = [
   { kind: 'mata', x0: -700, x1: 600, z0: -2400, z1: -1700 },
   { kind: 'mata', x0: 900, x1: 1500, z0: -2600, z1: -1800 },
   { kind: 'mata', x0: -3400, x1: -2700, z0: 700, z1: 2000 },
+  // Fazenda Mata Alta: the strip and its two talhões are clearings in tall
+  // native forest; the blocks' edges are staggered so the clearing reads
+  // irregular. The strip has ~40 m of clear ground each side; each talhão is
+  // walled in along its passes (trees ~15 m off its long sides) and has
+  // 150–230 m of open ground at both ends to drop in and pull up over the trees.
+  { kind: 'mata', ring: true, x0: -5950, x1: -5650, z0: 250, z1: 1650 },
+  { kind: 'mata', ring: true, x0: -5650, x1: -5400, z0: 250, z1: 856 },
+  { kind: 'mata', ring: true, x0: -5650, x1: -5100, z0: 944, z1: 1650 },
+  { kind: 'mata', ring: true, x0: -5268, x1: -4935, z0: 250, z1: 405 },
+  { kind: 'mata', ring: true, x0: -5170, x1: -4935, z0: 655, z1: 861 },
+  { kind: 'mata', ring: true, x0: -4800, x1: -4715, z0: 250, z1: 765 },
+  { kind: 'mata', ring: true, x0: -4715, x1: -4250, z0: 250, z1: 765 },
+  { kind: 'mata', ring: true, x0: -5100, x1: -4935, z0: 938, z1: 1650 },
+  { kind: 'mata', ring: true, x0: -4935, x1: -4715, z0: 1075, z1: 1650 },
+  { kind: 'mata', ring: true, x0: -4715, x1: -4250, z0: 1075, z1: 1650 },
+  { kind: 'mata', ring: true, x0: -4180, x1: -4050, z0: 765, z1: 1075 },
+  { kind: 'mata', ring: true, x0: -4250, x1: -4050, z0: 250, z1: 765 },
+  { kind: 'mata', ring: true, x0: -4250, x1: -4050, z0: 1075, z1: 1650 },
+  // Gallery forest along the Vale Verde creek's lower course and the slopes.
+  { kind: 'mata', ring: true, x0: 5300, x1: 5900, z0: 5080, z1: 5500 },
+  { kind: 'mata', ring: true, x0: 4150, x1: 4520, z0: 3820, z1: 4200 },
+  // Native reserve north-east of Serra do Cedro and east of Ipê Amarelo.
+  { kind: 'mata', ring: true, x0: 5450, x1: 5900, z0: -5300, z1: -4500 },
+  { kind: 'mata', ring: true, x0: 5600, x1: 5900, z0: -1200, z1: 0 },
   // Windbreaks behind the base, out of the extended pass lines of T-07.
   { kind: 'eucalyptus', x0: -540, x1: -500, z0: -130, z1: -75 },
   { kind: 'eucalyptus', x0: -540, x1: -500, z0: -270, z1: -175 },
@@ -231,6 +303,36 @@ ROADS.push(
   { w: 6, mesh: true, pts: [[-450, -2600], [-411, -2600], [-373, -2600], [-339, -2613], [-311, -2637], [-277, -2650], [-239, -2650], [-202, -2650], [-164, -2650], [-127, -2650], [-89, -2650], [-52, -2650], [-14, -2650], [23, -2650], [61, -2650], [98, -2650], [136, -2650], [173, -2650], [211, -2650], [248, -2650], [286, -2650], [323, -2650], [361, -2650], [398, -2650], [436, -2650], [473, -2650], [511, -2650], [548, -2650], [586, -2650], [623, -2650], [661, -2650], [698, -2650], [736, -2651], [770, -2671], [798, -2698], [827, -2727], [850, -2750]] },
 );
 
+// Access roads of the outer-ring farms (airstrips expansion), drawn the same
+// way: from each farm yard out to the farm network or off the map, resampled
+// every ~40 m (the ribbon drapes on the terrain). Mata Alta has none: the
+// clearing is reached by air.
+function track(w, ...way) {
+  const pts = [way[0]];
+  for (let i = 1; i < way.length; i++) {
+    const [ax, az] = way[i - 1], [bx, bz] = way[i];
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / 40));
+    for (let k = 1; k <= n; k++) pts.push([Math.round(ax + ((bx - ax) * k) / n), Math.round(az + ((bz - az) * k) / n)]);
+  }
+  return { w, mesh: true, ring: true, pts };
+}
+ROADS.push(
+  // Horizonte: south to the end of the main farm's north road.
+  track(7, [-80, -5292], [-260, -5210], [-262, -4800], [-400, -4200], [-452, -3400], [-450, -2600]),
+  // Dois Lagos: west, off the map.
+  track(6, [-5050, -4372], [-5140, -4430], [-5520, -4600], [-5980, -4690]),
+  // Serra do Cedro: north over the shoulder of the hill.
+  track(6, [4250, -4675], [4215, -4760], [4150, -5120], [4110, -5980]),
+  // Ipê Amarelo: north past the ipês, then east.
+  track(6, [4552, -672], [4560, -770], [4700, -1000], [5100, -1300], [5980, -1360]),
+  // Vale Verde: west along the valley side, gaining height, then north and east.
+  track(6, [4552, 4428], [4430, 4385], [4200, 4262], [4095, 4150], [4080, 3800], [4100, 3300], [5980, 3250]),
+  // Terra Vermelha: north to the main farm's south road.
+  track(7, [-862, 5182], [-700, 4880], [-300, 4500], [300, 3900], [520, 3300], [560, 3000], [590, 2760], [700, 2700]),
+  // Chapada dos Ventos: down the north escarpment, then west.
+  track(6, [-4962, 4922], [-5200, 4600], [-5520, 4260], [-5980, 4100]),
+);
+
 // Farm headquarters (sede) and grain storage.
 export const HQ = {
   house: { x: -1260, z: -260, rot: 0.0 },
@@ -251,6 +353,7 @@ export const FENCES = [
   // terrain, so the wires follow the swells.
   ...pasture(2780, 3280, -3300, -2900, 's', 0.35), // T-44
   ...pasture(-3400, -2900, -3300, -3000, 'e', 0.6), // T-36
+  ...pasture(-4880, -4420, 5120, 5380, 'w', 0.5), // CV-02 (Chapada dos Ventos)
 ];
 
 // Four fence sides 3 m inside a pasture, with the gate on one side.
@@ -295,6 +398,71 @@ export const FARMS = [
     len: 430, width: 15, surface: 3, grade: 0, difficulty: 3, color: '#9a8cd8',
     crops: ['corn', 'soy'], weather: 'mist',
   },
+  // --- airstrips expansion: eight farms in the outer ring --------------------
+  // Each strip has its own identity (length, width, grade, cross slope,
+  // surface, markers, surroundings); difficulty 1-5 sets the pay.
+  //   bank: cross slope of the strip, rise per metre towards the south, from
+  //     100 m past the threshold on (the service area stays level).
+  //   ring: an outer-ring farm (its platform level is fitted along the grade).
+//   blend: metres over which the strip platform blends into the land.
+  //   clear: half width kept clear of tall trees along the strip (m).
+  //   tight: the talhões are clearings in the forest (no cleared run-in lanes).
+  //   wind: local wind factor { mean, gust } (exposed plateau).
+  //   aircraft: the aircraft cleared for the strip (default: the whole fleet).
+  //   marks: strip markers — tyres, stakes, stones, ends (threshold rows only).
+  //   shed: steel (default), wood (rustic) or big.
+  //   props: farm scenery [kind, x, z, rot] in the base's own frame (the site
+  //     is the base layout moved by dx, dz), clear of the service truck's yard.
+  {
+    id: 'horizonte', name: 'Fazenda Horizonte', short: 'Horizonte', dx: 400, dz: -5200, ring: true,
+    len: 720, width: 24, surface: 1, grade: 0, difficulty: 1, color: '#f0c419',
+    crops: ['soy', 'corn'], weather: 'dry', marks: 'tyres', shed: 'big',
+    props: [['silo', -330, -232], ['silo', -316, -232], ['silo', -302, -232], ['silo', -323, -219], ['dryer', -288, -226],
+      ['bigShed', -240, -184, 0], ['house', -500, -215, 0.1], ['tower', -462, -178]],
+  },
+  {
+    id: 'doislagos', name: 'Fazenda Dois Lagos', short: 'Dois Lagos', dx: -4600, dz: -4300, ring: true,
+    len: 560, width: 16, surface: 1, grade: -0.012, difficulty: 3, color: '#3fa7d6', blend: 190,
+    crops: ['soy', 'corn'], weather: 'humid', marks: 'tyres',
+    props: [['house', -50, 262, Math.PI], ['corral', -205, 250], ['pier', -120, 150, 0], ['boat', -112, 158, 0.4]],
+  },
+  {
+    id: 'serradocedro', name: 'Fazenda Serra do Cedro', short: 'Serra do Cedro', dx: 4700, dz: -4600, ring: true,
+    len: 540, width: 16, surface: 3, grade: 0.036, bank: 0.012, difficulty: 4, color: '#c96f3b',
+    crops: ['soy', 'corn'], weather: 'mist', marks: 'stakes', aircraft: ['ipanema', 'at502', 'r44'],
+    props: [['boulder', -150, 31], ['boulder', -40, -33], ['boulder', 30, 38], ['boulder', 95, -36], ['tower', -470, -150], ['house', -520, -250, 0.2]],
+  },
+  {
+    id: 'mataalta', name: 'Fazenda Mata Alta', short: 'Mata Alta', dx: -4900, dz: 900, ring: true,
+    len: 440, width: 14, surface: 4, grade: -0.01, difficulty: 5, color: '#2e8b57', clear: 34, tight: true,
+    crops: ['soy', 'corn'], weather: 'humid', marks: 'ends', shed: 'wood', aircraft: ['ipanema', 'r44'],
+    props: [['shack', -462, -138, 0.05], ['drums', -298, -122]],
+  },
+  {
+    id: 'ipeamarelo', name: 'Sítio Ipê Amarelo', short: 'Ipê Amarelo', dx: 5000, dz: -600, ring: true,
+    len: 400, width: 13, surface: 1, grade: -0.02, difficulty: 3, color: '#e8b923',
+    crops: ['corn', 'soy'], weather: 'dry', marks: 'stones', shed: 'wood', aircraft: ['ipanema', 'r44'],
+    props: [['house', -478, -158, 0], ['corral', -540, -250]],
+  },
+  {
+    id: 'valeverde', name: 'Fazenda Vale Verde', short: 'Vale Verde', dx: 5000, dz: 4500, ring: true,
+    len: 500, width: 16, surface: 2, grade: 0.01, bank: -0.02, difficulty: 4, color: '#6cc04a',
+    crops: ['soy', 'corn'], weather: 'humid', marks: 'tyres', aircraft: ['ipanema', 'at502', 'r44'],
+    props: [['house', -480, -200, 0], ['tower', -440, -172], ['corral', -250, 95]],
+  },
+  {
+    id: 'terravermelha', name: 'Fazenda Terra Vermelha', short: 'Terra Vermelha', dx: -400, dz: 5300, ring: true,
+    len: 580, width: 20, surface: 1, grade: 0, bank: 0.004, difficulty: 3, color: '#d1495b', shed: 'big',
+    crops: ['cotton', 'soy'], weather: 'dry', marks: 'tyres',
+    props: [['silo', -250, -250], ['silo', -236, -250], ['silo', -222, -250], ['silo', -208, -250], ['silo', -243, -237], ['silo', -229, -237],
+      ['dryer', -190, -244], ['bigShed', -300, -212, 0], ['bigShed', -140, -212, 0], ['house', -520, -230, 0]],
+  },
+  {
+    id: 'chapada', name: 'Fazenda Chapada dos Ventos', short: 'Chapada', dx: -4500, dz: 5000, ring: true,
+    len: 520, width: 18, surface: 5, grade: 0, bank: 0.006, difficulty: 5, color: '#9b72cf',
+    crops: ['soy'], weather: 'windy', marks: 'stones', wind: { mean: 1.45, gust: 2.2 }, aircraft: ['ipanema', 'at502', 'r44'],
+    props: [['house', -490, -210, 0], ['mast', 300, -480], ['turbine', -800, 560], ['turbine', -560, 660], ['turbine', -320, 730]],
+  },
 ];
 
 const mv = (p, dx, dz) => ({ ...p, x: p.x + dx, z: p.z + dz });
@@ -305,7 +473,7 @@ function makeSite(f) {
   const x0 = RUNWAY.x0 + dx;
   return {
     id: f.id, farm: f, main: false, dx, dz, y0: 0,
-    runway: { x0, x1: x0 + f.len, z: dz, width: f.width, shoulder: 6, surface: f.surface, grade: f.grade },
+    runway: { x0, x1: x0 + f.len, z: dz, width: f.width, shoulder: 6, surface: f.surface, grade: f.grade, bank: f.bank ?? 0 },
     apron: mvr(BASE.apron, dx, dz),
     taxiway: { ...mvr(BASE.taxiway, dx, dz), z1: dz - f.width / 2 },
     hangar: mv(BASE.hangar, dx, dz),
@@ -314,7 +482,8 @@ function makeSite(f) {
     fuelTank: mv(BASE.fuelTank, dx, dz), mixTank: mv(BASE.mixTank, dx, dz),
     reservoirs: BASE.reservoirs.map((r) => mv(r, dx, dz)),
     crewPost: mv(BASE.crewPost, dx, dz), pickup: mv(BASE.pickup, dx, dz), truck: mv(BASE.truck, dx, dz),
-    windsocks: [{ x: x0 + 70, z: dz + f.width / 2 + 14 }, { x: x0 + f.len - 40, z: dz - f.width / 2 - 14 }],
+    windsocks: [{ x: x0 + 70, z: dz + f.width / 2 + 14 }, { x: x0 + f.len - 40, z: dz - f.width / 2 - 14 },
+      ...(f.wind ? [{ x: x0 + f.len / 2, z: dz + f.width / 2 + 16 }] : [])],
   };
 }
 
@@ -336,11 +505,38 @@ export function nearestSite(x, z) {
   return { site: best, dist: bd };
 }
 
-// Strip level at x: flat at y0 past the apron (first 100 m), then rising
-// east by the grade.
-export function stripLevel(site, x) {
+// Strip level at (x, z): flat at y0 past the apron (first 100 m), then rising
+// east by the grade and tilted across by the bank (the bank eases in over
+// the 80 m after the level stretch).
+export function stripLevel(site, x, z = site.runway?.z ?? 0) {
   const r = site.runway;
-  return site.y0 + (r.grade || 0) * Math.max(0, Math.min(x, r.x1) - r.x0 - 100);
+  const along = Math.max(0, Math.min(x, r.x1) - r.x0 - 100);
+  let y = site.y0 + (r.grade || 0) * along;
+  if (r.bank) {
+    const k = Math.min(1, along / 80);
+    y += r.bank * (z - r.z) * k * k * (3 - 2 * k);
+  }
+  return y;
+}
+
+// Aircraft cleared for a farm's strip (the main base takes the whole fleet).
+export const stripAllows = (farm, aircraftId) => !farm?.aircraft || farm.aircraft.includes(aircraftId);
+
+// Local wind factors at a point: { mean, gust } (exposed farms, 1 elsewhere).
+// (Returns a shared object: read it before the next call.)
+const WINDY = FARMS.filter((f) => f.wind);
+const _wf = { mean: 1, gust: 1 };
+export function windFactorAt(x, z) {
+  let mean = 1, gust = 1;
+  for (const f of WINDY) {
+    const cx = RUNWAY.x0 + f.dx + f.len / 2, cz = f.dz;
+    const d = Math.hypot(x - cx, z - cz);
+    if (d > 2200) continue;
+    const k = d < 1200 ? 1 : 1 - (d - 1200) / 1000;
+    mean += (f.wind.mean - 1) * k; gust += (f.wind.gust - 1) * k;
+  }
+  _wf.mean = mean; _wf.gust = gust;
+  return _wf;
 }
 
 // Service pad of a site for an aircraft kind (helipad for the helicopter).

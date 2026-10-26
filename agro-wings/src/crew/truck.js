@@ -490,22 +490,35 @@ function splitLegs(path) {
 }
 
 // The local service truck of a farm whose service area the crew is not
-// working right now: the same tanker, parked in its bay (engine off).
+// working right now: the same tanker, parked in its bay (engine off). Its
+// model is built the first time the camera comes within 2.5 km (eleven
+// farms: most are never seen in a session).
 export class ParkedTruck {
   constructor(game, site) {
     this.site = site;
-    this.model = buildTruckModel(game.world.structures.M);
-    game.scene.add(this.model.root);
+    this.game = game;
+    this.model = null;
+    this.shown = true;
     const yaw = TRUCK.home.yaw, fx = Math.sin(yaw), fz = Math.cos(yaw);
-    const x = TRUCK.home.x + site.dx - fx * TRUCK.axleZ, z = TRUCK.home.z + site.dz - fz * TRUCK.axleZ;
-    this.model.root.position.set(x, game.world.terrain.heightAt(x, z), z);
-    this.model.root.rotation.y = yaw;
+    this.x = TRUCK.home.x + site.dx - fx * TRUCK.axleZ; this.z = TRUCK.home.z + site.dz - fz * TRUCK.axleZ;
+  }
+  _build() {
+    const g = this.game;
+    this.model = buildTruckModel(g.world.structures.M);
+    g.scene.add(this.model.root);
+    this.model.root.position.set(this.x, g.world.terrain.heightAt(this.x, this.z), this.z);
+    this.model.root.rotation.y = TRUCK.home.yaw;
     this.model.root.updateMatrixWorld(true);
     this.model.root.matrixAutoUpdate = false;
+    this.model.root.visible = this.shown;
   }
-  set visible(v) { this.model.root.visible = v; this.shown = v; }
+  set visible(v) { this.shown = v; if (this.model) this.model.root.visible = v; }
   cull(cam) {
     if (!this.shown) return;
+    if (!this.model) {
+      if (Math.hypot(cam.x - this.x, cam.z - this.z) > 2500) return;
+      this._build();
+    }
     vehicleLod(this.model.root, this.model.detail, cam, 220, 900, this.model.setWheels.meshes);
   }
 }

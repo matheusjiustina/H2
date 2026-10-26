@@ -123,7 +123,7 @@ export function buildBaseMap(size = 1024) {
   // Secondary farms: strip, apron, shed.
   for (const st of FARM_SITES) {
     const r = st.runway;
-    g.fillStyle = r.surface === 2 ? '#8fb46a' : r.surface === 3 ? '#b8b0a2' : '#c98a5c';
+    g.fillStyle = r.surface === 2 ? '#8fb46a' : r.surface === 3 ? '#b8b0a2' : r.surface === 4 ? '#a8603a' : r.surface === 5 ? '#d8c08e' : '#c98a5c';
     g.fillRect(r.x0, r.z - r.width, r.x1 - r.x0, r.width * 2);
     g.fillStyle = '#b06a44';
     g.fillRect(st.apron.x0, st.apron.z0, st.apron.x1 - st.apron.x0, st.apron.z1 - st.apron.z0);
@@ -140,7 +140,7 @@ export function buildBaseMap(size = 1024) {
   g.setLineDash([]);
   // Relief shading over everything but the labels (flat land is unchanged).
   g.imageSmoothingEnabled = true;
-  g.drawImage(reliefOverlay(size), -EXT, -EXT, EXT * 2, EXT * 2);
+  g.drawImage(reliefOverlay(size, 320), -EXT, -EXT, EXT * 2, EXT * 2);
   return { canvas: c, ext: EXT };
 }
 
@@ -190,20 +190,32 @@ export function drawMap(g, w, h, base, game, view) {
   g.beginPath();
   g.arc(pad.x, pad.z, BASE.pad.radius, 0, Math.PI * 2);
   g.stroke();
-  // Farm names (kept upright on a track-up map).
+  // Farm markers (strip pin in the farm's colour, a ring round the farm of
+  // the accepted request) and names, kept upright on a track-up map.
   if (view.labels !== false) {
+    const lp = view.labelPx ?? 13;
     for (const st of SITES) {
       const r = st.runway;
-      const lx = (r.x0 + r.x1) / 2, lz = r.z - 60;
+      const mx = (r.x0 + r.x1) / 2;
       g.save();
-      g.translate(lx, lz);
+      g.translate(mx, r.z);
       g.rotate(-rot);
       g.scale(1 / scale, 1 / scale);
-      g.font = `bold ${view.labelPx ?? 13}px Arial`;
+      const col = st.main ? '#ffffff' : st.farm.color;
+      const pin = Math.max(4, lp * 0.42);
+      if (game.job?.c.farm === st.id) {
+        g.strokeStyle = '#ffe14a'; g.lineWidth = 2.5;
+        g.beginPath(); g.arc(0, 0, pin * 2.1, 0, Math.PI * 2); g.stroke();
+      }
+      g.fillStyle = col; g.strokeStyle = 'rgba(0,0,0,0.75)'; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(0, 0, pin, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = 'rgba(0,0,0,0.75)';
+      g.fillRect(-pin * 0.62, -pin * 0.16, pin * 1.24, pin * 0.32); // the strip
+      g.font = `bold ${lp}px Arial`;
       g.textAlign = 'center';
-      g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.fillStyle = st.main ? '#ffffff' : (st.farm.color);
+      g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.fillStyle = col;
       const txt = st.main ? 'Boa Esperança' : st.farm.short;
-      g.strokeText(txt, 0, 0); g.fillText(txt, 0, 0);
+      g.strokeText(txt, 0, -pin - 5); g.fillText(txt, 0, -pin - 5);
       g.restore();
     }
   }

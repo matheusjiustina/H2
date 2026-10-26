@@ -53,7 +53,7 @@ export class HUD {
     // Click the minimap to switch it between the farm map and the GPS page.
     this.$.mini.parentElement.classList.add('interactive');
     this.$.mini.addEventListener('click', () => this.toggleGps());
-    this.base = buildBaseMap(1024);
+    this.base = buildBaseMap(1536); // 12 x 12 km at ~7.7 m per pixel
     this.miniT = 0;
     this.warnState = '';
     this.fpsAcc = { t: 0, n: 0, v: 0 };

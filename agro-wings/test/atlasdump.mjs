@@ -12,7 +12,7 @@ await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null
 const imgs = await page.evaluate(() => {
   const v = window.__agro.world.vegetation;
   const out = { atlas: v.atlas.image.toDataURL('image/png') };
-  const cm = v.group.getObjectByName('forestCanopy');
+  const cm = v.group.children.find((o) => o.name.startsWith('forestCanopy'));
   if (cm) out.canopy = cm.material.map.image.toDataURL('image/png');
   return out;
 });

@@ -6,8 +6,8 @@
 // obstacles cheap and independent from what is drawn.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { FORESTS, CREEK, FIELDS, HQ, BASE, ROADS, RUNWAY, FARM_SITES, WATER, pondRadius } from './layout.js';
-import { reliefWeights } from './relief.js';
+import { FORESTS, CREEK, FIELDS, HQ, BASE, ROADS, RUNWAY, FARM_SITES, WATER, pondRadius, siteById } from './layout.js';
+import { reliefWeights, RING } from './relief.js';
 import { rng, fbm, segDist } from '../core/math.js';
 import {
   makeFoliageAtlas, makeCanopyTexture, foliageMaterial, tileRect, TILES,
@@ -100,25 +100,46 @@ export function createVegetation(terrain, quality) {
   // and the outer access roads: kept clear of trees (low scrub may stay
   // outside the fields themselves).
   const FIELDS2 = FIELDS.filter((f) => f.level > 1 || f.farm), ROADS2 = ROADS.filter((rd) => rd.mesh);
+  // The outer roads' segments in a 200 m grid (each in every cell its
+  // corridor touches), so a point only checks the segments near it.
+  const RG = 200, roadGrid = new Map();
+  for (const rd of ROADS2) for (let i = 0; i < rd.pts.length - 1; i++) {
+    const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1], m = rd.w / 2 + 3;
+    const seg = [ax, az, bx, bz, m];
+    for (let cx = Math.floor((Math.min(ax, bx) - m) / RG); cx <= Math.floor((Math.max(ax, bx) + m) / RG); cx++) {
+      for (let cz = Math.floor((Math.min(az, bz) - m) / RG); cz <= Math.floor((Math.max(az, bz) + m) / RG); cz++) {
+        const k = cx * 4096 + cz;
+        if (!roadGrid.has(k)) roadGrid.set(k, []);
+        roadGrid.get(k).push(seg);
+      }
+    }
+  }
+  const nearOuterRoad = (x, z) => {
+    const list = roadGrid.get(Math.floor(x / RG) * 4096 + Math.floor(z / RG));
+    if (list) for (const [ax, az, bx, bz, m] of list) if (segDist(x, z, ax, az, bx, bz) < m) return true;
+    return false;
+  };
+  // Farm buildings and props of the outer-ring farms (world positions).
+  const PROPS = FARM_SITES.flatMap((s) => (s.farm.props ?? []).map(([kind, px, pz]) => ({ x: px + s.dx, z: pz + s.dz, r: kind === 'turbine' || kind === 'mast' ? 30 : 26 })));
   const cleared = (x, z, tall = true, m = 6) => {
-    // Secondary farm strips: service area, strip and its approaches.
+    // Secondary farm strips: service area, strip and its approaches (a
+    // forest strip keeps its trees close: farm.clear).
     for (const s of FARM_SITES) {
       const r = s.runway;
       if (x > s.apron.x0 - 40 && x < s.apron.x1 + 30 && z > s.apron.z0 - 40 && z < r.z + 30) return true;
-      if (Math.abs(z - r.z) < (tall ? 60 : r.width / 2 + 8) && x > r.x0 - (tall ? 300 : 20) && x < r.x1 + (tall ? 300 : 20)) return true;
+      if (Math.abs(z - r.z) < (tall ? s.farm.clear ?? 60 : r.width / 2 + 8) && x > r.x0 - (tall ? 300 : 20) && x < r.x1 + (tall ? 300 : 20)) return true;
     }
+    for (const p of PROPS) if (Math.abs(x - p.x) < p.r && Math.abs(z - p.z) < p.r) return true;
     for (const f of FIELDS2) {
       if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
-      if (!tall || !f.contract) continue;
+      // Talhões cut out of the forest keep the forest up to their edges.
+      if (!tall || !f.contract || siteById(f.farm).farm?.tight) continue;
       const along = f.rowAxis === 'x';
       const a = along ? x : z, c = along ? z : x;
       const a0 = along ? f.x0 : f.z0, a1 = along ? f.x1 : f.z1, c0 = along ? f.z0 : f.x0, c1 = along ? f.z1 : f.x1;
       if (c > c0 - 35 && c < c1 + 35 && a > a0 - 600 && a < a1 + 600) return true;
     }
-    for (const rd of ROADS2) for (let i = 0; i < rd.pts.length - 1; i++) {
-      if (segDist(x, z, rd.pts[i][0], rd.pts[i][1], rd.pts[i + 1][0], rd.pts[i + 1][1]) < rd.w / 2 + 3) return true;
-    }
-    return false;
+    return nearOuterRoad(x, z);
   };
   const isTall = (kind) => kind !== 'bush' && kind !== 'mound';
   const add = (kind, x, z, s = 1) => {
@@ -127,8 +148,13 @@ export function createVegetation(terrain, quality) {
   };
 
   // --- forest blocks -------------------------------------------------------
+  // The original map's blocks draw from `r` in their old order (every tree
+  // stays where it was); the outer ring's blocks are built further down from
+  // their own random stream. keep(x, z): drop trees buried in a neighbouring
+  // block (ring blocks overlap so their roofs close without a seam).
   const canopyParts = [];
-  for (const fb of FORESTS) {
+  const FOR0 = FORESTS.filter((f) => !f.ring), FOR_RING = FORESTS.filter((f) => f.ring);
+  const forestBlock = (fb, r, add, keep = () => true) => {
     if (fb.kind === 'eucalyptus') {
       for (let x = fb.x0 + 2; x < fb.x1; x += 4.2) for (let z = fb.z0 + 2; z < fb.z1; z += 4.2) {
         const jx = x + (r() - 0.5) * 1.2, jz = z + (r() - 0.5) * 1.2;
@@ -136,11 +162,11 @@ export function createVegetation(terrain, quality) {
         add('euca', jx, jz, 0.9 + r() * 0.25);
         colliders.push({ x: jx, z: jz, r: 2.6, top: terrain.heightAt(jx, jz) + 27 });
       }
-      continue;
+      return;
     }
     const w = fb.x1 - fb.x0, d = fb.z1 - fb.z0;
     const narrow = Math.min(w, d) < 120;
-    if (!narrow) canopyParts.push(forestCanopy(fb, terrain));
+    if (!narrow) canopyParts.push({ g: forestCanopy(fb, terrain, fb.ring ? FOR_RING.filter((o) => o !== fb && o.kind === 'mata') : []), key: Math.floor((fb.x0 + fb.x1) / 6000) + ',' + Math.floor((fb.z0 + fb.z1) / 6000) });
     // Edge trees, two staggered rows facing inward; emergents inside.
     const spacing = 7.5;
     const sides = [
@@ -154,7 +180,7 @@ export function createVegetation(terrain, quality) {
         for (let row = 0; row < 2; row++) {
           const off = 2 + row * 6 + r() * 2;
           const px = x + ix * off + (r() - 0.5) * 3, pz = z + iz * off + (r() - 0.5) * 3;
-          if (!avoid(px, pz, 3)) add('mata', px, pz, 0.85 + r() * 0.45);
+          if (!avoid(px, pz, 3) && keep(px, pz)) add('mata', px, pz, 0.85 + r() * 0.45);
         }
       }
     }
@@ -168,10 +194,13 @@ export function createVegetation(terrain, quality) {
       for (let i = 0; i < n; i++) add('mata', fb.x0 + 20 + r() * (w - 40), fb.z0 + 20 + r() * (d - 40), 1.25 + r() * 0.4);
     }
     colliders.push({ box: fb, top: narrow ? 21 : 24 });
-  }
+  };
+  for (const fb of FOR0) forestBlock(fb, r, add);
 
   // --- riparian strip along the creek: buritis + mixed trees ---------------
-  const cp = CREEK.points;
+  // (The original course from `r`; the stretches added across the outer ring
+  // further down, from the ring's stream.)
+  const riparian = (cp, r, add) => {
   for (let i = 0; i < cp.length - 1; i++) {
     const [ax, az] = cp[i], [bx, bz] = cp[i + 1];
     const len = Math.hypot(bx - ax, bz - az);
@@ -193,6 +222,9 @@ export function createVegetation(terrain, quality) {
       }
     }
   }
+  };
+  const CREEK0 = CREEK.points.filter((q) => Math.abs(q[1]) <= 4200);
+  riparian(CREEK0, r, add);
 
   // --- isolated trees, ipês, bushes ---------------------------------------
   const hx = HQ.house.x, hz = HQ.house.z;
@@ -222,8 +254,7 @@ export function createVegetation(terrain, quality) {
   const add2 = (kind, x, z, s = 1) => {
     trees.push({ kind, v: Math.floor(r2() * variants[kind].length), x, z, s, rot: r2() * Math.PI * 2 });
   };
-  for (const fb of FORESTS) {
-    if (fb.kind !== 'mata') continue;
+  const capoeira = (fb, r2, add2, keep = () => true) => {
     const sides = [
       [fb.x0, fb.z0, fb.x1, fb.z0, 0, 1], [fb.x1, fb.z0, fb.x1, fb.z1, -1, 0],
       [fb.x1, fb.z1, fb.x0, fb.z1, 0, -1], [fb.x0, fb.z1, fb.x0, fb.z0, 1, 0],
@@ -235,16 +266,17 @@ export function createVegetation(terrain, quality) {
         // Shrubby forest border (capoeira) just outside and inside the edge.
         const off = -1.5 + r2() * 4;
         const px = x + ix * off + (r2() - 0.5) * 2, pz = z + iz * off + (r2() - 0.5) * 2;
-        if (!avoid(px, pz, 1)) add2('bush', px, pz, 0.7 + r2() * 0.9);
+        if (!avoid(px, pz, 1) && keep(px, pz)) add2('bush', px, pz, 0.7 + r2() * 0.9);
         // Irregular extra trees break the planted look of the two edge rows.
         if (r2() < 0.28) {
           const o2 = 3 + r2() * 12;
           const qx = x + ix * o2 + (r2() - 0.5) * 4, qz = z + iz * o2 + (r2() - 0.5) * 4;
-          if (!avoid(qx, qz, 3)) add2('mata', qx, qz, 0.65 + r2() * 0.85);
+          if (!avoid(qx, qz, 3) && keep(qx, qz)) add2('mata', qx, qz, 0.65 + r2() * 0.85);
         }
       }
     }
-  }
+  };
+  for (const fb of FOR0) if (fb.kind === 'mata') capoeira(fb, r2, add2);
   // Cupinzeiros in the pasture and scattered over the grassland.
   const past = FIELDS.find((f) => f.crop === 'pasture');
   if (past) {
@@ -317,7 +349,9 @@ export function createVegetation(terrain, quality) {
   // the Vale do Rio stream, clumps of trees and scrub around the açudes with
   // open gaps where the cattle and the roads come down to the water.
   const rw = rng(4242);
-  for (const st of WATER.streams) {
+  // (The original map's water first, from rw; the outer ring's stream and
+  // açudes further down, from the ring's stream.)
+  const streamMargin = (st, rw, add) => {
     const sp = st.points;
     for (let i = 0; i < sp.length - 1; i++) {
       const [ax, az] = sp[i], [bx, bz] = sp[i + 1];
@@ -336,8 +370,8 @@ export function createVegetation(terrain, quality) {
         }
       }
     }
-  }
-  for (const p of WATER.ponds) {
+  };
+  const pondMargin = (p, rw, add) => {
     const n = Math.round(p.r * 0.7);
     for (let i = 0; i < n; i++) {
       const a = rw() * Math.PI * 2;
@@ -351,7 +385,9 @@ export function createVegetation(terrain, quality) {
       else if (k < 0.55) add('buriti', x, z, 0.8 + rw() * 0.3);
       else { add('mata', x, z, 0.75 + rw() * 0.45); colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + 18 }); }
     }
-  }
+  };
+  for (const st of WATER.streams) if (!st.ring) streamMargin(st, rw, add);
+  for (const p of WATER.ponds) if (!p.ring) pondMargin(p, rw, add);
 
   // Cerrado vegetation (own random stream): clumps of crooked cerrado trees,
   // macaúba palms, a pink ipê here and there and dead snags in the open
@@ -378,8 +414,8 @@ export function createVegetation(terrain, quality) {
       else add6('bush', x, z, 0.6 + r6() * 0.6);
     }
   }
-  for (const fb of FORESTS) {
-    if (fb.kind !== 'mata' || Math.min(fb.x1 - fb.x0, fb.z1 - fb.z0) < 100) continue;
+  const orla = (fb, r6, add6, keep = () => true) => {
+    if (fb.kind !== 'mata' || Math.min(fb.x1 - fb.x0, fb.z1 - fb.z0) < 100) return;
     const per = [[fb.x0, fb.z0, fb.x1, fb.z0, 0, -1], [fb.x1, fb.z0, fb.x1, fb.z1, 1, 0], [fb.x1, fb.z1, fb.x0, fb.z1, 0, 1], [fb.x0, fb.z1, fb.x0, fb.z0, -1, 0]];
     for (const [ax, az, bx, bz, nx, nz] of per) {
       const len = Math.hypot(bx - ax, bz - az);
@@ -387,12 +423,114 @@ export function createVegetation(terrain, quality) {
         if (r6() < 0.3) continue;
         const t = sd / len, off = 2 + r6() * r6() * 14;
         const x = ax + (bx - ax) * t + nx * off, z = az + (bz - az) * t + nz * off;
-        if (avoid(x, z, 4)) continue;
+        if (avoid(x, z, 4) || !keep(x, z)) continue;
         const q = r6();
         if (q < 0.62) add6('bush', x, z, 0.7 + r6() * 0.8);
         else if (q < 0.86) add6('cerrado', x, z, 0.8 + r6() * 0.4);
         else add6('macauba', x, z, 0.8 + r6() * 0.3);
       }
+    }
+  };
+  for (const fb of FOR0) orla(fb, r6, add6);
+
+  // Outer ring (airstrips expansion; own random stream, nothing above
+  // moves): isolated shade trees and ipês, cerrado clumps, scrub and
+  // termite mounds over the open country between the eight farms, gallery
+  // woods in the valley floors, and the yellow ipês that name the Ipê
+  // Amarelo farm along its yard and road.
+  const r7 = rng(9191);
+  const add7 = (kind, x, z, s = 1) => {
+    trees.push({ kind, v: Math.floor(r7() * variants[kind].length), x, z, s, rot: r7() * Math.PI * 2 });
+    if (kind === 'mata' || kind === 'buriti') colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + 20 });
+    else if (kind === 'shade' || kind === 'ipe') colliders.push({ x, z, r: 4.5 * s, top: terrain.heightAt(x, z) + 11 * s });
+    else if (kind === 'cerrado' || kind === 'macauba' || kind === 'ipeRoxo' || kind === 'snag') colliders.push({ x, z, r: kind === 'macauba' ? 2 : 3, top: terrain.heightAt(x, z) + (kind === 'macauba' ? 14 : 10) * s });
+  };
+  // The outer ring's forest blocks, the creek's new stretches, and their
+  // borders (capoeira, orla), as for the original ones.
+  const addR = (kind, x, z, s = 1) => {
+    trees.push({ kind, v: Math.floor(r7() * variants[kind].length), x, z, s, rot: r7() * Math.PI * 2 });
+  };
+  for (const fb of FOR_RING) {
+    const buried = (x, z) => FOR_RING.some((o) => o !== fb && x > o.x0 + 1 && x < o.x1 - 1 && z > o.z0 + 1 && z < o.z1 - 1);
+    const keep = (x, z) => !buried(x, z);
+    forestBlock(fb, r7, addR, keep);
+    if (fb.kind === 'mata') { capoeira(fb, r7, addR, keep); orla(fb, r7, add7, keep); }
+  }
+  const CREEK_N = CREEK.points.filter((q) => q[1] <= -4200), CREEK_S = CREEK.points.filter((q) => q[1] >= 4200);
+  riparian(CREEK_N, r7, addR);
+  riparian(CREEK_S, r7, addR);
+  for (const st of WATER.streams) if (st.ring) streamMargin(st, r7, addR);
+  for (const p of WATER.ponds) if (p.ring) pondMargin(p, r7, addR);
+  const EDGE = 5900;
+  const inRing = (x, z) => { const m = Math.max(Math.abs(x), Math.abs(z)); return m > RING.inner + 20 && m < EDGE; };
+  const ringPt = () => {
+    for (;;) {
+      const x = -EDGE + r7() * EDGE * 2, z = -EDGE + r7() * EDGE * 2;
+      if (inRing(x, z)) return [x, z];
+    }
+  };
+  const openGround = (x, z, m) => inRing(x, z) && !inForest(x, z, m) && !cleared(x, z, true, m) && !fieldNear(x, z, m);
+  const fieldNear = (x, z, m) => FIELDS.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
+  for (let i = 0; i < 230; i++) {
+    const [x, z] = ringPt();
+    if (!openGround(x, z, 25)) continue;
+    add7(r7() < 0.14 ? 'ipe' : 'shade', x, z, 0.9 + r7() * 0.5);
+  }
+  for (let i = 0; i < 520; i++) {
+    const [cx, cz] = ringPt();
+    if (!openGround(cx, cz, 30)) continue;
+    const n = 2 + Math.floor(r7() * 6);
+    for (let k = 0; k < n; k++) {
+      const x = cx + (r7() - 0.5) * 50, z = cz + (r7() - 0.5) * 50;
+      if (!openGround(x, z, 8)) continue;
+      const q = r7();
+      if (q < 0.5) add7('cerrado', x, z, 0.8 + r7() * 0.5);
+      else if (q < 0.64) add7('macauba', x, z, 0.85 + r7() * 0.3);
+      else if (q < 0.68) add7('ipeRoxo', x, z, 0.85 + r7() * 0.3);
+      else if (q < 0.72) add7('snag', x, z, 0.8 + r7() * 0.4);
+      else add7('bush', x, z, 0.6 + r7() * 0.6);
+    }
+  }
+  for (let i = 0; i < 1100; i++) {
+    const [x, z] = ringPt();
+    if (openGround(x, z, 6)) add7('bush', x, z, 0.45 + r7() * 0.6);
+  }
+  for (let i = 0; i < 320; i++) {
+    const [x, z] = ringPt();
+    if (openGround(x, z, 8)) add7('mound', x, z, 0.5 + r7() * 0.8);
+  }
+  // Valley floors and flanks of the ring's relief (as in the zones above).
+  for (let z = -EDGE; z <= EDGE; z += 60) {
+    for (let x = -EDGE; x <= EDGE; x += 60) {
+      if (!inRing(x + 30, z + 30)) continue;
+      const px = x + r7() * 60, pz = z + r7() * 60;
+      if (!openGround(px, pz, 12)) continue;
+      const h = terrain.heightAt(px, pz);
+      const around = (terrain.heightAt(px + 200, pz) + terrain.heightAt(px - 200, pz) + terrain.heightAt(px, pz + 200) + terrain.heightAt(px, pz - 200)) / 4;
+      const rel = h - around;
+      const gx = terrain.heightAt(px + 10, pz) - terrain.heightAt(px - 10, pz), gz = terrain.heightAt(px, pz + 10) - terrain.heightAt(px, pz - 10);
+      const slope = Math.hypot(gx, gz) / 20;
+      const k = r7();
+      if (rel < -3.5 && slope < 0.08 && k < 0.5) {
+        const n = 2 + Math.floor(r7() * 3);
+        for (let i = 0; i < n; i++) {
+          const qx = px + (r7() - 0.5) * 26, qz = pz + (r7() - 0.5) * 26;
+          if (!openGround(qx, qz, 8)) continue;
+          if (r7() < 0.22) add7('buriti', qx, qz, 0.9 + r7() * 0.3); else add7('mata', qx, qz, 0.9 + r7() * 0.5);
+        }
+      } else if (slope > 0.06 && k < 0.32) {
+        add7('bush', px, pz, 0.5 + r7() * 0.7);
+      } else if (rel > 4 && k < 0.1) {
+        add7(r7() < 0.2 ? 'ipe' : 'shade', px, pz, 0.9 + r7() * 0.4);
+      }
+    }
+  }
+  // Ipê Amarelo: yellow ipês around the yard and down the access road.
+  const ia = siteById('ipeamarelo');
+  if (ia.farm) {
+    for (let i = 0; i < 44; i++) {
+      const x = ia.dx - 580 + r7() * 300, z = ia.dz - 320 + r7() * 220;
+      if (!cleared(x, z, true, 4) && !fieldNear(x, z, 6)) add7('ipe', x, z, 1.0 + r7() * 0.4);
     }
   }
 
@@ -454,12 +592,17 @@ export function createVegetation(terrain, quality) {
     group.add(hi); group.add(lo);
     cellObjs.push({ center, hi, lo });
   }
+  // Forest roofs merged per 3 km region (frustum culling per region).
   if (canopyParts.length) {
-    const cg = mergeGeometries(canopyParts);
-    const cm = new THREE.Mesh(cg, canopyMaterial(makeCanopyTexture()));
-    cm.receiveShadow = true;
-    cm.name = 'forestCanopy';
-    group.add(cm);
+    const cmat = canopyMaterial(makeCanopyTexture());
+    const regions = new Map();
+    for (const c of canopyParts) { if (!regions.has(c.key)) regions.set(c.key, []); regions.get(c.key).push(c.g); }
+    for (const [key, parts] of regions) {
+      const cm = new THREE.Mesh(mergeGeometries(parts), cmat);
+      cm.receiveShadow = true;
+      cm.name = 'forestCanopy ' + key;
+      group.add(cm);
+    }
   }
 
   let near = quality.treeNear;
@@ -503,18 +646,26 @@ function canopyMaterial(tex) {
   return m;
 }
 
-function forestCanopy(fb, terrain) {
+// nb: neighbouring blocks. A side lying against one (the outer ring's
+// clearings are cut from several blocks) is not an edge: the roof runs on
+// to the boundary at full height there, so adjoining roofs close without a
+// seam; only the exposed edges come down to the edge trees.
+function forestCanopy(fb, terrain, nb = []) {
   const step = 10;
   const inset = 9;
-  const x0 = fb.x0 + inset, x1 = fb.x1 - inset, z0 = fb.z0 + inset, z1 = fb.z1 - inset;
+  const inNb = (x, z) => nb.some((o) => x > o.x0 && x < o.x1 && z > o.z0 && z < o.z1);
+  const covered = (side, x, z) => nb.length > 0 && inNb(side === 0 ? fb.x0 - 3 : side === 1 ? fb.x1 + 3 : x, side === 2 ? fb.z0 - 3 : side === 3 ? fb.z1 + 3 : z);
+  const sideCov = (side) => nb.length > 0 && [0.1, 0.3, 0.5, 0.7, 0.9].every((t) => covered(side, fb.x0 + (fb.x1 - fb.x0) * t, fb.z0 + (fb.z1 - fb.z0) * t));
+  const cx0 = sideCov(0), cx1 = sideCov(1), cz0 = sideCov(2), cz1 = sideCov(3);
+  const x0 = fb.x0 + (cx0 ? 0 : inset), x1 = fb.x1 - (cx1 ? 0 : inset), z0 = fb.z0 + (cz0 ? 0 : inset), z1 = fb.z1 - (cz1 ? 0 : inset);
   const nx = Math.ceil((x1 - x0) / step) + 1, nz = Math.ceil((z1 - z0) / step) + 1;
   const pos = [], col = [], idx = [], uv = [], mix = [];
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
     const x = Math.min(x1, x0 + i * step), z = Math.min(z1, z0 + j * step);
-    const edge = Math.min(x - x0, x1 - x, z - z0, z1 - z);
+    const edge = Math.min(cx0 ? 1e9 : x - x0, cx1 ? 1e9 : x1 - x, cz0 ? 1e9 : z - z0, cz1 ? 1e9 : z1 - z);
     // Edge (ground) vertices: the texture is pulled outward so the shade
     // wall carries it at its real scale instead of in vertical streaks.
-    const ox = x - x0 < 0.5 ? -14 : x1 - x < 0.5 ? 14 : 0, oz = z - z0 < 0.5 ? -14 : z1 - z < 0.5 ? 14 : 0;
+    const ox = !cx0 && x - x0 < 0.5 ? -14 : !cx1 && x1 - x < 0.5 ? 14 : 0, oz = !cz0 && z - z0 < 0.5 ? -14 : !cz1 && z1 - z < 0.5 ? 14 : 0;
     uv.push((x + ox) / 48, (z + oz) / 48);
     const lump = fbm(x / 16, z / 16, 3), big = fbm(x / 120 + 4, z / 120, 2);
     // The edge goes down to the ground behind the edge trees: a wall of deep

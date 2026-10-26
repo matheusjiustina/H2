@@ -250,3 +250,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .replay-ui .rp-btn { background: rgba(255,255,255,.08); color: #e9ecef; border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 5px 9px; cursor: pointer; font: inherit; }
 .replay-ui .rp-btn.on { background: #f2c94c; color: #1d1a10; border-color: #f2c94c; }
 .replay-ui .rp-close { margin-left: auto; }
+.os-stars { color: #c99a12; letter-spacing: 1px; font-size: 12px; }
+.os-loc { font-size: 11px; color: #5a6a5c; }
+.os-farmh { display: flex; align-items: center; gap: 6px; margin: 14px 0 8px !important; }
+.os-farmh:first-child { margin-top: 2px !important; }
+.os-farmh i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.os-req.nofit { opacity: 0.78; }

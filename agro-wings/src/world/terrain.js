@@ -189,7 +189,8 @@ vec3 farPatchwork(vec2 p, vec4 nA, vec4 nB, vec4 nC, vec4 nD, inout float rough)
 
 // Airstrip + apron of one site (main base or a secondary farm). off: site
 // offset from the main base layout; surf: 0 laterite, 1 red earth, 2 mown
-// grass, 3 gravel.
+// grass, 3 gravel, 4 rough red earth (forest strip: ruts, grass tufts),
+// 5 pale chapada sand.
 vec3 stripColor(vec3 col, inout float rough, vec2 p, vec4 rw, vec4 apr, vec4 txw, vec2 pad, vec2 fuel, vec2 off, float surf,
     vec4 nA, vec4 nB, vec4 nC, vec4 nD, vec4 det, float near) {
   float dRw = sdBox(p, rw);
@@ -202,13 +203,19 @@ vec3 stripColor(vec3 col, inout float rough, vec2 p, vec4 rw, vec4 apr, vec4 txw
     vec3 lat = mix(vec3(0.285, 0.150, 0.078), vec3(0.385, 0.215, 0.120), smoothstep(0.25, 0.8, nC.r));
     if (surf > 0.5 && surf < 1.5) lat = mix(vec3(0.36, 0.17, 0.085), vec3(0.47, 0.24, 0.13), smoothstep(0.2, 0.8, nC.r)); // red earth
     if (surf > 1.5 && surf < 2.5) lat = grassColor(p, nA, nB, nC, nD) * vec3(1.16, 1.2, 0.9) * (0.86 + 0.2 * smoothstep(0.35, 0.65, abs(fract((p.y - rw.y) / 6.0) - 0.5) * 2.0)); // mown grass, mower stripes
-    if (surf > 2.5) lat = mix(vec3(0.40, 0.37, 0.33), vec3(0.55, 0.51, 0.45), smoothstep(0.2, 0.85, nD.b)); // gravel
+    if (surf > 2.5 && surf < 3.5) lat = mix(vec3(0.40, 0.37, 0.33), vec3(0.55, 0.51, 0.45), smoothstep(0.2, 0.85, nD.b)); // gravel
+    if (surf > 3.5 && surf < 4.5) {
+      // Rough red earth: darker, wetter latosol with tufts of grass between the ruts.
+      lat = mix(vec3(0.30, 0.12, 0.06), vec3(0.42, 0.19, 0.10), smoothstep(0.2, 0.8, nC.r));
+      lat = mix(lat, grassColor(p, nA, nB, nC, nD) * 0.95, smoothstep(0.55, 0.8, nC.g + nB.b * 0.35) * 0.7);
+    }
+    if (surf > 4.5) lat = mix(vec3(0.52, 0.40, 0.27), vec3(0.66, 0.53, 0.37), smoothstep(0.2, 0.85, nC.r)); // chapada sand
     lat *= 0.9 + 0.18 * nD.g;
     float track = exp(-pow((abs(cl) - 1.55) / 0.95, 2.0));
     float ends = max(1.0 - smoothstep(10.0, 26.0, length(p - vec2(rw.x + 14.0, zc))), 1.0 - smoothstep(10.0, 26.0, length(p - vec2(rw.z - 14.0, zc))));
     track = max(track, ends * 0.8);
     float scuff = smoothstep(0.55, 0.9, nD.r) * track * (1.0 - smoothstep(60.0, 200.0, abs(p.x - rw.x - 120.0))) ;
-    lat = mix(lat, lat * (surf > 1.5 && surf < 2.5 ? vec3(0.95, 0.86, 0.66) : vec3(0.76, 0.70, 0.68)), track * 0.65);
+    lat = mix(lat, lat * (surf > 1.5 && surf < 2.5 ? vec3(0.95, 0.86, 0.66) : surf > 3.5 && surf < 4.5 ? vec3(0.62, 0.55, 0.52) : vec3(0.76, 0.70, 0.68)), track * 0.65);
     lat = mix(lat, vec3(0.06, 0.05, 0.045), scuff * 0.35);
     lat = soilDetail(lat, det, near, 1.0 - track * 0.6, 0.2 * track);
     float edgeIn = hwR - abs(p.y - zc);
@@ -251,10 +258,14 @@ vec3 terrainColor(vec2 p, out float rough) {
   float steep = smoothstep(0.992, 0.955, vTN);
   col = mix(col, dirtColor(nB, nC, nD) * 0.92, steep * 0.34 * smoothstep(0.35, 0.7, nC.g + nA.g * 0.5));
 
-  // Fields + carreadores.
+  // Fields + carreadores. Regions: a pixel of the original 8 x 8 km map
+  // looks through its fields only, one of the outer ring through the ring's
+  // (fields near the border are in both ranges).
+  bool outer = max(abs(p.x), abs(p.y)) > RING_IN;
+  int f0 = outer ? NF_RING0 : 0, f1 = outer ? NF : NF_IN1;
   float dmin = 1e9;
   int imin = 0;
-  for (int i = 0; i < NF; i++) {
+  for (int i = f0; i < f1; i++) {
     float d = sdBox(p, uFieldRect[i]);
     if (d < dmin) { dmin = d; imin = i; }
   }
@@ -314,7 +325,7 @@ vec3 terrainColor(vec2 p, out float rough) {
   // aircraft touch down. Apron / taxiway: compacted red earth, oil stains at
   // the service pad, darker taxi tracks.
   col = stripColor(col, rough, p, uRunway, uApron, uTaxi, uPad, uFuel, vec2(0.0), 0.0, nA, nB, nC, nD, det, near);
-  for (int i = 0; i < NS; i++) {
+  for (int i = outer ? NS_IN : 0; i < (outer ? NS : NS_IN); i++) {
     vec4 so = uSiteOff[i];
     col = stripColor(col, rough, p, uSiteRw[i], uSiteAp[i], uSiteTx[i], so.xy + uPad, so.xy + uFuel, so.xy, so.z, nA, nB, nC, nD, det, near);
   }
@@ -363,20 +374,31 @@ vec3 terrainBump(vec3 surf_pos, vec3 surf_norm, float faceDirection) {
 export function createTerrainMaterial(noiseTex, detailTex) {
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0.0 });
   const nf = FIELDS.length;
+  // Field order for the shader: original-map fields, the ones near the ring
+  // border (in both ranges), then the ring's own (see terrainColor).
+  const RING_IN = 4000, M = 30;
+  const touchesIn = (f) => f.x0 - M < RING_IN && f.x1 + M > -RING_IN && f.z0 - M < RING_IN && f.z1 + M > -RING_IN;
+  const touchesOut = (f) => !(f.x0 - M > -RING_IN && f.x1 + M < RING_IN && f.z0 - M > -RING_IN && f.z1 + M < RING_IN);
+  const inOnly = FIELDS.filter((f) => touchesIn(f) && !touchesOut(f)), both = FIELDS.filter((f) => touchesIn(f) && touchesOut(f)), outOnly = FIELDS.filter((f) => !touchesIn(f));
+  const SF = [...inOnly, ...both, ...outOnly];
+  const nsIn = FARM_SITES.filter((st) => !st.farm.ring).length;
   const segs = [];
   for (const r of ROADS) if (!r.mesh) for (let i = 0; i < r.pts.length - 1; i++) segs.push({ a: r.pts[i], b: r.pts[i + 1], w: r.w });
   const nr = segs.length;
   const nc = CREEK.points.length;
   const stp = WATER.streams[0].points;
-  mat.defines = { NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: WATER.ponds.length };
+  mat.defines = {
+    NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: WATER.ponds.length,
+    RING_IN: RING_IN.toFixed(1), NF_IN1: inOnly.length + both.length, NF_RING0: inOnly.length, NS_IN: nsIn,
+  };
   const uniforms = {
     uNoise: { value: noiseTex },
     uDetail: { value: detailTex },
     uPad: { value: new THREE.Vector2(BASE.pad.x, BASE.pad.z) },
     uFuel: { value: new THREE.Vector2(BASE.fuelTank.x, BASE.fuelTank.z) },
-    uFieldRect: { value: FIELDS.map((f) => new THREE.Vector4(f.x0, f.z0, f.x1, f.z1)) },
+    uFieldRect: { value: SF.map((f) => new THREE.Vector4(f.x0, f.z0, f.x1, f.z1)) },
     uFieldInfo: {
-      value: FIELDS.map((f) => {
+      value: SF.map((f) => {
         const sp = { soy: 0.5, corn: 0.8, cotton: 0.9, stubble: 0.5, fallow: 0.9, pasture: 0 }[f.crop];
         return new THREE.Vector4(CROP_CODE[f.crop], f.rowAxis === 'x' ? 0 : 1, f.growth, sp);
       }),
@@ -414,7 +436,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => 'terrain-v5';
+  mat.customProgramCacheKey = () => 'terrain-v6';
   return mat;
 }
 
@@ -473,13 +495,15 @@ export function createTerrain(td, noiseTex) {
   const group = new THREE.Group();
   group.name = 'terrain';
   const mat = createTerrainMaterial(noiseTex, makeGroundDetail(256));
-  const CH = 32; // cells per chunk (500 m)
+  const CH = 48; // cells per chunk (750 m)
   const chunks = GRID_N / CH;
   for (let j = 0; j < chunks; j++) {
     for (let i = 0; i < chunks; i++) {
       const lod = new THREE.LOD();
       const cx = i * CH, cz = j * CH;
-      const levels = [[1, 0], [2, 950], [4, 2000], [8, 4200]];
+      // (Distances from the chunk centre: a 750 m chunk keeps its finest
+      // level until its near edge is ~700 m away, as the 500 m chunks did.)
+      const levels = [[1, 0], [2, 1075], [4, 2125], [8, 4325]];
       for (const [step, dist] of levels) {
         const m = new THREE.Mesh(buildChunk(td, cx, cz, CH, step), mat);
         m.receiveShadow = true;

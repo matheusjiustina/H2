@@ -15,9 +15,11 @@ void main() {
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mvPosition;
   gl_PointSize = aSize * uScale / max(0.5, -mvPosition.z);
-  // Fade sprites that get huge on screen (camera inside the cloud).
+  // Fade sprites that get huge on screen (camera inside the cloud); the
+  // fully faded ones are not rasterised at all (a spray cloud blown back
+  // over the chase camera would otherwise fill the screen many times over).
   vAlpha = aAlpha * (1.0 - smoothstep(180.0, 420.0, gl_PointSize));
-  gl_PointSize = min(gl_PointSize, 420.0);
+  gl_PointSize = vAlpha > 0.0 ? min(gl_PointSize, 420.0) : 0.0;
   vColor = aColor;
   #include <fog_vertex>
 }`;
