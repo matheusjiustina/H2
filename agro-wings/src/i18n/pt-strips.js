@@ -14,6 +14,9 @@ export default {
   "{0} km from you": "{0} km de você",
   "terrain L{0}": "terreno N{0}",
   "≈ {0}": "≈ {0}",
+  // Maps
+  "Mouse wheel: zoom · drag: move · click: close": "Roda do mouse: zoom · arrastar: mover · clique: fechar",
+  "Mouse wheel: zoom · drag: move": "Roda do mouse: zoom · arrastar: mover",
   "The strip does not take the {0} — change aircraft at the main base.": "A pista não recebe o {0} — troque de aeronave na base principal.",
 
   // Fazenda Horizonte

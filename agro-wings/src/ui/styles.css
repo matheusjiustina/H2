@@ -256,3 +256,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .os-farmh:first-child { margin-top: 2px !important; }
 .os-farmh i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .os-req.nofit { opacity: 0.78; }
+.maphint { position: absolute; left: 10px; top: 10px; padding: 3px 8px; border-radius: 6px; background: rgba(0,0,0,.55); color: #e9ecef; font-size: 12px; pointer-events: none; }
+.mapwrap canvas, .os-mapbox canvas { cursor: grab; touch-action: none; }
+.mapwrap canvas:active, .os-mapbox canvas:active { cursor: grabbing; }
+.os-mapbox { position: relative; max-width: 520px; }
+.os-mapbox canvas { width: 100%; height: auto; border-radius: 6px; background: #3d5a24; display: block; }

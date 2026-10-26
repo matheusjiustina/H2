@@ -242,3 +242,50 @@ export function drawMap(g, w, h, base, game, view) {
   g.stroke();
   g.restore();
 }
+
+// Mouse-wheel zoom (about the cursor, out to the whole 12 km map) and
+// drag-to-pan for a north-up map canvas drawn with drawMap. `view` ({ cx,
+// cz, range }) is changed in place and marked `manual` once touched;
+// onClick fires for a click that did not drag.
+export function mapControls(canvas, view, { min = 250, max = WORLD_HALF, onChange, onClick } = {}) {
+  const lim = (v, a, b) => Math.min(b, Math.max(a, v));
+  const keep = () => {
+    view.range = lim(view.range, min, max);
+    view.cx = lim(view.cx, -WORLD_HALF, WORLD_HALF);
+    view.cz = lim(view.cz, -WORLD_HALF, WORLD_HALF);
+    view.manual = true;
+    onChange?.();
+  };
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const r = canvas.getBoundingClientRect();
+    const u = (e.clientX - r.left) / r.width - 0.5, v = (e.clientY - r.top) / r.height - 0.5;
+    const wx = view.cx + u * 2 * view.range, wz = view.cz + v * 2 * view.range;
+    // One wheel notch (~100 px) is ~16 %; trackpads give smaller steps.
+    const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+    view.range = lim(view.range * Math.exp(lim(dy, -400, 400) * 0.0015), min, max);
+    view.cx = wx - u * 2 * view.range; view.cz = wz - v * 2 * view.range;
+    keep();
+  }, { passive: false });
+  let drag = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY, cx: view.cx, cz: view.cz, moved: false };
+    canvas.setPointerCapture?.(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const r = canvas.getBoundingClientRect(), dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    drag.moved = true;
+    view.cx = drag.cx - (dx / r.width) * 2 * view.range;
+    view.cz = drag.cz - (dy / r.height) * 2 * view.range;
+    keep();
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    const d = drag;
+    drag = null;
+    if (d && !d.moved) onClick?.(e);
+  });
+  canvas.addEventListener('pointercancel', () => { drag = null; });
+}

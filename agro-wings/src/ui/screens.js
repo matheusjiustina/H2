@@ -10,7 +10,7 @@ import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
-import { drawMap } from './maps.js';
+import { drawMap, mapControls } from './maps.js';
 import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
 
@@ -418,11 +418,19 @@ export class Screens {
 
   map() {
     const g = this.game;
-    const el = h(`<div class="mapwrap"><canvas width="1400" height="1400"></canvas>
+    const el = h(`<div class="mapwrap"><canvas width="1400" height="1400"></canvas><div class="maphint">${t('Mouse wheel: zoom · drag: move · click: close')}</div>
       <div class="legend"><div><i style="background:#3f8f2c"></i>${t('Soy')}</div><div><i style="background:#2f7224"></i>${t('Corn')}</div><div><i style="background:#5f8f4a"></i>${t('Cotton')}</div><div><i style="background:#9a3a1c"></i>${t('Roads / fallow')}</div><div><i style="background:#1f3a18"></i>${t('Forest')}</div><div><i style="background:#c83228"></i>${t('Not covered')}</div><div><i style="background:#46c85a"></i>${t('Covered')}</div><div><i style="background:#9650dc"></i>${t('Overlap')}</div><div><i style="background:#ffe14a"></i>${t('Next pass')}</div></div></div>`);
     const c = el.querySelector('canvas');
+    // Framed automatically until the wheel or a drag takes over.
+    const view = { cx: 0, cz: 0, range: 1900, manual: false };
+    mapControls(c, view, { onClick: () => this.close() });
     const draw = () => {
       if (this.open !== 'map') return;
+      if (view.manual) {
+        drawMap(c.getContext('2d'), c.width, c.height, g.hud.base, g, { cx: view.cx, cz: view.cz, range: view.range, labelPx: 30 });
+        requestAnimationFrame(draw);
+        return;
+      }
       const ac = g.aircraft.fm.pos;
       const job = g.job;
       // Frame the aircraft with the job's talhões (or with the base): the
@@ -436,11 +444,12 @@ export class Screens {
       }
       const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
       const range = Math.min(6000, Math.max(minR, Math.max(x1 - x0, z1 - z0) / 2 + 500));
+      Object.assign(view, { cx, cz, range });
       drawMap(c.getContext('2d'), c.width, c.height, g.hud.base, g, { cx, cz, range, labelPx: 30 });
       requestAnimationFrame(draw);
     };
     this._show('map', el);
-    el.addEventListener('click', () => this.close());
+    el.addEventListener('click', (e) => { if (e.target !== c) this.close(); });
     requestAnimationFrame(draw);
   }
 

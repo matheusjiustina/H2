@@ -5,7 +5,7 @@
 // of the farms, aircraft choice (main base only), and the two operation
 // histories kept apart (main farm / secondary farms) with their replays.
 import { h } from './hud.js';
-import { drawMap } from './maps.js';
+import { drawMap, mapControls } from './maps.js';
 import { FARM_CONTRACTS, FARM_INFO, contractWindow, windowLabel, contractStars } from '../game/farmContracts.js';
 import { CONTRACTS, contractById } from '../game/contracts.js';
 import { FARMS, siteById, MAIN_SITE, stripAllows, CROPS } from '../world/layout.js';
@@ -44,7 +44,7 @@ export function showOffice(screens, tab = 'inbox') {
   let body = '';
   if (tab === 'inbox') body = inbox(g);
   else if (tab === 'requests') body = requests(g, env, office);
-  else if (tab === 'map') body = `<div class="os-map"><canvas width="900" height="900"></canvas><div class="os-farms">${FARMS.slice().sort((a, b) => a.difficulty - b.difficulty).map((f) => {
+  else if (tab === 'map') body = `<div class="os-map"><div class="os-mapbox"><canvas width="900" height="900"></canvas><div class="maphint">${t('Mouse wheel: zoom · drag: move')}</div></div><div class="os-farms">${FARMS.slice().sort((a, b) => a.difficulty - b.difficulty).map((f) => {
     const s = siteById(f.id), km = Math.hypot(s.pad.x - MAIN_SITE.pad.x, s.pad.z - MAIN_SITE.pad.z) / 1000;
     const brg = bearing(s.pad.x - MAIN_SITE.pad.x, s.pad.z - MAIN_SITE.pad.z);
     return `<div class="os-farm"><i style="background:${f.color}"></i><b>${f.name}</b><span>${km.toFixed(1)} km ${point(brg)} · ${t('heading {0}°', String(Math.round(brg)).padStart(3, '0'))} · <span class="os-stars" title="${t('difficulty {0}/5', f.difficulty)}">${stars(f.difficulty)}</span></span><span>${FARM_INFO[f.id].blurb}</span><span>${t('Strip')}: ${FARM_INFO[f.id].strip}</span><span>${t('Aircraft')}: ${fleetFor(f).map(acName).join(', ')}</span><span>${t('Weather')}: ${FARM_INFO[f.id].weather}</span></div>`;
@@ -73,7 +73,12 @@ export function showOffice(screens, tab = 'inbox') {
   screens._show('office', el);
   if (tab === 'map') {
     const c = el.querySelector('canvas');
-    drawMap(c.getContext('2d'), c.width, c.height, g.hud.base, g, { cx: 0, cz: 0, range: 6000, labelPx: 26 });
+    // The whole 12 km map; the wheel zooms in on a farm, a drag moves.
+    const view = screens._officeView ??= { cx: 0, cz: 0, range: 6000 };
+    const draw = () => drawMap(c.getContext('2d'), c.width, c.height, g.hud.base, g, { cx: view.cx, cz: view.cz, range: view.range, labelPx: 26 });
+    let queued = false;
+    mapControls(c, view, { onChange: () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; draw(); }); } } });
+    draw();
   }
 }
 

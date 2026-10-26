@@ -1891,7 +1891,11 @@ How it is built:
   refuses an aircraft it is not cleared for (`stripAllows`).
 - **Maps**: 12 km base map at 1536 px, farm pins in each farm's colour with
   a ring round the farm of the accepted request; the full map frames the
-  aircraft with its job (or the base).
+  aircraft with its job (or the base). Mouse wheel zooms about the cursor
+  (out to the whole 12 km map, in to ~500 m) and a drag moves the full map
+  (M) and the office map (`mapControls` in `src/ui/maps.js`; a plain click
+  still closes the full map); the wheel over the minimap zooms it from
+  ~500 m to ~6 km across.
 - **Wind**: `windFactorAt` raises the mean wind and the gusts within 2 km of
   the Chapada strip (flight model wind, felt in the aircraft and windsocks);
   a "windy" weather tendency there.

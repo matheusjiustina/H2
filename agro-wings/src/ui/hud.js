@@ -53,6 +53,14 @@ export class HUD {
     // Click the minimap to switch it between the farm map and the GPS page.
     this.$.mini.parentElement.classList.add('interactive');
     this.$.mini.addEventListener('click', () => this.toggleGps());
+    // Mouse wheel over the minimap: zoom out to ~6 km across, in to ~500 m.
+    this.miniRange = 650;
+    this.$.mini.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+      this.miniRange = Math.min(3000, Math.max(250, this.miniRange * Math.exp(Math.max(-400, Math.min(400, dy)) * 0.0015)));
+    }, { passive: false });
     this.base = buildBaseMap(1536); // 12 x 12 km at ~7.7 m per pixel
     this.miniT = 0;
     this.warnState = '';
@@ -199,7 +207,7 @@ export class HUD {
         this._fps(dt);
         return;
       }
-      drawMap(gctx, c.width, c.height, this.base, g, { cx: ac.fm.pos.x, cz: ac.fm.pos.z, range: 650, rot: yaw - Math.PI });
+      drawMap(gctx, c.width, c.height, this.base, g, { cx: ac.fm.pos.x, cz: ac.fm.pos.z, range: this.miniRange, rot: yaw - Math.PI, labelPx: this.miniRange > 1200 ? 11 : 13 });
       // North tick
       gctx.save();
       gctx.translate(c.width / 2, c.height / 2);
