@@ -306,6 +306,114 @@ export const SPRAY_M18 = {
   flow: 5.6,
 };
 
+// ---------------------------------------------------------------------------
+// Thrush 510G (fifth aircraft, fictional registration PR-TSH).
+// Reference figures (Thrush Aircraft / dealer spec sheets, as given for the
+// game): length 9.85 m; span 14.48 m; height 2.84 m; GE H80 turboprop
+// 800 shp; Hartzell four-blade constant-speed prop, ≈ 2.62 m; empty
+// ≈ 2,132 kg; maximum take-off 4,763 kg; hopper 1,930 L; fuel 863 L; working
+// speed 145–241 km/h (78–130 kt); cruise ≈ 256 km/h at 55 % power; stall
+// ≈ 89 km/h (48 kt, flaps down at a light weight); VNE ≈ 303 km/h (164 kt).
+// Estimated for the game (not published, or not given): wing area 34.4 m²
+// (the 510 family's 370 ft²); CLmax 1.57 clean / 2.3 with flaps so that the
+// 48 kt flaps-down stall falls at ≈ 3,000 kg; CD0 0.045 with e 0.8 — the
+// 256 km/h cruise is a clean-airframe figure, with booms, nozzles, wire
+// cutter and spreader brackets the 55 % level speed comes out near 215 km/h;
+// inertias scaled from the AT-502B by mass and span (shorter span: less roll
+// inertia); the GE H80's quicker spool (faster Ng acceleration than the
+// PT6A-34AG), its 2,080 prop rpm, a 0.6 lb/shp/h fuel flow; static thrust
+// from momentum theory (figure of merit 0.66). Hopper volume is not payload:
+// with full fuel and pilot the MTOW leaves ≈ 1,850 kg for the hopper.
+export const FLIGHT_T510G = {
+  ...FLIGHT,
+  emptyMass: 2132,
+  mtow: 4763,
+  pilotMass: 85,
+  wingArea: 34.4,
+  span: 14.48,
+  chord: 2.37,
+  oswald: 0.8,
+  inertiaEmpty: [8800, 11500, 7100],
+
+  CL0: 0.3, CLa: 5.0, alphaStall: 0.255, alphaStallNeg: -0.2,
+  CD0: 0.045,
+  CDflap: 0.065, CLflap: 0.9,
+  Cm0: 0.04, CmaWB: 0.25, CmaTail: -1.45, Cmq: -16, Cmde: 0.47, Cmflap: -0.065,
+  Clb: -0.085, Clp: -0.5, Clr: 0.11, Clda: 0.082,
+  Cnb: 0.09, Cnr: -0.18, Cndr: 0.078, Cnda: -0.012,
+  CYb: -0.6, CYdr: 0.12,
+
+  engineType: 'turboprop',
+  maxPower: 597e3, // 800 shp
+  propRadius: 1.31,
+  maxRpm: 2080, // governed prop rpm (H80 output speed)
+  idleRpm: 1100, // prop on the fine stop at ground idle
+  turbine: {
+    idleNg: 56, maxNg: 100.5, // gas generator %
+    accel: 19, decel: 26, // Ng %/s: the H80 spools up quicker than a PT6A-34
+    idleFrac: 0.022,
+    lightoff: 2.6, // s of starter before fuel is introduced
+    govFrac: 0.3,
+    betaDrag: 2800,
+    etaStatic: 0.66, // ≈ 13.8 kN static at 800 shp
+    etaCruise: 0.85,
+    discDrag: 0.1,
+    maxTorque: 2020, // ft·lb at 800 shp / 2,080 rpm
+    flatSigma: 0.72, // density ratio down to which 800 shp is available
+  },
+  fuelFlowFull: 272 / 3600, // L/s at max power (Jet-A, ≈ 0.6 lb/shp/h)
+  fuelFlowIdle: 62 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.8,
+
+  fuelCapacity: 863,
+  hopperCapacity: 1930,
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.35, // the hopper sits ahead of the cabin, over the wing's leading edge
+  fuelTankSpanY: 2.7,
+
+  // Tubular main legs with a drag brace, big 29×11 tyres well ahead of the
+  // wing; a steerable tailwheel on a long spring under the upswept tail
+  // cone: ≈ 10° three-point attitude (side photographs of parked 510Gs).
+  gear: [
+    { name: 'mainL', p: [1.45, -1.6, 1.0], k: 200000, c: 20000, travel: 0.24, radius: 0.37, steer: false },
+    { name: 'mainR', p: [-1.45, -1.6, 1.0], k: 200000, c: 20000, travel: 0.24, radius: 0.37, steer: false },
+    { name: 'tail', p: [0, -0.52, -5.12], k: 55000, c: 4800, travel: 0.14, radius: 0.15, steer: true },
+  ],
+  brakeMu: 0.4,
+  tailSteer: 0.36,
+
+  hard: [
+    { name: 'wingtipL', p: [7.3, 0.02, -0.25] },
+    { name: 'wingtipR', p: [-7.3, 0.02, -0.25] },
+    { name: 'boomL', p: [6.5, -0.5, -1.72] },
+    { name: 'boomR', p: [-6.5, -0.5, -1.72] },
+    { name: 'prop', p: [0, -1.01, 3.82] },
+    { name: 'spinner', p: [0, 0.3, 4.3] },
+    { name: 'belly', p: [0, -0.62, 0.6] },
+    { name: 'tail', p: [0, 0.5, -5.55] },
+    { name: 'fin', p: [0, 2.32, -4.9] },
+    { name: 'stabL', p: [2.65, 0.92, -4.95] },
+    { name: 'stabR', p: [-2.65, 0.92, -4.95] },
+    { name: 'roof', p: [0, 1.88, -0.5] },
+  ],
+  hardLandingVs: 3.0,
+  crashVs: 5.5,
+
+  wheelPoint: [0, -1.45, 1.0],
+  aglOffset: 1.45,
+  wingDrop: 0.5,
+  assistGain: { pitch: 2.0, roll: 1.55 },
+  assistSpeedScale: 1.22, // stall speed ratio to the PR-AGW at max weight
+};
+
+export const SPRAY_T510G = {
+  // ≈ 13 m boom: a swath scaled the same way as the others', and the flow
+  // that gives the PR-AGW's dose at a 58 m/s (113 kt) working speed.
+  swath: 30,
+  flow: 6.3,
+};
+
 export const ASSIST = {
   modes: ['off', 'normal', 'high'],
   default: 'normal',

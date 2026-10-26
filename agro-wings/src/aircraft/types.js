@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, SPRAY, SPRAY_AT502, SPRAY_M18, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createAirTractorModel, AT_SHADOW, atWingY } from './atModel.js';
@@ -11,6 +11,8 @@ import { createR44Model, R44_SHADOW } from './r44Model.js';
 import { createR44Panel } from './r44Panel.js';
 import { createDromaderModel, M18_SHADOW, m18WingY } from './dromaderModel.js';
 import { createDromaderPanel } from './dromaderPanel.js';
+import { createThrushModel, T510_SHADOW, thWingY } from './thrushModel.js';
+import { createThrushPanel } from './thrushPanel.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
 
@@ -139,6 +141,49 @@ export const AIRCRAFT_TYPES = {
     createShadow: () => createContactShadow(M18_SHADOW),
   },
 
+  // Turboprop: Thrush 510G (FLIGHT_T510G: the turbine branch with the GE
+  // H80's own figures). Fictional registration.
+  thrush: {
+    id: 'thrush',
+    slot: '05',
+    label: 'Thrush',
+    reg: 'PR-TSH',
+    name: 'Thrush 510G',
+    get role() { return t('Turboprop Agricultural Aircraft'); },
+    get engineName() { return t('GE H80 turboprop · 800 shp'); },
+    get summary() { return t('1,930 L hopper · 863 L fuel · 4,763 kg MTOW'); },
+    flight: FLIGHT_T510G,
+    spray: { swath: SPRAY_T510G.swath, flow: SPRAY_T510G.flow, boom: [6.5, -0.41, -1.67] },
+    work: [[0, -1.45, 1.0], [6.6, -0.45, -1.7], [-6.6, -0.45, -1.7]],
+    collide: [[0, 0.3, 4.3], [7.3, 0.02, -0.25], [-7.3, 0.02, -0.25], [0, 2.36, -4.4], [0, 0.55, -5.4], [0, -1.45, 1.0], [0, 1.86, -0.5], [2.7, 0.68, -4.8], [-2.7, 0.68, -4.8]],
+    wire: [[0, 0.3, 4.3], [7.3, 0.02, -0.25], [-7.3, 0.02, -0.25], [0, 2.36, -4.4], [0, -1.45, 1.0], [3.6, -0.3, -1.7], [-3.6, -0.3, -1.7], [0, 1.86, -0.5]],
+    smoke: [-0.5, 0.3, 3.18], // right exhaust stack
+    wash: [0, -1.2, -2.5],
+    anim: { elev: 0.38, rud: 0.4, ail: 0.36, flap: 0.5, pedalZ: 0.48, disc: [500, 1000], wash: [1500, 2000], vib: [1100, 2080] },
+    vspeeds: { vs0: 52, vs1: 66, vfe: 110, vne: 164 },
+    // Own cockpit view: eye from thrushGeom.js, a slightly shallower look
+    // down than the default (the panel sits low under the tall windshield).
+    camera: { dist: 15, height: 4.3, orbit: 22, cockpitPitch: -0.2, cockpitFov: 68 },
+    audio: { profile: 'h80', blades: 4 },
+    fuel: { name: 'Jet-A', price: GAME.fuelPrice * 1.35 },
+    loads: { free: { fuel: 450, hopper: 1150 }, boot: 300 },
+    loadSheet: { bankKt: 110, roll: [148, 2617, 2.0] },
+    service: {
+      rates: { fuel: 7, liquid: 27 },
+      local: { A: [8.2, -2.6], B: [4.8, -2.2], F: [2.3, -1.6], P: [1.4, -1.9] },
+      keepOut: { wing: [7.3, -1.65, 0.75], wingY: thWingY, fus: [0.62, -0.5, 1.86, -5.4, 4.3], stab: [2.75, 0.6, 0.78, -5.5, -4.25] },
+      veto: 11,
+    },
+    stub: { eye: [0, 1.57, -0.44], fuelFiller: [2.3, 0.05, -0.35], hopperPort: [0.62, -0.12, -1.6] },
+    bounds: [
+      [-0.62, 0.62, -0.5, 1.88, -5.45, 4.35], [-7.3, 7.3, -0.5, 0.25, -1.75, 0.8], [-0.12, 0.12, 0.7, 2.4, -5.55, -3.4],
+      [-2.75, 2.75, 0.6, 0.8, -5.5, -4.25], [-1.8, 1.8, -1.65, -0.8, 0.6, 1.4], [-1.32, 1.32, -1.0, 1.6, 3.8, 4.0],
+    ],
+    createModel: (panel, opts) => createThrushModel(panel, opts),
+    createPanel: () => createThrushPanel(),
+    createShadow: () => createContactShadow(T510_SHADOW),
+  },
+
   // Rotary wing: flown by Helicopter (src/aircraft/helicopter.js) with its
   // own physics (HeliModel); everything the game, crew, sprayer, GPS and
   // cameras need comes from the same fields as the airplanes.
@@ -209,5 +254,5 @@ export const AIRCRAFT_TYPES = {
   },
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18'];
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;

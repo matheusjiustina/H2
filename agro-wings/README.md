@@ -2015,3 +2015,111 @@ catch; the flare is a level effect only. A match with the recordings is
 spectral and statistical, not sample-exact; real IO-540 samples (start, idle,
 run-up, take-off, flyby, cabin) would allow a hybrid sample + synthesis
 version.
+
+## Aircraft 05 — Thrush 510G (PR-TSH)
+
+A fifth aircraft with its own geometry, physics, cockpit and sound
+profile; the other four keep theirs (`test/thrush.test.mjs` checks their
+engines and figures). PR-TSH is a fictional registration.
+
+**References.** Six exterior photographs of 510Gs (white with the red
+swoosh, the parked side view, two in flight, a spray pass, a top-quarter
+view) and three cockpit photographs (in flight over a field, the whole
+panel from the front, the interior from the seat). Where the photos show
+other 510 versions, the 510G figures were used.
+
+**Figures used** (as given for the game; Thrush data): length 9.85 m,
+span 14.48 m, height 2.84 m; GE H80 turboprop, 800 shp, prop governed at
+2,080 rpm; Hartzell four-blade, 2.62 m; empty 2,132 kg, max take-off
+4,763 kg; hopper 1,930 L; fuel 863 L; working speed 145–241 km/h; cruise
+≈ 256 km/h at 55 %; stall ≈ 89 km/h; VNE 303 km/h.
+
+**Estimated** (all in `FLIGHT_T510G`, `src/config.js`, with comments):
+wing area 34.4 m² (the 510's 370 ft²); CLmax 1.57 clean / 2.3 flaps so the
+89 km/h stall falls at ≈ 3,000 kg flaps down; CD0 0.045 — the 256 km/h
+cruise is a clean-airframe figure; with booms, nozzles and wire cutter the
+model flies 215 km/h at 61 % power; inertias scaled from the AT-502B by
+mass and span; the H80's quicker spool (Ng 19 %/s up vs 14 for the
+PT6A-34), fuel flow from ≈ 0.6 lb/shp/h. Geometry fitted to the parked side
+photograph (outline points converted to the body frame at the 10.5°
+three-point attitude) and to the published dimensions.
+
+**Measured** (`node --test test/thrush.test.mjs`):
+
+| check | result | reference |
+| --- | --- | --- |
+| three-point attitude | 10.5° | ≈ 10° (photo) |
+| start | light-off 2.6 s, idle 11.6 s | — |
+| full power, static | 801 shp, 2,080 rpm, 272 L/h | 800 shp |
+| 90 % torque after full lever | 2.8 s (AT-502B ≈ 4 s) | quicker than the PT6 |
+| take-off roll 2,617 / 4,763 kg | 148 m / 488 m | — |
+| climb at 4,200 kg, 97 kt | 932 ft/min (AT-502B 861) | — |
+| stall 3,000 kg flaps down / 4,763 kg clean | 48 kt / 75 kt | 48 kt |
+| level at 3,800 kg | 145 kt (268 km/h) full power, 116 kt (215 km/h) at 61 % | below VNE; working band |
+| roll to 60° (assist, loaded) | 1.07 s | — |
+| balão 1,200 L / dive pull-outs / landing / low turns | no stall, lowest 2.7 m, 0.34 m/s touchdown, 2.5 m lost at 60° | — |
+
+Payload is not hopper volume: with full fuel and pilot the MTOW leaves
+≈ 1,850 kg, less than a full 1,930 L hopper of water (the load sheet says
+so). Against the AT-502B: lighter, 50 shp more, a quicker engine and a
+crisper roll, a slightly shorter span; heavier on the stall at MTOW.
+
+**Exterior** (`src/aircraft/thrushModel.js`, shared sections in
+`thrushGeom.js`): its own cross-sections — the slim H80 cowl falling to a
+long polished spinner, round bronze exhaust stubs, chin inlet, dark
+anti-glare top, the tan fibreglass hopper lid with the yellow vent cap,
+the tall glasshouse (windshield base 1.2 m, roof 1.86 m above the CG) with
+a three-piece windshield, door and quarter windows, white roof with the
+vent hatch, wire cutter and deflector cable, the parked wiper; a steep
+cabin fairing into the upswept tail cone; tall square-topped fin with a big
+rudder and trim tab, strut-braced tailplane with red tips; constant-chord
+wing (upper and lower surfaces closed, separate flaps and ailerons on
+their hinge lines, red rounded tips with 510G, nav lights and strobes,
+walkway, filler); tubular main legs with drag braces on 29×11 tyres, a
+long tailwheel spring; booms with 48 nozzles on hangers ahead of the flap
+hinge, fan pump, gatebox; four-blade Hartzell feathering on the ground,
+blade fade into the shared disc. Livery: white with the five-band red
+swoosh, GE roundel and THRUSH badges, registration, small AGRO WINGS.
+Fine parts in a LOD beyond 90 m.
+
+**Cockpit** (`thrushCockpit.js`, instruments in `thrushPanel.js`): a 3D
+black panel tilted 12° under a padded hood with rounded corners; MVP-50T-
+style engine monitor (Ng, ITT, Np, torque %, fuel flow, fuel, run timer,
+alerts — oil, fuel pressure, volts and OAT are not simulated and read
+"--- N/S"), master caution / warning lamps, airspeed (MPH, knots) and
+altimeter with 3D needles, a G5-style attitude unit (attitude, tapes,
+heading, slip), the hopper sight window with the live level, the AG-NAV-
+style monitor in an olive bezel showing the game's guidance (talhão, pass
+lines, coverage, track, cross-track, job progress, boom state; soft keys
+are labels only), the glareshield guidance display with the LED lightbar;
+sloped consoles (toggles, dimmers, low-fuel lamp; breaker matrix, start /
+battery, tailwheel placard), the hopper wall with its litre scale, stick
+with red buttons, two pedal sets with master cylinders, power and
+condition levers on the left wall, the boom valve on the right, a black
+mesh seat with harness, white walls and tube frame, window seals, roof
+lining. Screens redraw only when their values change (G5 at 15 Hz, the
+others at ≤ 5 Hz), each on its own small canvas. Eye 1.57 m above the CG,
+0.44 m behind it, its own look-down (−11.5°) and 68° field of view.
+
+**Integration:** registry entry `thrush` (slot 05): selection card,
+office list, a fourth apron spot (used when the R44 is flown), farm strips
+(cleared wherever the AT-502B is; not at Mata Alta and Ipê Amarelo), crew
+service points and rates, collision / wire points, load sheet, guidance
+theme, cameras, audio profile `h80` (the turboprop layers with a higher
+compressor whine, brighter roar and the four-blade blade-pass — synthesized,
+not a recording of an H80).
+
+**Validation.** Unit tests 114/114 (`npm test`, 13 of them the Thrush's); `test/thrushcockpit.mjs`: the
+game's cockpit camera parked, taxiing, level, turning, pulling up, looking
+left / right / down / up, back to chase, in 16:9, 4:3 and 21:9; nearest
+surface 27 cm from the eye; instruments follow the flight model.
+Autopilot soybean contract (`AC=thrush node test/e2e.mjs soy`): done, 90 %
+coverage, no damage (AT-502B: same score, 10 % longer flight). Draw calls
+in the same scenes (medium, SwiftShader): chase 510 (AT-502B 468,
+Dromader 486), cockpit 632 (619 / 641), side 635 (596 / 622).
+
+**Limitations.** No oil, fuel-pressure, electrical or outside-air model,
+so those indications read N/S. The wiper is static. The swoosh, the
+windshield and the fin were matched to photographs, not drawings. The
+cockpit switches are visual except where a simulated system exists
+(spray valve, power and condition levers through the existing controls).

@@ -195,7 +195,7 @@ export class Game {
     const next = this.fleet[id];
     // Parked spots: the helicopter waits on its pad; the airplanes take the
     // west apron spots in order.
-    const spots = [BASE.parking, BASE.parking2, BASE.parking3];
+    const spots = [BASE.parking, BASE.parking2, BASE.parking3, BASE.parking4];
     for (const ac of Object.values(this.fleet)) {
       if (ac === next) continue;
       ac.onSimStep = null; ac.onEvent = null;

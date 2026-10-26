@@ -29,7 +29,7 @@ export class CameraRig {
 
   setMode(m, aircraft) {
     this.mode = m;
-    if (m === 'cockpit') { this.look.yaw = 0; this.look.pitch = -0.3; }
+    if (m === 'cockpit') { this.look.yaw = 0; this.look.pitch = aircraft?.type?.camera?.cockpitPitch ?? -0.3; }
     if (m === 'orbit' && aircraft) {
       const f = aircraft.forward(_v);
       this.orbit.yaw = Math.atan2(f.x, f.z) + Math.PI * 0.75;
@@ -81,7 +81,7 @@ export class CameraRig {
       cam.quaternion.copy(quat).multiply(FLIP);
       _e.set(this.look.pitch, this.look.yaw, 0, 'YXZ');
       cam.quaternion.multiply(_q.setFromEuler(_e));
-      this._fov(70 * this.zoom.cockpit, dt);
+      this._fov((C.cockpitFov ?? 70) * this.zoom.cockpit, dt);
     } else if (this.mode === 'chase') {
       const fwd = _v.set(0, 0, 1).applyQuaternion(quat);
       // Follow the flight path when flying (shows where you are going),

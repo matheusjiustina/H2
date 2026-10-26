@@ -51,6 +51,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .ac-reg { font: 600 12px var(--mono); color: var(--ink-dim); }
 .ac-spec { font-size: 11px; line-height: 1.5; color: var(--ink-faint); margin-top: 2px; }
 .ac-role { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+/* Five aircraft on one row on wide screens. */
+@media (min-width: 1200px) { .ac-card { width: min(236px, calc(20vw - 14px)); padding: 10px 12px 11px; } }
 @media (max-width: 900px) { .ac-card { width: min(300px, calc(50vw - 26px)); } }
 @media (max-width: 560px) { .ac-card { width: calc(100vw - 32px); } .ac-spec { display: none; } }
 

@@ -30,6 +30,10 @@ export const BASE = {
   // others in front of the hangar, clear of the taxi route and the tanks;
   // used when the helicopter is flown and all three airplanes wait parked.
   parking3: { x: -404, z: -100, heading: Math.PI / 2 },
+  // Fourth airplane spot (Thrush 510G, 14.5 m), between the first two and
+  // east of them, west of the taxiway; used when the helicopter is flown
+  // and all four airplanes wait parked.
+  parking4: { x: -404, z: -70, heading: Math.PI / 2 },
   // Helicopter pad (R44): gravel pad with a painted H at the east end of the
   // apron, clear of the taxi route, the service pad and the fuel slab.
   helipad: { x: -323, z: -48, heading: Math.PI / 2, radius: 6 },
@@ -429,7 +433,7 @@ export const FARMS = [
   {
     id: 'serradocedro', name: 'Fazenda Serra do Cedro', short: 'Serra do Cedro', dx: 4700, dz: -4600, ring: true,
     len: 540, width: 16, surface: 3, grade: 0.036, bank: 0.012, difficulty: 4, color: '#c96f3b',
-    crops: ['soy', 'corn'], weather: 'mist', marks: 'stakes', aircraft: ['ipanema', 'at502', 'r44'],
+    crops: ['soy', 'corn'], weather: 'mist', marks: 'stakes', aircraft: ['ipanema', 'at502', 'r44', 'thrush'],
     props: [['boulder', -150, 31], ['boulder', -40, -33], ['boulder', 30, 38], ['boulder', 95, -36], ['tower', -470, -150], ['house', -520, -250, 0.2]],
   },
   {
@@ -447,7 +451,7 @@ export const FARMS = [
   {
     id: 'valeverde', name: 'Fazenda Vale Verde', short: 'Vale Verde', dx: 5000, dz: 4500, ring: true,
     len: 500, width: 16, surface: 2, grade: 0.01, bank: -0.02, difficulty: 4, color: '#6cc04a',
-    crops: ['soy', 'corn'], weather: 'humid', marks: 'tyres', aircraft: ['ipanema', 'at502', 'r44'],
+    crops: ['soy', 'corn'], weather: 'humid', marks: 'tyres', aircraft: ['ipanema', 'at502', 'r44', 'thrush'],
     props: [['house', -480, -200, 0], ['tower', -440, -172], ['corral', -250, 95]],
   },
   {
@@ -460,7 +464,7 @@ export const FARMS = [
   {
     id: 'chapada', name: 'Fazenda Chapada dos Ventos', short: 'Chapada', dx: -4500, dz: 5000, ring: true,
     len: 520, width: 18, surface: 5, grade: 0, bank: 0.006, difficulty: 5, color: '#9b72cf',
-    crops: ['soy'], weather: 'windy', marks: 'stones', wind: { mean: 1.45, gust: 2.2 }, aircraft: ['ipanema', 'at502', 'r44'],
+    crops: ['soy'], weather: 'windy', marks: 'stones', wind: { mean: 1.45, gust: 2.2 }, aircraft: ['ipanema', 'at502', 'r44', 'thrush'],
     props: [['house', -490, -210, 0], ['mast', 300, -480], ['turbine', -800, 560], ['turbine', -560, 660], ['turbine', -320, 730]],
   },
 ];
@@ -477,7 +481,7 @@ function makeSite(f) {
     apron: mvr(BASE.apron, dx, dz),
     taxiway: { ...mvr(BASE.taxiway, dx, dz), z1: dz - f.width / 2 },
     hangar: mv(BASE.hangar, dx, dz),
-    pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz), parking3: mv(BASE.parking3, dx, dz),
+    pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz), parking3: mv(BASE.parking3, dx, dz), parking4: mv(BASE.parking4, dx, dz),
     helipad: mv(BASE.helipad, dx, dz),
     fuelTank: mv(BASE.fuelTank, dx, dz), mixTank: mv(BASE.mixTank, dx, dz),
     reservoirs: BASE.reservoirs.map((r) => mv(r, dx, dz)),

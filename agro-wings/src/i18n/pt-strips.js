@@ -130,4 +130,8 @@ export default {
   "Plateau farm in the south-west, 42 m above the plain at the escarpment edge: wind turbines, a radio mast and a wind that never stops.": "Fazenda de chapada no sudoeste, 42 m acima da planície na borda da escarpa: aerogeradores, uma torre de rádio e um vento que não para.",
   "520 × 18 m pale sand, cross slope, on the plateau": "520 × 18 m de areia clara, caimento lateral, na chapada",
   "Strong, gusty wind": "Vento forte, com rajadas",
+  // Thrush 510G
+  'Turboprop Agricultural Aircraft': 'Avião Agrícola Turboélice',
+  'GE H80 turboprop · 800 shp': 'Turboélice GE H80 · 800 shp',
+  '1,930 L hopper · 863 L fuel · 4,763 kg MTOW': 'Hopper 1.930 L · 863 L combustível · PMD 4.763 kg',
 };

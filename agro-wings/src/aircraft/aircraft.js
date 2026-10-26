@@ -536,7 +536,7 @@ export class Aircraft {
       gLoad: o.gLoad, slip: o.beta, yawRate: -fm.omega.y, onGround: o.onGround, reg: this.type.reg,
       stall: o.stall, spray: !!this.game.sprayer?.on, brake: fm.brake > 0.3 || fm.parkBrake,
       engine: fm.engine, flaps: fm.flaps, hdg: this.headingDeg(), hgt: this.workHeight(), vsFpm: o.vs * FT * 60,
-      flow: this.game.sprayer?.flowNow ?? 0, gps: this.game.guidance, pitch: att.pitch, bank: att.bank,
+      flow: this.game.sprayer?.flowNow ?? 0, gps: this.game.guidance, pitch: att.pitch, bank: att.bank, gs: o.groundSpeed * KT,
     };
   }
 
