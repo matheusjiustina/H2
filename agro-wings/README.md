@@ -2735,6 +2735,30 @@ the yellow grab handles and the lower hopper sight.
   view or with the camera within 9 m; the live textures only when what
   they show changes.
 
+### EMB-203 final geometry pass
+
+After the PS-BYA side photograph and the in-game captures
+(`src/aircraft/e203Model.js`; wings, winglets, flaps, ailerons, propeller,
+ag kit, cockpit, physics and contact points unchanged):
+- **Rear fuselage.** Narrower from behind the cabin aft (half width at
+  z −3.5: 0.33 → 0.30 m; at −4.5: 0.185 → 0.16 m); the underside rises
+  toward the tail (−0.50 → −0.43 m at −3.5; −0.38 → −0.28 m at the rudder
+  post) and the dorsal sits 1–2 cm lower, so it no longer runs back as a
+  deep parallel block.
+- **Cabin.** Roof 3 cm higher (1.04 → 1.07 m): as far as the type's 2.43 m
+  parked height allows (the test now reads 2.47 m).
+- **Fin and rudder.** The square top became a rounded one (leading edge
+  easing over into the top, rudder top rounded over it), same height; the
+  rudder runs 13 cm further down, past the fuselage's underside.
+- **Tailplane.** Raised from low on the cone (y −0.28) to mid-height
+  (−0.10), as in the photograph; the elevator turns about the same hinge
+  line, moved with it.
+- **Nose.** The last 0.45 m of the cowl round off into the spinner (lip's
+  lower half drawn in, rounder sections), chin inlet moved up with it.
+- **Tailwheel.** A ventral keel under the tail carries the mount; the leaf
+  spring from it to the fork is about half as long as before. The contact
+  point is the flight model's and did not move.
+
 ## Robinson R44 — exterior reconstruction and paint B
 
 Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor

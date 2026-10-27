@@ -71,8 +71,10 @@ export const E203_LIVERIES = [
 // Seen from above the body widens steadily to the cabin (0.97 m) and starts
 // narrowing again right behind it.
 const FWD_KEYS = [
-  K(2.14, 0.31, 0.1, -0.24, 0.41, 2.4, 2.4), K(2.02, 0.33, 0.09, -0.27, 0.43, 2.7, 2.6),
-  K(1.7, 0.36, 0.07, -0.33, 0.46, 3.0, 2.9), K(1.2, 0.395, 0.04, -0.41, 0.52, 3.4, 3.2),
+  // (final pass) the last 0.45 m round off into the spinner: the lip's
+  // lower half drawn in, rounder sections, no flat face below the spinner.
+  K(2.14, 0.29, 0.1, -0.17, 0.4, 2.3, 2.2), K(2.02, 0.315, 0.09, -0.235, 0.425, 2.5, 2.4),
+  K(1.7, 0.355, 0.07, -0.32, 0.46, 2.85, 2.75), K(1.2, 0.395, 0.04, -0.41, 0.52, 3.4, 3.2),
   K(0.6, 0.435, 0.0, -0.5, 0.58, 3.8, 3.6), K(0.0, 0.465, -0.04, -0.56, 0.62, 4.2, 3.8),
   K(-0.5, 0.485, -0.06, -0.58, 0.64, 4.3, 3.8),
 ];
@@ -96,17 +98,22 @@ const WS_Z = -0.5, WS_ZS = -0.62; // windshield base: centre / sides
 // 45° in the middle, concave into the dorsal) to a low dorsal near the sill
 // height, which runs on, rounded and narrowing, to the rudder post.
 const R = (z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT) => ({ z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT });
+// (final pass, after the PS-BYA side photograph) the roof 3 cm higher (as
+// far as the type's 2.43 m parked height allows); the
+// rear fuselage drawn in: narrower from behind the cabin aft (top view),
+// the underside rising toward the tail and the dorsal a little lower, so it
+// no longer runs back as a deep, parallel block.
 const AFT_KEYS = [
-  R(-1.78, 0.48, -0.06, -0.57, 3.8, 4.3, 0.64, 0.447, 1.04, 0.345, 0.07),
-  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.0, 0.33, 0.1),
-  R(-2.15, 0.46, -0.062, -0.562, 3.72, 4.1, 0.625, 0.435, 0.84, 0.3, 0.14),
-  R(-2.35, 0.445, -0.065, -0.555, 3.62, 3.9, 0.61, 0.41, 0.655, 0.29, 0.17),
-  R(-2.6, 0.425, -0.07, -0.545, 3.5, 3.7, 0.58, 0.36, 0.5, 0.29, 0.19),
-  R(-3.0, 0.385, -0.075, -0.525, 3.3, 3.4, 0.53, 0.3, 0.44, 0.27, 0.19),
-  R(-3.5, 0.33, -0.08, -0.5, 3.2, 3.1, 0.48, 0.25, 0.395, 0.235, 0.17),
-  R(-4.0, 0.265, -0.07, -0.47, 3.0, 2.9, 0.43, 0.21, 0.36, 0.19, 0.14),
-  R(-4.5, 0.185, -0.05, -0.44, 2.8, 2.7, 0.39, 0.18, 0.335, 0.13, 0.1),
-  R(-5.02, 0.085, -0.02, -0.38, 2.5, 2.5, 0.35, 0.15, 0.32, 0.06, 0.05),
+  R(-1.78, 0.48, -0.06, -0.57, 3.8, 4.3, 0.64, 0.447, 1.07, 0.345, 0.075),
+  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.03, 0.33, 0.11),
+  R(-2.15, 0.455, -0.062, -0.56, 3.72, 4.1, 0.625, 0.435, 0.88, 0.3, 0.15),
+  R(-2.35, 0.435, -0.065, -0.55, 3.62, 3.9, 0.61, 0.41, 0.67, 0.28, 0.17),
+  R(-2.6, 0.41, -0.07, -0.535, 3.5, 3.7, 0.58, 0.36, 0.5, 0.275, 0.19),
+  R(-3.0, 0.36, -0.07, -0.495, 3.3, 3.4, 0.52, 0.3, 0.43, 0.25, 0.18),
+  R(-3.5, 0.3, -0.06, -0.43, 3.1, 3.1, 0.46, 0.25, 0.38, 0.21, 0.16),
+  R(-4.0, 0.235, -0.04, -0.37, 2.9, 2.9, 0.41, 0.21, 0.35, 0.165, 0.13),
+  R(-4.5, 0.16, -0.02, -0.32, 2.7, 2.7, 0.37, 0.18, 0.33, 0.11, 0.09),
+  R(-5.02, 0.075, 0.0, -0.28, 2.5, 2.5, 0.34, 0.15, 0.31, 0.05, 0.045),
 ];
 const CABIN = AFT_KEYS[0];
 // Upper contour of a structured section, left half (x ≥ 0), from the rim up
@@ -483,7 +490,7 @@ export function e203Extent() {
   const bb = wl.geo.boundingBox;
   return {
     span: 2 * bb.max.x, length: E203_DIM.spinnerZ - E203_DIM.rudderZ,
-    tops: [[0, ROOF.yt, -1.45], [0, 1.135, -4.95], [bb.max.x, bb.max.y, -1.2]],
+    tops: [[0, ROOF.yt, -1.45], [0, 1.15, -5.0], [bb.max.x, bb.max.y, -1.2]],
   };
 }
 
@@ -590,7 +597,7 @@ export function createE203Model(panel, opts = {}) {
     const yb = Math.max(0, 1 - Math.abs(y + 0.42) / 0.2), zb = Math.max(0, 1 - Math.abs(z + 0.43) / 1.1);
     a *= 1 - 0.32 * yb * Math.sqrt(zb);
     // Tailplane root; just behind the spinner.
-    if (z < -3.95 && z > -5.05) a *= 1 - 0.2 * Math.max(0, 1 - Math.abs(y + 0.28) / 0.12);
+    if (z < -3.95 && z > -5.05) a *= 1 - 0.2 * Math.max(0, 1 - Math.abs(y + 0.1) / 0.12);
     if (z > 2.0) a *= 0.82 + 0.18 * clamp((2.14 - z) / 0.14, 0, 1);
     return clamp(a, 0.5, 1);
   };
@@ -634,8 +641,8 @@ export function createE203Model(panel, opts = {}) {
     add('polished', tx(new THREE.TorusGeometry(0.068, 0.009, 8, 28), -0.215, AX + 0.03, z + 0.002), true);
     add('polished', tx(new THREE.CircleGeometry(0.05, 22), 0.205, AX - 0.04, z + 0.001, 0, 0, 0, [1.3, 0.85, 1]));
     add('lens', tx(new THREE.SphereGeometry(0.05, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0.205, AX - 0.04, z + 0.003, Math.PI / 2, 0, 0, [1.3, 0.25, 0.85]));
-    add('dark', rbox(0.25, 0.075, 0.05, 0.02, 0, AX - 0.31, 2.112));
-    for (let k = 0; k < 4; k++) add('steel', tx(new THREE.BoxGeometry(0.23, 0.005, 0.005), 0, AX - 0.335 + k * 0.016, 2.14), true);
+    add('dark', rbox(0.22, 0.065, 0.05, 0.02, 0, AX - 0.265, 2.112));
+    for (let k = 0; k < 4; k++) add('steel', tx(new THREE.BoxGeometry(0.2, 0.005, 0.005), 0, AX - 0.288 + k * 0.014, 2.14), true);
   }
   // Exhaust stubs out of the bottom of the cowl, either side.
   for (const sx of [1, -1]) {
@@ -805,15 +812,20 @@ export function createE203Model(panel, opts = {}) {
   // Fin: 45° leading edge from the dorsal, square top; rudder on a
   // straight vertical hinge, running down past the end of the cone. The
   // root reaches down into the low dorsal; the top is where it was.
-  const finSt = [[0.27, -4.0, 1.04], [0.36, -4.08, 0.96], [0.6, -4.3, 0.74], [0.85, -4.55, 0.49], [1.0, -4.71, 0.33], [1.08, -4.8, 0.24], [1.12, -4.85, 0.19]];
+  // (final pass) the leading edge easing into a rounded top instead of a
+  // square corner; the top stays at the type's 2.43 m height, now about
+  // level with the raised roof (as on PS-BYA).
+  const finSt = [[0.27, -4.0, 1.04], [0.349, -4.08, 0.96], [0.559, -4.29, 0.75], [0.778, -4.5, 0.54], [0.927, -4.64, 0.4], [1.023, -4.74, 0.3], [1.085, -4.82, 0.22], [1.115, -4.9, 0.14]];
   add('livery', liveryUV(tagged(vfin(airfoil(0, 1, 0.12, 0, 0.4, 12), finSt))));
   // Dorsal fillet: a concave rise from the spine that runs into the fin's
   // leading edge (its last station is inside the fin).
   add('livery', liveryUV(tagged(loft(sampleStations([
-    K(-3.4, 0.015, 0.385, 0.375, 0.402, 2.2, 2.2), K(-3.75, 0.035, 0.37, 0.358, 0.44, 2.2, 2.2),
-    K(-4.05, 0.05, 0.36, 0.345, 0.52, 2.2, 2.2), K(-4.32, 0.055, 0.35, 0.335, 0.645, 2.2, 2.2),
+    K(-3.4, 0.015, 0.37, 0.36, 0.388, 2.2, 2.2), K(-3.75, 0.035, 0.355, 0.343, 0.43, 2.2, 2.2),
+    K(-4.05, 0.05, 0.345, 0.33, 0.52, 2.2, 2.2), K(-4.32, 0.055, 0.335, 0.32, 0.645, 2.2, 2.2),
   ], 20), 12, null))));
-  const rudSt = [[-0.32, HINGE_Z, 0.4], [0.0, HINGE_Z, 0.42], [0.45, HINGE_Z, 0.43], [0.9, HINGE_Z, 0.42], [1.08, HINGE_Z, 0.38], [1.135, HINGE_Z - 0.02, 0.27]];
+  // Rudder: deep chord down past the fuselage's underside (the real one
+  // reaches the tailwheel), the top rounded over the fin's top.
+  const rudSt = [[-0.45, HINGE_Z, 0.36], [-0.3, HINGE_Z, 0.4], [0.0, HINGE_Z, 0.42], [0.45, HINGE_Z, 0.43], [0.9, HINGE_Z, 0.43], [1.02, HINGE_Z, 0.41], [1.1, HINGE_Z - 0.01, 0.35], [1.135, HINGE_Z - 0.04, 0.24], [1.15, HINGE_Z - 0.08, 0.13]];
   const rudGeo = liveryUV(tagged(vfin(airfoil(0, 1, 0.13, 0, 0.3, 8), rudSt)));
   const rudTab = tagged(tx(new THREE.BoxGeometry(0.012, 0.26, 0.08), 0, 0.15, HINGE_Z - 0.42));
   rudGeo.translate(0, 0, -HINGE_Z); rudTab.translate(0, 0, -HINGE_Z);
@@ -824,10 +836,11 @@ export function createE203Model(panel, opts = {}) {
   rudder.add(rudMesh, new THREE.Mesh(rudTab, M.paint));
   rudder.add(new THREE.Mesh(tagged(ball([0, -0.29, -0.42], 0.022, 8)), M.white)); // tail light
   root.add(rudder);
-  add('beacon', tx(new THREE.SphereGeometry(0.03, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, 1.125, -4.94));
+  add('beacon', tx(new THREE.SphereGeometry(0.03, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, 1.125, -4.96));
   // Tailplane: rectangular, low on the cone; elevators with a trim tab;
   // tips in the scheme's tip colour.
-  const STY = -0.28, SLE = -4.05, SC = 0.92, ELEV = 0.61, STIP = 2.1;
+  // (final pass) mid-height on the rear fuselage, as on PS-BYA.
+  const STY = -0.1, SLE = -4.05, SC = 0.92, ELEV = 0.61, STIP = 2.1;
   const sst = (x) => ({ x, y: STY + x * 0.005, le: SLE, chord: SC });
   const elevParts = [];
   for (const side of [1, -1]) {
@@ -906,9 +919,12 @@ export function createE203Model(panel, opts = {}) {
     const g = new THREE.Group();
     const R = cfg.radius;
     const fz = cfg.p[2] + 0.08, fy = cfg.p[1] + R + 0.13;
-    // Long leaf spring from under the cone back to the steerable fork.
-    add('ink', bar([0, -0.42, -4.45], [0, fy + 0.03, fz + 0.02], 0.05, 0.018));
-    add('dark', rbox(0.1, 0.05, 0.16, 0.02, 0, -0.42, -4.45));
+    // Ventral keel under the tail carrying the tailwheel mount, a short
+    // leaf spring from it back to the steerable fork (the contact point,
+    // cfg.p, is the flight model's and does not move).
+    add('livery', liveryUV(tagged(vfin(airfoil(0, 1, 0.1, 0, 0.4, 10), [[-0.25, -4.28, 0.66], [-0.5, -4.46, 0.48], [-0.7, -4.6, 0.3]]))));
+    add('ink', bar([0, -0.7, -4.72], [0, fy + 0.03, fz + 0.02], 0.05, 0.018));
+    add('dark', rbox(0.07, 0.05, 0.14, 0.015, 0, -0.71, -4.74));
     add('ink', tx(new THREE.CylinderGeometry(0.03, 0.03, 0.07, 10), 0, fy + 0.03, fz));
     const fork = new THREE.Group();
     fork.position.set(0, fy, fz);
