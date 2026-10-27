@@ -36,51 +36,52 @@ const INK = '#f1f0ea', GREEN = '#22a94a', YELLOW = '#f1c21b', RED = '#df2a1c', W
 // built in e203Cockpit.js; everything here sits inside it.
 export const E203_PANEL = {
   w: 0.96, h: 0.36, W: 2048, H: 768,
-  // Round instruments: bezel radius r, face radius f.
+  // Round instruments: bezel radius r, face radius f, atlas cell.
   dials: {
-    accel: { u: -0.392, v: 0.222, r: 0.031, f: 0.0255, cell: 5 },
-    asi: { u: -0.304, v: 0.226, r: 0.0415, f: 0.0365, cell: 0 },
-    alt: { u: -0.212, v: 0.226, r: 0.0415, f: 0.0365, cell: 1 },
-    mpff: { u: -0.396, v: 0.132, r: 0.0415, f: 0.0365, cell: 3 },
-    cht: { u: -0.304, v: 0.132, r: 0.0415, f: 0.0365, cell: 4 },
-    rpm: { u: -0.212, v: 0.132, r: 0.0415, f: 0.0365, cell: 2 },
-    amp: { u: -0.123, v: 0.088, r: 0.031, f: 0.0255, cell: 6 },
-    chrono: { u: 0.048, v: 0.108, r: 0.031, f: 0.0255, cell: 7 },
+    accel: { u: -0.335, v: 0.215, r: 0.031, f: 0.0255, cell: 5 },
+    asi: { u: -0.245, v: 0.215, r: 0.0415, f: 0.0365, cell: 0 },
+    alt: { u: -0.155, v: 0.215, r: 0.0415, f: 0.0365, cell: 1 },
+    mpff: { u: -0.335, v: 0.125, r: 0.0415, f: 0.0365, cell: 3 },
+    cht: { u: -0.245, v: 0.125, r: 0.0415, f: 0.0365, cell: 4 },
+    rpm: { u: -0.155, v: 0.125, r: 0.0415, f: 0.0365, cell: 2 },
+    amp: { u: -0.064, v: 0.085, r: 0.031, f: 0.0255, cell: 6 },
+    chrono: { u: 0.103, v: 0.104, r: 0.029, f: 0.024, cell: 7 },
   },
   // Sub-plates (u0, u1, v0, v1; v1 = top: clipped by the outline).
   plates: [
-    [-0.48, -0.172, 0, 1], [-0.168, -0.078, 0.158, 1], [-0.168, -0.078, 0, 0.154],
-    [-0.074, 0.092, 0.168, 1], [-0.074, 0.092, 0, 0.164], [0.096, 0.48, 0.255, 1], [0.096, 0.48, 0, 0.251],
+    [-0.47, -0.112, 0, 1], [-0.108, -0.02, 0.158, 1], [-0.108, -0.02, 0, 0.154],
+    [-0.016, 0.142, 0.168, 1], [-0.016, 0.142, 0, 0.164], [0.146, 0.47, 0.25, 1], [0.146, 0.47, 0, 0.246],
   ],
   // Lamps: lens radius, colour, label, the state that lights them.
   lamps: [
-    { id: 'start', u: -0.150, v: 0.300, r: 0.0085, col: 0xe8281c, label: 'PARTIDA' },
-    { id: 'alt', u: -0.152, v: 0.250, r: 0.0075, col: 0xe8281c, label: 'ALTERN.' },
-    { id: 'oil', u: -0.123, v: 0.250, r: 0.0075, col: 0xe8281c, label: 'PRESS.\nÓLEO' },
-    { id: 'fuel', u: -0.094, v: 0.250, r: 0.0075, col: 0xf0a21a, label: 'COMB.\nBAIXO' },
-    { id: 'stall', u: -0.355, v: 0.288, r: 0.0042, col: 0xff2a1a, label: '' },
-    { id: 'spray', u: 0.048, v: 0.150, r: 0.0055, col: 0xf0b21a, label: 'APLIC.' },
+    { id: 'start', u: -0.092, v: 0.300, r: 0.0085, col: 0xe8281c, label: 'PARTIDA' },
+    { id: 'alt', u: -0.093, v: 0.252, r: 0.0072, col: 0xe8281c, label: 'ALTERN.' },
+    { id: 'oil', u: -0.064, v: 0.252, r: 0.0072, col: 0xe8281c, label: 'PRESS.\nÓLEO' },
+    { id: 'fuel', u: -0.035, v: 0.252, r: 0.0072, col: 0xf0a21a, label: 'COMB.\nBAIXO' },
+    { id: 'stall', u: -0.288, v: 0.266, r: 0.0042, col: 0xff2a1a, label: '' },
+    { id: 'spray', u: 0.103, v: 0.148, r: 0.0055, col: 0xf0b21a, label: 'APLIC.', side: 'r' },
   ],
-  key: { u: -0.104, v: 0.300, r: 0.017 },
-  compass: { u: -0.123, v: 0.196, w: 0.058, h: 0.05, win: [0.036, 0.017] },
-  testSw: { u: -0.150, v: 0.134 },
-  blanks: [[-0.123, 0.030, 0.019], [0.048, 0.040, 0.019]],
+  key: { u: -0.046, v: 0.300, r: 0.016 },
+  compass: { u: -0.064, v: 0.198, w: 0.056, h: 0.048, win: [0.036, 0.017] },
+  testSw: { u: -0.094, v: 0.142 },
+  blanks: [[-0.064, 0.028, 0.018], [0.103, 0.036, 0.018]],
   // The two windows into the hopper, the trim indicator.
-  hopperWin: { u: 0.006, v: 0.262, w: 0.13, h: 0.112, r: 0.009 },
-  hopperLow: { u: -0.028, v: 0.068, w: 0.046, h: 0.085, r: 0.006 },
-  trim: { u: -0.028, v: 0.139, w: 0.058, h: 0.026 },
-  totalizer: { u: 0.150, v: 0.300, w: 0.092, h: 0.036 },
+  hopperWin: { u: 0.063, v: 0.262, w: 0.13, h: 0.11, r: 0.009 },
+  hopperLow: { u: 0.028, v: 0.066, w: 0.044, h: 0.08, r: 0.006 },
+  trim: { u: 0.028, v: 0.138, w: 0.052, h: 0.024 },
+  totalizer: { u: 0.19, v: 0.298, w: 0.08, h: 0.034 },
   // Switch block: push caps over toggles.
-  block: { us: [0.222, 0.249, 0.276, 0.303], vCap: 0.300, vSw: 0.270, labels: ['BAT', 'ALTERN.', 'B. COMB.', 'LUZ PAINEL'] },
+  block: { us: [0.24, 0.261, 0.282, 0.303], vCap: 0.296, vSw: 0.268, labels: ['BAT', 'ALT.', 'B.COMB', 'LUZ'] },
   // Left switch row and breakers under the instruments.
-  row: { v: 0.054, us: [-0.428, -0.383, -0.338, -0.293, -0.248, -0.203], labels: ['NAV', 'STROBE', 'BEACON', 'FAROL', 'TÁXI', 'PITOT'] },
-  breakers: { v: 0.022, us: [-0.395, -0.364, -0.333, -0.302, -0.271, -0.240, -0.209], labels: ['5', '5', '10', '5', '15', '10', '5'], caps: ['INSTR', 'GPS', 'B.COMB', 'LUZES', 'PARTIDA', 'FAROL', 'VÁLV.'] },
-  redStrip: { u0: -0.455, u1: -0.172, v: 0.083, h: 0.011 },
-  regPlate: { u: -0.300, v: 0.288, w: 0.058, h: 0.015 },
+  row: { v: 0.048, us: [-0.39, -0.346, -0.302, -0.258, -0.214, -0.17], labels: ['NAV', 'STROBE', 'BEACON', 'FAROL', 'TÁXI', 'PITOT'] },
+  breakers: { v: 0.018, us: [-0.37, -0.337, -0.304, -0.271, -0.238, -0.205, -0.172], labels: ['5', '5', '10', '5', '15', '10', '5'], caps: ['INSTR', 'GPS', 'B.COMB', 'LUZES', 'PARTIDA', 'FAROL', 'VÁLV.'] },
+  redStrip: { u0: -0.395, u1: -0.118, v: 0.074, h: 0.0105 },
+  regPlate: { u: -0.33, v: 0.263, w: 0.056, h: 0.015 },
   // GPS housing (bezel) and the screen in it; soft keys along the bottom.
-  gps: { u: 0.262, v: 0.168, w: 0.21, h: 0.15, d: 0.045, screen: { u: 0.272, v: 0.178, w: 0.15, h: 0.1031 }, keysV: 0.107, keysU: [0.215, 0.252, 0.289, 0.326], side: { u: 0.172, vs: [0.205, 0.178, 0.151] } },
-  pushes: [[0.128, 0.062], [0.152, 0.062], [0.128, 0.036], [0.152, 0.036]],
-  vents: [[-0.447, 0.038, 0.021], [0.447, 0.038, 0.021]],
+  gps: { u: 0.31, v: 0.16, w: 0.175, h: 0.128, d: 0.045, screen: { u: 0.318, v: 0.168, w: 0.13, h: 0.0894 }, keysV: 0.107, keysU: [0.272, 0.302, 0.332, 0.362], side: { u: 0.2365, vs: [0.19, 0.168, 0.146] } },
+  pushes: [[0.178, 0.062], [0.201, 0.062], [0.178, 0.036], [0.201, 0.036]],
+  placard: { u: 0.33, v: 0.05, w: 0.15, h: 0.045 },
+  vents: [[-0.42, 0.03, 0.019], [0.42, 0.03, 0.019]],
 };
 const P = E203_PANEL;
 const S = P.W / P.w; // px per metre
@@ -93,10 +94,12 @@ export const E203_ANG = {
   alt1000: (ft) => ((((ft % 10000) + 10000) % 10000) / 10000) * Math.PI * 2,
   alt10k: (ft) => ((((ft % 100000) + 100000) % 100000) / 100000) * Math.PI * 2,
   rpm: (rpm) => (-135 + (clamp(rpm, 0, 3500) / 3500) * 270) * D2R,
-  mp: (inHg) => (205 + ((clamp(inHg, 10, 35) - 10) / 25) * 150) * D2R,
-  ff: (gph) => (155 - (clamp(gph, 0, 35) / 35) * 150) * D2R,
-  cht: (f) => (205 + ((clamp(f, 100, 500) - 100) / 400) * 150) * D2R,
-  oilT: (f) => (155 - ((clamp(f, 50, 250) - 50) / 200) * 150) * D2R,
+  // Dual gauges: the left scale climbs from seven o'clock, the right one
+  // from five, each over 130° (a gap at the top keeps the end figures apart).
+  mp: (inHg) => (210 + ((clamp(inHg, 10, 35) - 10) / 25) * 130) * D2R,
+  ff: (gph) => (150 - (clamp(gph, 0, 35) / 35) * 130) * D2R,
+  cht: (f) => (210 + ((clamp(f, 100, 500) - 100) / 400) * 130) * D2R,
+  oilT: (f) => (150 - ((clamp(f, 50, 250) - 50) / 200) * 130) * D2R,
   accel: (g) => (-90 + clamp(g, -2.2, 6.2) * 33.75) * D2R,
   amp: (a) => (clamp(a, -60, 60) / 60) * 70 * D2R,
 };
@@ -146,10 +149,14 @@ function drawFace(reg) {
     const R = P.regPlate;
     g.fillStyle = '#121315'; roundRect(g, X(R.u - R.w / 2), Y(R.v + R.h / 2), R.w * S, R.h * S, 5); g.fill();
     text(g, reg, X(R.u), Y(R.v) + 1, 25, WHITE);
-    text(g, 'ESTOL', X(-0.355), Y(0.272), 13, '#2a2c2e');
+    text(g, 'ESTOL', X(-0.288), Y(0.252), 12, '#2a2c2e');
   }
   // Lamp captions; key positions; compass and ammeter captions.
-  for (const l of P.lamps) if (l.label) text(g, l.label, X(l.u), Y(l.v - l.r - 0.0095), 12.5, '#26282b');
+  for (const l of P.lamps) {
+    if (!l.label) continue;
+    if (l.side === 'r') text(g, l.label, X(l.u + l.r + 0.004), Y(l.v), 12.5, '#26282b', true, 'left');
+    else text(g, l.label, X(l.u), Y(l.v - l.r - 0.0095), 12.5, '#26282b');
+  }
   {
     const K = P.key;
     const ring = [['DESL', -55], ['D', -25], ['E', 5], ['AMBOS', 35], ['PARTIDA', 70]];
@@ -159,8 +166,8 @@ function drawFace(reg) {
     }
     text(g, 'MAGNETOS', X(K.u), Y(K.v - K.r - 0.01), 11, '#26282b');
   }
-  text(g, 'TESTE DE\nLUZES', X(P.testSw.u + 0.03), Y(P.testSw.v), 11.5, '#26282b');
-  text(g, 'CARGA / DESCARGA\nDA BATERIA', X(P.dials.amp.u), Y(P.dials.amp.v + P.dials.amp.r + 0.012), 11.5, '#26282b');
+  text(g, 'TESTE DE LUZES', X(P.testSw.u + 0.0075), Y(P.testSw.v), 11, '#26282b', true, 'left');
+  text(g, 'AMPERÍMETRO', X(P.dials.amp.u), Y(P.dials.amp.v + P.dials.amp.r + 0.0072), 11, '#26282b');
   // Red fuel placard under the instruments.
   {
     const R = P.redStrip;
@@ -170,17 +177,17 @@ function drawFace(reg) {
   // Switch captions (left row, the block), breaker ratings and captions.
   for (const [i, u] of P.row.us.entries()) text(g, P.row.labels[i], X(u), Y(P.row.v + 0.019), 11.5, '#26282b');
   for (const [i, u] of P.block.us.entries()) text(g, P.block.labels[i], X(u), Y(P.block.vSw - 0.016), 9.5, '#26282b');
-  text(g, 'LIGA ▲', X(0.262), Y(P.block.vSw - 0.026), 9, '#55595d');
+  text(g, 'LIGA ▲', X(P.block.us[1] + 0.01), Y(P.block.vSw - 0.026), 9, '#55595d');
   for (const [i, u] of P.breakers.us.entries()) {
     text(g, P.breakers.caps[i], X(u), Y(P.breakers.v + 0.0125), 9, '#26282b');
     g.strokeStyle = 'rgba(30,32,34,0.6)'; g.lineWidth = 1.2; g.beginPath(); g.arc(X(u), Y(P.breakers.v), 0.0078 * S, 0, Math.PI * 2); g.stroke();
   }
-  text(g, 'DISJUNTORES — PUXAR PARA DESARMAR', X(-0.31), Y(0.006), 9.5, '#45494d');
+  text(g, 'DISJUNTORES — PUXAR PARA DESARMAR', X(-0.27), Y(0.005), 9, '#45494d');
   // Hopper window: graduation caption; compass correction card under it.
   {
     const H = P.hopperWin;
     text(g, 'VISOR DO HOPPER — 1.050 L', X(H.u), Y(H.v + H.h / 2 + 0.008), 11, '#26282b');
-    const cx = X(H.u), cy = Y(0.19), w = 0.11 * S, h = 0.028 * S;
+    const cx = X(H.u), cy = Y(H.v - H.h / 2 - 0.02), w = 0.11 * S, h = 0.026 * S;
     g.fillStyle = '#f2f1ec'; g.fillRect(cx - w / 2, cy - h / 2, w, h);
     g.strokeStyle = '#3a3d40'; g.lineWidth = 1.5; g.strokeRect(cx - w / 2, cy - h / 2, w, h);
     const heads = ['N', '30', '60', 'L', '120', '150', 'S', '210', '240', 'O', '300', '330'];
@@ -198,11 +205,11 @@ function drawFace(reg) {
   text(g, 'TOTALIZADOR', X(P.totalizer.u), Y(P.totalizer.v - P.totalizer.h / 2 - 0.007), 10.5, '#26282b');
   // Operating placards under the GPS (category, manoeuvres, the hopper).
   {
-    const x = X(0.33), y = Y(0.066);
-    g.fillStyle = '#e9e8e2'; g.fillRect(x - 0.085 * S, y - 0.028 * S, 0.17 * S, 0.052 * S);
-    g.strokeStyle = '#2b2d30'; g.lineWidth = 1.2; g.strokeRect(x - 0.085 * S, y - 0.028 * S, 0.17 * S, 0.052 * S);
-    const L = ['OPERAÇÃO NA CATEGORIA RESTRITA', 'APLICAÇÃO AGRÍCOLA — ESTA AERONAVE NÃO', 'DEVE TRANSPORTAR PASSAGEIROS', 'MANOBRAS ACROBÁTICAS PROIBIDAS', 'CARGA DO HOPPER LIMITADA PELO PMD 1.900 kg'];
-    L.forEach((t, i) => text(g, t, x, y - 0.02 * S + i * 0.0102 * S, 10, '#1d1f22', i === 0));
+    const Pl = P.placard, x = X(Pl.u), y = Y(Pl.v);
+    g.fillStyle = '#e9e8e2'; g.fillRect(x - (Pl.w / 2) * S, y - (Pl.h / 2) * S, Pl.w * S, Pl.h * S);
+    g.strokeStyle = '#2b2d30'; g.lineWidth = 1.2; g.strokeRect(x - (Pl.w / 2) * S, y - (Pl.h / 2) * S, Pl.w * S, Pl.h * S);
+    const L = ['OPERAÇÃO NA CATEGORIA RESTRITA', 'APLICAÇÃO AGRÍCOLA — NÃO TRANSPORTAR', 'PASSAGEIROS · MANOBRAS ACROBÁTICAS', 'PROIBIDAS · CARGA DO HOPPER LIMITADA', 'PELO PMD DE 1.900 kg'];
+    L.forEach((t, i) => text(g, t, x, y - 0.0176 * S + i * 0.0088 * S, 8.6, '#1d1f22', i === 0));
   }
   text(g, 'VENT.', X(P.vents[0][0]), Y(P.vents[0][1] + P.vents[0][2] + 0.008), 10, '#26282b');
   text(g, 'VENT.', X(P.vents[1][0]), Y(P.vents[1][1] + P.vents[1][2] + 0.008), 10, '#26282b');
@@ -256,14 +263,14 @@ function drawDials(V) {
       g.beginPath(); g.moveTo(x + Math.cos(a) * r * 0.45, y + Math.sin(a) * r * 0.45); g.lineTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5); g.stroke();
       if (k % 20 === 0) T(g, String(k), x + Math.cos(a) * r * 0.37, y + Math.sin(a) * r * 0.37, 22, '#cfcfc8', false);
     }
-    T(g, 'MPH', x, y - r * 0.2, 30); T(g, 'AIRSPEED', x, y + r * 0.2, 22, '#cfcfc8', false); T(g, 'KNOTS', x, y + r * 0.31, 22, '#cfcfc8', false);
+    T(g, 'MPH', x, y - r * 0.2, 30); T(g, 'AIRSPEED', x, y + r * 0.07, 19, '#cfcfc8', false); T(g, 'KNOTS', x, y + r * 0.17, 17, '#cfcfc8', false);
   }
   // 1 — altimeter (0–9, 20 ft steps), Kollsman window, low-altitude flag.
   {
     const { x, y, r } = cell(1);
     faceBase(g, x, y, r);
     const ang = (v) => canvasAng((v / 10) * Math.PI * 2);
-    scale(g, x, y, r, ang, 0, 9.8, 0.2, 1, { numR: 0.66, size: 0.2 });
+    scale(g, x, y, r, ang, 0, 9.8, 0.2, 1, { numR: 0.66, size: 0.2, num: (v) => Math.round(v) });
     T(g, 'ALT', x, y - r * 0.32, 32);
     T(g, '100 FEET', x, y - r * 0.18, 20, '#cfcfc8', false);
     T(g, '1000 FT', x - r * 0.3, y + r * 0.04, 16, '#cfcfc8', false);
@@ -323,7 +330,7 @@ function drawDials(V) {
     const ang = (v) => canvasAng(A.accel(v));
     scale(g, x, y, r, ang, -2, 6, 0.5, 1, { numR: 0.64, size: 0.2, num: (v) => (v > 0 ? `+${v}` : String(v)) });
     T(g, 'G', x + r * 0.22, y + r * 0.04, 40); T(g, 'UNITS', x + r * 0.22, y + r * 0.24, 18, '#cfcfc8', false);
-    T(g, 'PUSH TO SET', x, y + r * 0.62, 15, '#9a9a94', false);
+    T(g, 'PUSH TO SET', x + r * 0.22, y + r * 0.4, 14, '#9a9a94', false);
   }
   // 6 — ammeter, centre zero.
   {
@@ -419,34 +426,60 @@ function drawLeather() {
 // the two windows and below the panel: litre graduations and the product
 // level from the aircraft's load. Height ↔ volume: the hopper narrows to its
 // gatebox, so a litre near the bottom takes more height than near the top.
-export const HOPPER_WALL = { W: 512, H: 1024, x0: -0.32, x1: 0.32, top: [0.15, 0.6], low: [-0.48, 0.22], split: 400, cap: 1050, yb: -0.45, yt: 0.585 };
+// Canvas x = 800 px/m from x = +0.32 (the pilot's left); the figures and
+// marks sit under the upper window (u ≈ 0.063, canvas ≈ 254–358).
+export const HOPPER_WALL = { W: 512, H: 1024, x0: -0.32, x1: 0.32, top: [0.15, 0.6], low: [-0.48, 0.22], split: 400, cap: 1050, yb: -0.45, yt: 0.585, mark: 324 };
 const HW = HOPPER_WALL;
 export const hopperY = (L) => HW.yb + (HW.yt - HW.yb) * clamp(L / HW.cap, 0, 1) ** 0.72;
 function wallRows(y) { // body y -> canvas row (upper region or tunnel face)
   if (y >= HW.top[0]) return { region: 'top', row: (1 - (y - HW.top[0]) / (HW.top[1] - HW.top[0])) * HW.split };
   return { region: 'low', row: HW.split + (1 - (y - HW.low[0]) / (HW.low[1] - HW.low[0])) * (HW.H - HW.split) };
 }
+// Lower face (between the pilot's legs), as in the cabin photographs: a U
+// slot in an aluminium frame through which the product is seen, the
+// in-flight scale (VÔO) on its right and the parked scale (SOLO) on its
+// left. Parked on the tailwheel the product runs aft, so a mark reads fewer
+// litres on the ground than at the same height in flight: about 1 : 1.4
+// (read off the photograph's two scales, e.g. SOLO 300 beside VÔO 400–450).
+export const HOPPER_SLOT = { x: 256, w: 36, y0: -0.3, y1: 0.1 };
+const SLOT = HOPPER_SLOT, SOLO_K = 1.4;
+const slotRows = () => [wallRows(SLOT.y1).row, wallRows(SLOT.y0).row];
 function drawHopperBase() {
   const c = canvas(HW.W, HW.H), g = c.getContext('2d');
   g.fillStyle = '#efc11e'; g.fillRect(0, 0, HW.W, HW.H);
   // Fibreglass weave and light through it.
   const r = rng(5);
   for (let i = 0; i < 26000; i++) { g.fillStyle = `rgba(${r() > 0.5 ? '255,240,180' : '150,105,10'},0.06)`; g.fillRect(r() * HW.W, r() * HW.H, 2, 2); }
-  const mark = (L, label) => {
+  // Upper wall (through the panel window): big figures, the hopper's own.
+  const markTop = (L, label) => {
     const y = hopperY(L);
-    for (const region of ['top', 'low']) {
-      const rr = region === 'top' ? HW.top : HW.low;
-      if (y < rr[0] || y > rr[1]) continue;
-      const row = wallRows(y).row;
-      // Painted like the hopper's own scale: the number, then its mark.
-      const big = L % 100 === 0;
-      g.fillStyle = '#16140e';
-      g.fillRect(big ? 270 : 286, row - (big ? 4 : 2.5), big ? 44 : 28, big ? 8 : 5);
-      if (label) text(g, label, 236, row, 40, '#16140e');
-    }
+    if (y < HW.top[0] || y > HW.top[1]) return;
+    const row = wallRows(y).row, big = L % 100 === 0;
+    g.fillStyle = '#16140e';
+    g.fillRect(big ? HW.mark : HW.mark + 10, row - (big ? 4 : 2.5), big ? 32 : 22, big ? 8 : 5);
+    if (label) text(g, label, HW.mark - 34, row, 38, '#16140e');
   };
-  for (let L = 50; L <= HW.cap; L += 50) mark(L, L % 100 === 0 ? String(L) : null);
-  mark(HW.cap, 'MÁX');
+  for (let L = 50; L <= HW.cap; L += 50) markTop(L, L % 100 === 0 ? String(L) : null);
+  markTop(HW.cap, 'MÁX');
+  // Lower face: the slot, its frame and the two scales.
+  const [ra, rb] = slotRows(), x0 = SLOT.x - SLOT.w / 2, x1 = SLOT.x + SLOT.w / 2;
+  g.fillStyle = 'rgba(70,52,12,0.32)'; roundRect(g, x0, ra, SLOT.w, rb - ra, SLOT.w / 2); g.fill();
+  g.strokeStyle = '#8d949b'; g.lineWidth = 9; roundRect(g, x0 - 5, ra - 5, SLOT.w + 10, rb - ra + 10, SLOT.w / 2 + 5); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 2; roundRect(g, x0 - 8, ra - 8, SLOT.w + 16, rb - ra + 16, SLOT.w / 2 + 8); g.stroke();
+  for (const yy of [ra + 12, (ra + rb) / 2, rb - 12]) for (const xx of [x0 - 5, x1 + 5]) { g.fillStyle = '#5d636a'; g.beginPath(); g.arc(xx, yy, 3.5, 0, Math.PI * 2); g.fill(); }
+  const scaleLow = (k, side, cap) => {
+    for (let L = 100; L <= 800; L += 50) {
+      const y = hopperY(L * k);
+      if (y < SLOT.y0 + 0.02 || y > SLOT.y1 - 0.01) continue;
+      const row = wallRows(y).row, big = L % 100 === 0;
+      const xm = side > 0 ? x1 + 14 : x0 - 14 - (big ? 24 : 14);
+      g.fillStyle = '#16140e'; g.fillRect(xm, row - (big ? 3 : 2), big ? 24 : 14, big ? 6 : 4);
+      if (big) text(g, String(L), side > 0 ? x1 + 44 : x0 - 44, row, 24, '#16140e', true, side > 0 ? 'left' : 'right');
+    }
+    text(g, cap, side > 0 ? x1 + 44 : x0 - 44, rb + 22, 22, '#16140e', true, side > 0 ? 'left' : 'right');
+  };
+  scaleLow(1, 1, 'VÔO');
+  scaleLow(SOLO_K, -1, 'SOLO');
   return c;
 }
 
@@ -483,8 +516,20 @@ export function createE203Panel({ reg: reg0 = 'PR-IPB' } = {}) {
       const r0 = region === 'top' ? 0 : HW.split, r1 = region === 'top' ? HW.split : HW.H;
       if (y < rr[0]) continue;
       const row = y > rr[1] ? r0 : wallRows(y).row;
-      g.fillStyle = 'rgba(70,58,18,0.42)'; g.fillRect(0, row, HW.W, r1 - row);
-      if (y <= rr[1]) { g.fillStyle = 'rgba(255,250,215,0.85)'; g.fillRect(0, row - 3, HW.W, 4); g.fillStyle = 'rgba(40,32,8,0.5)'; g.fillRect(0, row + 1, HW.W, 3); }
+      // Through the painted wall the product only darkens it; in the lower
+      // face's slot it shows plainly, with its meniscus.
+      const low = region === 'low';
+      g.fillStyle = `rgba(70,58,18,${low ? 0.16 : 0.42})`; g.fillRect(0, row, HW.W, r1 - row);
+      if (y <= rr[1] && !low) { g.fillStyle = 'rgba(255,250,215,0.85)'; g.fillRect(0, row - 3, HW.W, 4); g.fillStyle = 'rgba(40,32,8,0.5)'; g.fillRect(0, row + 1, HW.W, 3); }
+      if (low) {
+        const [ra, rb] = slotRows(), top = Math.max(row, ra);
+        if (top < rb) {
+          g.save(); roundRect(g, SLOT.x - SLOT.w / 2, ra, SLOT.w, rb - ra, SLOT.w / 2); g.clip();
+          g.fillStyle = 'rgba(52,40,10,0.62)'; g.fillRect(0, top, HW.W, rb - top);
+          if (row > ra) { g.fillStyle = 'rgba(255,248,205,0.9)'; g.fillRect(0, row - 2, HW.W, 3); }
+          g.restore();
+        }
+      }
     }
   });
   drawHopper(0);

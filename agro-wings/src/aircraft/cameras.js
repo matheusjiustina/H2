@@ -7,6 +7,7 @@ import { clamp, damp, smoothstep } from '../core/math.js';
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 const Y = new THREE.Vector3(0, 1, 0);
 const FLIP = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI);
+const NO_KEYS = { x: 0, y: 0, zoom: 0, reset: false };
 
 export class CameraRig {
   constructor(camera) {
@@ -45,15 +46,30 @@ export class CameraRig {
     ac.model.pilot.visible = this.mode !== 'cockpit';
     ac.model.cockpit.visible = true;
     const dragLook = mouse.buttons & 1;
-    if (mouse.wheel) {
+    // Look keys (held: turn the head / zoom at a steady rate; reset: back
+    // to the type's default view). Only the head turns and the lens zooms:
+    // the eye stays where it is, so nothing passes through the panel.
+    const K = mouse.keys ?? NO_KEYS;
+    const wheel = mouse.wheel + K.zoom * dt * 12;
+    if (K.reset) {
+      this.zoom.cockpit = 1; this.zoom.chase = 1; this.chaseOff.yaw = 0; this.chaseOff.pitch = 0;
+      if (this.mode === 'cockpit') { this.look.yaw = 0; this.look.pitch = C.cockpitPitch ?? -0.3; }
+    }
+    if (wheel) {
       // Scroll up zooms in, down zooms out (limited).
-      if (this.mode === 'cockpit') this.zoom.cockpit = clamp(this.zoom.cockpit * (1 + mouse.wheel * 0.1), 0.35, 1.7);
-      else if (this.mode === 'chase') this.zoom.chase = clamp(this.zoom.chase * (1 + mouse.wheel * 0.1), 0.6, 1.4);
+      if (this.mode === 'cockpit') this.zoom.cockpit = clamp(this.zoom.cockpit * (1 + wheel * 0.1), 0.35, 1.7);
+      else if (this.mode === 'chase') this.zoom.chase = clamp(this.zoom.chase * (1 + wheel * 0.1), 0.6, 1.4);
     }
     if (this.mode === 'cockpit') {
       if (dragLook) {
         this.look.yaw = clamp(this.look.yaw - mouse.dx * 1.6, -2.6, 2.6);
         this.look.pitch = clamp(this.look.pitch - mouse.dy * 1.6, -1.1, 0.9);
+      }
+      if (K.x || K.y) {
+        // Slower when zoomed in, so the instruments can be read one by one.
+        const r = 1.5 * Math.min(1, this.zoom.cockpit);
+        this.look.yaw = clamp(this.look.yaw - K.x * r * dt, -2.6, 2.6);
+        this.look.pitch = clamp(this.look.pitch + K.y * r * 0.75 * dt, -1.1, 0.9);
       }
       // Vibration: engine (rpm) + ground roughness; g-load sinks the head.
       const eng = fm.rpm > 300 ? 0.0009 + 0.0008 * smoothstep(vib[0], vib[1], fm.rpm) * (ac.A?.turbine ? 0.5 : 1) : 0;
@@ -99,6 +115,9 @@ export class CameraRig {
       if (dragLook) {
         this.chaseOff.yaw -= mouse.dx * 1.6;
         this.chaseOff.pitch = clamp(this.chaseOff.pitch + mouse.dy * 1.2, -0.5, 0.9);
+      } else if (K.x || K.y) {
+        this.chaseOff.yaw -= K.x * 1.5 * dt;
+        this.chaseOff.pitch = clamp(this.chaseOff.pitch - K.y * 0.9 * dt, -0.5, 0.9);
       } else {
         this.chaseOff.yaw = damp(this.chaseOff.yaw, 0, 1.5, dt);
         this.chaseOff.pitch = damp(this.chaseOff.pitch, 0, 1.5, dt);

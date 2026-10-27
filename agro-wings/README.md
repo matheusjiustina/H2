@@ -2657,3 +2657,80 @@ surfaces, gear contact points, ag kit, physics and paint layout kept):
 - The real spinner looks larger in the front-quarter photo.
 - The windshield's lower side corners look lower on the real aircraft.
 - The photo comparisons use estimated camera positions, not surveyed ones.
+
+### EMB-203 cockpit (phase 02)
+
+`src/aircraft/e203Panel.js` (layout, dial faces, live screens),
+`src/aircraft/e203Cockpit.js` (3D), placed in the corrected cabin by
+`e203Model.js`. No document with the 203's panel was found, so the fit
+follows one aircraft: the 203 PS-SBF in its start-and-taxi video (panel,
+glareshield, hopper window, lower hopper face, the lightbar on the cowl).
+The four cabin photographs (Ipanemas 202) gave the shapes, materials,
+the yellow grab handles and the lower hopper sight.
+
+- **Glareshield.** A black leather bullnose lofted along the windshield's
+  base across the cabin: from under the glass aft over the top, round the
+  nose and back under to the panel's top edge, 6 cm deep in the middle and
+  thinning into trim strips down the side walls. One piece; its shape alone
+  reads as the Ipanema's hood.
+- **Panel.** Light-grey 3 mm plate tilted back 8°, cut to the cabin walls
+  and the glareshield's underside, with real holes for every instrument,
+  lamp, window and unit; sub-plates with dark seams and screws, a return
+  flange under it.
+- **Instruments** (all from `Aircraft.instruments()`, nothing invented):
+  accelerometer with the max / min memory needles (reset on the ground with
+  the engine off), airspeed (MPH, knots inside, the type's V-speed arcs),
+  altimeter (100 / 1000 / 10 000 ft needles, Kollsman window, low-altitude
+  flag); manifold pressure / fuel flow, CYL / OIL temperatures, tachometer
+  with its live hour meter; ammeter (starter draw, recharge after the start,
+  the running load); quartz chronometer (time since the start); the
+  panel-mounted wet compass (a 3D card drum behind its window, lubber line);
+  the elevator trim indicator (its pointer follows the trim); the fuel
+  totalizer (quantity and flow). Each round instrument: can, recessed face
+  (512 px per dial), thin 3D needles, hub, glass, bezel ring, four flange
+  screws.
+- **Lamps and switches.** PARTIDA, ALTERN., PRESS. ÓLEO, COMB. BAIXO,
+  ESTOL, APLIC. light from the aircraft's state (starter engaged, alternator
+  not charging, oil pressure under 15 psi, fuel under 15 %, stall warning,
+  spray valve open); the magneto key turns with the engine (off / both /
+  start); the master, alternator, boost pump and the NAV / STROBE / BEACON
+  toggles follow the engine's state. Breakers, push buttons, eyeball vents,
+  blank plates.
+- **Hopper.** The big window shows the yellow fibreglass wall with the
+  hopper's own large figures (as on PS-SBF), the narrow lower window its
+  middle; below the panel, between the pilot's legs, the hopper's lower face
+  with the U sight slot in its aluminium frame and the two scales of the
+  photographs, VÔO (in flight) and SOLO (parked: about 1 : 1.4, read off
+  the photograph). The product level comes from the aircraft's load.
+- **GPS.** The game's own AGROWINGS NAV (`agroNav.js`, shared with the
+  Bell 206; not a copy) set into the panel's right side: housing, bezel,
+  recessed screen behind glass, the four page keys MAPA / DESTINO / MISSÃO /
+  COBERTURA, clicked in the cockpit view through the same ray as the game's
+  other cockpit buttons. Redrawn at most 4 Hz, only when its content changes.
+- **Controls.** White stick column on the torque-tube box (rubber boot,
+  black grip with trigger, trim hat and the red spray button; pivot at the
+  box, moved by aircraft.js); pedals with toe brakes; the power quadrant
+  against the left wall from the panel's lower corner aft (throttle,
+  propeller, mixture, friction lock); the spray valve lever and the fuel
+  shut-off on the right.
+- **Cabin.** Inner skins of the walls, the door (with its lower window,
+  handle and latch), the panels behind the B-posts, the headliner and the
+  rear bulkhead (harness anchor bar, fire extinguisher); dark A- and B-post
+  covers with rubber seals; kick strips; floor-side consoles over the wing's
+  centre section; tread-plate floor; the high-backed leather seat with its
+  four-point harness; the guidance lightbar on the cowl. No wiper: PS-SBF
+  has none. The wire-cutter and its cable stay outside the glass.
+- **Camera and free look.** The eye where the pilot figure's eyes are
+  (0.68 m behind the panel's base), 8.6° down, 68° vertical field of view.
+  Mouse drag or the keys Num 7 / Num 9 (left / right), Num ÷ / Num 2
+  (up / down), Num + / Num − (zoom) and Num 0 or Home (back to the default
+  view). Only the head turns and the lens zooms: the eye does not move, so
+  the view never passes through the panel. The same keys swing the chase
+  camera. On a touch screen (every aircraft): one finger dragged on the
+  view looks around, a double tap brings the default view back; the GPS
+  keys take a tap.
+- **Cost.** Static parts are merged per material; the small hardware sits
+  in a level of detail (shown within 24 m). Needles, lamps, switches, the
+  key, the compass card and the GPS keys are updated only in the cockpit
+  view or with the camera within 9 m; the live textures only when what
+  they show changes.

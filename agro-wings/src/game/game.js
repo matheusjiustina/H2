@@ -639,7 +639,13 @@ export class Game {
       this._presT = 0;
       if (!this.playing) this.rig.orbit.yaw += pdt * 0.06;
       if (this.replay.active) this.replay.update(pdt, mouse);
-      else this.rig.update(pdt, ac, this.playing && !this.controlsLocked ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
+      else {
+        const live = this.playing && !this.controlsLocked;
+        // Head look / zoom keys ride along with the mouse.
+        const ax = (a, b) => (input.isDown(a) ? 1 : 0) - (input.isDown(b) ? 1 : 0);
+        if (live) mouse.keys = { x: ax('lookRight', 'lookLeft'), y: ax('lookUp', 'lookDown'), zoom: ax('zoomOut', 'zoomIn'), reset: input.wasPressed('lookReset') };
+        this.rig.update(pdt, ac, live ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
+      }
       // Parked aircraft: drawn only within 1.2 km (a few pixels beyond that).
       // The flown aircraft is never culled (it may have been hidden while
       // it waited parked far away).

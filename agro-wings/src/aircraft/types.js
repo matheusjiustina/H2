@@ -5,6 +5,7 @@
 import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
+import { createE203Panel } from './e203Panel.js';
 import { createAirTractorModel, AT_SHADOW, atWingY } from './atModel.js';
 import { createTurbinePanel } from './atPanel.js';
 import { createR44Model, R44_SHADOW } from './r44Model.js';
@@ -334,7 +335,7 @@ AIRCRAFT_TYPES.e203 = {
   wash: [0, -1.0, -2],
   anim: { elev: 0.35, rud: 0.42, ail: 0.33, flap: 0.52, pedalZ: -0.53, disc: [380, 900], wash: [1500, 2600], vib: [1500, 2700] },
   vspeeds: { vs0: 48, vs1: 56, vfe: 95, vne: 140 },
-  camera: { dist: 13.5, height: 3.9, orbit: 20, cockpitPitch: -0.15, cockpitFov: 70 },
+  camera: { dist: 13.5, height: 3.9, orbit: 20, cockpitPitch: -0.15, cockpitFov: 68 },
   // The EMB-202A's IO-540 sound, with the 203's three-blade prop.
   audio: { profile: 'ipanema', blades: 3, cfg: { blades: 3, propDiameter: 2.18 } },
   fuel: { get name() { return t('ethanol'); }, price: GAME.fuelPrice },
@@ -346,13 +347,13 @@ AIRCRAFT_TYPES.e203 = {
     keepOut: { wing: [6.7, -1.45, 0.6], wingY: e203WingY, fus: [0.56, -0.6, 1.06, -5.5, 2.55], stab: [2.12, -0.36, -0.2, -5.0, -4.0] },
     veto: 9,
   },
-  stub: { eye: [0, 0.8, -1.45], fuelFiller: [2.3, -0.02, -0.17], hopperPort: [0.51, -0.26, -0.75] },
+  stub: { eye: [0, 0.78, -1.47], fuelFiller: [2.3, -0.02, -0.17], hopperPort: [0.51, -0.26, -0.75] },
   bounds: [
     [-0.56, 0.56, -0.6, 1.06, -5.5, 2.55], [-6.65, 6.65, -0.56, 0.85, -1.3, 0.45], [-0.08, 0.08, 0.4, 1.14, -5.48, -4.05],
     [-2.12, 2.12, -0.36, -0.2, -5.0, -4.0], [-1.3, 1.3, -1.57, -0.44, 0.15, 1.0], [-1.1, 1.1, -0.94, 1.24, 2.15, 2.28],
   ],
   createModel: (panel, opts) => createE203Model(panel, opts),
-  createPanel: (opts) => createPanel(opts),
+  createPanel: (opts) => createE203Panel(opts),
   createShadow: () => createContactShadow(E203_SHADOW),
 };
 

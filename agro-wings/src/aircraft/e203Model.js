@@ -25,8 +25,8 @@
 // Paint and lettering are a side-projected livery with a matching bump map
 // (two schemes share the geometry and UVs; only canvases and a few colours
 // change); AO is baked into vertex colours; small parts sit in a LOD.
-// The cockpit is provisional (eye, seat, controls, the EMB-202A panel as a
-// placeholder): the 203's own cockpit comes in a later phase.
+// The cockpit is built inside this cabin by e203Cockpit.js (panel layout and
+// textures in e203Panel.js).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -37,7 +37,7 @@ import {
   loft, K, sampleStations, ring, airfoil, wingPanel, flipWinding, tagged, tx, rod, tube, bar, ball, rbox, lathe, grid,
   speckle, orangePeel, treadTexture, propDiscTexture, WING_SPAN_UV, buildPilot,
 } from './model.js';
-import { IPA_PANEL } from './panel.js';
+import { buildE203Cockpit } from './e203Cockpit.js';
 
 const A = FLIGHT_E203;
 // Wing: rectangular planform, 1.71 m chord, leading edge 0.43 m ahead of the
@@ -1012,123 +1012,21 @@ export function createE203Model(panel, opts = {}) {
   prop.add(disc);
   root.add(prop);
 
-  // ---------------- cockpit (provisional) ----------------
-  // Reference points for the 203's own cockpit (next phase): the eye, seat,
-  // panel, stick, throttle quadrant, pedals, roof and door. The EMB-202A
-  // panel stands in on a plain board meanwhile.
+  // ---------------- cockpit ----------------
+  // Built inside this cabin (e203Cockpit.js): glareshield, panel and its
+  // instruments, the GPS, hopper windows, controls, seat and inner skins.
   const OFF = new THREE.Vector3(0, -0.2, -0.95); // pilot frame (the shared pilot figure's seat)
   const o3 = (x, y, z) => [x + OFF.x, y + OFF.y, z + OFF.z];
+  const ck = buildE203Cockpit({
+    panel, envMap: opts.envMap ?? null, harnessMat: M.harness, cowlTopY: topY,
+    cab: { halfX, SILL, RAIL, ROOF, WS_Z, WS_ZS, BPOST, roofAt, sideAt, wsZ, deckPt: (a) => sePt(stWS, a), RIM_A, sillX, CABIN, aftRing, DW, OFF },
+  });
+  const { cockpit, stick, pedals, throttle, valve, leds, THR } = ck;
   const REF = {
-    eye: new THREE.Vector3(0, 0.8, -1.45), seat: new THREE.Vector3(...o3(0, 0.05, -0.55)), panel: new THREE.Vector3(0, 0.43, -0.73),
-    stick: new THREE.Vector3(...o3(0, -0.22, -0.12)), throttle: new THREE.Vector3(...o3(0.42, 0.45, 0.0)), pedals: new THREE.Vector3(...o3(0, -0.12, 0.42)),
-    roof: new THREE.Vector3(0, ROOF.yt - 0.03, -1.5), door: new THREE.Vector3(SILL.x, 0.2, -1.15), floorY: OFF.y - 0.28,
+    eye: ck.eye.clone(), seat: new THREE.Vector3(...o3(0, 0.05, -0.55)), panel: ck.panelMesh.position.clone(),
+    stick: stick.position.clone(), throttle: throttle.position.clone(), pedals: pedals[0].position.clone().setX(0),
+    roof: new THREE.Vector3(0, ROOF.yt - 0.03, -1.5), door: new THREE.Vector3(SILL.x, 0.2, -1.15), floorY: -0.48,
   };
-  const cockpit = new THREE.Group();
-  const ci = {};
-  const addC = (mat, g) => { (ci[mat] ||= []).push(tagged(g)); };
-  const FLOOR = REF.floorY;
-  addC('floor', tx(new THREE.BoxGeometry(0.9, 0.03, 1.36), 0, FLOOR, -1.22));
-  // Inner skins a little inside the outer ones: the lower walls, the panels
-  // behind the B-posts (leaning with the cabin sides), the headliner under
-  // the roof, the bulkheads.
-  const inset = 0.014;
-  for (const sx of [1, -1]) {
-    addC('interior', grid((u, v) => { const z = lerp(-0.6, ROOF.zR + 0.02, u), y = lerp(FLOOR, SILL.y, v); return [sx * (halfX(z, y) - inset), y, z]; }, 8, 6, [sx * 3, 0.1, -1.2])); // faces the cabin
-    addC('interior', grid((u, v) => { const [x, y, z] = sideAt(sx, u, v, BPOST - 0.02, ROOF.zR + 0.02); return [x - sx * inset, y, z]; }, 3, 4, [sx * 3, 0.7, -1.7]));
-  }
-  addC('interior', grid((u, v) => { const [x, y, z] = lerp3(roofAt(u, false), roofAt(u, true), v); return [x, y - inset, z]; }, 16, 4, [0, 3, -1.4]));
-  addC('interior', tx(new THREE.BoxGeometry(0.88, 0.95, 0.02), 0, -0.08, -0.56)); // hopper bulkhead
-  addC('interior', new THREE.ShapeGeometry(new THREE.Shape(aftRing(CABIN).slice(0, -1).map(([x, y]) => new THREE.Vector2(x * 0.96, Math.max(FLOOR, y * 0.985))))).translate(0, 0, ROOF.zR + 0.03)); // rear bulkhead
-  addC('seat', rbox(0.46, 0.1, 0.46, 0.04, ...o3(0, 0.05, -0.55)));
-  addC('seat', rbox(0.46, 0.72, 0.1, 0.04, ...o3(0, 0.42, -0.8), -0.14));
-  for (const sx of [1, -1]) {
-    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.6, 0.01), M.harness);
-    strap.position.set(...o3(sx * 0.12, 0.48, -0.74));
-    strap.rotation.x = -0.14;
-    cockpit.add(strap);
-  }
-  // Provisional panel board (EMB-202A instruments), glareshield.
-  const PW = 0.78, PH = PW * (IPA_PANEL.H / IPA_PANEL.W);
-  const panelMat = new THREE.MeshStandardMaterial({ map: panel.texture, roughness: 0.5, metalness: 0.2, emissive: 0xffffff, emissiveMap: panel.texture, emissiveIntensity: 0.1 });
-  const panelMesh = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), panelMat);
-  panelMesh.position.copy(REF.panel);
-  panelMesh.rotation.set(-0.16, Math.PI, 0, 'YXZ');
-  cockpit.add(panelMesh);
-  addC('dark', rbox(PW + 0.08, 0.03, 0.17, 0.01, 0, REF.panel.y + PH / 2 + 0.02, REF.panel.z + 0.05));
-  addC('dark', tx(new THREE.BoxGeometry(PW + 0.06, PH + 0.04, 0.03), 0, REF.panel.y, REF.panel.z + 0.025, -0.16, Math.PI, 0));
-  const lightbar = new THREE.Group();
-  lightbar.position.set(0, REF.panel.y + PH / 2 + 0.05, REF.panel.z + 0.02);
-  const leds = [];
-  for (let i = -7; i <= 7; i++) {
-    const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.008), new THREE.MeshBasicMaterial({ color: 0x222222 }));
-    led.position.set(-i * 0.0155, 0, -0.016);
-    lightbar.add(led);
-    leds.push(led);
-  }
-  lightbar.add(new THREE.Mesh(tagged(new RoundedBoxGeometry(0.26, 0.032, 0.03, 2, 0.006)), M.dark));
-  cockpit.add(lightbar);
-  // Stick, pedals, throttle quadrant (left), valve (right).
-  const stick = new THREE.Group();
-  stick.position.copy(REF.stick);
-  {
-    const boot = new THREE.Mesh(tagged(lathe([[0.08, 0], [0.075, 0.02], [0.055, 0.06], [0.032, 0.1], [0.018, 0.14]], 16)), M.rubber);
-    const shaft = new THREE.Mesh(tagged(new THREE.CylinderGeometry(0.016, 0.02, 0.56, 10)), M.steel);
-    shaft.position.y = 0.3;
-    const grip = new THREE.Mesh(tagged(new THREE.CapsuleGeometry(0.028, 0.11, 6, 14)), M.gloss);
-    grip.position.set(0, 0.63, 0.012);
-    grip.rotation.x = 0.22;
-    const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.016, 12), M.knob);
-    btn.position.set(0, 0.712, 0.03);
-    stick.add(boot, shaft, grip, btn);
-  }
-  cockpit.add(stick);
-  const pedals = [];
-  for (const sx of [1, -1]) {
-    const p = new THREE.Group();
-    p.position.set(REF.pedals.x + sx * 0.17, REF.pedals.y, REF.pedals.z);
-    p.rotation.x = -0.6;
-    p.add(new THREE.Mesh(tagged(new RoundedBoxGeometry(0.11, 0.17, 0.025, 2, 0.008)), M.steel));
-    cockpit.add(p);
-    pedals.push(p);
-  }
-  const THR = [0.42, 0.45, 0.0];
-  addC('dark', rbox(0.1, 0.05, 0.34, 0.015, ...o3(0.42, 0.43, 0.02)));
-  const throttle = new THREE.Group();
-  throttle.position.copy(REF.throttle);
-  {
-    const tl = new THREE.Mesh(tagged(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 8)), M.steel);
-    tl.position.y = 0.08;
-    const tk = new THREE.Mesh(tagged(new THREE.SphereGeometry(0.024, 12, 10)), M.gloss);
-    tk.position.y = 0.16;
-    throttle.add(tl, tk);
-  }
-  cockpit.add(throttle);
-  for (const [lx, rot, m] of [[0.395, 0.3, M.steel], [0.37, 0.42, M.knob]]) {
-    const lv = new THREE.Group();
-    lv.position.set(...o3(lx, 0.45, 0.0));
-    lv.rotation.x = rot;
-    const sh = new THREE.Mesh(tagged(new THREE.CylinderGeometry(0.006, 0.006, 0.14, 8)), M.steel);
-    sh.position.y = 0.07;
-    const k = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 10), m);
-    k.position.y = 0.14;
-    lv.add(sh, k);
-    cockpit.add(lv);
-  }
-  const valve = new THREE.Group();
-  valve.position.set(...o3(-0.38, 0.45, 0.0));
-  {
-    const vl = new THREE.Mesh(tagged(new THREE.CylinderGeometry(0.01, 0.01, 0.18, 8)), M.steel);
-    vl.position.y = 0.09;
-    const vk = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), M.knob);
-    vk.position.y = 0.18;
-    valve.add(vl, vk);
-  }
-  cockpit.add(valve);
-  for (const [mat, parts] of Object.entries(ci)) {
-    const m = new THREE.Mesh(mergeGeometries(parts), M[mat]);
-    m.receiveShadow = true;
-    cockpit.add(m);
-  }
   root.add(cockpit);
 
   // ---------------- pilot ----------------
@@ -1163,7 +1061,7 @@ export function createE203Model(panel, opts = {}) {
   // Blade angle of the constant-speed prop: fine at rest and at low speed,
   // coarser as the governor takes the power at speed; beacon and strobes.
   let bladeAngle = 0.18, t = 0;
-  const update = (dt, fm) => {
+  const update = (dt, fm, ac) => {
     t += dt;
     const o = fm.out;
     const pf = fm.shaftPower / A.maxPower;
@@ -1173,6 +1071,7 @@ export function createE203Model(panel, opts = {}) {
     const on = fm.engine !== 'off';
     M.beacon.emissiveIntensity = on ? 0.6 + 2.4 * Math.max(0, Math.sin(t * 7.5)) ** 8 : 0;
     M.strobe.emissiveIntensity = on && t % 1.2 < 0.06 ? 4 : 0;
+    ck.update(dt, fm, ac);
   };
 
   const swap = (mat, n) => {
@@ -1198,7 +1097,7 @@ export function createE203Model(panel, opts = {}) {
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, flaps, elevator, rudder,
     gear: gearGroups,
-    stick, pedals, throttle, valve, leds, panelMesh,
+    stick, pedals, throttle, valve, leds, panelMesh: ck.panelMesh, inst: { pick: ck.pick, pickables: ck.pickables },
     pumpFan, nozzles, pilot, cockpit, glassMesh,
     eye: REF.eye.clone(),
     fuelFiller: new THREE.Vector3(2.3, leY(2.3) + 0.14, W.le - 0.35 * W.chord),

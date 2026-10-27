@@ -33,6 +33,14 @@ export const ACTIONS = {
   engine: { get label() { return t('Engine (hold start / tap stop)'); }, keys: ['KeyF'] },
   camera: { get label() { return t('Cockpit / chase camera'); }, keys: ['KeyV'] },
   orbit: { get label() { return t('Free external camera'); }, keys: ['KeyO'] },
+  // Head look and zoom (cockpit; the chase camera swings round the same way).
+  lookLeft: { get label() { return t('Look left'); }, keys: ['Numpad7'] },
+  lookRight: { get label() { return t('Look right'); }, keys: ['Numpad9'] },
+  lookUp: { get label() { return t('Look up'); }, keys: ['NumpadDivide'] },
+  lookDown: { get label() { return t('Look down'); }, keys: ['Numpad2'] },
+  lookReset: { get label() { return t('Default view'); }, keys: ['Numpad0', 'Home'] },
+  zoomIn: { get label() { return t('Zoom in'); }, keys: ['NumpadAdd', 'Equal'] },
+  zoomOut: { get label() { return t('Zoom out'); }, keys: ['NumpadSubtract', 'Minus'] },
   interact: { get label() { return t('Interact / service'); }, keys: ['KeyE'], shares: ['nYawRight'] },
   map: { get label() { return t('Map'); }, keys: ['KeyM'] },
   coverage: { get label() { return t('Coverage overlay'); }, keys: ['KeyK'] },
@@ -110,6 +118,32 @@ export class Input {
     });
     window.addEventListener('blur', () => { this.down.clear(); this.mouse.buttons = 0; });
     el.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Touch: one finger dragged on the view (the touch controls are their
+    // own elements over it) looks around like the mouse; a double tap
+    // brings the default view back.
+    let touchId = null, tx = 0, ty = 0, lastTap = 0;
+    const touchEnd = (e) => {
+      if (e.pointerId !== touchId) return;
+      touchId = null;
+      this.mouse.buttons &= ~1;
+      this.release(this.keysOf('lookReset')[0]);
+    };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch' || touchId !== null) return;
+      touchId = e.pointerId; tx = e.clientX; ty = e.clientY;
+      this.mouse.buttons |= 1;
+      const now = performance.now();
+      if (now - lastTap < 320) this.press(this.keysOf('lookReset')[0]);
+      lastTap = now;
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== touchId) return;
+      this.mouse.dx += (e.clientX - tx) * 0.0035;
+      this.mouse.dy += (e.clientY - ty) * 0.0035;
+      tx = e.clientX; ty = e.clientY;
+    });
+    el.addEventListener('pointerup', touchEnd);
+    el.addEventListener('pointercancel', touchEnd);
     el.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') return;
       this.mouse.buttons |= 1 << e.button;
@@ -215,5 +249,6 @@ export class Input {
 export function keyLabel(code) {
   if (!code) return '—';
   return code.replace(/^Numpad/, 'Num ').replace(/^Key/, '').replace(/^Digit/, '').replace('Arrow', '').replace('Left', ' L').replace('Right', ' R')
-    .replace('Bracket R', ']').replace('Bracket L', '[').replace('Control', 'Ctrl').replace('Backspace', '⌫').replace('Escape', 'Esc');
+    .replace('Bracket R', ']').replace('Bracket L', '[').replace('Control', 'Ctrl').replace('Backspace', '⌫').replace('Escape', 'Esc')
+    .replace('Divide', '÷').replace('Multiply', '×').replace('Add', '+').replace('Subtract', '−').replace('Equal', '=').replace('Minus', '-');
 }
