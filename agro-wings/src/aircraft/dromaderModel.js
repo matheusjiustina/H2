@@ -83,6 +83,24 @@ const AFT_KEYS = [
 
 // Livery: side projection (z, y); top half = left side (nose to the left),
 // bottom half = right side (nose to the right), lettering upright on both.
+// Paint schemes. A: the Agro Wings yellow with the black cheat line. B: the
+// Hellenic Air Force fire-fighting scheme — white fuselage, yellow cowl,
+// wings and tailplane, black diagonal bands on the wings, blue-white-blue
+// roundels, blue bars on the fin, black anti-glare and belly.
+export const M18_LIVERIES = [
+  { id: 'agro', name: 'Agro Wings yellow', base: YELLOW, frame: YELLOW, tip: YELLOW, seam: 'rgba(90,65,0,0.3)', rivet: 'rgba(90,70,0,0.25)' },
+  { id: 'hellenic', name: 'Hellenic fire-fighter', base: WHITE, frame: WHITE, tip: INK, seam: 'rgba(70,72,76,0.28)', rivet: 'rgba(70,72,76,0.22)' },
+];
+const BLUE = '#1f4c9e';
+// Blue-white-blue roundel, radius in metres on a surface whose metre is
+// (kx, ky) pixels.
+function roundel(g, x, y, r, kx, ky) {
+  for (const [f, col] of [[1, BLUE], [0.66, '#f4f4f0'], [0.33, BLUE]]) {
+    g.fillStyle = col;
+    g.beginPath(); g.ellipse(x, y, r * f * kx, r * f * ky, 0, 0, Math.PI * 2); g.fill();
+  }
+}
+
 const LV = { Z0: -6.7, Z1: 2.4, Y0: -1.0, Y1: 2.8, W: 2048, H: 1024, M: 6 };
 LV.kx = LV.W / (LV.Z1 - LV.Z0);
 LV.ky = (LV.H / 2 - 2 * LV.M) / (LV.Y1 - LV.Y0);
@@ -123,7 +141,8 @@ function camel(g, x, y, s, col) {
   g.restore();
 }
 
-function liveryTextures(reg) {
+function liveryTextures(reg, L = M18_LIVERIES[0]) {
+  const hel = L.id === 'hellenic';
   const c = canvas(LV.W, LV.H), b = canvas(LV.W, LV.H);
   const g = c.getContext('2d'), gb = b.getContext('2d');
   gb.fillStyle = '#808080';
@@ -138,8 +157,15 @@ function liveryTextures(reg) {
     };
     const poly = (pts, fill) => { path(g, pts); g.closePath(); g.fillStyle = fill; g.fill(); };
     const line = (ctx, pts, col, w) => { path(ctx, pts); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(); };
-    g.fillStyle = YELLOW;
+    g.fillStyle = L.base;
     g.fillRect(0, oy, LV.W, LV.H / 2);
+    if (hel) {
+      // Yellow cowl forward of the firewall, black anti-glare on its top,
+      // black belly under the wing root and the cabin.
+      poly([[2.5, -1.1], [2.5, 2.9], [1.5, 2.9], [1.5, -1.1]], YELLOW);
+      poly([[1.55, 0.74], [2.15, 0.66], [2.15, 2.9], [1.55, 2.9]], INK);
+      poly([[1.5, -1.1], [1.5, -0.4], [0.4, -0.44], [-1.2, -0.44], [-2.8, -0.34], [-2.8, -1.1]], INK);
+    }
     // Oil-stained belly (radial engines leave their mark).
     const [, belly] = P(0, -0.3);
     const grd = g.createLinearGradient(0, belly, 0, oy + LV.H / 2);
@@ -150,11 +176,16 @@ function liveryTextures(reg) {
     // Black cheat line from the cowl to the tail, thinning aft.
     const cl = [[2.25, 0.3], [1.5, 0.36], [0.9, 0.42], [0.0, 0.47], [-1.3, 0.52], [-2.7, 0.55], [-4.4, 0.5], [-5.6, 0.46]];
     const hh = [0.045, 0.045, 0.045, 0.045, 0.042, 0.038, 0.03, 0.018];
-    poly(cl.map(([z, y], i) => [z, y + hh[i]]).concat(cl.map(([z, y], i) => [z, y - hh[i]]).reverse()), INK);
-    // Tail colours: white over red band across the upper fin and rudder,
-    // where the reference aircraft wears its flag.
-    poly([[-5.3, 1.9], [-5.25, 2.1], [-6.6, 2.1], [-6.6, 1.9]], WHITE);
-    poly([[-5.36, 1.63], [-5.3, 1.9], [-6.6, 1.9], [-6.6, 1.63]], RED);
+    if (!hel) {
+      poly(cl.map(([z, y], i) => [z, y + hh[i]]).concat(cl.map(([z, y], i) => [z, y - hh[i]]).reverse()), INK);
+      // Tail colours: white over red band across the upper fin and rudder,
+      // where the reference aircraft wears its flag.
+      poly([[-5.3, 1.9], [-5.25, 2.1], [-6.6, 2.1], [-6.6, 1.9]], WHITE);
+      poly([[-5.36, 1.63], [-5.3, 1.9], [-6.6, 1.9], [-6.6, 1.63]], RED);
+    } else {
+      // Two blue bars up the fin and rudder.
+      for (const [z0, z1] of [[-5.3, -5.46], [-5.62, -5.78]]) poly([[z0, 1.48], [z0, 2.4], [z1, 2.4], [z1, 1.48]], BLUE);
+    }
     // Panel seams with camloc / rivet rows: cowl, firewall, hopper bay,
     // cabin, aft fuselage frames, access doors.
     const seams = [
@@ -163,13 +194,13 @@ function liveryTextures(reg) {
       [[-5.2, 0.2], [-5.2, 0.62]], [[1.15, 0.8], [-0.8, 0.92]], [[-0.8, 0.15], [-4.5, 0.4]],
     ];
     for (const s of seams) {
-      line(g, s, 'rgba(90,65,0,0.3)', 2);
+      line(g, s, L.seam, 2);
       line(gb, s, '#3c3c3c', 2.6);
       const [[za, ya], [zb, yb]] = s;
       const n = Math.max(2, Math.round(Math.hypot(za - zb, ya - yb) / 0.07));
       for (let k = 0; k <= n; k++) {
         const [px, py] = P(za + ((zb - za) * k) / n + 0.025, ya + ((yb - ya) * k) / n);
-        g.fillStyle = 'rgba(90,70,0,0.25)'; g.fillRect(px - 1, py - 1, 2, 2);
+        g.fillStyle = L.rivet; g.fillRect(px - 1, py - 1, 2, 2);
         gb.fillStyle = '#5c5c5c'; gb.beginPath(); gb.arc(px, py, 1.4, 0, Math.PI * 2); gb.fill();
       }
     }
@@ -203,11 +234,19 @@ function liveryTextures(reg) {
       g.fillText(str, 0, 0);
       g.restore();
     };
-    text(-3.3, 0.2, reg, 0.38, INK);
-    text(0.15, 0.74, 'PZL M-18B DROMADER', 0.1, RED, 'italic bold');
-    { const [px, py] = P(1.25, 0.76); camel(g, px, py, 0.12 * LV.ky, RED); }
-    text(-1.95, 0.88, 'AGRO WINGS', 0.08, INK, 'italic bold');
-    text(-1.95, 0.77, 'AVIAÇÃO AGRÍCOLA', 0.035, INK, 'bold');
+    if (hel) {
+      { const [px, py] = P(-3.7, 0.3); roundel(g, px, py, 0.25, LV.kx, LV.ky); }
+      text(-5.45, 1.22, reg, 0.17, INK);
+      text(-3.02, 0.6, 'ΠΑ', 0.15, INK);
+      text(0.15, 0.74, 'DROMADER  PZL M18 B', 0.1, RED, 'italic bold');
+      { const [px, py] = P(-1.6, 0.62); camel(g, px, py, 0.2 * LV.ky, RED); }
+    } else {
+      text(-3.3, 0.2, reg, 0.38, INK);
+      text(0.15, 0.74, 'PZL M-18B DROMADER', 0.1, RED, 'italic bold');
+      { const [px, py] = P(1.25, 0.76); camel(g, px, py, 0.12 * LV.ky, RED); }
+      text(-1.95, 0.88, 'AGRO WINGS', 0.08, INK, 'italic bold');
+      text(-1.95, 0.77, 'AVIAÇÃO AGRÍCOLA', 0.035, INK, 'bold');
+    }
     text(0.6, -0.42, 'AVGAS 100LL', 0.035, 'rgba(30,30,30,0.75)', 'bold');
     speckle(g, 0, oy, LV.W, LV.H / 2, 2800, side > 0 ? 27 : 28, 0.1);
   }
@@ -215,7 +254,7 @@ function liveryTextures(reg) {
 }
 
 // Wing skin: u = span / SPAN_UV, v = chord fraction (0 = LE).
-function wingTextures() {
+function wingTextures(L = M18_LIVERIES[0]) {
   const Wd = 2048, H = 512;
   const c = canvas(Wd, H), b = canvas(Wd, H);
   const g = c.getContext('2d'), gb = b.getContext('2d');
@@ -242,6 +281,20 @@ function wingTextures() {
     gb.fillStyle = '#5c5c5c';
     for (let k = 0; k <= n; k++) { gb.beginPath(); gb.arc(x0 + ((x1 - x0) * k) / n + 0.5, y0 + ((y1 - y0) * k) / n + 5, 1.4, 0, Math.PI * 2); gb.fill(); }
   };
+  if (L.id === 'hellenic') {
+    // Black bands slanting outboard toward the trailing edge, a black tip and
+    // the roundel between the bands (same on the upper and lower skins).
+    const band = (x, w, slant) => {
+      g.fillStyle = INK; g.beginPath();
+      g.moveTo(X(x), Y(0)); g.lineTo(X(x + w), Y(0)); g.lineTo(X(x + w + slant), Y(1)); g.lineTo(X(x + slant), Y(1));
+      g.closePath(); g.fill();
+    };
+    band(3.7, 0.5, 0.7);
+    band(7.3, 0.42, 0.55);
+    band(8.55, 1.0, 0.3);
+    const rc = m18Chord(5.9);
+    roundel(g, X(5.9), Y(0.4), 0.48, Wd / SPAN_UV, H / rc);
+  }
   // Spars (front 25 %, rear 70 %), ribs every ≈ 0.45 m, the centre-section
   // joint, hinge line.
   for (const f of [0.12, 0.25, 0.7]) seam(X(0.3), Y(f), X(9.0), Y(f));
@@ -335,12 +388,15 @@ export function createDromaderModel(panel, opts = {}) {
   const A = FLIGHT_M18;
   const root = new THREE.Group();
   root.name = 'dromader';
-  const liv = liveryTextures(opts.reg ?? 'PR-DMD');
+  let REG = opts.reg ?? 'PR-DMD', livery = 0;
+  const liv = liveryTextures(REG);
   const wtx = wingTextures();
   const coat = { roughness: 0.5, metalness: 0.0, specularIntensity: 0.3, clearcoat: 0.1, clearcoatRoughness: 0.35, envMap: opts.envMap ?? null, envMapIntensity: 0.3 };
   const ALBEDO = 0.84;
   const M = {
     paint: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(YELLOW).multiplyScalar(ALBEDO), vertexColors: true, ...coat }),
+    frame: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(YELLOW).multiplyScalar(ALBEDO), vertexColors: true, ...coat }), // cabin frame (scheme colour)
+    tip: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(YELLOW).multiplyScalar(ALBEDO), vertexColors: true, ...coat }), // wing tip caps
     ink: new THREE.MeshPhysicalMaterial({ color: new THREE.Color('#1a1a1a'), vertexColors: true, ...coat, roughness: 0.6 }),
     livery: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(ALBEDO), map: liv.map, bumpMap: liv.bump, bumpScale: 1.4, vertexColors: true, ...coat }),
     wing: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(ALBEDO), map: wtx.map, bumpMap: wtx.bump, bumpScale: 1.4, vertexColors: true, ...coat }),
@@ -578,7 +634,7 @@ export function createDromaderModel(panel, opts = {}) {
   glassMesh.add(gm);
   // Frame: painted tubes outside, grey tubes inside, rounded joints.
   const frame = (pts, r = 0.028) => {
-    add('paint', tube(pts, r, Math.max(4, pts.length * 3), 10));
+    add('frame', tube(pts, r, Math.max(4, pts.length * 3), 10));
     const mid = new THREE.Vector3(...pts[Math.floor(pts.length / 2)]);
     const inw = new THREE.Vector3(...cabC).sub(mid).normalize().multiplyScalar(0.016);
     add('tubeframe', tube(pts.map((p) => [p[0] + inw.x, p[1] + inw.y, p[2] + inw.z]), r * 0.8, Math.max(4, pts.length * 3), 8));
@@ -593,9 +649,9 @@ export function createDromaderModel(panel, opts = {}) {
     frame([sidePt(sx, -1.36, YW), sidePt(sx, -1.75, YW + 0.004), sidePt(sx, -2.14, YW)], 0.03); // roof rail
     frame([sidePt(sx, ZBP, SILL), sidePt(sx, ZBP, (SILL + YW) / 2), sidePt(sx, ZBP, YW)], 0.032); // B-post
     frame([sidePt(sx, ZA, SILL), sidePt(sx, -2.0, SILL), sidePt(sx, ZB, SILL)], 0.028); // sill rail
-    add('paint', tube(loop(sx, DOOR_WIN), 0.016, 24, 6));
-    add('paint', tube(loop(sx, REAR_WIN), 0.016, 18, 6));
-    for (const p of [wsBase[i], wsTop[i], sidePt(sx, ZBP, SILL), sidePt(sx, ZBP, YW), sidePt(sx, -2.14, YW), sidePt(sx, ZB, SILL)]) add('paint', ball(p, 0.04));
+    add('frame', tube(loop(sx, DOOR_WIN), 0.016, 24, 6));
+    add('frame', tube(loop(sx, REAR_WIN), 0.016, 18, 6));
+    for (const p of [wsBase[i], wsTop[i], sidePt(sx, ZBP, SILL), sidePt(sx, ZBP, YW), sidePt(sx, -2.14, YW), sidePt(sx, ZB, SILL)]) add('frame', ball(p, 0.04));
     // Door handle and hinges (door = the window bay between the posts).
     add('steel', rod(sidePt(sx, -1.78, 1.07, 0.03), sidePt(sx, -1.64, 1.07, 0.03), 0.011, 6), true);
     for (const hz of [-1.45, -1.8]) add('steel', tx(new THREE.CylinderGeometry(0.013, 0.013, 0.05, 8), sx * (WT + 0.02), YW + 0.01, hz, 0, 0, Math.PI / 2), true);
@@ -607,7 +663,7 @@ export function createDromaderModel(panel, opts = {}) {
   }
   // Roof: small peak over the windshield header, red anti-collision beacon
   // at the back, VHF blade antenna.
-  add('paint', rbox(0.62, 0.025, 0.1, 0.012, 0, 1.63, -1.27, -0.35));
+  add('frame', rbox(0.62, 0.025, 0.1, 0.012, 0, 1.63, -1.27, -0.35));
   add('dark', tx(new THREE.CylinderGeometry(0.05, 0.06, 0.03, 16), 0, 1.64, -2.07));
   add('beacon', tx(new THREE.SphereGeometry(0.045, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, 1.655, -2.07));
   add('white', tx(new THREE.BoxGeometry(0.012, 0.2, 0.08), -0.16, 1.75, -1.85, -0.25), true);
@@ -662,7 +718,7 @@ export function createDromaderModel(panel, opts = {}) {
       const t = i / 5, c0 = m18Chord(W.tipX);
       tipSt.push({ x: W.tipX + 0.1 * Math.sin((t * Math.PI) / 2), y: leY(W.tipX) + 0.012 * t, le: W.le - 0.02 * t, chord: c0 * (1 - 0.07 * t * t) });
     }
-    add('paint', wingPanel(tipSt, airfoil(0, 1, 0.15 * 0.85, 0.04, 0.4, 16), side));
+    add('tip', wingPanel(tipSt, airfoil(0, 1, 0.15 * 0.85, 0.04, 0.4, 16), side));
     // Root fillet along the fuselage side.
     const fil = mainProf.slice(0, 19).map(([xc, yc]) => [side * 0.6, W.rootY + yc * W.rootChord + 0.012, W.le - xc * W.rootChord]);
     wingParts.push(tube(fil, 0.065, 30, 10));
@@ -1202,13 +1258,25 @@ export function createDromaderModel(panel, opts = {}) {
     M.strobe.emissiveIntensity = on && t % 1.2 < 0.06 ? 4 : 0;
   };
 
+  const swap = (mat, n) => {
+    mat.map.dispose(); mat.bumpMap.dispose();
+    mat.map = n.map; mat.bumpMap = n.bump; mat.needsUpdate = true;
+  };
   return {
     // New registration marks: only the livery canvas is redrawn.
-    setReg(r) {
-      const n = liveryTextures(r);
-      M.livery.map.dispose(); M.livery.bumpMap.dispose();
-      M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
+    setReg(r) { REG = r; swap(M.livery, liveryTextures(REG, M18_LIVERIES[livery])); },
+    // Paint scheme: the fuselage and wing canvases and the cabin frame colour.
+    setLivery(i) {
+      const k = ((i % M18_LIVERIES.length) + M18_LIVERIES.length) % M18_LIVERIES.length;
+      if (k === livery) return;
+      livery = k;
+      const L = M18_LIVERIES[k];
+      swap(M.livery, liveryTextures(REG, L));
+      swap(M.wing, wingTextures(L));
+      M.frame.color.set(L.frame).multiplyScalar(ALBEDO);
+      M.tip.color.set(L.tip).multiplyScalar(ALBEDO);
     },
+    get livery() { return livery; },
     root, M,
     prop, blades, bladeMats: [bladeMat, tipMat, bandMat], disc,
     ailerons, flaps, elevator, rudder,

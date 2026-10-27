@@ -159,4 +159,7 @@ export default {
   'Default': 'Padrão',
   'in use': 'em uso',
   'invalid': 'inválido',
+  // Dromader paint schemes
+  'Agro Wings yellow': 'Amarelo Agro Wings',
+  'Hellenic fire-fighter': 'Combate a incêndio (Grécia)',
 };

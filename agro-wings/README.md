@@ -2408,3 +2408,24 @@ interior seen through the glass differs):
 
 `node test/m18cockpit.mjs <outDir>` renders the parked, level-flight and GPS
 views at 16:9 and 4:3.
+
+## Dromader paint schemes
+
+Title card → Dromader → **Paint A / B** (saved as `m18Livery`):
+
+- **A — Agro Wings yellow** (unchanged).
+- **B — Hellenic fire-fighter**, after the Greek Air Force PZL M-18B:
+  - white fuselage and cabin frame;
+  - yellow cowl, wings, tailplane and elevators, with a black anti-glare
+    panel on the cowl top and a black belly under the wing root and cabin;
+  - black diagonal bands on the wings and black tips;
+  - blue-white-blue roundels on the wings (upper and lower) and on the aft
+    fuselage;
+  - two blue bars on the fin;
+  - ΠΑ, the red camel and DROMADER PZL M18 B on the sides;
+  - the registration chosen in Settings on the fin.
+
+Only the fuselage and wing canvases and the colour of the frame and tip
+materials change between schemes; the geometry stays the same.
+`node test/m18livery.mjs <outDir>` renders both schemes from the side, the
+front and rear three-quarters, and the top.
