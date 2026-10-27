@@ -244,7 +244,7 @@ export const AIRCRAFT_TYPES = {
       standGap: 3.0, // truck parks well clear of the (stopped) rotor disc
     },
     servicePad: BASE.helipad,
-    stub: { eye: [-0.29, 0.44, 1.18], fuelFiller: [0.44, 0.56, -0.86], hopperPort: [0.53, -1.0, -0.42] },
+    stub: { eye: [-0.29, 0.44, 1.18], fuelFiller: [0.44, 0.56, -0.86], hopperPort: [0.27, -1.07, -0.55] },
     // Airframe boxes plus the rotor disc (the disc is overhead: people walk
     // under it, vehicles do not).
     bounds: [

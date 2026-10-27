@@ -2734,3 +2734,45 @@ the yellow grab handles and the lower hopper sight.
   key, the compass card and the GPS keys are updated only in the cockpit
   view or with the camera within 9 m; the live textures only when what
   they show changes.
+
+## Robinson R44 — exterior reconstruction and paint B
+
+Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor
+pivots and animation, skid contact points, cockpit (pod, pedestal,
+instruments, GPS, cyclic, collective, pedals, seats), sprayer, missions and
+sound are unchanged. Compared with the five reference photographs (black
+agricultural R44s, a grey one in flight and from below, a red one parked)
+in near-orthographic and three-quarter views (`test/r44ortho.mjs`).
+
+- **Cabin.** 1.28 m wide at the doors (R44 data; the model was 1.39 m),
+  with a fuller lower nose so the pedals stay inside the bubble. The
+  windshield's lower edge now runs from the A-pillar's foot down and
+  forward into the nose: the deep two-piece glass of the R44, a short
+  painted chin under it; the centre post follows the nose underneath.
+- **Mast fairing.** The low hump became the R44's tall tapered tower:
+  front edge raked back, rear edge raked forward, teardrop in plan, its top
+  just under the swashplate (raised with it; the hub and the rotor pivots
+  stay where they were). The pitot sits on its front.
+- **Engine compartment.** Closed cowling (it was an open bay showing the
+  engine and frame on both sides); its top continues the cabin roof line
+  to the tail cone; the cooling-air outlet is the open lower rear, with the
+  engine, muffler and the turned-down tailpipe seen through it; cowl seams
+  and an access door in the paint.
+- **Ag kit.** The boxy tank became the cylindrical belly tank of the
+  photographs (0.38 m × 1.5 m) on two straps between the cross tubes; the
+  fill coupler (where the service hose attaches) and the pump moved with
+  it. Boom, nozzles, flow and capacity unchanged.
+- **Interior fit.** Rear bench 1.0 m wide and the pedals 3 cm further in
+  and 8 cm aft, so nothing passes through the narrower hull.
+- **Paints** (same meshes; only the livery canvas and four colours change):
+  - **A — Original**: the red and graphite scheme, as before.
+  - **B — Black Agricultural**: deep black with a little more gloss so the
+    shapes still read, a gold band from the nose along the lower cabin
+    rising along the cowling with a fine line above it, gold marks on the
+    tail cone, R44 / RAVEN II on the cowling, black fins, stabiliser,
+    cross tubes and skids.
+  Chosen on the title card (Paint A / B) and kept with the other settings.
+
+**Not changed, and why.** The overall height is 3.05 m to the hub against
+the R44's 3.28 m: the hub height is part of the flight model
+(`FLIGHT_R44.rotor.hubHeight`) and was left alone.

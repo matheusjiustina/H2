@@ -69,18 +69,18 @@ const CAB_KEYS = [
   K(0.55, 0.639, -0.08, -0.87, 0.765, 3.8, 4.3), K(0.05, 0.63, -0.06, -0.86, 0.77, 3.7, 4.2),
   K(-0.3, 0.607, -0.03, -0.83, 0.77, 3.4, 3.9), K(-0.52, 0.57, 0.0, -0.79, 0.77, 3.0, 3.5),
 ];
-// Mast fairing on the cabin roof (upper shell only).
-const FAIR_KEYS = [
-  K(0.66, 0.04, 0.755, 0.6, 0.775, 2.2, 2.2), K(0.5, 0.2, 0.755, 0.6, 0.87, 2.4, 2.4),
-  K(0.28, 0.3, 0.755, 0.6, 1.01, 2.6, 2.4), K(0.05, 0.34, 0.755, 0.6, 1.1, 2.8, 2.4),
-  K(-0.2, 0.37, 0.755, 0.6, 1.12, 2.8, 2.4), K(-0.52, 0.42, 0.755, 0.6, 1.1, 2.8, 2.4),
-];
-// Aft body: tank bays and engine compartment to the tail-cone root.
+// Aft body (engine compartment), closed: its top carries the cabin roof
+// line back to the tail cone, its underside sweeps up to the cone's root;
+// the cooling-air outlet is the open lower rear (as on the real aircraft).
 const AFT_KEYS = [
-  K(-0.52, 0.57, 0.3, -0.62, 1.1, 2.7, 2.6), K(-0.9, 0.53, 0.33, -0.58, 1.05, 2.6, 2.5),
-  K(-1.3, 0.46, 0.37, -0.45, 0.94, 2.5, 2.4), K(-1.75, 0.34, 0.41, -0.18, 0.78, 2.4, 2.3),
+  K(-0.52, 0.57, 0.0, -0.79, 0.79, 3.0, 3.5), K(-0.9, 0.54, 0.02, -0.75, 0.8, 3.0, 3.2),
+  K(-1.3, 0.48, 0.08, -0.6, 0.78, 2.8, 2.8), K(-1.7, 0.36, 0.2, -0.32, 0.74, 2.5, 2.4),
   K(-2.15, 0.215, 0.44, 0.225, 0.655, 2.2, 2.2),
 ];
+// Mast fairing: the R44's tall tapered tower behind the cabin roof, front
+// edge raked back, rear edge raked forward, up to just under the
+// swashplate (side profile after the reference photographs).
+const TOWER = { y0: 0.7, y1: 1.4, front: [0.32, 0.15], rear: [-0.9, -0.22], hw: [0.29, 0.125] };
 const TC0 = -2.15, TC1 = -6.1;
 const tcAt = (z) => { const t = clamp((TC0 - z) / (TC0 - TC1), 0, 1); return { r: lerp(0.215, 0.085, t), y: lerp(0.44, 0.6, t) }; };
 
@@ -245,7 +245,7 @@ function innerShell(geo, d = 0.012) {
 // ==========================================================================
 // Livery: side projection (z, y); top half = left side (nose to the left),
 // bottom half = right side (nose to the right).
-const LV = { Z0: -6.75, Z1: 2.6, Y0: -1.0, Y1: 1.4, W: 2048, H: 1024, M: 6 };
+const LV = { Z0: -6.75, Z1: 2.6, Y0: -1.0, Y1: 1.5, W: 2048, H: 1024, M: 6 };
 LV.kx = LV.W / (LV.Z1 - LV.Z0);
 LV.ky = (LV.H / 2 - 2 * LV.M) / (LV.Y1 - LV.Y0);
 const lvPix = (side, z, y) => [
@@ -290,11 +290,11 @@ function liveryTextures(reg, scheme = 0) {
     poly([...belt, [-0.6, -1.0], [2.65, -1.0]], L.belly);
     line(g, belt.map(([z, y]) => [z, y + 0.03]), L.pin, 0.022 * LV.ky);
     if (L.gold) {
-      // Second, finer gold line above the first, carried along the aft body
-      // to the tail-cone root.
-      const upper = [[2.62, -0.18], [2.3, -0.31], [1.8, -0.41], [0.9, -0.45], [-0.55, -0.45], [-1.3, -0.3], [-1.9, -0.02], [-2.2, 0.32]];
-      line(g, upper, L.pin, 0.009 * LV.ky);
-      line(g, [[-0.6, -0.51], [-1.3, -0.37], [-1.9, -0.08], [-2.2, 0.27]], L.pin, 0.016 * LV.ky);
+      // Gold band from the nose along the lower cabin, rising along the
+      // engine cowling (PR-TOS), a fine line above it.
+      const band = [[2.6, -0.21], [2.3, -0.35], [1.8, -0.44], [0.9, -0.48], [-0.55, -0.47], [-1.2, -0.38], [-1.75, -0.2], [-2.05, 0.05]];
+      line(g, band, L.pin, 0.045 * LV.ky);
+      line(g, band.map(([z, y]) => [z, y + 0.045]), L.pin, 0.008 * LV.ky);
     }
     // Tail cone: graphite and white pinstripes along its side.
     const tl = [];
@@ -321,8 +321,9 @@ function liveryTextures(reg, scheme = 0) {
       g.restore();
     };
     if (L.gold) {
-      text('R44', -0.28, 0.3, 0.15, L.text, 'bold italic', 2);
-      text('AGRO WINGS', -1.2, 0.66, 0.08, L.marks, 'bold', 3);
+      text('R44', -0.95, 0.18, 0.17, L.text, 'bold italic', 2);
+      text('RAVEN II', -0.95, 0.04, 0.045, L.marks, 'bold', 3);
+      text('AGRO WINGS', -1.2, 0.62, 0.07, L.marks, 'bold', 3);
     } else text('AGRO WINGS', -1.2, 0.66, 0.11, L.text, 'bold', 3);
     text(reg, -3.45, tcAt(-3.45).y + 0.07, 0.17, L.marks, 'bold', 4);
     text('PERIGO · ROTOR DE CAUDA', -5.25, tcAt(-5.25).y + 0.06, 0.035, L.text);
@@ -342,7 +343,8 @@ function liveryTextures(reg, scheme = 0) {
     const rearDoor = [[0.9, -0.6], [0.9, yr], [0.3, yr], [0.1, 0.62], [0.02, 0.45], [0.02, -0.6]];
     const seams = [
       [...frontDoor, frontDoor[0]], [...rearDoor, rearDoor[0]],
-      [[-0.55, 0.32], [-0.55, 0.9]], [[-0.62, 0.32], [-1.85, 0.42]], [[-1.0, 0.32], [-1.0, 0.95]], [[-1.7, 0.42], [-1.7, 0.8]],
+      // Cowling: its forward seam, the access door, the upper cowl line.
+      [[-0.55, -0.7], [-0.55, 0.78]], [[-0.75, -0.55], [-0.75, 0.5], [-1.45, 0.5], [-1.45, -0.4]], [[-0.62, 0.62], [-1.9, 0.58]], [[-1.7, 0.1], [-1.7, 0.72]],
     ];
     for (let z = TC0 - 0.1; z > TC1; z -= 0.5) { const t = tcAt(z); seams.push([[z, t.y - t.r], [z, t.y + t.r]]); }
     for (const s of seams) {
@@ -603,50 +605,56 @@ export function createR44Model(panel, opts = {}) {
   }
 
 
-  // ---------------- mast fairing ----------------
-  const fairSt = sampleStations(FAIR_KEYS, 30);
-  const fairAO = (x, y) => clamp(0.8 + (y - 0.75) * 0.6, 0.7, 1);
-  add('livery', liveryUV(tagged(loft(fairSt, 40, fairAO, [-0.06, Math.PI + 0.06]))));
-  // Mast opening collar on top of the fairing, pitot on its nose.
-  add('dark', tx(new THREE.CylinderGeometry(0.1, 0.14, 0.05, 24), 0, 1.115, 0));
-  add('steel', rod([0, 0.86, 0.47], [0, 0.88, 0.72], 0.008, 6), true);
-  add('steel', rod([0, 0.82, 0.48], [0, 0.88, 0.5], 0.01, 6), true);
+  // ---------------- mast fairing (tower) ----------------
+  {
+    const NY = 18, NA = 40, T = TOWER, pos = [], idx = [];
+    const ringAt = (t) => {
+      const y = lerp(T.y0, T.y1, t), zf = lerp(T.front[0], T.front[1], t), zr = lerp(T.rear[0], T.rear[1], t ** 0.85);
+      const hw = lerp(T.hw[0], T.hw[1], t ** 0.9), cz = (zf + zr) / 2, hl = (zf - zr) / 2;
+      // Teardrop plan: full round nose, the tail drawn out behind the mast.
+      return Array.from({ length: NA }, (_, i) => {
+        const a = (i / NA) * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
+        const w = hw * (c >= 0 ? 1 : 1 - 0.55 * c * c) * Math.sign(sn) * Math.abs(sn) ** 0.85;
+        return [w, y, cz + hl * c];
+      });
+    };
+    for (let j = 0; j <= NY; j++) for (const p of ringAt(j / NY)) pos.push(...p);
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NA; i++) {
+      const a = j * NA + i, b = j * NA + ((i + 1) % NA), c = a + NA, d = b + NA;
+      idx.push(a, b, c, b, d, c);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    add('livery', liveryUV(tagged(g)));
+    // Top deck round the mast, collar, the pitot on the tower's front.
+    const top = ringAt(1).map(([x, , z]) => new THREE.Vector2(x, -z));
+    add('livery', liveryUV(tagged(new THREE.ShapeGeometry(new THREE.Shape(top)).rotateX(-Math.PI / 2).translate(0, T.y1, 0))));
+    add('dark', tx(new THREE.CylinderGeometry(0.075, 0.095, 0.04, 24), 0, T.y1 + 0.015, 0));
+    add('steel', rod([0, 1.06, 0.22], [0, 1.08, 0.42], 0.007, 6), true);
+    add('steel', rod([0, 1.03, 0.22], [0, 1.08, 0.24], 0.009, 6), true);
+  }
 
   // ---------------- aft body + open engine bay ----------------
   const aftSt = sampleStations(AFT_KEYS, 26);
   const aftAO = (x, y, z) => clamp(1 - Math.max(0, 0.4 - y) * 0.35, 0.6, 1);
-  // Open engine bay: the skin below y 0.18 between z -0.6 and -1.95 is cut away.
+  // Cooling-air outlet: the skin of the lower rear (aft of z -1.5, under
+  // y 0.2) is open; the dark inner skin and the engine show through it.
   const aftShell = (st, around) => {
-    const paint = liveryUV(soupGeo(splitSoup(soupOf(loft(st, around, aftAO)), [[0, -1, 0, 0.18], [0, 0, -1, -0.6], [0, 0, 1, 1.95]]).out));
+    const paint = liveryUV(soupGeo(splitSoup(soupOf(loft(st, around, aftAO)), [[0, -1, 0, 0.2], [0, 0, -1, -1.5], [0, 0, 1, 2.02]]).out));
     return { paint, inner: innerShell(paint, 0.012) };
   };
   const aftHi = aftShell(aftSt, 64), aftLo = aftShell(sampleStations(AFT_KEYS, 8), 24);
+  // Outlet rim (frame tube round the opening's edge).
   for (const sx of [1, -1]) {
-    const rail = [];
-    for (let z = -0.6; z >= -1.95; z -= 0.05) rail.push(surf(aftSt, z, 0.18, sx, 0.004));
-    add('frame', tube(rail, 0.018, 30, 8));
-    for (const z of [-0.6, -1.95]) {
-      const st = stationAt(aftSt, z), pts = [];
-      for (let y = 0.18; y >= st.yb + 0.01; y -= 0.05) pts.push(surf(aftSt, z, y, sx, 0.004));
-      if (pts.length > 1) add('frame', tube(pts, 0.016, 12, 6));
+    const rim = [];
+    for (let z = -1.5; z >= -2.0; z -= 0.05) {
+      const st = stationAt(aftSt, z);
+      if (st.yb > 0.2) break;
+      rim.push(surf(aftSt, z, Math.max(st.yb + 0.01, Math.min(0.2, st.ys)), sx, -0.004));
     }
-  }
-  // Firewall (front of the bay) and the bay ceiling.
-  add('dark', tx(new THREE.PlaneGeometry(1.08, 0.82), 0, -0.23, -0.6, 0, Math.PI, 0));
-  add('dark', tx(new THREE.PlaneGeometry(0.9, 1.3), 0, 0.17, -1.25, Math.PI / 2, 0, 0));
-  // Steel tube frame from the cabin to the tail-cone root.
-  {
-    const fr = (a, b, r = 0.017) => add('frame', rod(a, b, r, 8));
-    for (const sx of [1, -1]) {
-      fr([sx * 0.5, -0.6, -0.58], [sx * 0.42, -0.5, -1.25]);
-      fr([sx * 0.42, -0.5, -1.25], [sx * 0.2, 0.24, -2.0]);
-      fr([sx * 0.5, 0.15, -0.6], [sx * 0.2, 0.3, -2.0]);
-      fr([sx * 0.5, -0.6, -0.58], [sx * 0.5, 0.15, -0.6]);
-      fr([sx * 0.42, -0.5, -1.25], [sx * 0.45, 0.15, -1.2]);
-      fr([sx * 0.5, -0.6, -0.58], [sx * 0.45, 0.15, -1.2], 0.013);
-    }
-    fr([0.42, -0.5, -1.25], [-0.42, -0.5, -1.25]);
-    fr([0.5, -0.6, -0.58], [-0.5, -0.6, -0.58]);
+    if (rim.length > 1) add('frame', tube(rim, 0.012, 12, 6));
   }
   // Lycoming flat-six: crankcase, finned cylinders, sump, cooling scroll
   // (the fan housing ahead of the engine), exhaust to the muffler and the
@@ -658,18 +666,20 @@ export function createR44Model(panel, opts = {}) {
     for (const sx of [1, -1]) {
       for (let k = 0; k < 3; k++) {
         const z = -0.92 - k * 0.2 - (sx > 0 ? 0 : 0.09);
+        // (inside the closed cowling; seen through the outlet)
         const cyl = new THREE.CylinderGeometry(0.07, 0.07, 0.2, 14);
         ex(tx(cyl, sx * 0.29, -0.14, z, 0, 0, Math.PI / 2));
         for (let f = 0; f < 6; f++) ex(tx(new THREE.CylinderGeometry(0.085, 0.085, 0.008, 14), sx * (0.21 + f * 0.03), -0.14, z, 0, 0, Math.PI / 2));
         add('steel', tx(new THREE.CylinderGeometry(0.06, 0.06, 0.06, 12), sx * 0.42, -0.1, z, 0, 0, Math.PI / 2));
-        add('exhaust', tube([[sx * 0.36, -0.24, z], [sx * 0.33, -0.36, z - 0.05], [sx * 0.2, -0.42, -1.6], [sx * 0.08, -0.4, -1.78]], 0.022, 10, 6));
+        add('exhaust', tube([[sx * 0.33, -0.22, z], [sx * 0.28, -0.3, z - 0.05], [sx * 0.14, -0.2, -1.45], [sx * 0.06, -0.12, -1.6]], 0.022, 10, 6));
       }
     }
     add('dark', tx(new THREE.CylinderGeometry(0.31, 0.31, 0.2, 32), 0, -0.12, -0.72, Math.PI / 2));
     add('engine', tx(new THREE.TorusGeometry(0.31, 0.02, 8, 32), 0, -0.12, -0.82));
-    add('exhaust', tx(new THREE.CylinderGeometry(0.11, 0.11, 0.42, 20), 0, -0.4, -1.92, Math.PI / 2));
-    add('exhaust', tube([[-0.05, -0.42, -2.1], [-0.1, -0.5, -2.22], [-0.14, -0.62, -2.3]], 0.045, 10, 10));
-    add('gloss', tx(new THREE.CircleGeometry(0.042, 14), -0.14, -0.63, -2.31, Math.PI / 2 + 0.6, 0, 0));
+    // Muffler inside the outlet, the tailpipe turned down out of it.
+    add('exhaust', tx(new THREE.CylinderGeometry(0.1, 0.1, 0.36, 20), 0, -0.1, -1.6, Math.PI / 2));
+    add('exhaust', tube([[-0.04, -0.12, -1.78], [-0.08, -0.18, -1.86], [-0.12, -0.28, -1.9]], 0.042, 10, 10));
+    add('gloss', tx(new THREE.CircleGeometry(0.04, 14), -0.12, -0.285, -1.9, Math.PI / 2, 0, 0));
     add('alu', tx(new THREE.CylinderGeometry(0.06, 0.06, 0.12, 14), 0.16, 0.0, -0.9, 0, 0, Math.PI / 2));
     add('dark', rbox(0.26, 0.2, 0.06, 0.01, -0.22, -0.05, -1.62));
     // Upper drive: belt sheave and the clutch actuator under the fairing.
@@ -738,22 +748,28 @@ export function createR44Model(panel, opts = {}) {
   // ---------------- ag kit: belly tank, pump, boom, nozzles ----------------
   const nozzles = [];
   {
-    const tz = -0.05;
-    add('tank', rbox(0.95, 0.32, 1.0, 0.09, 0, -1.0, tz));
-    for (const z of [tz - 0.32, tz + 0.3]) add('dark', tx(new THREE.TorusGeometry(1, 0.012, 6, 36), 0, -1.0, z, 0, 0, 0, [0.5, 0.18, 1]));
-    for (const sx of [1, -1]) {
-      add('steel', rod([sx * 0.4, -0.86, tz - 0.32], [sx * 0.42, -0.88, -0.82], 0.014, 6));
-      add('steel', rod([sx * 0.4, -0.86, tz + 0.3], [sx * 0.42, -0.88, 0.95], 0.014, 6));
-      // Fill coupler on the tank side (aft) — the hose couples here.
-      add('dark', tx(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 16), sx * 0.49, -1.0, -0.42, 0, 0, Math.PI / 2));
-      add('brass', tx(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 16), sx * 0.53, -1.0, -0.42, 0, 0, Math.PI / 2));
+    // Cylindrical belly tank (as in the photographs) on two straps, slung
+    // between the cross tubes.
+    const tz = -0.05, TR0 = 0.19, TL = 1.5, ty = -0.88 - TR0;
+    add('tank', tx(new THREE.CylinderGeometry(TR0, TR0, TL - 2 * 0.12, 32, 1, true), 0, ty, tz, Math.PI / 2));
+    for (const sz of [1, -1]) add('tank', tx(new THREE.SphereGeometry(TR0, 32, 10, 0, Math.PI * 2, 0, Math.PI / 2), 0, ty, tz + sz * (TL / 2 - 0.12), sz * Math.PI / 2, 0, 0, [1, 0.63, 1]));
+    for (const z of [tz - 0.42, tz + 0.4]) {
+      add('dark', tx(new THREE.TorusGeometry(TR0 + 0.006, 0.011, 6, 36), 0, ty, z));
+      add('steel', rbox(0.06, 0.05, 0.03, 0.008, 0, -0.875, z));
     }
-    // Sight strip (translucent level band) on the tank side.
-    add('tint', tx(new THREE.PlaneGeometry(0.5, 0.05), 0.477, -0.98, tz, 0, Math.PI / 2, 0), true);
+    for (const sx of [1, -1]) {
+      add('steel', rod([sx * 0.15, -0.95, tz - 0.42], [sx * 0.42, -0.88, -0.82], 0.014, 6));
+      add('steel', rod([sx * 0.15, -0.95, tz + 0.4], [sx * 0.42, -0.88, 0.95], 0.014, 6));
+    }
+    // Fill coupler on the tank's left side, aft — the hose couples here.
+    add('dark', tx(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 16), TR0 + 0.02, ty, -0.55, 0, 0, Math.PI / 2));
+    add('brass', tx(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 16), TR0 + 0.06, ty, -0.55, 0, 0, Math.PI / 2));
+    // Sight strip (translucent level band) along the tank's side.
+    add('tint', tx(new THREE.PlaneGeometry(0.6, 0.045), TR0 * 0.97 + 0.003, ty, tz, 0, Math.PI / 2, 0), true);
     // Pump at the tank front and the feed line to the boom centre.
-    add('dark', tx(new THREE.CylinderGeometry(0.065, 0.065, 0.2, 16), 0, -1.02, 0.5, Math.PI / 2));
-    add('alu', tx(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 14), 0, -1.02, 0.62, Math.PI / 2));
-    add('rubber', tube([[0, -1.05, 0.42], [0, -1.12, 0.47], [0, BOOM.y, 0.55], [0, BOOM.y, BOOM.z]], 0.022, 12, 8));
+    add('dark', tx(new THREE.CylinderGeometry(0.06, 0.06, 0.16, 16), 0, ty - 0.05, 0.78, Math.PI / 2));
+    add('alu', tx(new THREE.CylinderGeometry(0.045, 0.045, 0.05, 14), 0, ty - 0.05, 0.88, Math.PI / 2));
+    add('rubber', tube([[0, ty - 0.08, 0.7], [0, ty - 0.12, 0.66], [0, BOOM.y, 0.62], [0, BOOM.y, BOOM.z]], 0.022, 12, 8));
     // Boom: 8 m (80 % of the rotor diameter, kept inside the rotor wake).
     add('alu', rod([BOOM.half, BOOM.y, BOOM.z], [-BOOM.half, BOOM.y, BOOM.z], 0.025, 12));
     add('alu', ball([0, BOOM.y, BOOM.z], 0.045, 12));
@@ -779,11 +795,11 @@ export function createR44Model(panel, opts = {}) {
   // ---------------- main rotor ----------------
   // Mast and the stationary swashplate on the airframe; the rotating parts
   // turn in `spin`, inside `tpp` (tip-path-plane tilt from the simulation).
-  add('steel', tx(new THREE.CylinderGeometry(0.052, 0.058, R.hubHeight - 1.08, 16), 0, (R.hubHeight + 1.08) / 2, R.hubZ));
+  add('steel', tx(new THREE.CylinderGeometry(0.052, 0.058, R.hubHeight - TOWER.y1, 16), 0, (R.hubHeight + TOWER.y1) / 2, R.hubZ));
   const rotor = new THREE.Group();
   rotor.position.set(0, R.hubHeight, R.hubZ);
   const swash = new THREE.Group();
-  swash.position.set(0, 1.26 - R.hubHeight, 0);
+  swash.position.set(0, TOWER.y1 + 0.07 - R.hubHeight, 0);
   rotor.add(swash);
   swash.add(new THREE.Mesh(tagged(new THREE.CylinderGeometry(0.15, 0.15, 0.035, 28)), M.alu));
   const tpp = new THREE.Group();
@@ -801,8 +817,9 @@ export function createR44Model(panel, opts = {}) {
     hub.push(tagged(tx(lathe([[0, 0.1], [0.05, 0.09], [0.07, 0.05], [0.075, 0]], 18), 0, 0.055, 0)));
     spin.add(new THREE.Mesh(mergeGeometries(hub), M.alu));
     // Rotating swashplate ring and the two pitch links up to the horns.
-    const links = [tagged(tx(new THREE.CylinderGeometry(0.13, 0.13, 0.03, 28), 0, 1.3 - R.hubHeight, 0))];
-    for (const sx of [1, -1]) links.push(tagged(rod([sx * 0.04, 1.3 - R.hubHeight, sx * -0.12], [sx * 0.2, -0.02, sx * -0.1], 0.011, 6)));
+    const yl = TOWER.y1 + 0.11 - R.hubHeight;
+    const links = [tagged(tx(new THREE.CylinderGeometry(0.13, 0.13, 0.03, 28), 0, yl, 0))];
+    for (const sx of [1, -1]) links.push(tagged(rod([sx * 0.04, yl, sx * -0.12], [sx * 0.2, -0.02, sx * -0.1], 0.011, 6)));
     spin.add(new THREE.Mesh(mergeGeometries(links), M.steel));
   }
   // Blades: cone (coning / static droop) -> pitch (collective) -> blade.
@@ -1149,7 +1166,7 @@ export function createR44Model(panel, opts = {}) {
     nozzles, pilot, cockpit, glassMesh,
     eye: new THREE.Vector3(...o3(0, 0.98, -0.42)),
     fuelFiller: new THREE.Vector3(0.44, 0.56, -0.86),
-    hopperPort: new THREE.Vector3(0.53, -1.0, -0.42),
+    hopperPort: new THREE.Vector3(0.27, -1.07, -0.55),
     update,
   };
 }
