@@ -651,8 +651,9 @@ export function buildE203Cockpit(ctx) {
 
   // ---------------- guidance lightbar (on the cowl, facing the pilot) ----
   const leds = [];
+  let lightbar = null;
   {
-    const lb = new THREE.Group();
+    const lb = (lightbar = new THREE.Group());
     lb.position.set(0, ctx.cowlTopY(0.1) + 0.03, 0.1);
     lb.add(new THREE.Mesh(new RoundedBoxGeometry(0.27, 0.035, 0.05, 2, 0.007), CM.black));
     lb.add(new THREE.Mesh(at(new THREE.BoxGeometry(0.06, 0.02, 0.03), 0, -0.022, 0.0), CM.black));
@@ -695,11 +696,17 @@ export function buildE203Cockpit(ctx) {
   const nd = { ias: 0, ft: 0, rpm: 0, mp: 29.9, ff: 0, cht: 86, oil: 86, g: 1, gmax: 1, gmin: 1, amp: 0, hdg: 0, trim: 0 };
   const setN = (m, a) => { m.rotation.z = -a; };
   let nearT = 0;
+  let shown = true;
   const update = (dt, fm, ac) => {
     const g = ac?.game;
     if (!g) return;
     const inCk = g.cameraMode === 'cockpit' && g.aircraft === ac;
-    const near = !inCk && g.camera && g.camera.position.distanceTo(ac.rPos) < 9;
+    const dist = g.camera ? g.camera.position.distanceTo(ac.rPos) : 0;
+    const near = !inCk && dist < 9;
+    // Beyond 30 m the interior is a few pixels behind the glass: not drawn
+    // (the lightbar on the cowl stays).
+    const show = inCk || dist < 30;
+    if (show !== shown) { shown = show; for (const c of cockpit.children) if (c !== lightbar) c.visible = show; }
     if (near) {
       nearT -= dt;
       if (nearT <= 0) { nearT = 0.3; panel.draw(ac.instruments()); }
