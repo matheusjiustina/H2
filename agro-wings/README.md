@@ -2580,3 +2580,80 @@ wing canvases and a few material colours (frame, tips, gear) change.
 - The detailed 203 cockpit; the panel is still the 202A's.
 - Opening animations for the door and the hopper lid.
 - The estimated figures above, to check against the manual.
+
+### EMB-203 geometry correction — cabin, planform, rear fuselage
+
+The first 203 model read as low and bulky: the turtle deck behind the cabin
+started at roof height and fell slowly, a hump that buried the cabin; the
+windshield was raked to 32°; the body kept a parallel planform from the
+hopper to well behind the cabin; the cabin section was one rounded
+superellipse. Compared with the photographs of PS-BYA (side), PS-DIR (high
+front quarter), PS-WBM (rear quarter) and a 203 taxiing (front quarter),
+using near-orthographic renders and cameras placed where the photos were
+taken (`test/e203ortho.mjs`, `test/e203photo.mjs`).
+
+**What changed** (`src/aircraft/e203Model.js`; wings, winglets, tail
+surfaces, gear contact points, ag kit, physics and paint layout kept):
+
+- **Structured sections.** The cabin and rear fuselage are lofted from
+  sections of their own (`AFT_KEYS`, `aftRing`):
+  - the lower fuselage keeps its superellipse up to the window sill;
+  - above the sill, straight sides lean in to a flat top with rounded
+    corners (7 cm radius at the roof).
+  The cabin's rear frame is the first of these sections, so the roof flows
+  into the fairing with no seam.
+- **Cabin.**
+  - Roof top 1.025 → 1.04 m (body frame); flat, 0.69 m wide (was a crowned
+    0.84 m).
+  - Side windows flat, leaning in 12° from the sill to the roof rails.
+  - Windshield raked 43° from the hopper's top to the roof's front edge,
+    which moved forward from z −1.12/−1.17 to −0.93/−0.97 m.
+  - Roof rear frame at −1.78 m, B-posts at −1.58 m.
+  - The lower door window is shorter and sits under the side window's front
+    half.
+  - Frames are slimmer: tubes of 1.1–1.7 cm radius instead of 1.8–2.6 cm,
+    and no corner balls.
+- **Behind the cabin.** The fairing drops from the roof's rear edge (convex
+  at the edge, about 45° in the middle, concave into the dorsal) to a low,
+  rounded dorsal near the sill height.
+  - The fin root reaches down to it; the fin top is where it was.
+  - A concave dorsal fillet runs into the fin's leading edge.
+- **Planform.** About 8 % narrower from the cowl to the cabin, and the taper
+  starts right behind the cabin (no parallel run).
+- **Fits.**
+  - The wing root goes 8 cm further into the narrower body (no gap).
+  - The root fillet follows the body's surface.
+  - The main gear legs and the hopper coupler sit on the new lower sides.
+  - The provisional interior skins follow the cabin's leaning sides and
+    roof.
+
+| z (m) | half width before → after (m) | top before → after (m) |
+| --- | --- | --- |
+| 1.2 (cowl) | 0.43 → 0.395 | 0.52 (same) |
+| 0.0 (hopper) | 0.51 → 0.465 | 0.62 (same) |
+| −1.2 (cabin) | 0.53 → 0.485 | roof 1.025 → 1.04 |
+| −2.3 | 0.49 → 0.449 | 0.86 → 0.70 |
+| −2.8 | 0.44 → 0.405 | 0.71 → 0.47 |
+| −3.3 | 0.38 → 0.352 | 0.60 → 0.41 |
+| −3.9 | 0.30 → 0.278 | 0.52 → 0.37 |
+| −4.5 | 0.21 → 0.185 | 0.47 → 0.335 |
+
+**Paint.** Both schemes keep the same layout on the new surfaces:
+- the gold band (01) now passes under the B-post and climbs the fairing to
+  the dorsal, as on PS-BYA;
+- the green swoosh (02) follows the lower dorsal into the fin;
+- panel seams and the RESTRITA marking moved with the frames.
+
+**Measured** (this container):
+- span 13.299 m, length 8.00 m, height 2.44 m parked (roof top);
+- three wheels on the ground, 3.1° three-point attitude;
+- 71,542 triangles in 129 meshes (was 72,172 in 130);
+- `npm test`: 136 tests passing.
+
+**Still different from the photographs.**
+- On PS-BYA the fin top looks level with the roof or slightly above it; on
+  the model it is 8 cm below. It was left as it was rather than raised to
+  balance the cabin.
+- The real spinner looks larger in the front-quarter photo.
+- The windshield's lower side corners look lower on the real aircraft.
+- The photo comparisons use estimated camera positions, not surveyed ones.

@@ -9,11 +9,13 @@
 // The parts, after the photographs: a long IO-540 cowl tapering to the
 // polished spinner, a round cooling inlet and the landing light in its nose,
 // a chin inlet; the hopper's tan fibreglass lid with the loading box at its
-// front; the raised cabin behind it — raked one-piece windshield, big side
-// windows, the door on the left with its lower window, a rounded roof — and
-// a turtle deck falling steadily to a slender, flat-sided tail cone; the
-// swept fin with a straight-hinged rudder that runs down past the end of the
-// cone; a rectangular tailplane low on the cone; a constant-chord 1.71 m
+// front; the cabin standing on the hopper section — windshield raked 43°,
+// flat side windows leaning in from the sill, the door on the left with its
+// lower window, a flat roof with rounded edges — and behind it a fairing
+// that drops steeply from the roof to a low, rounded dorsal tapering to the
+// rudder post; the swept fin with a straight-hinged rudder that runs down
+// past the end of the cone; a rectangular tailplane low on the cone; a
+// constant-chord 1.71 m
 // wing with 6.5° of dihedral, flaps and ailerons, ending in the 203's
 // winglets — swept "fins" that rise out of the full tip chord in one
 // continuous curve; tubular V main legs on big tyres, a long-spring
@@ -66,31 +68,136 @@ export const E203_LIVERIES = [
 // Fuselage stations K(z, half-width, shoulder y, bottom y, top y, pU, pL).
 // Nose: the cowl lip just larger than the spinner, opening out over the
 // engine to the hopper; the top line rises gently to the windshield base.
+// Seen from above the body widens steadily to the cabin (0.97 m) and starts
+// narrowing again right behind it.
 const FWD_KEYS = [
-  K(2.14, 0.33, 0.1, -0.24, 0.41, 2.4, 2.4), K(2.02, 0.35, 0.09, -0.27, 0.43, 2.7, 2.6),
-  K(1.7, 0.385, 0.07, -0.33, 0.46, 3.0, 2.9), K(1.2, 0.43, 0.04, -0.41, 0.52, 3.4, 3.2),
-  K(0.6, 0.475, 0.0, -0.5, 0.58, 3.8, 3.6), K(0.0, 0.51, -0.04, -0.56, 0.62, 4.2, 3.8),
-  K(-0.5, 0.53, -0.06, -0.58, 0.64, 4.3, 3.8),
+  K(2.14, 0.31, 0.1, -0.24, 0.41, 2.4, 2.4), K(2.02, 0.33, 0.09, -0.27, 0.43, 2.7, 2.6),
+  K(1.7, 0.36, 0.07, -0.33, 0.46, 3.0, 2.9), K(1.2, 0.395, 0.04, -0.41, 0.52, 3.4, 3.2),
+  K(0.6, 0.435, 0.0, -0.5, 0.58, 3.8, 3.6), K(0.0, 0.465, -0.04, -0.56, 0.62, 4.2, 3.8),
+  K(-0.5, 0.485, -0.06, -0.58, 0.64, 4.3, 3.8),
 ];
 // Cabin: the lower fuselage keeps the hopper's section; it is cut 30° above
 // the sides (the window sill) and the cabin stands on it.
-const CAB_KEYS = [FWD_KEYS[FWD_KEYS.length - 1], K(-1.2, 0.53, -0.06, -0.58, 0.64, 4.3, 3.8), K(-1.9, 0.53, -0.06, -0.57, 0.64, 4.3, 3.8)];
-// Rear fuselage: from the cabin's rear frame the turtle deck falls in a
-// steady ramp to the fin root and on to the rudder post; the sides taper
-// all the way (no parallel run), the belly rises gently.
-const AFT_KEYS = [
-  K(-1.9, 0.52, -0.05, -0.57, 0.99, 6.5, 3.8), K(-2.3, 0.49, -0.06, -0.55, 0.86, 5.0, 3.6),
-  K(-2.8, 0.44, -0.07, -0.53, 0.71, 4.0, 3.4), K(-3.3, 0.38, -0.08, -0.5, 0.6, 3.2, 3.2),
-  K(-3.9, 0.3, -0.07, -0.47, 0.52, 2.7, 3.0), K(-4.5, 0.21, -0.05, -0.44, 0.47, 2.5, 2.8),
-  K(-5.02, 0.09, -0.02, -0.38, 0.42, 2.4, 2.5),
-];
+const CAB_KEYS = [FWD_KEYS[FWD_KEYS.length - 1], K(-1.2, 0.485, -0.06, -0.58, 0.64, 4.3, 3.8), K(-1.78, 0.48, -0.06, -0.57, 0.64, 4.3, 3.8)];
 const CAB_ARC = [Math.PI * (5 / 6), Math.PI * (13 / 6)]; // open above the sill (30°)
 const RIM_A = Math.PI / 6;
 // Sill line: where the cabin loft is cut (its 30° point).
 const SILL = (() => { const st = CAB_KEYS[1]; return { x: st.hw * Math.cos(RIM_A) ** (2 / st.pU), y: st.ys + (st.yt - st.ys) * Math.sin(RIM_A) ** (2 / st.pU) }; })();
-const WS_Z = -0.5, WS_ZS = -0.66; // windshield base: centre / sides
-const ROOF = { y: 0.95, hw: 0.42, crown: 0.075, zF: -1.17, zFc: -1.12, zR: -1.9 }; // roof rail height / half width, crown, front & rear
-const BPOST = -1.62;
+const WS_Z = -0.5, WS_ZS = -0.62; // windshield base: centre / sides
+
+// Structured sections for the cabin top and the rear fuselage
+// R(z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT): below the rim yr the body
+// is the superellipse of the lower fuselage (half width hw at the shoulder
+// ys, belly yb, exponents pL / pU, virtual top yv); above it straight sides
+// lean in to a top corner of radius rT and a flat top at yt, hwT wide (half).
+// The first key is the cabin itself at its rear frame: the sill, the side
+// windows leaning in 12°, the flat roof with its rounded edges. Behind it
+// the fairing drops steeply from the roof (convex at the roof edge, about
+// 45° in the middle, concave into the dorsal) to a low dorsal near the sill
+// height, which runs on, rounded and narrowing, to the rudder post.
+const R = (z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT) => ({ z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT });
+const AFT_KEYS = [
+  R(-1.78, 0.48, -0.06, -0.57, 3.8, 4.3, 0.64, 0.447, 1.04, 0.345, 0.07),
+  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.0, 0.33, 0.1),
+  R(-2.15, 0.46, -0.062, -0.562, 3.72, 4.1, 0.625, 0.435, 0.84, 0.3, 0.14),
+  R(-2.35, 0.445, -0.065, -0.555, 3.62, 3.9, 0.61, 0.41, 0.655, 0.29, 0.17),
+  R(-2.6, 0.425, -0.07, -0.545, 3.5, 3.7, 0.58, 0.36, 0.5, 0.29, 0.19),
+  R(-3.0, 0.385, -0.075, -0.525, 3.3, 3.4, 0.53, 0.3, 0.44, 0.27, 0.19),
+  R(-3.5, 0.33, -0.08, -0.5, 3.2, 3.1, 0.48, 0.25, 0.395, 0.235, 0.17),
+  R(-4.0, 0.265, -0.07, -0.47, 3.0, 2.9, 0.43, 0.21, 0.36, 0.19, 0.14),
+  R(-4.5, 0.185, -0.05, -0.44, 2.8, 2.7, 0.39, 0.18, 0.335, 0.13, 0.1),
+  R(-5.02, 0.085, -0.02, -0.38, 2.5, 2.5, 0.35, 0.15, 0.32, 0.06, 0.05),
+];
+const CABIN = AFT_KEYS[0];
+// Upper contour of a structured section, left half (x ≥ 0), from the rim up
+// to the top centre: rim point, the side line to the corner's tangent
+// point, the corner arc, the flat top. counts: [side, arc, top].
+const NS = [5, 7, 4];
+function topHalf(st) {
+  const s = clamp((st.yr - st.ys) / (st.yv - st.ys), 0, 1) ** st.pU;
+  const rim = [st.hw * (1 - s) ** (1 / st.pU), st.yr];
+  const cx = Math.max(0, st.hwT - st.rT), cy = st.yt - st.rT;
+  const dx = rim[0] - cx, dy = rim[1] - cy, d = Math.hypot(dx, dy);
+  const a1 = Math.atan2(dy, dx) + Math.acos(clamp(st.rT / d, -1, 1));
+  const tp = [cx + Math.cos(a1) * st.rT, cy + Math.sin(a1) * st.rT];
+  const pts = [];
+  for (let i = 0; i < NS[0]; i++) pts.push([lerp(rim[0], tp[0], i / NS[0]), lerp(rim[1], tp[1], i / NS[0])]);
+  for (let i = 0; i < NS[1]; i++) { const a = a1 + ((Math.PI / 2 - a1) * i) / NS[1]; pts.push([cx + Math.cos(a) * st.rT, cy + Math.sin(a) * st.rT]); }
+  for (let i = 0; i <= NS[2]; i++) pts.push([cx * (1 - i / NS[2]), st.yt]);
+  return { pts, rim, tp };
+}
+// The whole ring: left shoulder, up to the rim (superellipse), the top half,
+// mirrored down the right side, the belly back to the start — the same
+// direction as ring() so the faces point outward.
+const NLO = [6, 24]; // shoulder->rim, belly
+function aftRing(st) {
+  const out = [];
+  const s0 = clamp((st.yr - st.ys) / (st.yv - st.ys), 0, 1);
+  const aR = Math.asin(s0 ** (st.pU / 2)); // superellipse angle of the rim
+  const up = (a) => { const c = Math.cos(a), s = Math.sin(a); return [st.hw * c ** (2 / st.pU), st.ys + (st.yv - st.ys) * s ** (2 / st.pU)]; };
+  for (let i = 0; i < NLO[0]; i++) out.push(up((aR * i) / NLO[0]));
+  const { pts } = topHalf(st);
+  out.push(...pts);
+  const right = out.slice(0, -1).reverse().map(([x, y]) => [-x, y]);
+  out.push(...right);
+  for (let i = 1; i < NLO[1]; i++) {
+    const a = Math.PI + (Math.PI * i) / NLO[1], c = Math.cos(a), s = Math.sin(a);
+    out.push([st.hw * Math.sign(c) * Math.abs(c) ** (2 / st.pL), st.ys - (st.ys - st.yb) * Math.abs(s) ** (2 / st.pL)]);
+  }
+  out.push(out[0].slice());
+  return out;
+}
+function sampleR(keys, per) {
+  const P = Object.keys(keys[0]);
+  const cr = (p0, p1, p2, p3, t) => 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
+  const out = [];
+  for (let i = 0; i < keys.length - 1; i++) {
+    const k0 = keys[Math.max(0, i - 1)], k1 = keys[i], k2 = keys[i + 1], k3 = keys[Math.min(keys.length - 1, i + 2)];
+    const n = Math.max(2, Math.round(Math.abs(k1.z - k2.z) * per));
+    for (let j = 0; j < n; j++) { const t = j / n, st = {}; for (const p of P) st[p] = cr(k0[p], k1[p], k2[p], k3[p], t); out.push(st); }
+  }
+  out.push({ ...keys[keys.length - 1] });
+  return out;
+}
+function loftR(stations, colorFn) {
+  const pos = [], col = [], idx = [];
+  let rl = 0;
+  for (const st of stations) {
+    const pts = aftRing(st);
+    rl = pts.length;
+    for (const [x, y] of pts) { pos.push(x, y, st.z); const g = colorFn ? colorFn(x, y, st.z) : 1; col.push(g, g, g); }
+  }
+  for (let si = 0; si < stations.length - 1; si++) for (let k = 0; k < rl - 1; k++) {
+    const a = si * rl + k, b = a + 1, c = a + rl, d = c + 1;
+    idx.push(a, c, b, b, c, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+// Cabin top (roof and windshield head): the structured section's upper
+// contour, right rail -> left rail through the flat top, by arc length
+// (u = 0 left rail, 1 right rail).
+const CAB_TOP = (() => {
+  const { pts, tp } = topHalf(CABIN);
+  const half = pts.slice(NS[0]); // from the rail (tangent point) to the centre
+  const all = half.concat(half.slice(0, -1).reverse().map(([x, y]) => [-x, y]));
+  const L = [0];
+  for (let i = 1; i < all.length; i++) L.push(L[i - 1] + Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]));
+  const at = (u) => {
+    const t = clamp(u, 0, 1) * L[L.length - 1];
+    let i = 1; while (i < L.length - 1 && L[i] < t) i++;
+    const f = (t - L[i - 1]) / (L[i] - L[i - 1] || 1);
+    return [lerp(all[i - 1][0], all[i][0], f), lerp(all[i - 1][1], all[i][1], f)];
+  };
+  return { at, rail: { x: tp[0], y: tp[1] } };
+})();
+const RAIL = CAB_TOP.rail; // where the side glass meets the roof edge
+const ROOF = { yt: CABIN.yt, zF: -0.97, zFc: -0.93, zR: CABIN.z }; // roof top, front edge (rails / centre), rear frame
+const BPOST = -1.58;
 // Half width of a fuselage station at height y (upper half).
 const surfX = (st, y) => {
   const s = clamp((y - st.ys) / (st.yt - st.ys), 0, 1) ** (st.pU / 2);
@@ -170,9 +277,10 @@ function liveryTextures(reg, L = E203_LIVERIES[0]) {
     g.fillStyle = L.base;
     g.fillRect(0, oy, LV.W, LV.H / 2);
     if (brasil) {
-      // Gold band from under the cabin front, sweeping up behind the cabin to
-      // the turtle deck; blue below and aft of it; green ahead and above.
-      const C = [[0.45, -0.66], [-0.3, -0.38], [-0.95, -0.07], [-1.55, 0.25], [-2.15, 0.56], [-2.7, 0.84], [-3.05, 1.05]];
+      // Gold band from under the cabin front, past the B-post and up the
+      // fairing behind the roof to the dorsal; blue below and aft of it;
+      // green ahead and above (the cabin and the top of the fairing).
+      const C = [[0.45, -0.66], [-0.3, -0.4], [-0.95, -0.16], [-1.55, 0.08], [-1.98, 0.3], [-2.3, 0.55], [-2.55, 0.85]];
       const off = (dz, dy) => C.map(([z, y]) => [z + dz, y + dy]);
       poly(off(-0.07, -0.09).concat([[-3.4, 1.4], [-5.8, 1.4], [-5.8, -0.9], [0.5, -0.9]]), BLUE);
       band(C, 0.105, GOLD);
@@ -186,7 +294,7 @@ function liveryTextures(reg, L = E203_LIVERIES[0]) {
       poly([[-5.04, -0.5], [-5.04, 1.4], [-5.8, 1.4], [-5.8, -0.5]], BLUE2);
       // Green swoosh, thin at the cabin and broad up the fin, a gold line
       // under it.
-      const S = [[0.35, -0.11], [-0.5, -0.05], [-1.3, 0.03], [-2.1, 0.13], [-2.9, 0.26], [-3.6, 0.4], [-4.15, 0.56], [-4.55, 0.78], [-4.82, 1.02]];
+      const S = [[0.35, -0.11], [-0.5, -0.06], [-1.3, 0.0], [-2.1, 0.07], [-2.9, 0.15], [-3.6, 0.25], [-4.15, 0.45], [-4.55, 0.75], [-4.82, 1.02]];
       band(S, (f) => 0.012 + 0.065 * f ** 1.3, GREEN2);
       band(S.slice(1, 7).map(([z, y]) => [z, y - 0.075]), (f) => 0.008 + 0.012 * f, GOLD2);
       { const [px, py] = P(-4.86, 1.06); arrow(g, px, py, 0.05 * LV.ky, BLUE2, side > 0 ? 1 : -1); }
@@ -211,10 +319,10 @@ function liveryTextures(reg, L = E203_LIVERIES[0]) {
     const seams = [
       [[2.14, -0.2], [2.14, 0.4]], [[1.45, -0.5], [1.45, 0.55]], [[2.1, 0.1], [1.45, 0.08]], [[1.95, 0.32], [1.5, 0.36]],
       [[1.15, -0.55], [1.15, 0.6]], [[0.2, -0.6], [0.2, 0.65]], [[-0.5, -0.6], [-0.5, 0.66]],
-      [[-1.9, -0.58], [-1.9, 1.0]], [[-2.6, -0.56], [-2.6, 0.78]], [[-3.3, -0.52], [-3.3, 0.62]], [[-4.0, -0.48], [-4.0, 0.52]],
-      [[-4.5, -0.45], [-4.5, 0.48]], [[0.2, -0.3], [-1.9, -0.34]], [[-1.9, -0.32], [-4.9, -0.2]],
+      [[-1.78, -0.58], [-1.78, 1.05]], [[-2.6, -0.56], [-2.6, 0.5]], [[-3.3, -0.52], [-3.3, 0.42]], [[-4.0, -0.48], [-4.0, 0.37]],
+      [[-4.5, -0.45], [-4.5, 0.34]], [[0.2, -0.3], [-1.78, -0.34]], [[-1.78, -0.32], [-4.9, -0.2]],
     ];
-    if (side > 0) seams.push([[-0.66, 0.43], [-0.66, -0.1], [-1.6, -0.1], [-1.6, 0.43]]);
+    if (side > 0) seams.push([[-0.64, 0.43], [-0.64, 0.1], [-1.56, 0.1], [-1.56, 0.43]]);
     for (const s of seams) {
       line(g, s, L.seam, 2);
       line(gb, s, '#3c3c3c', 2.6);
@@ -252,7 +360,7 @@ function liveryTextures(reg, L = E203_LIVERIES[0]) {
     for (let k = 0; k < 3; k++) line(g, [[1.98 - k * 0.03, 0.17 - k * 0.022], [1.52, 0.17 - k * 0.022]], L.text, 2);
     if (brasil) {
       text(-3.28, 0.04, reg, 0.3, '#f4f4f0', 'bold', 1.12);
-      text(-1.76, 0.63, 'RESTRITA', 0.035, '#f4f4f0', 'bold');
+      text(-1.92, 0.5, 'RESTRITA', 0.035, '#f4f4f0', 'bold');
     } else {
       text(-2.95, -0.14, reg, 0.28, NAVY, 'bold', 1.12);
       text(-1.2, 0.3, 'EXPERIMENTAL', 0.035, NAVY, 'bold');
@@ -375,7 +483,7 @@ export function e203Extent() {
   const bb = wl.geo.boundingBox;
   return {
     span: 2 * bb.max.x, length: E203_DIM.spinnerZ - E203_DIM.rudderZ,
-    tops: [[0, ROOF.y + ROOF.crown, -1.45], [0, 1.135, -4.95], [bb.max.x, bb.max.y, -1.2]],
+    tops: [[0, ROOF.yt, -1.45], [0, 1.135, -4.95], [bb.max.x, bb.max.y, -1.2]],
   };
 }
 
@@ -488,14 +596,25 @@ export function createE203Model(panel, opts = {}) {
   };
   const fwdSt = sampleStations(FWD_KEYS, 22);
   const cabSt = sampleStations(CAB_KEYS, 10);
-  const aftSt = sampleStations(AFT_KEYS, 16);
+  const aftSt = sampleR(AFT_KEYS, 16);
   add('livery', liveryUV(tagged(loft(fwdSt, 64, fusAO))));
   add('livery', liveryUV(tagged(loft(cabSt, 56, fusAO, CAB_ARC))));
-  add('livery', liveryUV(tagged(loft(aftSt, 64, fusAO))));
+  add('livery', liveryUV(tagged(loftR(aftSt, fusAO))));
+  // Half width of the body (nose to cabin rear) at (z, y): wing-root fillet,
+  // gear and coupler fits.
+  const bodySt = fwdSt.concat(cabSt.slice(1));
+  const halfX = (z, y) => {
+    let i = 1; while (i < bodySt.length - 1 && bodySt[i].z > z) i++;
+    const a = bodySt[i - 1], b = bodySt[i], f = clamp((a.z - z) / (a.z - b.z || 1), 0, 1);
+    const st = {}; for (const k of ['hw', 'ys', 'yb', 'yt', 'pU', 'pL']) st[k] = lerp(a[k], b[k], f);
+    if (y >= st.ys) return surfX(st, y);
+    const t = clamp((st.ys - y) / (st.ys - st.yb), 0, 1);
+    return st.hw * Math.max(0, 1 - t ** st.pL) ** (1 / st.pL);
+  };
   // Rudder post: the end of the cone, closed.
   {
     const st = aftSt[aftSt.length - 1];
-    const cap = new THREE.ShapeGeometry(new THREE.Shape(ring(st, 32).slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y))));
+    const cap = new THREE.ShapeGeometry(new THREE.Shape(aftRing(st).slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y))));
     cap.scale(-1, 1, 1); cap.translate(0, 0, st.z);
     add('livery', liveryUV(tagged(cap)));
   }
@@ -539,72 +658,80 @@ export function createE203Model(panel, opts = {}) {
     for (const sx of [1, -1]) add('steel', tx(new THREE.CylinderGeometry(0.012, 0.012, 0.06, 8), sx * 0.09, topY(1.2) + 0.13, 1.115, 0, 0, Math.PI / 2), true);
   }
   // Hopper loading coupler on the left side, gatebox under the hopper.
-  add('dark', tx(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 18), 0.53, -0.26, -0.75, 0, 0, Math.PI / 2));
-  add('brass', tx(new THREE.CylinderGeometry(0.045, 0.045, 0.025, 18), 0.575, -0.26, -0.75, 0, 0, Math.PI / 2));
+  { const cx = halfX(-0.75, -0.26);
+    add('dark', tx(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 18), cx, -0.26, -0.75, 0, 0, Math.PI / 2));
+    add('brass', tx(new THREE.CylinderGeometry(0.045, 0.045, 0.025, 18), cx + 0.045, -0.26, -0.75, 0, 0, Math.PI / 2)); }
   add('dark', rbox(0.34, 0.08, 0.42, 0.02, 0, -0.59, 0.2));
 
   // ---------------- cabin ----------------
+  // A structured cabin on the hopper section: the windshield raked 40° from
+  // the hopper's top to the roof's front edge; flat side windows leaning in
+  // from the sill to the roof rails; a flat roof with rounded edges; the
+  // painted side panels behind the B-posts; the rear frame flows into the
+  // fairing (rear fuselage, AFT_KEYS).
   const stWS = CAB_KEYS[0], stCab = CAB_KEYS[1];
   const wsA = (u) => RIM_A + (Math.PI - 2 * RIM_A) * u; // u = 0 left rim .. 1 right rim
   const wsZ = (y) => WS_Z + (WS_ZS - WS_Z) * (1 - clamp((y - SILL.y) / (stWS.yt - SILL.y), 0, 1)) ** 0.7;
   const wsBase = (u) => { const [x, y] = sePt(stWS, wsA(u)); return [x, y, wsZ(y)]; };
+  // Roof across (u = 0 left rail .. 1 right rail): its front edge curves
+  // forward to the centre; the rear frame is straight across.
   const roofAt = (u, rear) => {
-    const b = Math.PI * u, c = Math.cos(b), s = Math.abs(Math.sin(b));
-    const x = ROOF.hw * Math.sign(c) * Math.abs(c) ** 0.55;
-    const y = ROOF.y + (rear ? 0.05 : ROOF.crown) * s ** 0.5;
-    return [x, y, rear ? ROOF.zR : ROOF.zF + (ROOF.zFc - ROOF.zF) * s ** 0.5];
+    const [x, y] = CAB_TOP.at(u);
+    const c = Math.max(0, 1 - (x / RAIL.x) ** 2);
+    return [x, y, rear ? ROOF.zR : ROOF.zF + (ROOF.zFc - ROOF.zF) * c ** 0.6];
   };
+  // Sill half width along the cabin (the lower body's 30° line).
+  const sillX = (z) => halfX(z, SILL.y);
   // Deck strip from the hopper top back to the curved windshield base.
   add('livery', liveryUV(tagged(grid((u, v) => { const [x, y, z] = wsBase(u); return [x, y, lerp(WS_Z, z, v)]; }, 28, 2, [0, 0.1, -0.6]))));
   // Roof.
-  add('livery', liveryUV(tagged(grid((u, v) => lerp3(roofAt(u, false), roofAt(u, true), v), 24, 6, [0, 0.6, -1.5]))));
-  // Side: glass from the A-post to the B-post, painted panel behind it.
+  add('livery', liveryUV(tagged(grid((u, v) => lerp3(roofAt(u, false), roofAt(u, true), v), 26, 6, [0, 0.6, -1.4]))));
+  // Side: flat glass from the A-post to the B-post, painted panel behind it.
   const sideAt = (sx, u, v, z0, z1) => {
-    const y = lerp(SILL.y, ROOF.y, v);
     const zf = z0 === 'A' ? lerp(WS_ZS, ROOF.zF, v) : z0;
-    return [sx * (lerp(SILL.x, ROOF.hw, v) + 0.012 * Math.sin(Math.PI * u) * Math.sin(Math.PI * v)), y, lerp(zf, z1, u)];
+    const z = lerp(zf, z1, u);
+    return [sx * lerp(sillX(z), RAIL.x, v), lerp(SILL.y, RAIL.y, v), z];
   };
   const glassG = [];
   glassG.push(grid((u, v) => {
     const b = wsBase(u), t = roofAt(u, false);
     const p = lerp3(b, t, v);
-    const bul = 0.03 * Math.sin(Math.PI * v) * (0.4 + 0.6 * Math.sin(Math.PI * u));
-    return [p[0], p[1] + bul * 0.55, p[2] + bul * 0.83];
+    const bul = 0.012 * Math.sin(Math.PI * v);
+    return [p[0], p[1] + bul * 0.6, p[2] + bul * 0.8];
   }, 26, 10));
   for (const sx of [1, -1]) {
-    glassG.push(grid((u, v) => sideAt(sx, u, v, 'A', BPOST), 12, 6));
-    add('livery', liveryUV(tagged(grid((u, v) => sideAt(sx, u, v, BPOST, ROOF.zR), 4, 6, [0, 0.6, -1.75]))));
+    glassG.push(grid((u, v) => sideAt(sx, u, v, 'A', BPOST), 10, 6));
+    add('livery', liveryUV(tagged(grid((u, v) => sideAt(sx, u, v, BPOST, ROOF.zR), 4, 6, [0, 0.6, -1.7]))));
   }
-  // Lower window in the left door.
-  const DW = { z0: -0.88, z1: -1.42, y0: 0.08, y1: 0.36 };
+  // Lower window in the left door, under the side window's front half.
+  const DW = { z0: -0.72, z1: -1.2, y0: 0.2, y1: 0.38 };
   const doorWin = grid((u, v) => { const y = lerp(DW.y0, DW.y1, v); return [surfX(stCab, y) + 0.005, y, lerp(DW.z0, DW.z1, u)]; }, 6, 4);
-  // Frames (painted tubes outside; the scheme colour).
+  // Frames: slim painted tubes in the scheme colour.
   const fr = (pts, r) => add('frame', tube(pts, r, Math.max(6, pts.length * 3), 8));
   const N = 16;
-  fr(Array.from({ length: N + 1 }, (_, i) => wsBase(i / N)), 0.02);
-  fr(Array.from({ length: N + 1 }, (_, i) => roofAt(i / N, false)), 0.024);
-  fr(Array.from({ length: N + 1 }, (_, i) => roofAt(i / N, true)), 0.022);
+  fr(Array.from({ length: N + 1 }, (_, i) => wsBase(i / N)), 0.012);
+  fr(Array.from({ length: N + 1 }, (_, i) => roofAt(i / N, false)), 0.015);
   for (const sx of [1, -1]) {
-    const f0 = [sx * SILL.x, SILL.y, WS_ZS], f1 = [sx * ROOF.hw, ROOF.y, ROOF.zF];
-    fr([f0, lerp3(f0, f1, 0.5), f1], 0.026); // A-post
-    fr([[sx * SILL.x, SILL.y, BPOST], [sx * (SILL.x + ROOF.hw) / 2, (SILL.y + ROOF.y) / 2, BPOST], [sx * ROOF.hw, ROOF.y, BPOST]], 0.022); // B-post
-    fr([[sx * ROOF.hw, ROOF.y, ROOF.zF], [sx * ROOF.hw, ROOF.y, ROOF.zR]], 0.02); // roof rail
-    fr([[sx * SILL.x, SILL.y, WS_ZS], [sx * SILL.x, SILL.y, ROOF.zR]], 0.018); // sill
-    fr([[sx * SILL.x, SILL.y, ROOF.zR], [sx * ROOF.hw, ROOF.y, ROOF.zR]], 0.02); // rear frame
-    for (const p of [f0, f1, [sx * ROOF.hw, ROOF.y, BPOST], [sx * SILL.x, SILL.y, BPOST]]) add('frame', ball(p, 0.03, 8), true);
+    const f0 = [sx * sillX(WS_ZS), SILL.y, WS_ZS], f1 = [sx * RAIL.x, RAIL.y, ROOF.zF];
+    fr([f0, lerp3(f0, f1, 0.5), f1], 0.017); // A-post
+    const b0 = [sx * sillX(BPOST), SILL.y, BPOST], b1 = [sx * RAIL.x, RAIL.y, BPOST];
+    fr([b0, lerp3(b0, b1, 0.5), b1], 0.015); // B-post
+    fr([f1, [sx * RAIL.x, RAIL.y, ROOF.zR + 0.03]], 0.012); // roof rail
+    fr([f0, [sx * sillX(ROOF.zR), SILL.y, ROOF.zR + 0.03]], 0.011); // sill
   }
   {
     const loopPts = [[DW.z0, DW.y0], [DW.z1, DW.y0], [DW.z1, DW.y1], [DW.z0, DW.y1], [DW.z0, DW.y0]].map(([z, y]) => [surfX(stCab, y) + 0.008, y, z]);
-    add('frame', tube(loopPts, 0.012, 20, 6));
+    add('frame', tube(loopPts, 0.011, 20, 6));
     add('steel', rod([surfX(stCab, 0.3) + 0.03, 0.3, -1.5], [surfX(stCab, 0.3) + 0.03, 0.3, -1.38], 0.01, 6), true); // door handle
     for (const hy of [0.0, 0.36]) add('steel', tx(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), surfX(stCab, hy) + 0.01, hy, -0.68), true);
   }
   // Wire deflector over the windshield, the mast, the antenna wire to the
   // fin top, a whip on the turtle deck, beacon on the fin.
-  add('ink', rod([0, topY(1.95) + 0.02, 1.95], [0, 1.09, -1.12], 0.0045, 5));
-  add('ink', rod([0, 1.0, -1.15], [0, 1.1, -1.13], 0.012, 6));
-  add('ink', rod([0, 1.09, -1.14], [0, 1.135, -4.93], 0.0035, 4), true);
-  add('white', rod([0, 0.6, -3.35], [0, 1.02, -3.55], 0.006, 5), true);
+  const mastTop = [0, ROOF.yt + 0.075, ROOF.zFc - 0.01];
+  add('ink', rod([0, topY(1.95) + 0.02, 1.95], mastTop, 0.0045, 5));
+  add('ink', rod([0, ROOF.yt - 0.01, ROOF.zFc - 0.03], [0, ROOF.yt + 0.085, ROOF.zFc - 0.005], 0.012, 6));
+  add('ink', rod(mastTop, [0, 1.135, -4.93], 0.0035, 4), true);
+  add('white', rod([0, 0.41, -3.35], [0, 0.82, -3.55], 0.006, 5), true);
 
   // ---------------- wing ----------------
   const leY = (x) => e203WingY(x);
@@ -637,8 +764,8 @@ export function createE203Model(panel, opts = {}) {
   const FLAP = [0.6, 3.62], AIL = [3.7, 6.2];
   const winglet = wingletGeometry();
   for (const side of [1, -1]) {
-    add("wing", e203WingPanel([0.42, W.rootX, 1.5, 2.6, 3.7, 4.8, 5.8, W.tipX].map(st), mainProf, side, wingAO));
-    for (const [a, b] of [[0.42, FLAP[0]], [FLAP[1], AIL[0]], [AIL[1], W.tipX]]) add('wing', e203WingPanel([st(a), st(b)], aftProf, side, wingAO));
+    add("wing", e203WingPanel([0.34, W.rootX, 1.5, 2.6, 3.7, 4.8, 5.8, W.tipX].map(st), mainProf, side, wingAO));
+    for (const [a, b] of [[0.34, FLAP[0]], [FLAP[1], AIL[0]], [AIL[1], W.tipX]]) add('wing', e203WingPanel([st(a), st(b)], aftProf, side, wingAO));
     flaps.push(surfaceMesh(e203WingPanel([FLAP[0], 2.0, FLAP[1]].map(st), aftProf, side, wingAO), FLAP[0], FLAP[1], side));
     ailerons.push(surfaceMesh(e203WingPanel([AIL[0], 5.0, AIL[1]].map(st), aftProf, side), AIL[0], AIL[1], side));
     // Winglet out of the tip, nav light at its root, strobe at its top.
@@ -648,8 +775,8 @@ export function createE203Model(panel, opts = {}) {
     add('lens', tx(new THREE.SphereGeometry(0.05, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), ...navP, 0, 0, side * Math.PI / 2, [1, 1, 1.3]));
     add('strobe', ball([side * winglet.top[0], winglet.top[1] - 0.02, winglet.top[2] - 0.04], 0.018, 8));
     // Root fillet along the fuselage side.
-    const fil = mainProf.slice(0, 19).map(([xc, yc]) => [side * 0.52, W.rootY + yc * W.chord + 0.01, W.le - xc * W.chord]);
-    add('wing', tube(fil, 0.05, 30, 10));
+    const fil = mainProf.slice(0, 19).map(([xc, yc]) => { const y = W.rootY + yc * W.chord + 0.01, z = W.le - xc * W.chord; return [side * (halfX(z, y) - 0.006), y, z]; });
+    add('wing', tube(fil, 0.036, 30, 10));
     // Walkway on the left root, fuel filler, hinge brackets, pitot (left).
     if (side > 0) {
       const up = mainProf.slice(0, 19).filter(([xc]) => xc > 0.12 && xc < 0.62);
@@ -675,12 +802,16 @@ export function createE203Model(panel, opts = {}) {
     return flipWinding(g);
   };
   const HINGE_Z = -5.04;
-  // Fin: 45° leading edge from the turtle deck, square top; rudder on a
-  // straight vertical hinge, running down past the end of the cone.
-  const finSt = [[0.36, -4.08, 0.96], [0.6, -4.3, 0.74], [0.85, -4.55, 0.49], [1.0, -4.71, 0.33], [1.08, -4.8, 0.24], [1.12, -4.85, 0.19]];
+  // Fin: 45° leading edge from the dorsal, square top; rudder on a
+  // straight vertical hinge, running down past the end of the cone. The
+  // root reaches down into the low dorsal; the top is where it was.
+  const finSt = [[0.27, -4.0, 1.04], [0.36, -4.08, 0.96], [0.6, -4.3, 0.74], [0.85, -4.55, 0.49], [1.0, -4.71, 0.33], [1.08, -4.8, 0.24], [1.12, -4.85, 0.19]];
   add('livery', liveryUV(tagged(vfin(airfoil(0, 1, 0.12, 0, 0.4, 12), finSt))));
+  // Dorsal fillet: a concave rise from the spine that runs into the fin's
+  // leading edge (its last station is inside the fin).
   add('livery', liveryUV(tagged(loft(sampleStations([
-    K(-3.65, 0.022, 0.5, 0.49, 0.53, 2.2, 2.2), K(-3.95, 0.045, 0.52, 0.5, 0.59, 2.2, 2.2), K(-4.2, 0.055, 0.54, 0.5, 0.66, 2.2, 2.2),
+    K(-3.4, 0.015, 0.385, 0.375, 0.402, 2.2, 2.2), K(-3.75, 0.035, 0.37, 0.358, 0.44, 2.2, 2.2),
+    K(-4.05, 0.05, 0.36, 0.345, 0.52, 2.2, 2.2), K(-4.32, 0.055, 0.35, 0.335, 0.645, 2.2, 2.2),
   ], 20), 12, null))));
   const rudSt = [[-0.32, HINGE_Z, 0.4], [0.0, HINGE_Z, 0.42], [0.45, HINGE_Z, 0.43], [0.9, HINGE_Z, 0.42], [1.08, HINGE_Z, 0.38], [1.135, HINGE_Z - 0.02, 0.27]];
   const rudGeo = liveryUV(tagged(vfin(airfoil(0, 1, 0.13, 0, 0.3, 8), rudSt)));
@@ -746,7 +877,8 @@ export function createE203Model(panel, opts = {}) {
     const g = new THREE.Group();
     // Tubular V: a front and a rear leg from the lower fuselage meet at the
     // axle on the inboard side of the wheel; the axle stub, brake line.
-    const fA = [sx * 0.42, -0.44, 0.98], rA = [sx * 0.42, -0.52, 0.18];
+    // Leg roots on the fuselage's lower sides (front leg ahead of the wing).
+    const fA = [sx * halfX(0.98, -0.36), -0.36, 0.98], rA = [sx * halfX(0.18, -0.46), -0.46, 0.18];
     const attachY = (fA[1] + rA[1]) / 2;
     const leg = new THREE.Group();
     leg.position.y = attachY;
@@ -889,20 +1021,24 @@ export function createE203Model(panel, opts = {}) {
   const REF = {
     eye: new THREE.Vector3(0, 0.8, -1.45), seat: new THREE.Vector3(...o3(0, 0.05, -0.55)), panel: new THREE.Vector3(0, 0.43, -0.73),
     stick: new THREE.Vector3(...o3(0, -0.22, -0.12)), throttle: new THREE.Vector3(...o3(0.42, 0.45, 0.0)), pedals: new THREE.Vector3(...o3(0, -0.12, 0.42)),
-    roof: new THREE.Vector3(0, 0.99, -1.5), door: new THREE.Vector3(SILL.x, 0.2, -1.15), floorY: OFF.y - 0.28,
+    roof: new THREE.Vector3(0, ROOF.yt - 0.03, -1.5), door: new THREE.Vector3(SILL.x, 0.2, -1.15), floorY: OFF.y - 0.28,
   };
   const cockpit = new THREE.Group();
   const ci = {};
   const addC = (mat, g) => { (ci[mat] ||= []).push(tagged(g)); };
   const FLOOR = REF.floorY;
   addC('floor', tx(new THREE.BoxGeometry(0.9, 0.03, 1.36), 0, FLOOR, -1.22));
+  // Inner skins a little inside the outer ones: the lower walls, the panels
+  // behind the B-posts (leaning with the cabin sides), the headliner under
+  // the roof, the bulkheads.
+  const inset = 0.014;
   for (const sx of [1, -1]) {
-    addC('interior', tx(new THREE.BoxGeometry(0.02, SILL.y - FLOOR, 1.34), sx * 0.475, (SILL.y + FLOOR) / 2, -1.22));
-    addC('interior', tx(new THREE.BoxGeometry(0.02, ROOF.y - SILL.y, 0.27), sx * 0.44, (SILL.y + ROOF.y) / 2, -1.76));
+    addC('interior', grid((u, v) => { const z = lerp(-0.6, ROOF.zR + 0.02, u), y = lerp(FLOOR, SILL.y, v); return [sx * (halfX(z, y) - inset), y, z]; }, 8, 6, [sx * 3, 0.1, -1.2])); // faces the cabin
+    addC('interior', grid((u, v) => { const [x, y, z] = sideAt(sx, u, v, BPOST - 0.02, ROOF.zR + 0.02); return [x - sx * inset, y, z]; }, 3, 4, [sx * 3, 0.7, -1.7]));
   }
-  addC('interior', tx(new THREE.BoxGeometry(0.94, 0.95, 0.02), 0, -0.08, -0.56)); // hopper bulkhead
-  addC('interior', tx(new THREE.BoxGeometry(0.9, 1.45, 0.02), 0, 0.22, -1.88)); // rear bulkhead
-  addC('interior', tx(new THREE.BoxGeometry(0.8, 0.012, 0.66), 0, ROOF.y + 0.03, -1.52)); // headliner
+  addC('interior', grid((u, v) => { const [x, y, z] = lerp3(roofAt(u, false), roofAt(u, true), v); return [x, y - inset, z]; }, 16, 4, [0, 3, -1.4]));
+  addC('interior', tx(new THREE.BoxGeometry(0.88, 0.95, 0.02), 0, -0.08, -0.56)); // hopper bulkhead
+  addC('interior', new THREE.ShapeGeometry(new THREE.Shape(aftRing(CABIN).slice(0, -1).map(([x, y]) => new THREE.Vector2(x * 0.96, Math.max(FLOOR, y * 0.985))))).translate(0, 0, ROOF.zR + 0.03)); // rear bulkhead
   addC('seat', rbox(0.46, 0.1, 0.46, 0.04, ...o3(0, 0.05, -0.55)));
   addC('seat', rbox(0.46, 0.72, 0.1, 0.04, ...o3(0, 0.42, -0.8), -0.14));
   for (const sx of [1, -1]) {
@@ -1066,7 +1202,7 @@ export function createE203Model(panel, opts = {}) {
     pumpFan, nozzles, pilot, cockpit, glassMesh,
     eye: REF.eye.clone(),
     fuelFiller: new THREE.Vector3(2.3, leY(2.3) + 0.14, W.le - 0.35 * W.chord),
-    hopperPort: new THREE.Vector3(0.56, -0.26, -0.75),
+    hopperPort: new THREE.Vector3(halfX(-0.75, -0.26) + 0.03, -0.26, -0.75),
     update,
   };
 }
