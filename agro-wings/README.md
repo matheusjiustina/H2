@@ -2332,3 +2332,21 @@ this one, two runs each; frame times on the software renderer are noisy):
 | geometries / textures in memory | 753 / 54 | 923 / 70 |
 | JS heap | 373–374 MB | 413–445 MB |
 | parked meshes drawn (R44 / Bell / Thrush) | | 32 / 39 / 77 |
+
+## Registrations chosen by the player
+
+Settings → **Prefixos** (Registrations) has one row per aircraft: the
+nationality prefix (PP, PR, PS, PT or PU) and three letters. Only marks in the
+Brazilian civil format are accepted — letters only, not starting with Q (the
+Q code), none of SOS / XXX / PAN / TTT / VFR / IFR / VMC / IMC, and no two
+aircraft of the fleet with the same marks; the button beside each row puts
+back the factory marks (PR-AGW, PR-AWT, PR-DMD, PR-TSH, PR-AGH, PR-AGJ). The
+choice is saved with the settings and applied before the fleet is built.
+
+Changing the marks only redraws the letters: the livery canvas (the fuselage
+or tail-boom registration — on the Bell, for the scheme in use) and the panel
+placard (Ipanema, AT-502B, Dromader, Thrush, R44). Geometry, colours, scheme,
+kit, fuel, hopper and damage stay as they are. Every text that names the
+aircraft (title card, load sheet, office, histories, replays, messages) reads
+the current marks. `test/registration.test.mjs` checks the format rules and
+the per-aircraft storage.

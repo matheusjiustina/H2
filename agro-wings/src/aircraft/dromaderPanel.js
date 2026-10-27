@@ -17,12 +17,13 @@ export const M18_HOPPER = { W: 512, H: 768, cap: 2500 };
 
 const KMH = 1.852, MPS = 0.00508, KGCM = 0.0703, MMHG = 25.4;
 
-export function createDromaderPanel() {
+export function createDromaderPanel({ reg = 'PR-DMD' } = {}) {
   const c = canvas(M18_PANEL.W, M18_PANEL.H);
   const tex = canvasTexture(c, { aniso: 8 });
   const g = c.getContext('2d');
   const bg = canvas(M18_PANEL.W, M18_PANEL.H);
-  drawBackground(bg.getContext('2d'));
+  const bgg = bg.getContext('2d');
+  drawBackground(bgg, reg);
   // Glareshield GPS.
   const gc = canvas(420, 300);
   const gpsTexture = canvasTexture(gc, { aniso: 4 });
@@ -53,6 +54,7 @@ export function createDromaderPanel() {
   drawSight(0);
   return {
     canvas: c, texture: tex, gpsTexture, sightTexture,
+    setReg(r) { bgg.clearRect(0, 0, bg.width, bg.height); drawBackground(bgg, r); g.drawImage(bg, 0, 0); tex.needsUpdate = true; },
     draw(d) {
       g.clearRect(0, 0, M18_PANEL.W, M18_PANEL.H);
       g.drawImage(bg, 0, 0);
@@ -131,7 +133,7 @@ function boardPath(g, x0, x1, inner) {
   g.closePath();
 }
 
-function drawBackground(g) {
+function drawBackground(g, reg) {
   g.clearRect(0, 0, M18_PANEL.W, M18_PANEL.H);
   const r = rng(181);
   for (const [x0, x1, side] of [[...M18_PANEL.left, 'left'], [...M18_PANEL.right, 'right']]) {
@@ -157,7 +159,7 @@ function drawBackground(g) {
   }
   // Placards (white on black), as stencilled on the real boards.
   g.fillStyle = '#d8d8d2'; g.font = 'bold 11px Arial'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-  g.fillText('PR-DMD', 60, 92);
+  g.fillText(reg, 60, 92);
   g.fillText('PZL M-18B', 395, 92);
   g.fillText('ASz-62IR-M18', 560, 92);
   g.font = '9px Arial';

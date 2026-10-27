@@ -152,4 +152,11 @@ export default {
   'MISSION': 'MISSÃO',
   'COVERAGE': 'COBERTURA',
   'Light-off — N1 to ground idle, rotor spinning up.': 'Ignição — N1 em marcha lenta, rotor acelerando.',
+  // Settings: registration marks
+  'Registrations': 'Prefixos',
+  '— PP, PR, PS, PT or PU and three letters (not starting with Q)': '— PP, PR, PS, PT ou PU e três letras (sem começar por Q)',
+  'Registration': 'Prefixo',
+  'Default': 'Padrão',
+  'in use': 'em uso',
+  'invalid': 'inválido',
 };

@@ -440,7 +440,7 @@ function placardTexture() {
 export function createR44Model(panel, opts = {}) {
   const root = new THREE.Group();
   root.name = 'r44';
-  const liv = liveryTextures('PR-AGH');
+  const liv = liveryTextures(opts.reg ?? 'PR-AGH');
   const coat = { roughness: 0.4, metalness: 0.0, specularIntensity: 0.35, clearcoat: 0.3, clearcoatRoughness: 0.22, envMap: opts.envMap ?? null, envMapIntensity: 0.35 };
   const ALB = 0.86;
   const M = {
@@ -1092,6 +1092,12 @@ export function createR44Model(panel, opts = {}) {
   };
 
   return {
+    // New registration marks: only the livery canvas is redrawn.
+    setReg(r) {
+      const n = liveryTextures(r);
+      M.livery.map.dispose(); M.livery.bumpMap.dispose();
+      M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
+    },
     root, M,
     rotor, disc, tail, blades, tailBlades: tBlades,
     stick: cyclic, cyclic, collective, pedals, throttle, leds, panelMesh, inst,

@@ -8,7 +8,7 @@ import { fieldsTerrain } from '../world/terrainInfo.js';
 import { BASE } from '../world/layout.js';
 import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
-import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
+import { AIRCRAFT_TYPES, AIRCRAFT_ORDER, REG_PREFIXES, normalizeReg, regTaken } from '../aircraft/types.js';
 import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap, mapControls } from './maps.js';
 import { showOffice } from './office.js';
@@ -340,6 +340,12 @@ export class Screens {
     const seg = (key, opts) => `<div class="seg" data-key="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(s[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
     const keyRow = ([a, d]) => `<div class="kr"><span>${d.label}</span><button class="keybtn" data-bind="${a}">${g.input.bindings[a].map(keyLabel).join(' / ')}</button></div>`;
     const keyGroup = (scope) => Object.entries(ACTIONS).filter(([, d]) => d.scope === scope).map(keyRow).join('');
+    // Registration marks, one row per aircraft: the national prefix and the
+    // three letters (only the letters on the aircraft change).
+    const regRow = (id) => {
+      const T = AIRCRAFT_TYPES[id], [p, x] = T.reg.split('-');
+      return `<div class="field reg" data-reg="${id}"><label>${T.label}</label><div class="regin"><div class="seg regp">${REG_PREFIXES.map((v) => `<button data-p="${v}" class="${v === p ? 'on' : ''}">${v}</button>`).join('')}</div><span class="regdash">-</span><input type="text" maxlength="3" value="${x}" spellcheck="false" autocomplete="off" aria-label="${t('Registration')}"><button class="btn small" data-regdef title="${t('Default')} ${T.reg0}">${T.reg0}</button></div><span class="val">${T.reg}</span></div>`;
+    };
     const keys = keyGroup(undefined), numKeys = keyGroup('num'), classicKeys = keyGroup('classic');
     const el = h(`<div class="panel"><h2>${t('Settings')}</h2>
       <h3>${t('Graphics')}</h3>
@@ -355,6 +361,8 @@ export class Screens {
       <div class="field"><label>${t('Helicopter assist')}</label>${seg('heliAssist', [['off', t('Off')], ['normal', t('Normal')], ['high', t('High')]])}<span></span></div>
       <div class="field"><label>${t('Wind')}</label>${seg('wind', [[0, t('Calm')], [1, t('Light')], [1.8, t('Moderate')]])}<span></span></div>
       <div class="field"><label>${t('Flight keys')}</label>${seg('keyScheme', [['numpad', t('Numpad + Q/E')], ['classic', 'W/S/A/D + Z/X']])}<span></span></div>
+      <h3>${t('Registrations')} <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">${t('— PP, PR, PS, PT or PU and three letters (not starting with Q)')}</span></h3>
+      ${AIRCRAFT_ORDER.map(regRow).join('')}
       <h3>${t('Audio')}</h3>
       <div class="field"><label>${t('Volume')}</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-vol><span class="val">${Math.round(s.volume * 100)}%</span></div>
       <h3>${t('Keys')} <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">${t('— click a key, then press the new one (Esc cancels)')}</span></h3>
@@ -365,7 +373,31 @@ export class Screens {
       <div class="keys">${classicKeys}</div>
       <div class="note">${t('Assist Normal keeps attitude when the stick is centred, coordinates turns and protects against stalls; High also limits bank and pitch. Off gives raw control surfaces. On the ground, assist adds a light yaw damper against ground loops.')}</div>
       <div class="row2"><button class="btn small" data-a="resetKeys">${t('Reset keys')}</button><button class="btn small" data-a="resetSave">${t('Reset career')}</button><button class="btn primary small" data-a="close">${t('Done')}</button></div></div>`);
+    // Applies a row's prefix + letters when they make valid, free marks.
+    const applyReg = (row) => {
+      const id = row.dataset.reg, inp = row.querySelector('input'), out = row.querySelector('.val');
+      const p = row.querySelector('.regp button.on')?.dataset.p ?? 'PR';
+      const want = normalizeReg(p + inp.value);
+      if (inp.value.length < 3) { out.textContent = AIRCRAFT_TYPES[id].reg; out.classList.remove('bad'); return; }
+      const r = want && !regTaken(id, want) ? g.setRegistration(id, want) : null;
+      out.textContent = r ?? (want ? t('in use') : t('invalid'));
+      out.classList.toggle('bad', !r);
+    };
+    const showReg = (row) => {
+      const [p, x] = AIRCRAFT_TYPES[row.dataset.reg].reg.split('-');
+      row.querySelectorAll('.regp button').forEach((x2) => x2.classList.toggle('on', x2.dataset.p === p));
+      row.querySelector('input').value = x;
+      const out = row.querySelector('.val'); out.textContent = `${p}-${x}`; out.classList.remove('bad');
+    };
     el.addEventListener('click', (e) => {
+      const rp = e.target.closest('.regp button');
+      if (rp) {
+        rp.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === rp));
+        applyReg(rp.closest('[data-reg]'));
+        return;
+      }
+      const rd = e.target.closest('[data-regdef]');
+      if (rd) { const row = rd.closest('[data-reg]'); g.setRegistration(row.dataset.reg, null); showReg(row); return; }
       const b = e.target.closest('.seg button');
       if (b) {
         const key = b.parentElement.dataset.key;
@@ -394,11 +426,20 @@ export class Screens {
       }
     });
     el.addEventListener('input', (e) => {
+      const row = e.target.closest('[data-reg]');
+      if (row) {
+        // Letters only, upper case (no digits, accents or symbols in the marks).
+        const v = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+        if (v !== e.target.value) e.target.value = v;
+        applyReg(row);
+        return;
+      }
       if (e.target.dataset.vol !== undefined) {
         g.setSetting('volume', +e.target.value);
         e.target.nextElementSibling.textContent = `${Math.round(+e.target.value * 100)}%`;
       }
     });
+    el.addEventListener('focusout', (e) => { const row = e.target.closest?.('[data-reg]'); if (row && e.target.tagName === 'INPUT') showReg(row); });
     this._show('settings', el);
   }
 

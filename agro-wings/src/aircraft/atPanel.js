@@ -40,12 +40,13 @@ export const AT_PANEL = {
 };
 const instAt = Object.fromEntries(AT_PANEL.inst.map(([id, x, y, r]) => [id, [x, y, r]]));
 
-export function createTurbinePanel() {
+export function createTurbinePanel({ reg = 'PR-AWT' } = {}) {
   const c = canvas(AT_PANEL.W, AT_PANEL.H);
   const tex = canvasTexture(c, { aniso: 8 });
   const g = c.getContext('2d');
   const bg = canvas(AT_PANEL.W, AT_PANEL.H);
-  drawBackground(bg.getContext('2d'));
+  const bgg = bg.getContext('2d');
+  drawBackground(bgg, reg);
   const sc = canvas(256, 448);
   const sightTex = canvasTexture(sc, { aniso: 4 });
   const sg = sc.getContext('2d');
@@ -73,6 +74,7 @@ export function createTurbinePanel() {
   const at = (id) => instAt[id];
   return {
     canvas: c, texture: tex, sightTexture: sightTex,
+    setReg(r) { bgg.clearRect(0, 0, bg.width, bg.height); drawBackground(bgg, r); g.drawImage(bg, 0, 0); tex.needsUpdate = true; },
     draw(d) {
       g.drawImage(bg, 0, 0);
       annunciators(g, d);
@@ -132,7 +134,7 @@ export function createTurbinePanel() {
   };
 }
 
-function drawBackground(g) {
+function drawBackground(g, reg) {
   const { W, H, FACE } = AT_PANEL;
   g.fillStyle = '#0d0f11';
   g.fillRect(0, 0, W, H);
@@ -170,7 +172,7 @@ function drawBackground(g) {
   g.font = 'bold 11px Arial'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
   g.fillText('PT6A-34AG', 170, 106);
   g.font = 'bold 10px Arial';
-  g.fillText('PR-AWT · AT-502B', 510, 84);
+  g.fillText(`${reg} · AT-502B`, 510, 84);
   // Placards (white on black, as on the real panel).
   const placard = (x, y, w, h, lines) => {
     g.fillStyle = '#e6e8e9'; g.fillRect(x, y, w, h);

@@ -59,7 +59,7 @@ export const AIRCRAFT_TYPES = {
     ],
     shadow: undefined,
     createModel: (panel, opts) => createAircraftModel(panel, opts),
-    createPanel: () => createPanel(),
+    createPanel: (opts) => createPanel(opts),
     createShadow: () => createContactShadow(),
   },
 
@@ -98,7 +98,7 @@ export const AIRCRAFT_TYPES = {
       [-2.8, 2.8, 0.3, 0.55, -6.0, -4.9], [-1.8, 1.8, -1.65, -0.8, 0.6, 1.3], [-1.42, 1.42, -1.12, 1.72, 3.85, 4.1],
     ],
     createModel: (panel, opts) => createAirTractorModel(panel, opts),
-    createPanel: () => createTurbinePanel(),
+    createPanel: (opts) => createTurbinePanel(opts),
     createShadow: () => createContactShadow(AT_SHADOW),
   },
 
@@ -140,7 +140,7 @@ export const AIRCRAFT_TYPES = {
       [-2.95, 2.95, 0.48, 0.69, -6.2, -4.5], [-1.95, 1.95, -1.92, -0.9, 0.7, 1.45], [-1.65, 1.65, -1.2, 2.1, 2.9, 3.4],
     ],
     createModel: (panel, opts) => createDromaderModel(panel, opts),
-    createPanel: () => createDromaderPanel(),
+    createPanel: (opts) => createDromaderPanel(opts),
     createShadow: () => createContactShadow(M18_SHADOW),
   },
 
@@ -183,7 +183,7 @@ export const AIRCRAFT_TYPES = {
       [-2.75, 2.75, 0.6, 0.8, -5.5, -4.25], [-1.8, 1.8, -1.65, -0.8, 0.6, 1.4], [-1.32, 1.32, -1.0, 1.6, 3.8, 4.0],
     ],
     createModel: (panel, opts) => createThrushModel(panel, opts),
-    createPanel: () => createThrushPanel(),
+    createPanel: (opts) => createThrushPanel(opts),
     createShadow: () => createContactShadow(T510_SHADOW),
   },
 
@@ -252,7 +252,7 @@ export const AIRCRAFT_TYPES = {
     ],
     overhead: 1.2, // boxes starting above this body height are walked under
     createModel: (panel, opts) => createR44Model(panel, opts),
-    createPanel: () => createR44Panel(),
+    createPanel: (opts) => createR44Panel(opts),
     createShadow: () => createContactShadow(R44_SHADOW),
   },
 };
@@ -307,9 +307,43 @@ AIRCRAFT_TYPES.b206 = {
   ],
   overhead: 1.25,
   createModel: (panel, opts) => createB206Model(panel, opts),
-  createPanel: () => createB206Panel(),
+  createPanel: (opts) => createB206Panel(opts),
   createShadow: () => createContactShadow(B206_SHADOW),
 };
 
 export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
+
+// Registrations: each type keeps its factory marks as `reg0`; `reg` reads the
+// player's choice. Brazilian civil marks only — a national prefix (PP, PR,
+// PS, PT, PU), a hyphen and three letters, not starting with Q and not one
+// of the reserved distress/ATC groups.
+export const REG_PREFIXES = ['PP', 'PR', 'PS', 'PT', 'PU'];
+const REG_RESERVED = new Set(['SOS', 'XXX', 'PAN', 'TTT', 'VFR', 'IFR', 'VMC', 'IMC']);
+const REGS = {};
+for (const ty of Object.values(AIRCRAFT_TYPES)) {
+  const r0 = ty.reg;
+  Object.defineProperty(ty, 'reg0', { value: r0 });
+  Object.defineProperty(ty, 'reg', { get: () => REGS[ty.id] ?? r0, configurable: true, enumerable: true });
+}
+// 'pr agx' / 'PRAGX' / 'PR-AGX' → 'PR-AGX'; null when the marks are not valid.
+export function normalizeReg(s) {
+  const l = String(s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (l.length !== 5) return null;
+  const p = l.slice(0, 2), x = l.slice(2);
+  if (!REG_PREFIXES.includes(p) || x[0] === 'Q' || REG_RESERVED.has(x)) return null;
+  return `${p}-${x}`;
+}
+// Marks in use by another aircraft of the fleet (each must be unique).
+export const regTaken = (id, reg) => Object.values(AIRCRAFT_TYPES).some((ty) => ty.id !== id && ty.reg === reg);
+// Sets (or, with a falsy/default value, clears) a type's marks; returns the
+// marks now in force, or null when refused.
+export function setRegistration(id, reg) {
+  const ty = AIRCRAFT_TYPES[id];
+  if (!ty) return null;
+  if (!reg) { delete REGS[id]; return ty.reg; }
+  const r = normalizeReg(reg);
+  if (!r || regTaken(id, r)) return null;
+  if (r === ty.reg0) delete REGS[id]; else REGS[id] = r;
+  return ty.reg;
+}

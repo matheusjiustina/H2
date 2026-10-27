@@ -193,7 +193,7 @@ function radial(g, x, y, r, a, col, w = 0.05) {
   g.beginPath(); g.moveTo(x + Math.cos(a) * r * 0.78, y + Math.sin(a) * r * 0.78); g.lineTo(x + Math.cos(a) * r * 0.99, y + Math.sin(a) * r * 0.99); g.stroke();
 }
 
-function drawPod(g) {
+function drawPod(g, reg) {
   speckle(g, POD.W, POD.H, 91, '#1b1d20');
   // Soft shading toward the moulded rim.
   const vg = g.createRadialGradient(POD.W / 2, POD.H * 0.5, POD.H * 0.25, POD.W / 2, POD.H * 0.5, POD.W * 0.6);
@@ -310,7 +310,7 @@ function drawPod(g) {
   // Placards; registration plate; panel screws round the face.
   text(g, 'DO NOT EXCEED 110 KIAS EXCEPT IN SMOOTH AIR', mx(0.089), my(-0.034), 8.5, '#d9dbd6');
   g.fillStyle = '#0d0e10'; roundRect(g, mx(-0.205) - 34, my(-0.047) - 9, 68, 18, 3); g.fill();
-  text(g, 'PR-AGH', mx(-0.205), my(-0.047), 11, '#d7d9dc');
+  text(g, reg, mx(-0.205), my(-0.047), 11, '#d7d9dc');
   for (const [x, y] of [[-0.262, 0.07], [0.262, 0.07], [-0.212, -0.074], [0.212, -0.074], [-0.07, 0.108], [0.07, 0.108], [-0.166, -0.124], [0.166, -0.124]]) screw(g, mx(x), my(y), 3.6);
   // Small screws at the corners of every case.
   for (const o of Object.values(G)) for (const a of [45, 135, 225, 315]) screw(g, o.x + Math.cos(a * D2R) * o.R * 1.16, o.y + Math.sin(a * D2R) * o.R * 1.16, 2.6);
@@ -512,9 +512,9 @@ function drawGlass(g, S) {
 }
 
 
-export function createR44Panel() {
+export function createR44Panel({ reg = 'PR-AGH' } = {}) {
   const mk = (w, h, fn, opts) => { const c = canvas(w, h); fn(c.getContext('2d'), w, h); return canvasTexture(c, opts); };
-  const pod = mk(POD.W, POD.H, (g) => drawPod(g), { aniso: 8 });
+  const pod = mk(POD.W, POD.H, (g) => drawPod(g, reg), { aniso: 8 });
   const con = mk(CON.W, CON.H, (g) => drawConsole(g), { aniso: 8 });
   const attTape = mk(256, 1024, (g, w, h) => drawAttTape(g, w, h), { aniso: 4 });
   const attOverlay = mk(256, 256, (g, w) => drawAttOverlay(g, w), { aniso: 4 });
@@ -527,6 +527,11 @@ export function createR44Panel() {
   const gpsTex = canvasTexture(gc, { aniso: 4 });
   const gg = gc.getContext('2d');
   return {
+    setReg(r) {
+      const n = canvas(POD.W, POD.H), pg = pod.image.getContext('2d');
+      drawPod(n.getContext('2d'), r);
+      pg.clearRect(0, 0, POD.W, POD.H); pg.drawImage(n, 0, 0); pod.needsUpdate = true;
+    },
     texture: pod, texture2: con, attTape, attOverlay, card, cardOverlay, glass, tcPlane, gpsTex,
     draw(d) {
       gps(gg, 0, 0, gc.width, gc.height, d.gps);

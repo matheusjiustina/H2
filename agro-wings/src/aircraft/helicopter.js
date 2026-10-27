@@ -41,8 +41,9 @@ export class Helicopter {
       this.panel = { draw() {}, texture: null };
       this.model = stubModel(this.type);
     } else {
-      this.panel = this.type.createPanel();
-      this.model = this.type.createModel(this.panel, { envMap: game.scene.environment });
+      const reg = this.type.reg;
+      this.panel = this.type.createPanel({ reg });
+      this.model = this.type.createModel(this.panel, { envMap: game.scene.environment, reg });
     }
     game.scene.add(this.model.root);
     if (!headless) { this.contactShadow = this.type.createShadow(); game.scene.add(this.contactShadow); }

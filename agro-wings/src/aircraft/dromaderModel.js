@@ -335,7 +335,7 @@ export function createDromaderModel(panel, opts = {}) {
   const A = FLIGHT_M18;
   const root = new THREE.Group();
   root.name = 'dromader';
-  const liv = liveryTextures('PR-DMD');
+  const liv = liveryTextures(opts.reg ?? 'PR-DMD');
   const wtx = wingTextures();
   const coat = { roughness: 0.5, metalness: 0.0, specularIntensity: 0.3, clearcoat: 0.1, clearcoatRoughness: 0.35, envMap: opts.envMap ?? null, envMapIntensity: 0.3 };
   const ALBEDO = 0.84;
@@ -1157,6 +1157,12 @@ export function createDromaderModel(panel, opts = {}) {
   };
 
   return {
+    // New registration marks: only the livery canvas is redrawn.
+    setReg(r) {
+      const n = liveryTextures(r);
+      M.livery.map.dispose(); M.livery.bumpMap.dispose();
+      M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
+    },
     root, M,
     prop, blades, bladeMats: [bladeMat, tipMat, bandMat], disc,
     ailerons, flaps, elevator, rudder,

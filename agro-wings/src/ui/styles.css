@@ -140,6 +140,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .seg { display: flex; gap: 4px; flex-wrap: wrap; }
 .seg button { font: 12px var(--sans); color: var(--ink-dim); background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
 .seg button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.regin { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.regin .seg button { padding: 6px 8px; font-family: var(--mono); }
+.regin input { width: 4.2em; font: 14px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 4px; padding: 5px 6px; }
+.regin input:focus { outline: none; border-color: var(--accent); }
+.regin .regdash { font: 14px var(--mono); color: var(--ink-dim); }
+.regin .btn.small { font-family: var(--mono); opacity: .75; }
+.field.reg .val.bad { color: #e8765c; }
 .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
 .keys .kr { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 12.5px; }
 .keys .kr span { color: var(--ink-dim); }

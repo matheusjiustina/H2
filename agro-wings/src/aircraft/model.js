@@ -761,7 +761,7 @@ function flipWinding(g) {
 export function createAircraftModel(panel, opts = {}) {
   const root = new THREE.Group();
   root.name = 'aircraft';
-  const liv = liveryTextures('PR-AGW');
+  const liv = liveryTextures(opts.reg ?? 'PR-AGW');
   const wtx = wingTextures();
   // Gloss aviation enamel. Base colours are scaled to a physically plausible
   // albedo (a real orange paint reflects ~60–70 % of red light, not 100 %),
@@ -1842,6 +1842,12 @@ export function createAircraftModel(panel, opts = {}) {
   root.traverse((o) => { if (o.isMesh && o.castShadow === undefined) o.castShadow = true; });
 
   return {
+    // New registration marks: only the livery canvas is redrawn.
+    setReg(r) {
+      const n = liveryTextures(r);
+      M.livery.map.dispose(); M.livery.bumpMap.dispose();
+      M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
+    },
     root, M,
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, flaps, elevator, rudder,

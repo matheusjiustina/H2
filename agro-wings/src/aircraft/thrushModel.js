@@ -932,6 +932,12 @@ export function createThrushModel(panel, opts = {}) {
   };
 
   return {
+    // New registration marks: only the livery canvas is redrawn.
+    setReg(r) {
+      const n = liveryTextures(r);
+      M.livery.map.dispose(); M.livery.bumpMap.dispose();
+      M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
+    },
     root, M,
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, flaps, elevator, rudder, wiper,

@@ -246,7 +246,7 @@ function leatherTexture() {
 export function createB206Model(panel, opts = {}) {
   const root = new THREE.Group();
   root.name = 'b206';
-  const REG = 'PR-AGJ';
+  let REG = opts.reg ?? 'PR-AGJ';
   // Livery canvases are drawn on first use (one per scheme, shared geometry).
   const bumpC = canvas(LV.W, LV.H);
   const gb = bumpC.getContext('2d');
@@ -887,6 +887,14 @@ export function createB206Model(panel, opts = {}) {
     fuelFiller: new THREE.Vector3(0.56, 0.2, -0.85), // (mirrored to the side the crew works from)
     hopperPort: new THREE.Vector3(B206_KIT.tank.hw * 0.86 + 0.06, (B206_KIT.tank.top + B206_KIT.tank.bot) / 2, B206_KIT.tank.z0 + 0.25),
     setLivery, setKit, get livery() { return livery; },
+    // New registration marks: the scheme canvases are redrawn on demand.
+    setReg(r) {
+      REG = r;
+      for (const m of livMaps) m?.dispose();
+      livMaps.length = 0;
+      M.livery.map = livMap(livery);
+      M.livery.needsUpdate = true;
+    },
     update,
   };
 }

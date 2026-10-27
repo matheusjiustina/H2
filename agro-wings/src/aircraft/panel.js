@@ -60,7 +60,8 @@ const SCALES = {
 const angOf = (sc, v) => sc.a0 + ((clamp(v, sc.min, sc.max) - sc.min) / (sc.max - sc.min)) * (sc.a1 - sc.a0);
 const KEY_ANG = { off: -2.25, r: -1.8, l: -1.35, both: -0.9, start: -0.42 };
 
-export function createPanel() {
+export function createPanel({ reg: reg0 = 'PR-AGW' } = {}) {
+  let reg = reg0;
   const L = IPA_PANEL;
   const c = canvas(L.W, L.H);
   const tex = canvasTexture(c, { aniso: 8 });
@@ -69,12 +70,13 @@ export function createPanel() {
   const bgg = bg.getContext('2d');
   // The static layer (plate, placards, dial faces) depends on the type's
   // limits (V-speeds, tank size); it is redrawn if they change.
-  let bgKey = '';
+  let bgKey = '', bgD = null;
   const ensureBg = (d) => {
+    bgD = d;
     const k = [d.vs0, d.vs1, d.vfe, d.vne, d.fuelCap].join();
     if (k === bgKey) return;
     bgKey = k;
-    drawIpaBackground(bgg, d);
+    drawIpaBackground(bgg, d, reg);
   };
   const sc = canvas(256, 448);
   const sightTex = canvasTexture(sc, { aniso: 4 });
@@ -115,6 +117,7 @@ export function createPanel() {
       if (Math.abs(d.hopper - lastHopper) > 0.8) { lastHopper = d.hopper; drawSight(d.hopper, d.hopperCap); }
     },
     readings,
+    setReg(r) { reg = r; bgKey = ''; ensureBg(bgD); g.drawImage(bg, 0, 0); tex.needsUpdate = true; },
   };
   // Not blank before the first cockpit frame (seen through the windshield).
   ensureBg(DEF);
@@ -154,7 +157,7 @@ function readings(d) {
   return { a, tc, ball, toggles, key, master, mixture: run || crank ? 1 : 0, prop: run || crank ? 1 : 0.15 };
 }
 
-function drawIpaBackground(g, d) {
+function drawIpaBackground(g, d, reg) {
   const L = IPA_PANEL, W = L.W, H = L.H;
   // Light grey aluminium, a little darker under the glareshield.
   const grd = g.createLinearGradient(0, 0, 0, H);
@@ -195,7 +198,7 @@ function drawIpaBackground(g, d) {
   g.fillStyle = '#1f252b';
   g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   g.font = 'bold 12px Arial';
-  g.fillText('PR-AGW', 420, 36);
+  g.fillText(reg, 420, 36);
   g.font = 'bold 9px Arial';
   g.fillText('EMB-202A', 420, 50);
   const placard = (x, y, w, h, lines, fill = '#e9e6dc', ink = '#1d1f22') => {

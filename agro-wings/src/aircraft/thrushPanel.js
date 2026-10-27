@@ -27,13 +27,13 @@ export const TH_SCREENS = {
   mvp: [512, 400], g5: [256, 320], agnav: [640, 420], hud: [320, 96],
 };
 
-export function createThrushPanel() {
+export function createThrushPanel({ reg = 'PR-TSH' } = {}) {
   const mk = (w, h, aniso = 4) => { const c = canvas(w, h); return { c, g: c.getContext('2d'), tex: canvasTexture(c, { aniso }), key: '' }; };
   const S = {
     mvp: mk(...TH_SCREENS.mvp), g5: mk(...TH_SCREENS.g5), agnav: mk(...TH_SCREENS.agnav), hud: mk(...TH_SCREENS.hud),
   };
   const dials = drawDials();
-  const face = drawFace();
+  const face = drawFace(reg);
   const consoles = drawConsoles();
   const hopperWall = drawHopperWall();
   // Start with every screen blank-dark (engine off, before the first draw).
@@ -42,6 +42,7 @@ export function createThrushPanel() {
   const api = {
     texture: face.tex, // the panel face (what aircraft.js calls the panel texture)
     face, dials, consoles, hopperWall,
+    setReg(r) { const n = drawFace(r); const fg = face.c.getContext('2d'); fg.clearRect(0, 0, face.c.width, face.c.height); fg.drawImage(n.c, 0, 0); n.tex.dispose(); face.tex.needsUpdate = true; },
     screens: S,
     last: null,
     draw(d) {
@@ -360,7 +361,7 @@ function drawDials() {
 // Panel face (1024 x 448 px for 0.96 x 0.42 m): black anodised, placards,
 // labels round the units, the annunciator captions.
 export const FACE = { W: 1024, H: 448, w: 0.96, h: 0.42 };
-function drawFace() {
+function drawFace(reg) {
   const c = canvas(FACE.W, FACE.H), g = c.getContext('2d');
   const grd = g.createLinearGradient(0, 0, 0, FACE.H);
   grd.addColorStop(0, '#141619'); grd.addColorStop(0.15, '#1c1f23'); grd.addColorStop(1, '#17191c');
@@ -397,7 +398,7 @@ function drawFace() {
   placard(-0.3, 0.035, 0.18, 0.024, ['USABLE FUEL 863 L (228 US GAL)']);
   stripe(-0.3, 0.012, 0.2, 0.02, 'NÃO OPERAR EM BETA EM VOO');
   stripe(0.3, 0.012, 0.18, 0.02, 'NÃO DECOLAR COM HOPPER ABERTO');
-  text(0.04, 0.4, 'PR-TSH', 11, '#e6e8ea');
+  text(0.04, 0.4, reg, 11, '#e6e8ea');
   text(0.04, 0.07, 'HOPPER', 9, '#c3c9cf');
   text(0.43, 0.18, 'BOOM', 8, '#9aa2aa'); text(0.43, 0.165, 'PRESS', 8, '#9aa2aa');
   // Module plates: slightly lighter outlines round each unit's cut-out.

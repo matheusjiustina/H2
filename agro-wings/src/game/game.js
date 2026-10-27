@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { World } from '../world/world.js';
 import { QUALITY, GAME, SPRAY } from '../config.js';
-import { AIRCRAFT_ORDER, aircraftType } from '../aircraft/types.js';
+import { AIRCRAFT_ORDER, aircraftType, setRegistration } from '../aircraft/types.js';
 import { Input, KEY_SCHEMES, DEFAULT_KEY_SCHEME, keyLabel } from '../core/input.js';
 import { ParticlePool } from '../core/particles.js';
 import { Aircraft } from '../aircraft/aircraft.js';
@@ -50,7 +50,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'high', heliModel: 'power', b206Livery: 0, b206Kit: true, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'high', heliModel: 'power', b206Livery: 0, b206Kit: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     const q = new URLSearchParams(location.search).get('q');
     if (q && QUALITY[q]) { this.settings.quality = q; this.qualityForced = true; }
@@ -96,6 +96,8 @@ export class Game {
     await new Promise((r) => setTimeout(r, 0));
     // Both aircraft live in the world; the one not selected waits parked.
     this.fleet = {};
+    // The player's registration marks, before the liveries are painted.
+    for (const [id, r] of Object.entries(this.settings.regs ?? {})) if (!setRegistration(id, r)) delete this.settings.regs[id];
     for (const id of AIRCRAFT_ORDER) {
       // Each aircraft gets its own controller and physics by kind.
       const ac = aircraftType(id).kind === 'heli' ? new Helicopter(this, { type: id }) : new Aircraft(this, { type: id });
@@ -258,6 +260,20 @@ export class Game {
     b.fm.kitOn = on;
     if (!on) { b.fm.hopper = 0; if (this.aircraft === b) this.sprayer.on = false; }
     b.fm.updateMass();
+  }
+  // Registration marks of one aircraft (Settings): only the letters change —
+  // the livery canvas and the panel placard are redrawn, nothing else.
+  // Returns the marks in force, or null when refused (invalid or in use).
+  setRegistration(id, reg) {
+    const r = setRegistration(id, reg);
+    if (!r) return null;
+    const regs = { ...(this.settings.regs ?? {}) };
+    if (r === aircraftType(id).reg0) delete regs[id]; else regs[id] = r;
+    this.setSetting('regs', regs);
+    const ac = this.fleet?.[id];
+    ac?.model.setReg?.(r);
+    ac?.panel.setReg?.(r);
+    return r;
   }
   setAircraftOption(k, v) {
     this.setSetting(k, v);
