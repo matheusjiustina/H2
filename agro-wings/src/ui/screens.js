@@ -8,7 +8,7 @@ import { fieldsTerrain } from '../world/terrainInfo.js';
 import { BASE } from '../world/layout.js';
 import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
-import { AIRCRAFT_TYPES, AIRCRAFT_ORDER, REG_PREFIXES, normalizeReg, regTaken } from '../aircraft/types.js';
+import { AIRCRAFT_TYPES, AIRCRAFT_ORDER, REG_PREFIXES, normalizeReg, regTaken, productLimit } from '../aircraft/types.js';
 import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap, mapControls } from './maps.js';
 import { showOffice } from './office.js';
@@ -37,7 +37,8 @@ export class Screens {
             <span class="ac-reg">${ty.reg} · ${ty.name}</span>${ty.role ? `<span class="ac-role">${ty.role}</span>` : ''}
             <span class="ac-spec">${ty.engineName}<br>${ty.summary}</span>${id === 'b206' ? `
             <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B', 'C'].map((l, i) => `<span class="ac-opt" data-livery="${i}" title="${[t('Agricultural Classic'), t('Dark Green Agricultural'), t('Red Utility')][i]}">${l}</span>`).join('')}<span class="ac-opt kit" data-kit="1">${t('Spray kit')}</span></span>` : ''}${id === 'm18' ? `
-            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B'].map((l, i) => `<span class="ac-opt" data-lk="m18Livery" data-livery="${i}" title="${[t('Agro Wings yellow'), t('Hellenic fire-fighter')][i]}">${l}</span>`).join('')}</span>` : ''}
+            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B'].map((l, i) => `<span class="ac-opt" data-lk="m18Livery" data-livery="${i}" title="${[t('Agro Wings yellow'), t('Hellenic fire-fighter')][i]}">${l}</span>`).join('')}</span>` : ''}${id === 'e203' ? `
+            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['01', '02'].map((l, i) => `<span class="ac-opt" data-lk="e203Livery" data-livery="${i}" title="${[t('Green, blue and gold'), t('White, green and blue')][i]}">${l}</span>`).join('')}</span>` : ''}
           </button>`;
         }).join('')}</div>
         <div class="btn-row">
@@ -192,6 +193,8 @@ export class Screens {
     const rec0 = job ? job.c.recommended : { fuel: A.fuelCapacity, liquid: 600 * kl };
     const rec = { fuel: Math.round((job ? rec0.fuel * kf : rec0.fuel) / 5) * 5, liquid: Math.round((job ? rec0.liquid * kl : rec0.liquid) / 10) * 10 };
     let fuel = Math.max(fm.fuel, Math.min(A.fuelCapacity, rec.fuel));
+    // Aircraft whose recommended load is cut to what the MTOW allows.
+    if (A.loadByWeight) rec.liquid = Math.min(rec.liquid, Math.floor(productLimit(A, rec.fuel) / 10) * 10);
     let liquid = Math.max(fm.hopper, Math.min(A.hopperCapacity, rec.liquid));
     const st = job ? job.stats() : null;
     const el = h(`<div class="panel" style="width:min(620px,calc(100vw - 32px))"><h2>${t('Load sheet')}</h2>
@@ -201,6 +204,7 @@ export class Screens {
       <h3>${t('Weight &amp; performance')}</h3>
       <div class="stats">
         <div class="stat"><b class="m"></b><span>${t('Take-off mass · MTOW {0} kg', A.mtow.toLocaleString('en-US'))}</span></div>
+        ${A.loadByWeight ? `<div class="stat"><b class="p"></b><span>${t('Product the MTOW allows at this fuel ({0} L hopper volume)', A.hopperCapacity.toLocaleString('en-US'))}</span></div>` : ''}
         ${T.loadSheet.heli ? `<div class="stat"><b class="b"></b><span>${t('Hover power at 1 m (in ground effect)')}${g.settings.heliModel === 'rotor' ? t(' · {0} hp take-off', Math.round(A.engine.ratedKW / 0.7457)) : ''}</span></div>
         <div class="stat"><b class="r"></b><span>${t('Hover power out of ground effect')}</span></div>` : `<div class="stat"><b class="b"></b><span>${t('Max level bank at {0} kt', T.loadSheet.bankKt)}</span></div>
         <div class="stat"><b class="r"></b><span>${t('Est. ground roll')}</span></div>`}
@@ -217,6 +221,12 @@ export class Screens {
       const mEl = el.querySelector('.m');
       mEl.textContent = `${Math.round(mass)} kg${mass > A.mtow ? t(' · OVER') : ''}`;
       mEl.style.color = mass > A.mtow ? 'var(--bad)' : '';
+      const pEl = el.querySelector('.p');
+      if (pEl) {
+        const lim = productLimit(A, fuel);
+        pEl.textContent = `${Math.round(lim)} kg${liquid * A.liquidDensity > lim + 0.5 ? t(' · OVER') : ''}`;
+        pEl.style.color = liquid * A.liquidDensity > lim + 0.5 ? 'var(--bad)' : '';
+      }
       if (T.loadSheet.heli && g.settings.heliModel !== 'rotor') {
         // Power model: the lever power that hovers at this weight.
         for (const [sel, k] of [['.b', 1], ['.r', Infinity]]) {

@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createAirTractorModel, AT_SHADOW, atWingY } from './atModel.js';
@@ -15,6 +15,7 @@ import { createThrushModel, T510_SHADOW, thWingY } from './thrushModel.js';
 import { createThrushPanel } from './thrushPanel.js';
 import { createB206Model, B206_SHADOW, B206_KIT } from './b206Model.js';
 import { createB206Panel } from './b206Panel.js';
+import { createE203Model, E203_SHADOW, e203WingY } from './e203Model.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
 
@@ -311,7 +312,51 @@ AIRCRAFT_TYPES.b206 = {
   createShadow: () => createContactShadow(B206_SHADOW),
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206'];
+// Embraer EMB-203 Ipanema (FLIGHT_E203: its own figures on the piston +
+// constant-speed branch). Fictional registration. The exterior is the 203's
+// own model; the cockpit is provisional (the EMB-202A panel on a plain
+// board) until the 203's cockpit is built.
+AIRCRAFT_TYPES.e203 = {
+  id: 'e203',
+  slot: '07',
+  label: 'Ipanema 203',
+  reg: 'PR-IPB',
+  name: 'Embraer Ipanema 203',
+  get role() { return t('Ethanol Agricultural Aircraft · winglets'); },
+  get engineName() { return t('Lycoming IO-540-K1J5 · 320 hp (ethanol) · Hartzell 3-blade'); },
+  get summary() { return t('1,050 L hopper · 292 L ethanol · 13.30 m span · 1,900 kg MTOW'); },
+  flight: FLIGHT_E203,
+  spray: { swath: SPRAY_E203.swath, flow: SPRAY_E203.flow, boom: [5.4, -0.23, -1.12] },
+  work: [[0, -1.57, 0.62], [5.5, -0.33, -1.15], [-5.5, -0.33, -1.15]],
+  collide: [[0, 0.15, 2.53], [6.65, 0.83, -1.2], [-6.65, 0.83, -1.2], [6.42, 0.25, -0.4], [-6.42, 0.25, -0.4], [0, 1.13, -4.94], [0, -0.42, -4.9], [0, -1.5, 0.62], [0, 1.04, -1.5]],
+  wire: [[0, 0.15, 2.53], [6.65, 0.83, -1.2], [-6.65, 0.83, -1.2], [0, 1.13, -4.94], [0, -1.5, 0.62], [3.3, -0.2, -0.4], [-3.3, -0.2, -0.4], [0, 1.04, -1.5]],
+  smoke: [-0.36, -0.44, 1.14],
+  wash: [0, -1.0, -2],
+  anim: { elev: 0.35, rud: 0.42, ail: 0.33, flap: 0.52, pedalZ: -0.53, disc: [380, 900], wash: [1500, 2600], vib: [1500, 2700] },
+  vspeeds: { vs0: 48, vs1: 56, vfe: 95, vne: 140 },
+  camera: { dist: 13.5, height: 3.9, orbit: 20, cockpitPitch: -0.15, cockpitFov: 70 },
+  // The EMB-202A's IO-540 sound, with the 203's three-blade prop.
+  audio: { profile: 'ipanema', blades: 3, cfg: { blades: 3, propDiameter: 2.18 } },
+  fuel: { get name() { return t('ethanol'); }, price: GAME.fuelPrice },
+  loads: { free: { fuel: 230, hopper: 450 }, boot: 130 },
+  loadSheet: { bankKt: 90, roll: [244, 1400, 2.25] },
+  service: {
+    rates: { fuel: 4.5, liquid: 15 },
+    local: { A: [7.5, -2.2], B: [4.4, -1.9], F: [2.3, -1.6], P: [1.15, -1.55] },
+    keepOut: { wing: [6.7, -1.45, 0.6], wingY: e203WingY, fus: [0.56, -0.6, 1.06, -5.5, 2.55], stab: [2.12, -0.36, -0.2, -5.0, -4.0] },
+    veto: 9,
+  },
+  stub: { eye: [0, 0.8, -1.45], fuelFiller: [2.3, -0.02, -0.17], hopperPort: [0.56, -0.26, -0.75] },
+  bounds: [
+    [-0.56, 0.56, -0.6, 1.06, -5.5, 2.55], [-6.65, 6.65, -0.56, 0.85, -1.3, 0.45], [-0.08, 0.08, 0.4, 1.14, -5.48, -4.05],
+    [-2.12, 2.12, -0.36, -0.2, -5.0, -4.0], [-1.3, 1.3, -1.57, -0.44, 0.15, 1.0], [-1.1, 1.1, -0.94, 1.24, 2.15, 2.28],
+  ],
+  createModel: (panel, opts) => createE203Model(panel, opts),
+  createPanel: (opts) => createPanel(opts),
+  createShadow: () => createContactShadow(E203_SHADOW),
+};
+
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
 
 // Registrations: each type keeps its factory marks as `reg0`; `reg` reads the
@@ -347,3 +392,7 @@ export function setRegistration(id, reg) {
   if (r === ty.reg0) delete REGS[id]; else REGS[id] = r;
   return ty.reg;
 }
+
+// Product the MTOW leaves at a given fuel load (kg of liquid ≈ L): the
+// hopper's volume is not its payload.
+export const productLimit = (A, fuelL) => Math.max(0, (A.mtow - A.emptyMass - (A.agKitMass ?? 0) - A.pilotMass - fuelL * A.fuelDensity) / A.liquidDensity);

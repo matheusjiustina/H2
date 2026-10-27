@@ -2429,3 +2429,154 @@ Only the fuselage and wing canvases and the colour of the frame and tip
 materials change between schemes; the geometry stays the same.
 `node test/m18livery.mjs <outDir>` renders both schemes from the side, the
 front and rear three-quarters, and the top.
+
+## Aircraft 07 — Embraer Ipanema 203 (PR-IPB), phase 01: exterior
+
+A seventh aircraft, separate from the EMB-202A: its own geometry
+(`src/aircraft/e203Model.js`), its own flight figures (`FLIGHT_E203` and
+`SPRAY_E203` in `src/config.js`) and its own entry in the registry
+(`AIRCRAFT_TYPES.e203`, `src/aircraft/types.js`). It shares only the game's
+infrastructure with the other aircraft: the mesh helpers in `model.js`, the
+piston engine with constant-speed prop branch of the flight model, the
+IO-540 sound, the panel and the pilot. Nothing in the 202A's model or
+figures was changed (`test/e203.test.mjs` checks the 202A's engine and
+numbers). PR-IPB is a fictional registration. Phase 01 covers the exterior;
+the detailed cockpit comes later.
+
+**References.** The photos and figures sent with the brief: PS-DIR
+(green/blue/gold) parked, from the front while spraying and close up with
+IPANEMA 203 on the cowl; PP-ZPK (white with the green swoosh) from three
+angles and spraying from the front quarter; three untextured renders of a
+203 used only to check proportions; the spec table.
+
+**Figures used.** Lycoming IO-540-K1J5 on ethanol, 320 hp at 2,700 rpm;
+Hartzell three-blade constant-speed prop, 86 in (2.18 m); span 13.30 m with
+winglets; length 8.00 m; height 2.43 m; max take-off 1,900 kg; 292 L of
+ethanol; hopper 1,050 L.
+
+**Estimated** (all in `FLIGHT_E203`, with comments):
+- empty mass 1,090 kg;
+- wing area 22.2 m² and mean chord 1.71 m;
+- dihedral 6.5°;
+- CD0 0.054 with booms, nozzles and wire cutter;
+- inertias scaled from the 202A by mass and span;
+- ethanol flow 115 L/h at full power;
+- VFE 95 kt and VNE 140 kt (indicator marks only).
+
+**Volume is not payload.** The hopper holds 1,050 L, but the 1,900 kg
+MTOW sets the product mass. `productLimit(A, fuelL)` in `types.js` gives
+the litres the MTOW allows at a given fuel load: ≈ 494 kg of water with a
+full 292 L of ethanol and the pilot. The 203 sets `loadByWeight`, so the
+load sheet's recommended load and the autopilot's service request cap the
+product at that figure. The load sheet shows the limit next to the hopper volume
+and turns red when the load is over it.
+
+**Measured** (`node --test test/e203.test.mjs`, run in this container):
+
+| check | result | target |
+| --- | --- | --- |
+| model span / length | 13.299 m / 8.00 m | 13.30 / 8.00 |
+| parked height / three-point attitude | 2.43 m / 3.1°, three wheels down | 2.43 m |
+| start | catches after 1.4 s, idle 650 rpm, 12 L/h | — |
+| full throttle, static | 2,700 rpm, 28.3 inHg, 320 hp, 115 L/h, 6.09 kN thrust | 320 hp at 2,700 rpm |
+| take-off roll 1,270 / 1,900 kg | 196 m / 485 m | inside the 800 m strip |
+| climb at 70 kt, 1,450 / 1,900 kg | 1,335 / 889 ft/min | positive at MTOW |
+| clean stall at 1,900 kg | 58 kt (polar 56) | — |
+| level at 1,700 kg | 116 kt at full power; 93 kt at 62 % (68 L/h) | below VNE |
+
+**Exterior** (`createE203Model`):
+- **Fuselage.** Its own superellipse sections:
+  - the long cowl with the side inlet, landing light, chin inlet, louvres,
+    camlocs and exhausts;
+  - the hopper lid with the loading box and coupler;
+  - the taller cabin with deck, roof, windshield, side glass, rear panels,
+    the door with its lower window, and the frames;
+  - the tail cone running into the dorsal fillet and fin.
+- **Wing.** 13.30 m with real taper seen from above:
+  - upper and lower surfaces closed and wound outwards, so neither face
+    disappears from any angle;
+  - flaps (0.6–3.62 m) and ailerons (3.7–6.2 m) on their hinge lines;
+  - nav lights, strobes, root fillet, walkway, filler cap, hinge brackets
+    and pitot.
+- **Winglets.** Shark-fin shaped, grown from the tip:
+  - one continuous surface: the path bends from the wing's dihedral up to
+    78° through a knee;
+  - the chord narrows from the wing's 1.71 m to 0.16 m along a concave
+    leading edge, with the trailing edge held on the wing's;
+  - 0.46 m tall, canted 12° out;
+  - mirrored for the right side.
+- **Tail.** Fin with the rudder on a vertical hinge, beacon, tailplane with
+  elevators, painted tips.
+- **Wire cutter.** A thin cable from the roof mast to the fin, plus the
+  windshield deflector and the whip antenna.
+- **Gear.**
+  - Conventional: V legs to the main axles, a leaf-spring tailwheel and its
+    fork.
+  - Contact points match the mesh: three wheels on the ground; the prop tip
+    clears by 0.66 m and the boom tip by 1.21 m; winglet tops at 2.24 m and
+    fin at 2.36 m.
+- **Ag kit.**
+  - Booms on five hangers per side, 20 yellow nozzles each, and the cross
+    pipe.
+  - The wind-driven pump with seven orange fan blades.
+- **Prop.**
+  - Polished spinner and three blades with white tips.
+  - Blade pitch follows the governor.
+  - The blades give way to a blurred disc between 380 and 900 rpm.
+
+Small parts sit in a level of detail dropped beyond 95 m. AO is baked into
+the vertex colours.
+
+**Paint schemes.** Title card → Ipanema 203 → **Pintura 01 / 02**, saved
+as `e203Livery`. Both use the same geometry and UVs; only the fuselage and
+wing canvases and a few material colours (frame, tips, gear) change.
+- **01 — green, blue and gold** (after PS-DIR / PS-BYA): green cowl and
+  cabin; a gold band from the cowl back along the fuselage; blue aft and
+  under; blue wings; green fin cap with the gold stripe and white arrow.
+- **02 — white, green and blue** (after PP-ZPK): white airframe; green
+  swoosh with a gold line along the side; blue belly, rudder, wing tips,
+  winglets and tailplane tips; blue arrow on the fin.
+- Both carry the IPANEMA 203 marks and speed lines on the cowl, ETANOL low
+  on the cowl, NÃO PISE by the tailplane and RESTRITA/EXPERIMENTAL by the
+  door.
+  The registration chosen in Settings goes on the side.
+
+**Integration.**
+- **Fleet.**
+  - Slot 07. The apron gains a fifth airplane spot, `BASE.parking5`, at its
+    west edge, so all six airplanes can wait parked while a helicopter
+    flies (every farm site gets the same spot).
+  - Listed on the five farms that take the 202A.
+  - Has its own HUD/GPS theme and office entry.
+- **Fuel and service.**
+  - Ethanol from the ethanol tank, 4.5 L/s.
+  - Product at 15 L/s.
+  - Service points and keep-out boxes fitted to the 13.30 m wing and the
+    longer fuselage.
+- **Sound.** The IO-540 profile with a three-blade, 2.18 m configuration;
+  power read from the shaft.
+- **Cockpit (provisional).**
+  - Reference points for eye, seat, panel, stick, throttle, pedals, roof,
+    door and floor.
+  - The shared Ipanema panel, a glareshield, stick, pedals, throttle,
+    levers and interior skins.
+  - The internal camera at 70° FOV: the nose and the deflector stay in
+    view and nothing clips.
+  - No detailed panel yet.
+
+**Validation run in this container** (Chromium with SwiftShader):
+- `node test/e203views.mjs <outDir>`: side, other side, top, front, rear,
+  underside, two three-quarters, in flight, winglet close-ups and parked,
+  for both schemes, plus the cockpit. No page errors.
+- `AC=e203 node test/e2e.mjs soy`: the full soy contract flown by the test
+  autopilot through the player inputs — 90 % coverage, 2 stars, 2
+  sorties, no damage. The only console error is a 404 for a resource the
+  preview server does not serve.
+- `node test/fleetswitch.mjs`: 84 switches across the seven aircraft, none
+  hidden.
+- `npm test`: 136 tests, all passing.
+
+**Pending for the next phases.**
+- The detailed 203 cockpit; the panel is still the 202A's.
+- Opening animations for the door and the hopper lid.
+- The estimated figures above, to check against the manual.

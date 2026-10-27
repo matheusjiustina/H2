@@ -329,8 +329,9 @@ export class Aircraft {
       // catches in a cloud of oily smoke.
       const d = this.game.camera ? this.game.camera.position.distanceTo(this.rPos) : 0;
       const vol = this.game.cameraMode === 'cockpit' ? 0.8 : 1 / (1 + Math.max(0, d - 10) / 40);
-      this.game.audio?.play(e.kind === 'cough' ? 'cough' : 'catchRadial', { volume: vol });
-      this._exhaustPuff(e.kind === 'cough' ? 6 : 18);
+      // (The flat six on the same branch has its own start sound.)
+      if (this.type.audio.profile === 'radial') this.game.audio?.play(e.kind === 'cough' ? 'cough' : 'catchRadial', { volume: vol });
+      this._exhaustPuff(this.type.audio.profile === 'radial' ? (e.kind === 'cough' ? 6 : 18) : e.kind === 'cough' ? 0 : 5);
     }
     this.onEvent?.(e);
   }

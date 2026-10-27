@@ -6,6 +6,7 @@ import { clamp, wrapAngle, smoothstep } from '../core/math.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { RUNWAY, BASE, cropHeight } from '../world/layout.js';
 import { SPRAY } from '../config.js';
+import { productLimit } from '../aircraft/types.js';
 
 const G = 9.81;
 
@@ -57,7 +58,8 @@ export class Autopilot {
           const rec = job ? job.c.recommended : { fuel: 200, liquid: 600 };
           // Same scaling as the load sheet's recommendation for a bigger aircraft.
           const A = g.aircraft.A;
-          g.requestService(rec.fuel * (A.fuelCapacity / 260), rec.liquid * (A.hopperCapacity / 900));
+          const fuel = rec.fuel * (A.fuelCapacity / 260);
+          g.requestService(fuel, A.loadByWeight ? Math.min(rec.liquid * (A.hopperCapacity / 900), productLimit(A, fuel)) : rec.liquid * (A.hopperCapacity / 900));
           this.requested = true;
         }
         if (this.requested && !g.service.busy()) { this.requested = false; this.set('start'); }

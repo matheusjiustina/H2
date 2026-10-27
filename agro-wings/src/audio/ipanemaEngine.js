@@ -436,6 +436,8 @@ export class IpanemaEngineSound {
       return;
     }
     if (!this.active) { this.active = true; this.prevEngine = a.engine === 'cranking' ? 'off' : a.engine; this.state = IPA.OFF; }
+    // Per-aircraft constants (the EMB-203's three-blade prop).
+    if (a.cfg !== this._cfgSrc) { this._cfgSrc = a.cfg; this.cfg = { ...DEF, ...(a.cfg ?? {}) }; }
     this._machine(dt, a);
     const st = this.state, cfg = this.cfg;
     const rpm = Math.max(0, a.rpm);
@@ -605,7 +607,7 @@ export class IpanemaEngineSound {
 // listener space for the panner; the closing speed for the Doppler shift
 // comes from the aircraft and camera velocities.
 const _prevCam = { x: 0, y: 0, z: 0, ok: false, vx: 0, vy: 0, vz: 0 };
-export function ipanemaAudioState({ fm, acPos, camPos, camInv, inside, dt }) {
+export function ipanemaAudioState({ fm, acPos, camPos, camInv, inside, dt, cfg }) {
   const e = camInv;
   let rel = null, closing = 0, dist = 0;
   if (acPos && camPos) {
@@ -629,7 +631,10 @@ export function ipanemaAudioState({ fm, acPos, camPos, camInv, inside, dt }) {
     engine: fm.engine,
     rpm: fm.rpm,
     throttle: fm.throttle,
-    power: fm.engine === 'running' ? Math.pow(clamp(fm.rpm / (fm.A?.maxRpm ?? 2700), 0, 1.1), 1.5) : 0,
+    // Constant-speed prop (EMB-203): the rpm is governed, so the load is the
+    // shaft power; fixed pitch (EMB-202A): it follows the rpm.
+    power: fm.engine === 'running' ? (fm.A?.radial ? clamp(fm.shaftPower / fm.A.maxPower, 0, 1) : Math.pow(clamp(fm.rpm / (fm.A?.maxRpm ?? 2700), 0, 1.1), 1.5)) : 0,
+    cfg,
     inside: !!inside,
     rel, dist: Math.max(0, dist - 3), closing,
   };

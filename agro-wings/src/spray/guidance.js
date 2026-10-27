@@ -421,6 +421,8 @@ const THEMES = {
   thrush: { bg: '#060b12', strip: 'rgba(6,12,20,0.85)', main: '#7dffa0', text: '#e2f2ff', dim: '#5a6e80', edge: '#d8f0ff', next: '#ffe14a', good: '#7dff8a', warn: '#ff7a5a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#c6dcb0', fuel: '#ffc85a', load: '#7fd0ff', track: 'rgba(220,240,255,0.14)' },
   // Bell 206: AGROWINGS NAV, a modern colour unit (white text, cyan route).
   b206: { bg: '#07101a', strip: 'rgba(5,12,22,0.86)', main: '#52d8ff', text: '#eef6ff', dim: '#5c7488', edge: '#d6f1ff', next: '#ffd23a', good: '#6cf5a0', warn: '#ff6f5e', spray: '#ffd23a', trackOn: 'rgba(255,210,58,0.9)', terrain: '#a9c9a4', fuel: '#ffc85a', load: '#52d8ff', track: 'rgba(200,235,255,0.14)' },
+  // Ipanema 203: the EMB-202A's unit (provisional cockpit), green-blue.
+  e203: { bg: '#05100b', strip: 'rgba(4,14,9,0.85)', main: '#7dffb0', text: '#e0f6ec', dim: '#5a7a6a', edge: '#d6f6e6', next: '#ffe14a', good: '#86ff9a', warn: '#ff7a5a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#c6dcb8', fuel: '#ffd36a', load: '#7fd8ff', track: 'rgba(220,245,230,0.14)' },
   r44: { bg: '#050a10', strip: 'rgba(4,8,14,0.85)', main: '#8fe3ff', text: '#dff3ff', dim: '#56707e', edge: '#cfeeff', next: '#ffe14a', good: '#86ffb0', warn: '#ff7a6a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#b9d6e6', fuel: '#ffd36a', load: '#8fe3ff', track: 'rgba(200,235,255,0.14)' },
 };
 

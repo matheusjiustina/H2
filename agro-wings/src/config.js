@@ -414,6 +414,118 @@ export const SPRAY_T510G = {
   flow: 6.3,
 };
 
+// ---------------------------------------------------------------------------
+// Embraer EMB-203 Ipanema (seventh aircraft, fictional registration PR-IPB).
+// Published figures used (Embraer product page for the 203, as given for the
+// game): span 13.30 m (with the winglets); length 8.00 m; height 2.43 m;
+// Lycoming IO-540-K1J5 adapted to ethanol, 320 hp at 2,700 rpm; Hartzell
+// three-blade constant-speed propeller (the 86 in / 2.18 m variant); maximum
+// take-off mass 1,900 kg (reference); fuel 292 L of ethanol; hopper volume
+// 1,050 L. Volume is not payload: with the pilot and full fuel the MTOW
+// leaves ≈ 490 kg for the product, and the load sheet shows that limit.
+// Estimated for the game (not published, or not given): equipped empty mass
+// 1,090 kg; wing area 22.2 m² (≈ 13.0 m of panel span × the 1.71 m chord);
+// 6.5° dihedral; the winglets as a higher span efficiency (e 0.84) rather
+// than a separate force; CLa from the aspect ratio (7.6); CD0 0.054 (booms,
+// nozzles, pump, wire cutter, winglets); inertias scaled from the EMB-202A's
+// by mass, span and length; the piston + constant-speed branch of the flight
+// model (direct drive, normally aspirated: manifold pressure from the field
+// ambient down to idle); static figure of merit 0.7 for the three-blade
+// Hartzell; ethanol flow ≈ 115 L/h at take-off power. V-speeds on the
+// gauges: stall speeds from this polar, VFE / VNE as the EMB-202A's.
+export const FLIGHT_E203 = {
+  ...FLIGHT,
+  emptyMass: 1090,
+  mtow: 1900,
+  pilotMass: 85,
+  wingArea: 22.2,
+  span: 13.3,
+  chord: 1.71,
+  oswald: 0.84,
+  inertiaEmpty: [3300, 4700, 3450],
+
+  CL0: 0.3, CLa: 5.0, alphaStall: 0.27, alphaStallNeg: -0.21,
+  CD0: 0.054,
+  CDflap: 0.05, CLflap: 0.7,
+  Cm0: 0.045, CmaWB: 0.25, CmaTail: -1.32, Cmq: -14.5, Cmde: 0.44, Cmflap: -0.05,
+  Clb: -0.095, Clp: -0.52, Clr: 0.11, Clda: 0.082,
+  Cnb: 0.086, Cnr: -0.17, Cndr: 0.08, Cnda: -0.012,
+  CYb: -0.6, CYdr: 0.12,
+
+  engineType: 'piston-cs',
+  maxPower: 238.6e3, // 320 hp
+  propRadius: 1.09, // Hartzell 86 in
+  maxRpm: 2700,
+  idleRpm: 650,
+  // The flight model's piston / constant-speed branch (A.radial): here a
+  // direct-drive, normally aspirated flat six.
+  radial: {
+    gear: 1.0,
+    crank: 1.4, // s of starter before it fires
+    crankRpm: 280,
+    govThrottle: 0.36,
+    mpIdle: 12, mpMax: 28.3, mpAmbient: 28.8, // inHg at the 320 m field
+    idleFrac: 0.03,
+    govFrac: 0.32,
+    etaStatic: 0.7,
+    etaCruise: 0.82,
+    discDrag: 0.1,
+    spool: 0.6,
+  },
+  fuelFlowFull: 115 / 3600, // L/s of ethanol at take-off power
+  fuelFlowIdle: 12 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.79,
+
+  fuelCapacity: 292,
+  hopperCapacity: 1050,
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.3, // hopper between the firewall and the cabin, ahead of the CG
+  fuelTankSpanY: 2.6,
+  // Recommended loads are cut to what the MTOW allows (see the load sheet).
+  loadByWeight: true,
+
+  // Tubular V main legs from the lower fuselage ahead of the wing, a long
+  // spring tailwheel under the rudder: the 203 sits nearly level (≈ 3°).
+  gear: [
+    { name: 'mainL', p: [1.08, -1.57, 0.62], k: 100000, c: 10000, travel: 0.2, radius: 0.32, steer: false },
+    { name: 'mainR', p: [-1.08, -1.57, 0.62], k: 100000, c: 10000, travel: 0.2, radius: 0.32, steer: false },
+    { name: 'tail', p: [0, -1.27, -5.0], k: 30000, c: 2600, travel: 0.13, radius: 0.13, steer: true },
+  ],
+  tailSteer: 0.42,
+
+  hard: [
+    { name: 'wingtipL', p: [6.42, 0.25, -0.4] },
+    { name: 'wingtipR', p: [-6.42, 0.25, -0.4] },
+    { name: 'wingletL', p: [6.65, 0.83, -1.2] },
+    { name: 'wingletR', p: [-6.65, 0.83, -1.2] },
+    { name: 'boomL', p: [5.5, -0.05, -1.2] },
+    { name: 'boomR', p: [-5.5, -0.05, -1.2] },
+    { name: 'prop', p: [0, -0.94, 2.3] },
+    { name: 'spinner', p: [0, 0.15, 2.53] },
+    { name: 'belly', p: [0, -0.62, 0.3] },
+    { name: 'tail', p: [0, -0.45, -4.9] },
+    { name: 'fin', p: [0, 1.12, -5.0] },
+    { name: 'stabL', p: [2.1, -0.3, -4.6] },
+    { name: 'stabR', p: [-2.1, -0.3, -4.6] },
+    { name: 'roof', p: [0, 1.04, -1.5] },
+  ],
+  hardLandingVs: 2.6,
+  crashVs: 5.0,
+
+  wheelPoint: [0, -1.57, 0.62],
+  aglOffset: 1.57,
+  wingDrop: 0.45,
+  assistSpeedScale: 0.97,
+};
+
+export const SPRAY_E203 = {
+  // ≈ 11 m boom (5 hangers a side): the PR-AGW's swath scaled by the boom
+  // span, and the flow that gives its dose at the same working speed.
+  swath: 27,
+  flow: 4.4,
+};
+
 export const ASSIST = {
   modes: ['off', 'normal', 'high'],
   default: 'normal',

@@ -162,4 +162,11 @@ export default {
   // Dromader paint schemes
   'Agro Wings yellow': 'Amarelo Agro Wings',
   'Hellenic fire-fighter': 'Combate a incêndio (Grécia)',
+  // Embraer EMB-203 Ipanema
+  'Ethanol Agricultural Aircraft · winglets': 'Aeronave agrícola a etanol · winglets',
+  'Lycoming IO-540-K1J5 · 320 hp (ethanol) · Hartzell 3-blade': 'Lycoming IO-540-K1J5 · 320 hp (etanol) · Hartzell tripá',
+  '1,050 L hopper · 292 L ethanol · 13.30 m span · 1,900 kg MTOW': 'Hopper 1.050 L · 292 L de etanol · envergadura 13,30 m · PMD 1.900 kg',
+  'Green, blue and gold': 'Verde, azul e dourado',
+  'White, green and blue': 'Branco, verde e azul',
+  'Product the MTOW allows at this fuel ({0} L hopper volume)': 'Produto que o PMD permite com este combustível (hopper de {0} L)',
 };
