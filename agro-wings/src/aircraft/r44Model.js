@@ -62,10 +62,13 @@ export const R44_SHADOW = { W: 10, L: 13, wing: [4.0, 0.52, 0.68], fus: [0.66, 0
 // Cabin: 1.28 m outside at the doors (R44 data; was 1.39), the lower nose
 // fuller (flatter bottom corners) so the pedals stay inside the bubble.
 const CAB_KEYS = [
-  K(2.53, 0.059, -0.2, -0.25, -0.14, 2.0, 2.0), K(2.49, 0.264, -0.21, -0.44, 0.04, 2.2, 2.3),
-  K(2.4, 0.408, -0.21, -0.6, 0.22, 2.4, 3.3), K(2.22, 0.522, -0.2, -0.72, 0.41, 2.6, 4.3),
-  K(1.98, 0.583, -0.18, -0.8, 0.55, 2.9, 4.7), K(1.7, 0.612, -0.15, -0.84, 0.65, 3.2, 4.3),
-  K(1.42, 0.63, -0.12, -0.86, 0.71, 3.5, 4.6), K(1.05, 0.639, -0.1, -0.87, 0.75, 3.7, 4.3),
+  // Nose: a blunt three-dimensional bubble (no pointed tip), its foremost
+  // point low, the underside rounding up into it (after the side photo of
+  // a black R44 II on the ramp).
+  K(2.57, 0.13, -0.26, -0.4, -0.1, 2.2, 2.2), K(2.53, 0.31, -0.27, -0.56, 0.08, 2.3, 2.6),
+  K(2.45, 0.45, -0.27, -0.7, 0.27, 2.5, 3.4), K(2.3, 0.54, -0.25, -0.79, 0.44, 2.7, 4.3),
+  K(2.1, 0.59, -0.21, -0.84, 0.57, 3.0, 4.7), K(1.85, 0.615, -0.17, -0.86, 0.65, 3.2, 4.5),
+  K(1.55, 0.63, -0.13, -0.87, 0.71, 3.5, 4.6), K(1.05, 0.639, -0.1, -0.87, 0.75, 3.7, 4.3),
   K(0.55, 0.639, -0.08, -0.87, 0.765, 3.8, 4.3), K(0.05, 0.63, -0.06, -0.86, 0.77, 3.7, 4.2),
   K(-0.3, 0.607, -0.03, -0.83, 0.77, 3.4, 3.9), K(-0.52, 0.57, 0.0, -0.79, 0.77, 3.0, 3.5),
 ];
@@ -103,13 +106,15 @@ function roundPoly(pts, r = 0.07, n = 4) {
   }
   return out;
 }
-const FRONT_WIN = roundPoly([[1.0, -0.28], [zA(-0.28) - 0.08, -0.28], [zA(0.64) - 0.08, 0.64], [1.0, 0.64]], 0.06);
+// Front door window: its lower edge falls toward the A-pillar, corners on
+// generous radii (the R44's curved glazing, not a rectangle).
+const FRONT_WIN = roundPoly([[1.0, -0.26], [zA(-0.34) - 0.08, -0.34], [zA(0.64) - 0.08, 0.64], [1.0, 0.64]], 0.11);
 // Rear door window: aft upper corner swept on a large radius, as on the R44.
 const REAR_WIN = roundPoly([
   [0.12, -0.26], [0.88, -0.26], [0.88, 0.62], [0.38, 0.62],
   ...[0.25, 0.5, 0.75].map((t) => [0.38 - 0.26 * Math.sin((t * Math.PI) / 2), 0.36 + 0.26 * Math.cos((t * Math.PI) / 2)]),
   [0.12, 0.36],
-], 0.05);
+], 0.09);
 // Glazing regions as intersections of half-spaces a·x + b·y + c·z + d >= 0
 // (window outlines are lines in the side view, i.e. planes containing X), so
 // the skin is cut exactly along them.

@@ -2749,6 +2749,11 @@ in near-orthographic and three-quarter views (`test/r44ortho.mjs`).
   windshield's lower edge now runs from the A-pillar's foot down and
   forward into the nose: the deep two-piece glass of the R44, a short
   painted chin under it; the centre post follows the nose underneath.
+- **Nose and windows (second pass, after a side photo of a black R44 II).**
+  The pointed nose tip is gone: the nose is a blunt three-dimensional
+  bubble, its foremost point low and its underside rounding up into it,
+  4 cm longer; the front door window's lower edge falls toward the A-pillar
+  and both door windows have generous corner radii.
 - **Mast fairing.** The low hump became the R44's tall tapered tower:
   front edge raked back, rear edge raked forward, teardrop in plan, its top
   just under the swashplate (raised with it; the hub and the rotor pivots
