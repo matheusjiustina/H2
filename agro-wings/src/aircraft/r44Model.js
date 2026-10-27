@@ -35,6 +35,16 @@ const GROUND = A.skids[0][1]; // skid bottom
 const RED = '#b5141c';
 const GRAPHITE = '#2b2e33';
 const WHITE = '#f1f1ec';
+// Paint schemes (one model, only the livery canvas and three colours change):
+// A — the original red and graphite with white pinstripes; B — Black
+// Agricultural: deep black with fine gold pinstripes along the belt line and
+// the tail cone, the type name on the aft cabin and the marks in gold (after
+// the black-and-gold agricultural R44s of the reference photographs).
+const GOLD = '#c9a24a';
+export const R44_LIVERIES = [
+  { id: 'A', base: RED, belly: GRAPHITE, pin: WHITE, tail: GRAPHITE, text: WHITE, marks: WHITE, seam: 'rgba(40,0,0,0.45)', paint: RED, cross: RED },
+  { id: 'B', base: '#0f1012', belly: '#0f1012', pin: GOLD, tail: '#0f1012', text: '#d8d6cf', marks: GOLD, seam: 'rgba(120,120,125,0.35)', paint: '#121315', cross: '#141517', gold: true },
+];
 // Seated pilot: the shared pilot (PR-AGW frame) moved into the right seat.
 const OFF = new THREE.Vector3(-0.29, -0.54, 1.6);
 const o3 = (x, y, z) => [x + OFF.x, y + OFF.y, z + OFF.z];
@@ -49,13 +59,15 @@ export const R44_SHADOW = { W: 10, L: 13, wing: [4.0, 0.52, 0.68], fus: [0.66, 0
 
 // ==========================================================================
 // Stations K(z, half-width, shoulder y, bottom y, top y, pU, pL).
+// Cabin: 1.28 m outside at the doors (R44 data; was 1.39), the lower nose
+// fuller (flatter bottom corners) so the pedals stay inside the bubble.
 const CAB_KEYS = [
-  K(2.53, 0.06, -0.2, -0.25, -0.14, 2.0, 2.0), K(2.49, 0.27, -0.21, -0.44, 0.04, 2.2, 2.3),
-  K(2.4, 0.42, -0.21, -0.6, 0.22, 2.4, 2.6), K(2.22, 0.545, -0.2, -0.72, 0.41, 2.6, 2.9),
-  K(1.98, 0.62, -0.18, -0.8, 0.55, 2.9, 3.3), K(1.7, 0.665, -0.15, -0.84, 0.65, 3.2, 3.7),
-  K(1.42, 0.685, -0.12, -0.86, 0.71, 3.5, 4.0), K(1.05, 0.695, -0.1, -0.87, 0.75, 3.7, 4.3),
-  K(0.55, 0.695, -0.08, -0.87, 0.765, 3.8, 4.3), K(0.05, 0.685, -0.06, -0.86, 0.77, 3.7, 4.2),
-  K(-0.3, 0.66, -0.03, -0.83, 0.77, 3.4, 3.9), K(-0.52, 0.62, 0.0, -0.79, 0.77, 3.0, 3.5),
+  K(2.53, 0.059, -0.2, -0.25, -0.14, 2.0, 2.0), K(2.49, 0.264, -0.21, -0.44, 0.04, 2.2, 2.3),
+  K(2.4, 0.408, -0.21, -0.6, 0.22, 2.4, 3.3), K(2.22, 0.522, -0.2, -0.72, 0.41, 2.6, 4.3),
+  K(1.98, 0.583, -0.18, -0.8, 0.55, 2.9, 4.7), K(1.7, 0.612, -0.15, -0.84, 0.65, 3.2, 4.3),
+  K(1.42, 0.63, -0.12, -0.86, 0.71, 3.5, 4.6), K(1.05, 0.639, -0.1, -0.87, 0.75, 3.7, 4.3),
+  K(0.55, 0.639, -0.08, -0.87, 0.765, 3.8, 4.3), K(0.05, 0.63, -0.06, -0.86, 0.77, 3.7, 4.2),
+  K(-0.3, 0.607, -0.03, -0.83, 0.77, 3.4, 3.9), K(-0.52, 0.57, 0.0, -0.79, 0.77, 3.0, 3.5),
 ];
 // Mast fairing on the cabin roof (upper shell only).
 const FAIR_KEYS = [
@@ -102,7 +114,10 @@ const REAR_WIN = roundPoly([
 // (window outlines are lines in the side view, i.e. planes containing X), so
 // the skin is cut exactly along them.
 const zAPlane = [0, 0.622, 1, -(1.42 + 0.622 * 0.7)]; // z >= zA(y)
-const WS_REGION = (sx) => [zAPlane, [0, 0, 1, -WS_TOP_Z], [0, 1, 0, -WS_BOTTOM], [0, 1, -0.25, -(WS_BOTTOM - 0.25 * 2.2)], [0, -1, 0, 0.72], [sx, 0, 0, -0.014]];
+// Lower edge: from the A-pillar's foot it runs down and forward into the
+// lower nose (the R44's deep two-piece bubble; a short painted chin below).
+const WS_FOOT_Z = 1.42 + 0.622 * (0.7 - WS_BOTTOM), WS_DROP = 0.45;
+const WS_REGION = (sx) => [zAPlane, [0, 0, 1, -WS_TOP_Z], [0, 1, WS_DROP, -(WS_BOTTOM + WS_DROP * WS_FOOT_Z)], [0, -1, 0, 0.72], [sx, 0, 0, -0.014]];
 function polyRegion(P, sx) {
   let cz = 0, cy = 0;
   for (const [z, y] of P) { cz += z / P.length; cy += y / P.length; }
@@ -117,7 +132,7 @@ function polyRegion(P, sx) {
   }
   return out;
 }
-const WS_BOTTOM_AT = (z) => Math.max(WS_BOTTOM, WS_BOTTOM + 0.25 * (z - 2.2));
+const WS_BOTTOM_AT = (z) => WS_BOTTOM - WS_DROP * Math.max(0, z - WS_FOOT_Z);
 
 // Half-width of a station at height y (inverse of model.js ring()).
 function halfWidthAt(s, y) {
@@ -252,7 +267,8 @@ function liveryUV(geo) {
   return geo;
 }
 
-function liveryTextures(reg) {
+function liveryTextures(reg, scheme = 0) {
+  const L = R44_LIVERIES[scheme] ?? R44_LIVERIES[0];
   const c = canvas(LV.W, LV.H), b = canvas(LV.W, LV.H);
   const g = c.getContext('2d'), gb = b.getContext('2d');
   gb.fillStyle = '#808080';
@@ -267,17 +283,25 @@ function liveryTextures(reg) {
     };
     const poly = (pts, fill) => { path(g, pts); g.closePath(); g.fillStyle = fill; g.fill(); };
     const line = (ctx, pts, col, w) => { path(ctx, pts); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(); };
-    g.fillStyle = RED;
+    g.fillStyle = L.base;
     g.fillRect(0, oy, LV.W, LV.H / 2);
     // Graphite belly band with a white pinstripe, sweeping up at the nose.
     const belt = [[2.65, -0.26], [2.3, -0.4], [1.8, -0.5], [0.9, -0.54], [-0.55, -0.54], [-0.6, -0.54]];
-    poly([...belt, [-0.6, -1.0], [2.65, -1.0]], GRAPHITE);
-    line(g, belt.map(([z, y]) => [z, y + 0.03]), WHITE, 0.022 * LV.ky);
+    poly([...belt, [-0.6, -1.0], [2.65, -1.0]], L.belly);
+    line(g, belt.map(([z, y]) => [z, y + 0.03]), L.pin, 0.022 * LV.ky);
+    if (L.gold) {
+      // Second, finer gold line above the first, carried along the aft body
+      // to the tail-cone root.
+      const upper = [[2.62, -0.18], [2.3, -0.31], [1.8, -0.41], [0.9, -0.45], [-0.55, -0.45], [-1.3, -0.3], [-1.9, -0.02], [-2.2, 0.32]];
+      line(g, upper, L.pin, 0.009 * LV.ky);
+      line(g, [[-0.6, -0.51], [-1.3, -0.37], [-1.9, -0.08], [-2.2, 0.27]], L.pin, 0.016 * LV.ky);
+    }
     // Tail cone: graphite and white pinstripes along its side.
     const tl = [];
     for (let z = TC0 + 0.2; z >= TC1 + 0.05; z -= 0.25) tl.push([z, tcAt(z).y - 0.05 * (tcAt(z).r / 0.215)]);
-    line(g, tl, GRAPHITE, 0.05 * LV.ky);
-    line(g, tl.map(([z, y]) => [z, y - 0.045]), WHITE, 0.014 * LV.ky);
+    line(g, tl, L.tail, 0.05 * LV.ky);
+    line(g, tl.map(([z, y]) => [z, y - 0.045]), L.pin, 0.014 * LV.ky);
+    if (L.gold) line(g, tl.map(([z, y]) => [z, y + 0.03]), L.pin, 0.006 * LV.ky);
     // Upper cowl: dark louvres (engine air) and the fuel placard.
     for (let k = 0; k < 6; k++) {
       const z = -0.95 - k * 0.07;
@@ -296,10 +320,13 @@ function liveryTextures(reg) {
       g.fillText(str, px, py);
       g.restore();
     };
-    text('AGRO WINGS', -1.2, 0.66, 0.11, WHITE, 'bold', 3);
-    text(reg, -3.45, tcAt(-3.45).y + 0.07, 0.17, WHITE, 'bold', 4);
-    text('PERIGO · ROTOR DE CAUDA', -5.25, tcAt(-5.25).y + 0.06, 0.035, WHITE);
-    text('AVGAS 100LL', -0.86, 0.48, 0.03, WHITE);
+    if (L.gold) {
+      text('R44', -0.28, 0.3, 0.15, L.text, 'bold italic', 2);
+      text('AGRO WINGS', -1.2, 0.66, 0.08, L.marks, 'bold', 3);
+    } else text('AGRO WINGS', -1.2, 0.66, 0.11, L.text, 'bold', 3);
+    text(reg, -3.45, tcAt(-3.45).y + 0.07, 0.17, L.marks, 'bold', 4);
+    text('PERIGO · ROTOR DE CAUDA', -5.25, tcAt(-5.25).y + 0.06, 0.035, L.text);
+    text('AVGAS 100LL', -0.86, 0.48, 0.03, L.text);
     // Brazilian flag on the tail cone.
     {
       const [fx, fy] = P(-4.55, tcAt(-4.55).y + 0.1);
@@ -319,7 +346,7 @@ function liveryTextures(reg) {
     ];
     for (let z = TC0 - 0.1; z > TC1; z -= 0.5) { const t = tcAt(z); seams.push([[z, t.y - t.r], [z, t.y + t.r]]); }
     for (const s of seams) {
-      line(g, s, 'rgba(40,0,0,0.45)', 2);
+      line(g, s, L.seam, 2);
       line(gb, s, '#3a3a3a', 2.6);
     }
     for (let z = TC0 - 0.1; z > TC1; z -= 0.5) {
@@ -440,12 +467,15 @@ function placardTexture() {
 export function createR44Model(panel, opts = {}) {
   const root = new THREE.Group();
   root.name = 'r44';
-  const liv = liveryTextures(opts.reg ?? 'PR-AGH');
+  let reg = opts.reg ?? 'PR-AGH', scheme = 0;
+  const liv = liveryTextures(reg, scheme);
   const coat = { roughness: 0.4, metalness: 0.0, specularIntensity: 0.35, clearcoat: 0.3, clearcoatRoughness: 0.22, envMap: opts.envMap ?? null, envMapIntensity: 0.35 };
   const ALB = 0.86;
   const M = {
     livery: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(ALB), map: liv.map, bumpMap: liv.bump, bumpScale: 1.3, vertexColors: true, ...coat }),
     paint: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(RED).multiplyScalar(ALB), vertexColors: true, ...coat }),
+    skid: new THREE.MeshStandardMaterial({ color: 0xc6cacd, roughness: 0.3, metalness: 0.9, vertexColors: true }),
+    cross: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(RED).multiplyScalar(ALB), vertexColors: true, ...coat }),
     graphite: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(GRAPHITE), vertexColors: true, ...coat }),
     seal: new THREE.MeshStandardMaterial({ color: 0x141516, roughness: 0.75, metalness: 0.05, vertexColors: true }),
     dark: new THREE.MeshStandardMaterial({ color: 0x1d2024, roughness: 0.62, metalness: 0.1, vertexColors: true }),
@@ -544,7 +574,13 @@ export function createR44Model(panel, opts = {}) {
     const cp = [];
     for (let z = WS_TOP_Z; z <= 2.52; z += 0.04) cp.push([0, stationAt(cabSt, z).yt + 0.006, z]);
     const tip = cabSt[0];
-    for (let y = tip.yt; y >= WS_BOTTOM_AT(tip.z) - 0.01; y -= 0.03) cp.push([0, y, tip.z + 0.006]);
+    for (let y = tip.yt; y >= tip.yb; y -= 0.03) cp.push([0, y, tip.z + 0.006]);
+    // ...and back under the nose to the glass's lower edge.
+    for (let z = tip.z - 0.02; z >= WS_FOOT_Z; z -= 0.03) {
+      const st = stationAt(cabSt, z);
+      if (st.yb < WS_BOTTOM_AT(z) - 0.01) break;
+      cp.push([0, st.yb - 0.006, z]);
+    }
     seal(cp, 0.018);
     add('dark', rbox(0.07, 0.06, 0.07, 0.015, 0, 0.66, 1.36));
     add('dark', rod([0, 0.7, 1.4], [0, 0.73, 1.33], 0.008, 6));
@@ -679,9 +715,9 @@ export function createR44Model(panel, opts = {}) {
     const zf = 1.32, za = -1.38;
     for (const sx of [1, -1]) {
       const x = sx * Math.abs(A.skids[0][0]);
-      add('alu', tube([[x, sy, za], [x, sy, 0], [x, sy, zf], [x, sy + 0.03, zf + 0.18], [x, sy + 0.12, zf + 0.3], [x, sy + 0.22, zf + 0.35]], sr, 40, 12));
-      add('alu', ball([x, sy, za], sr, 10));
-      add('alu', ball([x, sy + 0.22, zf + 0.35], sr, 10));
+      add('skid', tube([[x, sy, za], [x, sy, 0], [x, sy, zf], [x, sy + 0.03, zf + 0.18], [x, sy + 0.12, zf + 0.3], [x, sy + 0.22, zf + 0.35]], sr, 40, 12));
+      add('skid', ball([x, sy, za], sr, 10));
+      add('skid', ball([x, sy + 0.22, zf + 0.35], sr, 10));
       // Wear shoes under the skid tube.
       for (const z of [-0.95, 0.75]) add('steel', rbox(0.05, 0.016, 0.4, 0.006, x, GROUND + 0.008, z), true);
     }
@@ -689,7 +725,7 @@ export function createR44Model(panel, opts = {}) {
     const arch = (z) => {
       const xs = [[1.09, GROUND + 0.075], [1.04, -1.18], [0.92, -1.02], [0.72, -0.935], [0.42, -0.9], [0, -0.892]];
       const pts = [...xs.map(([x, y]) => [x, y, z]), ...xs.slice(0, -1).reverse().map(([x, y]) => [-x, y, z])];
-      add('paint', tube(pts, 0.042, 48, 12));
+      add('cross', tube(pts, 0.042, 48, 12));
       for (const sx of [1, -1]) {
         add('dark', rbox(0.1, 0.06, 0.1, 0.015, sx * 0.42, -0.865, z));
         add('steel', tx(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 14), sx * 1.09, GROUND + 0.075, z), true);
@@ -870,9 +906,9 @@ export function createR44Model(panel, opts = {}) {
     addC('seat', rbox(0.3, 0.14, 0.08, 0.03, sx, 0.36, 0.73, -0.14));
   }
   // Rear bench and backrest against the bulkhead.
-  addC('interior', rbox(1.2, 0.32, 0.5, 0.03, 0, -0.54, -0.22));
-  addC('seat', rbox(1.2, 0.08, 0.5, 0.035, 0, -0.35, -0.2));
-  addC('seat', rbox(1.2, 0.72, 0.1, 0.04, 0, 0.02, -0.44, -0.08));
+  addC('interior', rbox(1.0, 0.32, 0.5, 0.03, 0, -0.54, -0.22));
+  addC('seat', rbox(1.0, 0.08, 0.5, 0.035, 0, -0.35, -0.2));
+  addC('seat', rbox(1.0, 0.72, 0.1, 0.04, 0, 0.02, -0.44, -0.08));
   // Pedestal console and the instrument pod (r44Cockpit.js): the pod face
   // tilted toward the pilots, the pedestal face below it sloping back to the
   // floor. Needles, lamps, the attitude ball and the heading card are 3D and
@@ -973,7 +1009,7 @@ export function createR44Model(panel, opts = {}) {
   for (const px of [-0.29, 0.29]) {
     for (const sx of [1, -1]) {
       const p = new THREE.Group();
-      p.position.set(px + sx * 0.17, -0.62, 2.1);
+      p.position.set(px + sx * 0.14, -0.62, 2.02);
       p.rotation.x = -0.75;
       p.add(new THREE.Mesh(tagged(rbox(0.1, 0.16, 0.025, 0.008, 0, 0, 0)), M.steel));
       p.add(new THREE.Mesh(tagged(tx(new THREE.CylinderGeometry(0.01, 0.01, 0.16, 8), 0, -0.11, 0.03)), M.steel));
@@ -982,8 +1018,8 @@ export function createR44Model(panel, opts = {}) {
     }
   }
   // Door pulls, fire extinguisher, rear-seat belts (fine).
-  addC('dark', rbox(0.04, 0.03, 0.18, 0.01, 0.6, -0.08, 1.3));
-  addC('dark', rbox(0.04, 0.03, 0.18, 0.01, -0.6, -0.08, 1.3));
+  addC('dark', rbox(0.04, 0.03, 0.18, 0.01, 0.575, -0.08, 1.3));
+  addC('dark', rbox(0.04, 0.03, 0.18, 0.01, -0.575, -0.08, 1.3));
   addC('red', tx(lathe([[0, -0.13], [0.035, -0.13], [0.036, 0.09], [0.025, 0.13], [0, 0.14]], 14), 0.48, -0.55, 0.6));
   for (const [mat, parts] of Object.entries(ci)) {
     const m = new THREE.Mesh(mergeGeometries(parts), M[mat]);
@@ -1091,13 +1127,22 @@ export function createR44Model(panel, opts = {}) {
     M.navGreen.emissiveIntensity = on ? 1.6 : 0;
   };
 
+  const repaint = () => {
+    const n = liveryTextures(reg, scheme), L = R44_LIVERIES[scheme];
+    M.livery.map.dispose(); M.livery.bumpMap.dispose();
+    M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
+    M.paint.color.set(L.paint).multiplyScalar(ALB);
+    M.cross.color.set(L.cross).multiplyScalar(ALB);
+    M.skid.color.set(L.gold ? 0x2a2c30 : 0xc6cacd); M.skid.roughness = L.gold ? 0.38 : 0.3; M.skid.metalness = L.gold ? 0.6 : 0.9;
+    // Black paint: a little more gloss so the shapes still read.
+    for (const m of [M.livery, M.paint, M.cross]) { m.clearcoat = L.gold ? 0.55 : 0.3; m.roughness = L.gold ? 0.32 : 0.4; }
+  };
   return {
-    // New registration marks: only the livery canvas is redrawn.
-    setReg(r) {
-      const n = liveryTextures(r);
-      M.livery.map.dispose(); M.livery.bumpMap.dispose();
-      M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
-    },
+    // New registration marks or paint scheme: only the livery canvas and
+    // the plain paint colours change (same meshes, same materials).
+    setReg(r) { reg = r; repaint(); },
+    setLivery(i) { const k = clamp(Math.round(i) || 0, 0, R44_LIVERIES.length - 1); if (k === scheme) return; scheme = k; repaint(); },
+    get livery() { return scheme; },
     root, M,
     rotor, disc, tail, blades, tailBlades: tBlades,
     stick: cyclic, cyclic, collective, pedals, throttle, leds, panelMesh, inst,

@@ -189,6 +189,7 @@ export default {
 
   // Aircraft types
   Original: 'Original',
+  'Black Agricultural': 'Black Agricultural — preta e dourada',
   'Lycoming IO-540 · 320 hp (ethanol)': 'Lycoming IO-540 · 320 hp (etanol)',
   '900 L hopper · 260 L fuel · 1,800 kg MTOW': 'Hopper 900 L · 260 L combustível · PMD 1.800 kg',
   'P&WC PT6A-34AG turboprop · 750 shp': 'P&WC PT6A-34AG turboélice · 750 shp',

@@ -52,7 +52,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, r44Livery: 0, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -257,11 +257,13 @@ export class Game {
     return page;
   }
 
-  // Aircraft options (title-screen card): the Bell 206's paint scheme and
-  // spray kit. Removing the kit drains the tank and drops its mass and drag.
+  // Aircraft options (title-screen card): paint schemes (M-18, EMB-203,
+  // R44, Bell 206) and the Bell 206's spray kit. Removing the kit drains the
+  // tank and drops its mass and drag.
   _applyAircraftOptions() {
     this.fleet?.m18?.model.setLivery?.(this.settings.m18Livery ?? 0);
     this.fleet?.e203?.model.setLivery?.(this.settings.e203Livery ?? 0);
+    this.fleet?.r44?.model.setLivery?.(this.settings.r44Livery ?? 0);
     const b = this.fleet?.b206;
     if (!b) return;
     b.model.setLivery?.(this.settings.b206Livery ?? 0);
