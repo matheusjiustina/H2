@@ -16,8 +16,9 @@ export function makeEnv({ ground = 0, crop = 0, wind = [0, 0, 0] } = {}) {
 
 // model: 'rotor' (the detailed model, which r44.test.mjs checks against the
 // published figures) or 'power' (the game's default handling).
-export function makeHeli({ fuel = 80, hopper = 0, engineOn = false, alt = 0, heading = 0, speed = 0, model = 'rotor' } = {}) {
-  const fm = new HeliModel(FLIGHT_R44);
+// A: the airframe (FLIGHT_R44 by default; FLIGHT_B206 for the Bell).
+export function makeHeli({ fuel = 80, hopper = 0, engineOn = false, alt = 0, heading = 0, speed = 0, model = 'rotor', A = FLIGHT_R44 } = {}) {
+  const fm = new HeliModel(A);
   fm.setPowerModel(model);
   fm.fuel = fuel; fm.hopper = hopper; fm.updateMass();
   const env = makeEnv();

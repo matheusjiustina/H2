@@ -241,6 +241,9 @@ export class TerrainData {
     if (x >= RUNWAY.x0 && x <= RUNWAY.x1 && Math.abs(z - RUNWAY.z) <= RUNWAY.width / 2) return 'runway';
     const a = BASE.apron, t = BASE.taxiway;
     if (x >= a.x0 && x <= a.x1 && z >= a.z0 && z <= a.z1) return 'runway';
+    // Second helipad (Bell 206), gravel slab on the grass east of the apron.
+    const h2 = BASE.helipad2;
+    if (Math.abs(x - h2.x) <= 7.5 && Math.abs(z - h2.z) <= 7.5) return 'runway';
     if (x >= t.x0 && x <= t.x1 && z >= t.z0 && z <= t.z1) return 'runway';
     for (const s of FARM_SITES) {
       const r = s.runway;
@@ -249,6 +252,7 @@ export class TerrainData {
       if (x >= r.x0 && x <= r.x1 && Math.abs(z - r.z) <= r.width / 2) return r.surface === 2 || r.surface >= 4 ? 'grass' : 'dirt';
       const a2 = s.apron, t2 = s.taxiway;
       if ((x >= a2.x0 && x <= a2.x1 && z >= a2.z0 && z <= a2.z1) || (x >= t2.x0 && x <= t2.x1 && z >= t2.z0 && z <= t2.z1)) return 'dirt';
+      if (Math.abs(x - s.helipad2.x) <= 7.5 && Math.abs(z - s.helipad2.z) <= 7.5) return 'dirt';
     }
     for (const r of ROADS) {
       for (let i = 0; i < r.pts.length - 1; i++) {

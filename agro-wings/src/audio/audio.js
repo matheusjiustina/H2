@@ -287,8 +287,12 @@ export class GameAudio {
     // a higher compressor whine (two axial stages ahead of the centrifugal),
     // a brighter exhaust roar and the four-blade prop's blade-pass.
     const h80 = s.profile === 'h80';
-    const turbo = s.profile === 'turboprop' || h80;
-    const heli = s.profile === 'heli';
+    // Bell 206 (Allison 250-C20J turboshaft): the turbine layers (a sharper,
+    // higher whine from the centrifugal compressor, a softer roar from the
+    // upturned exhausts on the roof) under the helicopter rotor layers.
+    const c20 = s.profile === 'c20';
+    const turbo = s.profile === 'turboprop' || h80 || c20;
+    const heli = s.profile === 'heli' || c20;
     // Radial (ASz-62IR): nine cylinders, 4.5 firings per crank revolution,
     // deeper exhaust, geared four-blade prop.
     const radial = s.profile === 'radial';
@@ -323,14 +327,14 @@ export class GameAudio {
     this.clatGain.gain.setTargetAtTime(piston * on * (0.05 + 0.06 * load) * att, t, k);
     // PT6: the whine follows the gas generator, the roar follows power.
     const ng = s.ng ?? 0;
-    this.tWhine.frequency.setTargetAtTime(h80 ? 1850 + ng * 66 : 1500 + ng * 58, t, 0.08);
-    this.tWhine2.frequency.setTargetAtTime(h80 ? 360 + ng * 27 : 280 + ng * 24, t, 0.08);
-    this.tHum.frequency.setTargetAtTime(Math.max(20, ng * (h80 ? 3.7 : 3.2)), t, 0.08);
+    this.tWhine.frequency.setTargetAtTime(c20 ? 2400 + ng * 64 : h80 ? 1850 + ng * 66 : 1500 + ng * 58, t, 0.08);
+    this.tWhine2.frequency.setTargetAtTime(c20 ? 420 + ng * 30 : h80 ? 360 + ng * 27 : 280 + ng * 24, t, 0.08);
+    this.tHum.frequency.setTargetAtTime(Math.max(20, ng * (c20 ? 4.2 : h80 ? 3.7 : 3.2)), t, 0.08);
     this.tWhineGain.gain.setTargetAtTime(turbo ? on * (s.inside ? 0.006 : 0.011 + 0.008 * load) * att : 0, t, k);
     this.tWhine2Gain.gain.setTargetAtTime(turbo ? on * (0.008 + 0.006 * load) * att : 0, t, k);
     this.tHumGain.gain.setTargetAtTime(turbo ? on * (0.05 + 0.04 * load) * att * (s.rough ? 0.8 + Math.random() * 0.4 : 1) : 0, t, k);
     this.tRoarBP.frequency.setTargetAtTime((h80 ? 460 : 380) + load * (h80 ? 1050 : 900), t, 0.1);
-    this.tRoarGain.gain.setTargetAtTime(turbo ? on * (0.03 + 0.2 * load) * att : 0, t, k);
+    this.tRoarGain.gain.setTargetAtTime(turbo ? on * (0.03 + 0.2 * load) * att * (c20 ? 0.55 : 1) : 0, t, k);
     const bpf = Math.max(1, ((rpm * (s.propGear ?? 1)) / 60) * (turbo || radial ? s.blades ?? 3 : 2));
     this.prop.frequency.setTargetAtTime(bpf, t, 0.04);
     this.propBP.frequency.setTargetAtTime(bpf * 3, t, 0.05);

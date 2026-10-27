@@ -33,6 +33,11 @@ export class Sprayer {
   toggle(force) {
     const fm = this.game.aircraft.fm;
     const next = force ?? !this.on;
+    if (next && fm.kitOn === false) {
+      this.game.toast(t('No spray kit fitted — fit it on the aircraft card to spray.'));
+      this.on = false;
+      return;
+    }
     if (next && fm.hopper <= 0.5) {
       this.game.toast(t('Hopper is empty — return to base for a reload.'));
       this.on = false;

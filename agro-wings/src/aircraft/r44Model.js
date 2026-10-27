@@ -351,7 +351,7 @@ function liveryTextures(reg) {
 // (uBlur = rotor speed x exposure, in radians). At low rotor speed the trail
 // is short and the solid blades carry the look; at speed the blades fade and
 // only the faint, flickering sectors remain — no permanent opaque disc.
-function blurMaterial(color, { blades, chord, dir, plane, envMap }) {
+function blurMaterial(color, { blades, chord, dir, plane, envMap, radius }) {
   const m = new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.2, transparent: true, depthWrite: false, side: THREE.DoubleSide, envMap: envMap ?? null, envMapIntensity: 0.4 });
   const u = { uAngle: { value: 0 }, uBlur: { value: 0 }, uOpacity: { value: 0 }, uCone: { value: 0 } };
   m.userData.u = u;
@@ -375,11 +375,11 @@ function blurMaterial(color, { blades, chord, dir, plane, envMap }) {
           // the exposure average), plus the faint persistence of the swept disc.
           float dens = clamp(1.8 * ${chord.toFixed(4)} / max(r, 0.05) / B, 0.0, 1.0);
           float a = d < B ? dens * (0.55 + 0.9 * (1.0 - d / B)) : 0.0;
-          a += 0.06 * smoothstep(0.35, 0.9, uBlur) * (1.0 - smoothstep(0.85, 1.0, r / ${(plane === 'xz' ? 5.03 : 0.737).toFixed(3)}) * 0.5);
+          a += 0.06 * smoothstep(0.35, 0.9, uBlur) * (1.0 - smoothstep(0.85, 1.0, r / ${(radius ?? (plane === 'xz' ? 5.03 : 0.737)).toFixed(3)}) * 0.5);
           diffuseColor.a *= clamp(a, 0.0, 0.85) * uOpacity;
         }`);
   };
-  m.customProgramCacheKey = () => `rotorblur-${plane}-${blades}-${dir}`;
+  m.customProgramCacheKey = () => `rotorblur-${plane}-${blades}-${dir}-${radius ?? ''}`;
   return m;
 }
 
@@ -1102,3 +1102,6 @@ export function createR44Model(panel, opts = {}) {
     update,
   };
 }
+
+// Shared with the Bell 206 model (b206Model.js).
+export { roundPoly, polyRegion, halfWidthAt, stationAt, soupOf, splitSoup, soupGeo, innerShell, blurMaterial, bladeGeo, carpetTexture };

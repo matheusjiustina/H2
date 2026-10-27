@@ -87,7 +87,7 @@ export class Helicopter {
     this._sync();
   }
   placeAtPad(site = this.game?.site ?? MAIN_SITE) {
-    const p = padOf(site, 'heli');
+    const p = padOf(site, 'heli', this.type.padKey);
     this.placeParked(p.x, p.z, p.heading);
   }
   placeParked(x, z, heading) {
@@ -281,7 +281,7 @@ export class Helicopter {
       this._toast('fuel', t('Engine stopped: out of fuel. Lower the collective — autorotate!'));
     } else if (e.kind === 'catch') {
       this.game.audio?.play('catch');
-      this._toast('start', t('Engine running — clutch engaging, rotor spinning up.'), 20);
+      this._toast('start', this.A.engine.turbine ? t('Light-off — N1 to ground idle, rotor spinning up.') : t('Engine running — clutch engaging, rotor spinning up.'), 20);
     }
     this.onEvent?.(e);
   }
@@ -460,6 +460,10 @@ export class Helicopter {
       rotorBrake: fm.rotorBrake, onGround: o.onGround, reg: this.type.reg, vne: this.type.vspeeds.vne,
       spray: !!this.game.sprayer?.on, flow: this.game.sprayer?.flowNow ?? 0, hgt: this.workHeight(), gps: this.game.guidance,
       power: fm.power / (this.A.engine.ratedKW * 1000), collective: fm.collective, rotorState: this.rotorState,
+      // Turboshaft (Bell 206): gas producer, turbine outlet temperature,
+      // torque, transmission oil; the flight phase and the spray kit.
+      ng: fm.ng, itt: fm.itt, torque: fm.torque, xmsnOilP: fm.xmsnOilP, xmsnOilT: fm.xmsnOilT, phase: fm.phase, kit: fm.kitOn,
+      gs: o.groundSpeed * KT, pos: fm.pos,
     };
   }
 

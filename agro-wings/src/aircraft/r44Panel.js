@@ -534,3 +534,6 @@ export function createR44Panel() {
     },
   };
 }
+
+// Shared with the Bell 206 panel (b206Panel.js).
+export { speckle, screw, text, dial, scale, arc, radial, drawTcPlane, drawAttTape, drawAttOverlay, drawCard, drawCardOverlay, drawGlass };

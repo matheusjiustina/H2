@@ -73,7 +73,7 @@ export class HeliAutopilot {
         return;
       case 'spool':
         this._neutral();
-        if (fm.phase === 'flight' && o.rotorPct > 100.5 && this.pt > 2) this.set('liftoff');
+        if (fm.phase === 'flight' && o.rotorPct > fm.A.rotor.govPct - 1 && this.pt > 2) this.set('liftoff');
         return;
       case 'liftoff': {
         // Collective up until light on the skids and off; then climb vertically.

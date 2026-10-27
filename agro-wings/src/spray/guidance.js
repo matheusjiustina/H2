@@ -170,7 +170,9 @@ export class Guidance {
     g.fillRect(x, y, w, h);
     const barW = Math.round(16 * fs);
     const mw = w - barW * 2 - 6; // map width (bars on the right)
-    if (!this.job || nav) this._drawNav(g, x, y, mw, h, fs, P, nav, opts);
+    // opts.page: 'map' (always the NAV page) or 'cov' (the talhão page when
+    // there is a job); otherwise chosen from the situation.
+    if (opts.page === 'map' || ((!this.job || nav) && opts.page !== 'cov') || !this.job) this._drawNav(g, x, y, mw, h, fs, P, nav, opts);
     else this._drawOps(g, x, y, mw, h, fs, P, opts);
     this._drawBars(g, x + mw + 3, y, barW, h, fs, P);
   }
@@ -417,6 +419,8 @@ const THEMES = {
   m18: { bg: '#0c0806', strip: 'rgba(16,9,5,0.85)', main: '#ffb066', text: '#ffe2c4', dim: '#7d6250', edge: '#ffd9b0', next: '#9df0ff', good: '#a6ff8c', warn: '#ff6a52', spray: '#9df0ff', trackOn: 'rgba(157,240,255,0.9)', terrain: '#e3c49a', fuel: '#ffc24d', load: '#9df0ff', track: 'rgba(255,214,180,0.14)' },
   // Thrush: AG-NAV-style unit, green on a deep blue-black screen.
   thrush: { bg: '#060b12', strip: 'rgba(6,12,20,0.85)', main: '#7dffa0', text: '#e2f2ff', dim: '#5a6e80', edge: '#d8f0ff', next: '#ffe14a', good: '#7dff8a', warn: '#ff7a5a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#c6dcb0', fuel: '#ffc85a', load: '#7fd0ff', track: 'rgba(220,240,255,0.14)' },
+  // Bell 206: AGROWINGS NAV, a modern colour unit (white text, cyan route).
+  b206: { bg: '#07101a', strip: 'rgba(5,12,22,0.86)', main: '#52d8ff', text: '#eef6ff', dim: '#5c7488', edge: '#d6f1ff', next: '#ffd23a', good: '#6cf5a0', warn: '#ff6f5e', spray: '#ffd23a', trackOn: 'rgba(255,210,58,0.9)', terrain: '#a9c9a4', fuel: '#ffc85a', load: '#52d8ff', track: 'rgba(200,235,255,0.14)' },
   r44: { bg: '#050a10', strip: 'rgba(4,8,14,0.85)', main: '#8fe3ff', text: '#dff3ff', dim: '#56707e', edge: '#cfeeff', next: '#ffe14a', good: '#86ffb0', warn: '#ff7a6a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#b9d6e6', fuel: '#ffd36a', load: '#8fe3ff', track: 'rgba(200,235,255,0.14)' },
 };
 

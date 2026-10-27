@@ -30,6 +30,7 @@ import { windAt } from '../flight/env.js';
 import { t } from '../i18n/index.js';
 
 const SETTINGS = 'agrowings.settings.v1';
+const GPS_PAGE_NAMES = { map: 'MAP', dest: 'DESTINATION', mission: 'MISSION', cov: 'COVERAGE' };
 
 // Crash reasons stay in English on the aircraft (tests and logs read them);
 // they are translated here, when shown.
@@ -49,7 +50,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'high', heliModel: 'power', timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'high', heliModel: 'power', b206Livery: 0, b206Kit: true, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     const q = new URLSearchParams(location.search).get('q');
     if (q && QUALITY[q]) { this.settings.quality = q; this.qualityForced = true; }
@@ -101,6 +102,7 @@ export class Game {
       ac.fm.fuel = ac.type.loads.boot; ac.fm.hopper = 0; ac.fm.updateMass();
       this.fleet[id] = ac;
     }
+    this._applyAircraftOptions();
     this.rig = new CameraRig(this.camera);
     this.rig.shakeScale = this.settings.shake;
     this.sprayer = new Sprayer(this);
@@ -125,6 +127,15 @@ export class Game {
     window.addEventListener('resize', () => this.resize());
     const startAudio = () => this.audio.start();
     window.addEventListener('pointerdown', startAudio);
+    // A click (no drag) in the cockpit view: switches and soft keys the
+    // aircraft's cockpit can pick (the Bell 206's GPS keys).
+    this.canvas.addEventListener('pointerdown', (e) => { this._click = { x: e.clientX, y: e.clientY }; });
+    this.canvas.addEventListener('pointerup', (e) => {
+      const c = this._click;
+      this._click = null;
+      if (!c || Math.hypot(e.clientX - c.x, e.clientY - c.y) > 6 || this.cameraMode !== 'cockpit') return;
+      this.cockpitClick(e.clientX, e.clientY);
+    });
     window.addEventListener('keydown', startAudio);
     this.resize();
     this.screens.setLoading(1, t('Ready'));
@@ -223,6 +234,35 @@ export class Game {
   // Flight key scheme (numpad / classic) onto the input, for every aircraft.
   _applyKeyScheme() {
     this.input?.setAlias(KEY_SCHEMES[this.settings.keyScheme] ?? KEY_SCHEMES[DEFAULT_KEY_SCHEME]);
+  }
+
+  // Cockpit click at a screen point: hands the ray to the cockpit.
+  cockpitClick(cx, cy) {
+    const pick = this.aircraft.model.inst?.pick;
+    if (!pick) return null;
+    const r = this.canvas.getBoundingClientRect();
+    (this._ray ??= new THREE.Raycaster()).setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), this.camera);
+    const page = pick(this._ray);
+    if (page) this.audio?.play('click');
+    return page;
+  }
+
+  // Aircraft options (title-screen card): the Bell 206's paint scheme and
+  // spray kit. Removing the kit drains the tank and drops its mass and drag.
+  _applyAircraftOptions() {
+    const b = this.fleet?.b206;
+    if (!b) return;
+    b.model.setLivery?.(this.settings.b206Livery ?? 0);
+    const on = this.settings.b206Kit !== false;
+    b.model.setKit?.(on);
+    b.fm.kitOn = on;
+    if (!on) { b.fm.hopper = 0; if (this.aircraft === b) this.sprayer.on = false; }
+    b.fm.updateMass();
+  }
+  setAircraftOption(k, v) {
+    this.setSetting(k, v);
+    this._applyAircraftOptions();
+    this.audio?.play('ui');
   }
 
   // Aircraft selection (title screen). Fuel, hopper and damage stay with
@@ -331,6 +371,12 @@ export class Game {
   }
 
   setJob(job) {
+    // A spray contract with the Bell 206 refits its spray kit.
+    if (job && this.aircraft?.type.id === 'b206' && this.settings.b206Kit === false) {
+      this.setSetting('b206Kit', true);
+      this._applyAircraftOptions();
+      this.toast(t('Spray kit fitted for the contract.'));
+    }
     this.job = job;
     this.replay.begin(job);
     this.world.activity?.setExcluded(job ? job.fields.map((f) => f.name) : []);
@@ -615,7 +661,11 @@ export class Game {
       if (this.job) this.toast(v ? t('Coverage overlay on (red = not covered, green = good, purple = overlap).') : t('Coverage overlay off.'));
     }
     if (input.wasPressed('interact')) this._interact();
-    if (input.wasPressed('gps')) this.hud.toggleGps();
+    if (input.wasPressed('gps')) {
+      // In the Bell 206's cockpit the key steps the AGROWINGS NAV pages.
+      if (this.cameraMode === 'cockpit' && ac.panel.nextPage) { ac.panel.nextPage(); this.toast(t('GPS: {0}', t(GPS_PAGE_NAMES[ac.panel.page]))); }
+      else this.hud.toggleGps();
+    }
     if (input.wasPressed('reset')) {
       if (ac.state === 'crashed') { if (this.screens.open !== 'crash') this.screens.crash(crashText(ac.crashReason ?? 'Crashed'), 0); return; }
       this.resetAircraft('pad');

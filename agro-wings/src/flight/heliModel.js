@@ -129,23 +129,30 @@ export class HeliModel {
     this.rotorOmega = 0; this.rotorRpm = 0; this.rotorAngle = 0; this.tailAngle = 0;
     this.rotorBrake = false;
     this.roughness = 0; this.extraDrag = 0;
+    this.kitOn = true; // spray kit fitted (mass, drag, belly tank / boom hard points)
     // Rotor state.
     this.a1 = 0; this.b1 = 0; this.lam = 0.03; this.lamTr = 0.06;
     this.thrust = 0; this.tailThrust = 0; this.pMain = 0; this.pTail = 0; this.shaftTorque = 0;
     // Engine instruments (derived from the simulated power and rpm).
     this.map = 0; this.cht = 30; this.oilT = 30; this.oilP = 0; this.amps = 0; this.fuelFlow = 0;
+    // Turboshaft gauges (A.engine.turbine): gas producer N1 %, turbine
+    // outlet temperature °C, torque % (100 % = the transmission limit).
+    this.ng = 0; this.itt = 30; this.torque = 0; this.xmsnOilP = 0; this.xmsnOilT = 30;
     this.fuel = A.fuelCapacity * 0.5;
     this.hopper = 0;
     // Skid contacts; `anchor` holds a static-friction stick point (world x, z).
     this.skid = A.skids.map((p) => ({ pv: new Vector3(...p), prevPen: -1, onGround: false, load: 0, anchor: null }));
     // Never-touch points except the rotor tips (those follow the disc).
+    // (A.hard: the airframe's own list; the R44's below by default.)
     this.hard = [
-      { name: 'tailRotor', p: [0.32, A.tailRotor.height - A.tailRotor.radius, -A.tailRotor.arm] },
-      { name: 'stinger', p: [0, -0.34, -5.98] },
-      { name: 'nose', p: [0, -0.62, 2.2] },
-      { name: 'tank', p: [0, -1.07, 0.15] },
-      { name: 'boomL', p: [4.0, -1.16, 0.6] },
-      { name: 'boomR', p: [-4.0, -1.16, 0.6] },
+      { name: 'tailRotor', p: [A.tailRotor.x ?? 0.32, A.tailRotor.height - A.tailRotor.radius, -A.tailRotor.arm] },
+      ...(A.hard ?? [
+        { name: 'stinger', p: [0, -0.34, -5.98] },
+        { name: 'nose', p: [0, -0.62, 2.2] },
+        { name: 'tank', p: [0, -1.07, 0.15] },
+        { name: 'boomL', p: [4.0, -1.16, 0.6] },
+        { name: 'boomR', p: [-4.0, -1.16, 0.6] },
+      ]),
     ].map((h) => ({ ...h, pv: new Vector3(...h.p), prev: -1 }));
     this.out = {
       airspeed: 0, groundSpeed: 0, alpha: 0, beta: 0, stall: 0, stallWarn: 0, agl: 100, onGround: false,
@@ -176,7 +183,7 @@ export class HeliModel {
   updateMass() {
     const A = this.A;
     const fuelKg = this.fuel * A.fuelDensity, hopKg = this.hopper * A.liquidDensity;
-    this.mass = A.emptyMass + A.agKitMass + A.pilotMass + fuelKg + hopKg;
+    this.mass = A.emptyMass + (this.kitOn ? A.agKitMass : 0) + A.pilotMass + fuelKg + hopKg;
     const [ip, iy, ir] = A.inertia;
     // Tank load sits under the mast: adds mostly to pitch and roll.
     this.inertia.set(ip + hopKg * 0.35 + fuelKg * 0.3, iy + hopKg * 0.3 + fuelKg * 0.4, ir + hopKg * 0.25 + fuelKg * 0.3);
@@ -239,7 +246,10 @@ export class HeliModel {
       this.crankTime += h;
       engPct = 9 + 4 * Math.sin(this.crankTime * 31);
       if (this.crankTime > E.crankS) {
-        this.engine = 'running'; this.phase = 'clutch'; this.phaseT = 0; this.clutch = Math.max(this.clutch, 0);
+        // Turboshaft: free power turbine, no clutch — N2 and the rotor come
+        // up together at ground idle, then the throttle opens to 100 %.
+        if (E.turbine) { this.engine = 'running'; this.phase = 'idle'; this.phaseT = 0; this.clutch = 1; }
+        else { this.engine = 'running'; this.phase = 'clutch'; this.phaseT = 0; this.clutch = Math.max(this.clutch, 0); }
         this.events.push({ kind: 'catch' });
       }
     } else if (this.engine === 'running') {
@@ -251,7 +261,10 @@ export class HeliModel {
       // to 101–102 % and holds it.
       const idle = E.idlePct / 100;
       let setPct;
-      if (this.phase === 'clutch') {
+      if (this.phase === 'idle') {
+        setPct = E.idleNr;
+        if (this.phaseT > E.idleS && nr > E.idleNr - 0.06) { this.phase = 'flight'; this.phaseT = 0; this.govI = 0; }
+      } else if (this.phase === 'clutch') {
         this.clutch = Math.min(1, this.clutch + h / 7.6);
         setPct = idle;
         if (this.clutch >= 1 && nr > idle - 0.02) { this.phase = 'warm'; this.phaseT = 0; this.govI = 0; }
@@ -263,6 +276,7 @@ export class HeliModel {
         setPct = Math.min(R.govPct / 100, 0.75 + this.phaseT * 0.16);
       }
       const engRpmFrac = this.phase === 'clutch' ? Math.max(idle, nr) : nr;
+      void idle;
       engPct = engRpmFrac * 100;
       // PI on rotor speed with power-required feed-forward.
       const err = setPct - nr;
@@ -429,7 +443,7 @@ export class HeliModel {
     const areaT = Math.PI * TR.radius * TR.radius;
     const sigmaT = (2 * TR.chord) / (Math.PI * TR.radius);
     const thetaT = TR.pitchMax + (TR.pitchMin - TR.pitchMax) * (clamp(this.pedal, -1, 1) + 1) / 2;
-    const rT = _r.set(0.32, TR.height, -TR.arm);
+    const rT = _r.set(TR.x ?? 0.32, TR.height, -TR.arm);
     const vT = _v1.copy(_vb).add(_v2.copy(this.omega).cross(rT));
     // Thrust points to -X (pushes the tail right); flow along it is "climb".
     const vAx = -vT.x;
@@ -479,7 +493,7 @@ export class HeliModel {
     const [fx, fy, fz0] = A.dragArea;
     // Power model: no power-required curve, so the frontal area is larger
     // (with the thrust lost towards Vne it sets the top speed).
-    const fz = pm ? A.power.dragFrontal : fz0;
+    const fz = (pm ? A.power.dragFrontal : fz0) - (this.kitOn ? 0 : A.kitDrag ?? 0);
     const dragB = _v1.set(-0.5 * rho * Math.abs(_vb.x) * _vb.x * fx, -0.5 * rho * Math.abs(_vb.y) * _vb.y * fy, -0.5 * rho * Math.abs(_vb.z) * _vb.z * fz * (1 + this.extraDrag));
     force.add(dragB.applyQuaternion(q));
     const qd = 0.5 * rho * V * V;
@@ -619,6 +633,7 @@ export class HeliModel {
       }
     }
     for (const hp of this.hard) {
+      if (!this.kitOn && hp.kit) { hp.prev = -1; continue; }
       const pw = _v1.copy(hp.pv).applyQuaternion(q).add(this.pos);
       const pen = env.ground(pw.x, pw.z) - pw.y;
       if (pen > 0 && hp.prev <= 0) {
@@ -630,9 +645,45 @@ export class HeliModel {
     }
   }
 
+  // Turboshaft gauges: N1 from the starter (light-off part-way through the
+  // crank) to ground idle, then with the power; TOT peaks at light-off and
+  // rises with the power; torque is the power over the N2 speed.
+  _turbine(h, pFrac) {
+    const E = this.A.engine;
+    const k = Math.min(1, h / 0.8);
+    let n1 = 0, tot = 30;
+    if (this.engine === 'cranking') {
+      const f = this.crankTime / E.crankS;
+      n1 = f < E.lightOff ? 15 * (f / E.lightOff) : 15 + (E.n1Idle - 15) * smoothstep(E.lightOff, 1, f);
+      tot = f < E.lightOff ? 40 : E.totIdle + 420 * Math.exp(-((f - E.lightOff) / 0.3)) * smoothstep(E.lightOff, E.lightOff + 0.04, f);
+    } else if (this.engine === 'running') {
+      n1 = E.n1Idle + (E.n1Max - E.n1Idle) * Math.sqrt(clamp(pFrac, 0, 1.1));
+      tot = E.totIdle + (E.totMax - 40 - E.totIdle) * clamp(pFrac, 0, 1.1);
+    }
+    // (h = 0: a placement, the gauges jump to the state.)
+    this.ng += (n1 - this.ng) * (h === 0 ? 1 : this.engine === 'off' ? Math.min(1, h / 3) : k);
+    this.itt += (tot - this.itt) * (h === 0 ? 1 : Math.min(1, h / (this.engine === 'off' ? 25 : this.engine === 'cranking' ? 0.35 : 1.2)));
+    const n2 = this.rpm / E.rpm100;
+    this.torque = this.engine === 'running' && n2 > 0.3 ? clamp((pFrac / n2) * 100, 0, 130) : 0;
+  }
+
   // Engine gauges from the simulated state (no animation of their own).
   _instruments(h, sigmaRho) {
     const E = this.A.engine;
+    if (E.turbine) {
+      const running = this.engine === 'running';
+      const pFrac = this.power / (E.ratedKW * 1000);
+      this._turbine(h, pFrac);
+      this.map = 0; this.cht = this.itt;
+      const n1F = this.ng / 100;
+      this.oilT += ((running ? 60 + 25 * pFrac : 30) - this.oilT) * Math.min(1, h / 90);
+      this.oilP = running || this.engine === 'cranking' ? clamp(20 + 95 * n1F, 0, 130) : Math.max(0, this.oilP - h * 30);
+      const nr = this.rotorOmega / (this.A.rotor.rpm100 * TAU / 60);
+      this.xmsnOilP = clamp(nr * 60, 0, 70);
+      this.xmsnOilT += ((nr > 0.3 ? 55 + 30 * pFrac : 30) - this.xmsnOilT) * Math.min(1, h / 120);
+      this.amps = running && n1F > 0.55 ? 15 + 25 * Math.exp(-this.phaseT * 0.05) : this.engine === 'cranking' ? -150 : -3;
+      return;
+    }
     const running = this.engine === 'running';
     const pFrac = this.power / (E.ratedKW * 1000);
     // Manifold pressure: ambient with the engine stopped, falling to ~12 inHg

@@ -2185,3 +2185,150 @@ is now shown when it is activated, and the flown aircraft is never culled
 (each frame). `test/fleetswitch.mjs` flies each aircraft far away, goes
 back to the menu, picks every other one and starts it in the air and on
 the ground (40 changes): 40 hidden before the fix, none after.
+
+## Aircraft 06 — Bell 206B-3 JetRanger III, agricultural (PR-AGJ)
+
+The second helicopter, with its own geometry, figures, engine branch,
+cockpit and sound profile; the R44 and the four airplanes are unchanged
+(their tests and the R44's end-to-end contract give the same results).
+Title screen: AIRCRAFT 06 · Bell 206B — "Bell 206B JetRanger —
+Agricultural". PR-AGJ is a fictional registration.
+
+**References.** Five photographs of agricultural 206s (the dark-blue one
+spraying over a canal, the white/maroon one with the belly tank, the green
+one from the front, the green one in flight from the side, the red one in
+three-quarter view) and five of the 206B-3 cabin (the whole cabin through
+the left door, the classic analog panel from the front — the main panel
+reference —, a simulator view, a cockpit with extra avionics and one with a
+portable GPS on the glareshield). Operators' changes in the photos were
+not copied; the build is one configuration: a 206B-3 with the classic
+analog panel, the 250-C20J and the DART/Simplex Model 4900 spray kit.
+
+**Figures used.** Bell 206B-3: rotor 33 ft 4 in (10.16 m), two blades,
+13 in chord, 394 rpm at 100 % N2; tail rotor 5 ft 5 in (1.65 m); MTOW
+3,200 lb (1,451 kg); 91 US gal (344 L) of Jet-A; Rolls-Royce (Allison)
+250-C20J, 420 shp, limited by the transmission to 317 shp (torque 100 %,
+5 min) and 270 shp continuous (85 %); N1 ground idle 62–64 %. Simplex 4900
+(DART product page): belly tank 530 L (140 US gal), mid-ship booms 35 ft
+(11 m) at 95 % of the rotor diameter, 84 kg, approved on the 206A/B;
+swath 15–21 m, 100 mph placard with booms (manual).
+
+**Estimated** (in `FLIGHT_B206`, `src/config.js`, with comments): empty
+weight 771 kg, inertias, rotor inertia, drag areas, tail-rotor arm and
+height, skid geometry, the power-model constants. Full of fuel the 530 L
+tank is over the MTOW (as in service: the load sheet shows how much the
+day allows — 415 L with 120 L of fuel).
+
+**Physics** (`src/flight/heliModel.js`, shared with the R44 through its
+figures; the R44's own behaviour is unchanged — its tests pass as before):
+- turboshaft branch (`engine.turbine`): no belt clutch; the starter takes
+  N1 up, light-off part-way through, the rotor comes up with N2 at ground
+  idle, then the throttle opens to 100 %; N1, TOT (peak at light-off),
+  torque (% of the 317 shp limit) and the transmission oil come from the
+  simulated power and speeds;
+- heavier per unit of power than the R44: hover at the MTOW at 82 % out of
+  ground effect (R44: 70 %), ~920 ft/min at full power there, the power
+  answering later (turbine), the nose turning slower on the pedals, level
+  top speed ~123 kt;
+- the spray kit is part of the state: its mass and drag, the tank and boom
+  hard points; without the kit none of them (and no spraying);
+- `test/b206.test.mjs` (8 tests, in `npm test`).
+
+**Exterior** (`src/aircraft/b206Model.js`, visual only): the JetRanger's
+round nose and wrap-round two-piece windshield, front and rear door
+windows, green-tinted roof windows, the transmission/engine fairing with
+the air inlets and the two upturned exhaust stacks, the long tapered boom
+with the drive-shaft cover, the horizontal stabiliser with the B-3's
+end-plate fins, swept upper and lower fins, tail skid, the tail rotor on
+the left of the fin, low skids on arched cross tubes with steps. Main rotor:
+two-blade underslung teetering hub, white tips, coning with rotor speed,
+tilting with the simulated tip-path plane, the R44's speed-dependent motion
+blur (never a solid disc). Spray kit: the carbon-glass belly tank between
+the cross tubes (its hangers go to the cross-tube saddles; it does not
+touch the tubes), its pump and manifold, the 10.7 m boom as a light truss
+with 44 nozzles 0.3 m over the ground (≈ 3° of roll before a tip
+touches), clamped to the skid tubes and braced to the fuselage. Three paint
+schemes on one geometry (only the livery map and three colours change):
+A Agricultural Classic (white, green and blue stripes), B Dark Green
+Agricultural (dark green over cream, light tank), C Red Utility. Paint and
+kit are chosen on the aircraft's card on the title screen; accepting a
+contract refits the kit.
+
+**Integration.** Second helipad (H2) on the grass east of the apron, 23 m
+from the R44's (both rotor discs and the truck's stands clear), drawn at
+the base and at every farm strip; the truck services the Bell there.
+Parking, selection, contracts, the farm strips that take the R44, office,
+history, save, map, HUD, the AGROWINGS NAV colour scheme of the guidance,
+audio profile `c20` (the 250's sharper compressor whine and a softer roar
+under the rotor layers), turbine start toast, the test autopilot (the
+spool-up now waits for the type's governed rotor speed).
+
+### Bell 206B-3 cockpit
+
+`src/aircraft/b206Panel.js` (faces, screens), `src/aircraft/b206Cockpit.js`
+(3D), placed in `b206Model.js`:
+- **Panel** after the frontal photo: black housing with the photo's
+  outline (wide, upper corners on a large radius, sides drawn in to the
+  bottom), a moulded hood over the caution row, the light-grey face plate
+  set into its rim, the panel tilted back 12°.
+- **Instruments** in the photo's columns: ENG OIL (pressure / temperature),
+  TORQUE, AIRSPEED, ATTITUDE, ALTIMETER; the digital clock, XMSN OIL, TURB
+  OUT TEMP, the dual tachometer (rotor and power turbine), the directional
+  gyro, the VSI; FUEL QTY, GAS PRODUCER (N1), two blanked optional
+  positions, the turn coordinator; LOAD, FUEL PRESS; the guarded FUEL
+  VALVE switch, LV knob, BAT TEMP and N2 placards. Every instrument: case,
+  bezel, recessed dial, 3D needles, glass, four screws. All read the
+  simulation (N1, TOT, torque, N2, rotor, oil, transmission oil, fuel,
+  load, airspeed, altitude, vertical speed, attitude, heading, rate of turn
+  and slip); fuel pressure is the boost pumps' with the master on.
+- **Caution row**: 10 × 2 framed lenses (ENGINE OUT, ROTOR LOW RPM, XMSN
+  OIL PRESS/TEMP, CHIP lights, FUEL PUMP/LOW/FILTER, GEN FAIL, BATTERY
+  HOT/TEMP, START, BAGGAGE DOOR, AUTO REIGN, SPRAY ON). Only those the game
+  simulates light, from its state (cold: dark; start: ENGINE OUT, ROTOR LOW
+  RPM, XMSN OIL PRESS, GEN FAIL, START; flying: none; low fuel: FUEL LOW);
+  redrawn only when a lamp changes.
+- **Pedestal**: a sloping box from under the panel to the floor between
+  the seats, raised modules (audio, COM 1, NAV 1, transponder, the Simplex
+  controller, a switch row) with knobs and toggles, the two VENT pulls.
+- **Controls and cabin**: Bell conventional cyclic from the floor (boot,
+  grip with trim hat and trigger, the right hand on it), the collective
+  with its throttle grip on the left of the seat, pedals on arms to their
+  floor pivots, beige leather seats with belts, the rear bench.
+- **AGROWINGS NAV**: a 7-inch colour unit on a short arm on the left of the
+  hood (≈ 18° below the horizon, left of the pilot's forward view), live
+  screen and anti-glare glass, four soft keys — MAPA (moving map: farms,
+  strips, talhões, destination), DESTINO (name, distance, bearing, ETE,
+  course arrow; the ferry target, else the job's talhões, else the base),
+  MISSÃO (contract, crop, area, passes, liquid, fuel, sorties, coverage
+  against the 90 % target), COBERTURA (the talhão with the passes and the
+  coverage the game recorded). Click a key in the cockpit view, or press N
+  there to step through the pages. Drawn from the game's guidance and job
+  (nothing external), at most 4 Hz and only when its content changes; the
+  mission figures once a second.
+- **Camera**: the pilot's eye in the right seat, 0.78 m from the panel,
+  17° down, 66° field of view.
+
+### Validation (Bell 206 build)
+
+| Check | Result |
+|---|---|
+| Node | `npm test` 122/122 (8 new Bell tests; R44 and airplanes unchanged) |
+| Contract (`AC=b206 node test/e2e.mjs soy`) | flown through the player's inputs: three sorties, 90 %, 2★, no damage |
+| R44 regression (`AC=r44 node test/e2e.mjs soy`) | 90 %, 2★, no damage |
+| Views (`node test/b206views.mjs`) | left, right, front, rear, top, underside, front ¾, in flight, with and without the kit, cockpit, parked, the three schemes; four skids on the ground, boom tips 0.26 m and tank 0.16 m above it |
+| Cockpit (`node test/b206cockpit.mjs`) | parked, start, hover, level, turn, left, right, pedestal, chase; 16:9, 4:3, 21:9; eye clearance 22.7 cm (dev server); GPS keys clicked through the game for every page with and without a contract; cyclic follows the cyclic; lamps follow the state; cockpit / chase / orbit switching |
+| Fleet switch (`node test/fleetswitch.mjs`) | 60 changes, none with the flown aircraft hidden |
+
+Performance (SwiftShader, 960×540, medium; the build before the Bell and
+this one, two runs each; frame times on the software renderer are noisy):
+
+| | before | after |
+|---|---|---|
+| load to the title screen | 63.7 / 46.1 s | 39.2 / 39.4 s |
+| Ipanema at the pad (chase): draw calls / frame | 679 / 15.8, 12.0 ms | 745 / 14.2, 15.0 ms (the Bell parked on H2 in view) |
+| R44 cockpit over the corn: calls / frame | 465 / 12.1, 14.4 ms | 465 / 11.3, 12.4 ms |
+| Bell cockpit over the corn: calls / frame | — | 481 / 12.3, 15.1 ms |
+| Bell chase: calls / triangles | — | 556 / 1.85 M |
+| geometries / textures in memory | 753 / 54 | 923 / 70 |
+| JS heap | 373–374 MB | 413–445 MB |
+| parked meshes drawn (R44 / Bell / Thrush) | | 32 / 39 / 77 |

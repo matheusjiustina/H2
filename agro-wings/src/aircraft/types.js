@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createAirTractorModel, AT_SHADOW, atWingY } from './atModel.js';
@@ -13,10 +13,13 @@ import { createDromaderModel, M18_SHADOW, m18WingY } from './dromaderModel.js';
 import { createDromaderPanel } from './dromaderPanel.js';
 import { createThrushModel, T510_SHADOW, thWingY } from './thrushModel.js';
 import { createThrushPanel } from './thrushPanel.js';
+import { createB206Model, B206_SHADOW, B206_KIT } from './b206Model.js';
+import { createB206Panel } from './b206Panel.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
 
 const R44_ROTOR = FLIGHT_R44.rotor.radius;
+const B206_ROTOR = FLIGHT_B206.rotor.radius;
 
 export const AIRCRAFT_TYPES = {
   ipanema: {
@@ -254,5 +257,59 @@ export const AIRCRAFT_TYPES = {
   },
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush'];
+// Bell 206B-3 JetRanger III with the Simplex 4900 spray kit: the second
+// helicopter (FLIGHT_B206: the shared helicopter model with its own figures
+// and the turboshaft branch); same controls as the R44, its own helipad.
+AIRCRAFT_TYPES.b206 = {
+  id: 'b206',
+  kind: 'heli',
+  slot: '06',
+  label: 'Bell 206B',
+  reg: 'PR-AGJ',
+  get name() { return t('Bell 206B JetRanger — Agricultural'); },
+  get role() { return t('Turbine Rotary-Wing Agricultural Aircraft'); },
+  get engineName() { return t('Rolls-Royce 250-C20J turboshaft · 317 shp take-off (transmission)'); },
+  get summary() { return t('530 L Simplex tank · 344 L fuel · 1,451 kg MTOW'); },
+  flight: FLIGHT_B206,
+  // Simplex 4900: 10.7 m boom (95 % of the rotor diameter), 44 nozzles;
+  // 18 m swath (the kit's 15–21 m); 1.8 L/s gives the contracts' 40 L/ha at
+  // 25 m/s (≈ 50 kt; the kit is placarded to 100 mph).
+  spray: { swath: 18, flow: 1.8, boom: [B206_KIT.boom.half, B206_KIT.boom.y, B206_KIT.boom.z], pump: 'engine' },
+  work: [[0.96, -1.28, 0], [-0.96, -1.28, 0], [5.35, -1.0, 0.82], [-5.35, -1.0, 0.82]],
+  collide: [[0, -0.3, 2.65], [0, 0.8, 0.5], [0, 1.75, 0], [0, 1.5, -6.62], [0.33, 0.6, -6.15], [0, -0.26, -6.2], [5.35, -0.98, 0.82], [-5.35, -0.98, 0.82], [0, -1.1, 0]],
+  wire: [[0, -0.3, 2.65], [0, 1.75, 0], [0, 1.5, -6.62], [0.33, 0.6, -6.15], [5.35, -0.98, 0.82], [-5.35, -0.98, 0.82], [0.96, -1.28, 1.2], [-0.96, -1.28, 1.2]],
+  smoke: [0.2, 1.17, -1.56], // exhaust stacks on the roof
+  wash: [0, -1.2, -1],
+  anim: { vib: [1500, 2700] },
+  vspeeds: { vne: 122 },
+  camera: { dist: 15, height: 4.2, orbit: 19, noseOnly: true, cockpitPitch: -0.3, cockpitFov: 66 },
+  controls: AIRCRAFT_TYPES.r44.controls,
+  audio: { profile: 'c20', blades: 2 },
+  fuel: { name: 'Jet-A', price: GAME.fuelPrice * 1.35 },
+  loads: { free: { fuel: 200, hopper: 250 }, boot: 120 },
+  loadSheet: { heli: true },
+  service: {
+    rates: { fuel: 5, liquid: 10 },
+    // Walk in from outside the boom tip; fuel filler on the aft body side,
+    // tank coupler at the aft end of the belly tank.
+    local: { A: [6.4, -1.4], B: [2.3, -1.6], F: [1.0, -0.9], P: [1.25, -0.6] },
+    keepOut: { wing: [5.4, 0.72, 0.92], wingY: () => B206_KIT.boom.y, fus: [0.66, -0.81, 1.2, -2.2, 2.7], stab: [1.0, 0.25, 0.75, -4.7, -4.05] },
+    veto: 8,
+    standGap: 3.0,
+  },
+  servicePad: BASE.helipad2,
+  padKey: 'helipad2',
+  stub: { eye: [-0.34, 0.43, 1.13], fuelFiller: [0.56, 0.2, -0.85], hopperPort: [0.54, -0.93, -0.55] },
+  bounds: [
+    [-0.66, 0.66, -0.81, 1.2, -2.2, 2.7], [-0.23, 0.23, 0.15, 0.62, -6.1, -2.2], [-0.05, 0.42, -0.26, 1.55, -6.8, -5.5],
+    [-1.0, 1.0, 0.25, 0.75, -4.7, -4.05], [-1.0, 1.0, -1.28, -0.75, -1.5, 1.75], [-5.4, 5.4, -1.04, -0.84, 0.72, 0.92],
+    [-B206_ROTOR, B206_ROTOR, 1.4, 1.9, -B206_ROTOR, B206_ROTOR],
+  ],
+  overhead: 1.25,
+  createModel: (panel, opts) => createB206Model(panel, opts),
+  createPanel: () => createB206Panel(),
+  createShadow: () => createContactShadow(B206_SHADOW),
+};
+
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;

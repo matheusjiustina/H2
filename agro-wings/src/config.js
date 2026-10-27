@@ -534,3 +534,93 @@ export const FLIGHT_R44 = {
     dragFrontal: 2.4, // m², replaces dragArea[2] in this model
   },
 };
+
+// ---------------------------------------------------------------------------
+// Bell 206B-3 JetRanger III, agricultural configuration (rotary wing; flown
+// by the same src/flight/heliModel.js as the R44, with its own figures and
+// the turboshaft branch of the engine). FLIGHT_R44 is untouched.
+// Published figures (Bell 206B-3 spec sheets / type data as quoted by Global
+// Air, helis.com, Jetav): 2 main blades, 33 ft 4 in (10.16 m) rotor, 13 in
+// chord, counter-clockwise seen from above, 394 rpm at 100 % N2; 5 ft 5 in
+// (1.65 m) 2-blade tail rotor on the left of the fin; MTOW 3,200 lb
+// (1,451 kg); Rolls-Royce (Allison) 250-C20J, 420 shp thermodynamic, the
+// transmission limiting it to 317 shp for take-off (torque 100 %, 5 min)
+// and 270 shp continuous (85 %); 91 US gal (344 L) of Jet-A; N1 ground idle
+// 62–64 %. Agricultural kit: DART / Simplex Aerospace Model 4900 for the
+// Bell 206A/B — belly-mounted carbon-glass tank, 530 L (140 US gal), mid-
+// ship booms 35 ft (11 m) at 95 % of the rotor diameter, system 185 lb
+// (84 kg).
+// Estimates (not published; chosen to give the published performance and
+// flagged as such): empty weight of this airframe, blade and tail-rotor
+// inertias, Lock number, airframe inertias, drag areas, tail-rotor arm and
+// height, skid geometry, the power-model constants. With pilot, the kit and
+// 120 L of fuel the 530 L tank is over the MTOW when full (as in service: it
+// is filled to what the day's weight allows — the load sheet shows it).
+export const FLIGHT_B206 = {
+  kind: 'heli',
+  sim: { dt: 1 / 120, maxSubsteps: 12 },
+  emptyMass: 771, // equipped empty (1,700 lb) incl. unusable fuel and oil — estimate
+  agKitMass: 84, // Simplex 4900, published
+  pilotMass: 85,
+  mtow: 1451,
+  inertia: [2900, 2650, 900], // pitch, yaw, roll (kg·m²) — estimates (long boom, heavier cabin than the R44)
+  cgLateral: -0.04, // pilot in the right seat
+  rotor: {
+    blades: 2, radius: 5.08, chord: 0.33, liftSlope: 5.73, cd0: 0.0105,
+    rpm100: 394, govPct: 100, inertia: 1050, lock: 5.2,
+    hubHeight: 1.55, hubZ: 0,
+    pitchMin: 0.0, pitchMax: 0.24,
+    cyclicLon: 0.16, cyclicLat: 0.13,
+    precone: 0.035,
+  },
+  tailRotor: {
+    radius: 0.826, chord: 0.135, gear: 6.47, arm: 6.15, height: 0.98, x: 0.33,
+    pitchMin: -0.12, pitchMax: 0.27,
+  },
+  // Turboshaft: rpm100 is the N2 output shaft at 100 %; ratedKW / mcpKW the
+  // transmission limits (torque 100 % / 85 %). The power answers more slowly
+  // than the R44's piston (gas-producer spool), the start is longer.
+  engine: {
+    turbine: true, ratedKW: 236.4, mcpKW: 201.3, idlePct: 63, rpm100: 6016, lagS: 0.35, crankS: 6.0, transEff: 0.95,
+    n1Idle: 63, n1Max: 101, totIdle: 430, totMax: 810, lightOff: 0.45, // light-off at this fraction of the crank
+    idleNr: 0.66, idleS: 2.5, // rotor model: N2 held at ground idle this long before the throttle opens
+  },
+  fuelCapacity: 344, // L (91 US gal)
+  fuelDensity: 0.8, // Jet-A
+  fuelPerKWh: 0.5, // L per kWh (≈ 100 L/h at 200 kW, ~26 US gal/h)
+  fuelBurnScale: 2.5,
+  hopperCapacity: 530, // L, Simplex 4900 belly tank
+  kitDrag: 0.3, // m² of the frontal drag area that comes off with the spray kit
+  liquidDensity: 1.0,
+  dragArea: [7.2, 4.2, 0.85],
+  finYaw: 1.5, stabPitch: 0.95, // larger fin and a horizontal stabiliser on the boom
+  // Skid tread 1.92 m (6 ft 3.5 in); contact points at the cross-tube saddles.
+  skids: [[0.96, -1.28, 1.15], [0.96, -1.28, -1.2], [-0.96, -1.28, 1.15], [-0.96, -1.28, -1.2]],
+  skidK: 140000, skidC: 9500, skidMu: 0.45,
+  hardLandingVs: 1.8, crashVs: 3.6,
+  vne: 122, // kt at low altitude; the kit's own placard limits spraying speed (see type)
+  // Never-touch points: tail rotor (added from tailRotor), tail skid,
+  // nose, tank, boom tips.
+  hard: [
+    { name: 'stinger', p: [0, -0.15, -6.35] },
+    { name: 'nose', p: [0, -0.55, 2.55] },
+    { name: 'tank', p: [0, -1.1, 0.02], kit: true },
+    { name: 'boomL', p: [5.35, -1.0, 0.82], kit: true },
+    { name: 'boomR', p: [-5.35, -1.0, 0.82], kit: true },
+  ],
+  // Power model: heavier per unit of power than the R44 — hover at the MTOW
+  // at about 82 % out of ground effect, ~1,000 ft/min at full power there,
+  // slower power and yaw response, top speed about the Vne.
+  power: {
+    maxThrust: 18000,
+    lagS: 0.3, // turbine: the power follows the lever a little later
+    climbDamp: 0.33,
+    holdDamp: 1.0, holdV: 0.45,
+    glideDamp: 0.11, glideSat: 8,
+    spoolS: 2.2, // rotor run-up after light-off (heavier rotor than the R44)
+    yawMoment: 7600, yawDamp: 5000,
+    etl: 0.1,
+    vLoss: 0.45, vLossFrom: 56, vLossTo: 75,
+    dragFrontal: 2.5, // m², airframe plus the tank and booms
+  },
+};

@@ -184,6 +184,7 @@ export function createStructures(terrain, scene) {
   dyn.hangar = buildHangar(B, M, group);
   buildService(B, M, group, H);
   buildHelipad(B, M, group, H);
+  buildHelipad(B, M, group, H, BASE.helipad2);
   buildVehicles(B, M, H);
   buildStripMarks(B, M, group, H, RUNWAY);
   dyn.sites = FARM_SITES.map((site) => buildFarmSite(B, M, group, H, site, dyn));
@@ -493,46 +494,50 @@ function buildService(B, M, group, H) {
 }
 
 // Helicopter pad: square of compacted gravel with a painted H and a
-// touchdown circle, white-edged; low edge markers at the corners.
-function buildHelipad(B, M, group, H) {
-  const hp = BASE.helipad;
+// touchdown circle, white-edged; low edge markers at the corners. Two pads
+// (R44 and Bell 206), the same canvas texture.
+let helipadMat = null;
+function buildHelipad(B, M, group, H, hp = BASE.helipad) {
   const S = 15, px = 1024;
-  const c = canvas(px, px);
-  const g = c.getContext('2d');
-  g.fillStyle = '#9b958a';
-  g.fillRect(0, 0, px, px);
-  const r = rng(29);
-  for (let i = 0; i < 26000; i++) {
-    const v = 90 + Math.floor(r() * 120);
-    g.fillStyle = `rgba(${v},${v - 4},${v - 12},${0.25 + r() * 0.4})`;
-    const s = 1 + r() * 3.5;
-    g.fillRect(r() * px, r() * px, s, s * (0.6 + r() * 0.6));
+  if (!helipadMat) {
+    const c = canvas(px, px);
+    const g = c.getContext('2d');
+    g.fillStyle = '#9b958a';
+    g.fillRect(0, 0, px, px);
+    const r = rng(29);
+    for (let i = 0; i < 26000; i++) {
+      const v = 90 + Math.floor(r() * 120);
+      g.fillStyle = `rgba(${v},${v - 4},${v - 12},${0.25 + r() * 0.4})`;
+      const s = 1 + r() * 3.5;
+      g.fillRect(r() * px, r() * px, s, s * (0.6 + r() * 0.6));
+    }
+    // Red-earth wash at the edges, tyre/skid scuffs.
+    const edge = g.createRadialGradient(px / 2, px / 2, px * 0.38, px / 2, px / 2, px * 0.75);
+    edge.addColorStop(0, 'rgba(140,70,40,0)');
+    edge.addColorStop(1, 'rgba(140,70,40,0.35)');
+    g.fillStyle = edge; g.fillRect(0, 0, px, px);
+    const k = px / S;
+    g.fillStyle = 'rgba(236,233,224,0.88)';
+    // H (letter 6 m tall), bars 0.9 m wide.
+    const hw = 3.6 * k, hh = 6 * k, bw = 0.9 * k;
+    g.fillRect(px / 2 - hw / 2, px / 2 - hh / 2, bw, hh);
+    g.fillRect(px / 2 + hw / 2 - bw, px / 2 - hh / 2, bw, hh);
+    g.fillRect(px / 2 - hw / 2, px / 2 - bw / 2, hw, bw);
+    // Touchdown circle and edge line.
+    g.strokeStyle = 'rgba(236,233,224,0.7)'; g.lineWidth = 0.35 * k;
+    g.beginPath(); g.arc(px / 2, px / 2, 5.2 * k, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = 0.25 * k;
+    g.strokeRect(0.4 * k, 0.4 * k, px - 0.8 * k, px - 0.8 * k);
+    // Worn paint and skid marks.
+    for (let i = 0; i < 2600; i++) {
+      g.fillStyle = `rgba(120,112,100,${0.2 + r() * 0.4})`;
+      g.fillRect(r() * px, r() * px, 1 + r() * 4, 1 + r() * 2);
+    }
+    g.strokeStyle = 'rgba(40,36,32,0.18)'; g.lineWidth = 0.08 * k;
+    for (const sx of [-1.09, 1.09]) { g.beginPath(); g.moveTo(px / 2 + sx * k - 1.4 * k, px / 2 - sx * 0.1 * k); g.lineTo(px / 2 + sx * k + 1.4 * k, px / 2 + sx * 0.05 * k); g.stroke(); }
+    helipadMat = new THREE.MeshStandardMaterial({ map: canvasTexture(c, { aniso: 8 }), roughness: 0.96 });
   }
-  // Red-earth wash at the edges, tyre/skid scuffs.
-  const edge = g.createRadialGradient(px / 2, px / 2, px * 0.38, px / 2, px / 2, px * 0.75);
-  edge.addColorStop(0, 'rgba(140,70,40,0)');
-  edge.addColorStop(1, 'rgba(140,70,40,0.35)');
-  g.fillStyle = edge; g.fillRect(0, 0, px, px);
-  const k = px / S;
-  g.fillStyle = 'rgba(236,233,224,0.88)';
-  // H (letter 6 m tall), bars 0.9 m wide.
-  const hw = 3.6 * k, hh = 6 * k, bw = 0.9 * k;
-  g.fillRect(px / 2 - hw / 2, px / 2 - hh / 2, bw, hh);
-  g.fillRect(px / 2 + hw / 2 - bw, px / 2 - hh / 2, bw, hh);
-  g.fillRect(px / 2 - hw / 2, px / 2 - bw / 2, hw, bw);
-  // Touchdown circle and edge line.
-  g.strokeStyle = 'rgba(236,233,224,0.7)'; g.lineWidth = 0.35 * k;
-  g.beginPath(); g.arc(px / 2, px / 2, 5.2 * k, 0, Math.PI * 2); g.stroke();
-  g.lineWidth = 0.25 * k;
-  g.strokeRect(0.4 * k, 0.4 * k, px - 0.8 * k, px - 0.8 * k);
-  // Worn paint and skid marks.
-  for (let i = 0; i < 2600; i++) {
-    g.fillStyle = `rgba(120,112,100,${0.2 + r() * 0.4})`;
-    g.fillRect(r() * px, r() * px, 1 + r() * 4, 1 + r() * 2);
-  }
-  g.strokeStyle = 'rgba(40,36,32,0.18)'; g.lineWidth = 0.08 * k;
-  for (const sx of [-1.09, 1.09]) { g.beginPath(); g.moveTo(px / 2 + sx * k - 1.4 * k, px / 2 - sx * 0.1 * k); g.lineTo(px / 2 + sx * k + 1.4 * k, px / 2 + sx * 0.05 * k); g.stroke(); }
-  const mat = new THREE.MeshStandardMaterial({ map: canvasTexture(c, { aniso: 8 }), roughness: 0.96 });
+  const mat = helipadMat;
   const y = H(hp.x, hp.z);
   const slab = new THREE.Mesh(new THREE.BoxGeometry(S, 0.05, S), mat);
   // Rotated so the H reads along the approach (east-west).
@@ -625,6 +630,7 @@ function buildFarmSite(B, M, group, H, site, dyn) {
   const flat = () => 0;
   buildService(B2, M, g2, flat);
   buildHelipad(B2, M, g2, flat);
+  buildHelipad(B2, M, g2, flat, BASE.helipad2);
   const pk = BASE.pickup;
   pickup(B2, M, pk.x, 0, pk.z, pk.heading + 0.3);
   B2.collider(pk.x - 2.6, pk.x + 2.6, pk.z - 2.6, pk.z + 2.6, 2.1, 'pickup');

@@ -35,7 +35,8 @@ export class Screens {
             <span class="ac-slot">${t('Aircraft {0}', ty.slot)}</span>
             <span class="ac-label">${ty.label}</span>
             <span class="ac-reg">${ty.reg} · ${ty.name}</span>${ty.role ? `<span class="ac-role">${ty.role}</span>` : ''}
-            <span class="ac-spec">${ty.engineName}<br>${ty.summary}</span>
+            <span class="ac-spec">${ty.engineName}<br>${ty.summary}</span>${id === 'b206' ? `
+            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B', 'C'].map((l, i) => `<span class="ac-opt" data-livery="${i}" title="${[t('Agricultural Classic'), t('Dark Green Agricultural'), t('Red Utility')][i]}">${l}</span>`).join('')}<span class="ac-opt kit" data-kit="1">${t('Spray kit')}</span></span>` : ''}
           </button>`;
         }).join('')}</div>
         <div class="btn-row">
@@ -71,6 +72,9 @@ export class Screens {
     this.title.appendChild(pick);
     root.appendChild(this.title);
     this.title.addEventListener('click', (e) => {
+      const lv = e.target.closest('[data-livery]')?.dataset.livery;
+      if (lv !== undefined) game.setAircraftOption('b206Livery', +lv);
+      if (e.target.closest('[data-kit]')) game.setAircraftOption('b206Kit', game.settings.b206Kit === false);
       const ac = e.target.closest('[data-ac]')?.dataset.ac;
       if (ac) { game.selectAircraft(ac); this._markAircraft(); return; }
       const a = e.target.closest('[data-a]')?.dataset.a;
@@ -93,6 +97,9 @@ export class Screens {
       el.classList.toggle('sel', on);
       el.setAttribute('aria-checked', String(on));
     }
+    const S = this.game.settings;
+    for (const el of this.title.querySelectorAll('[data-livery]')) el.classList.toggle('on', +el.dataset.livery === (S.b206Livery ?? 0));
+    for (const el of this.title.querySelectorAll('[data-kit]')) el.classList.toggle('on', S.b206Kit !== false);
   }
 
   showTitle(v) {

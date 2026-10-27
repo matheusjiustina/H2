@@ -85,7 +85,7 @@ export class GroundService {
   // Aircraft parked in the service area?
   inZone() {
     const ac = this.game.aircraft;
-    const p = padOf(this.site, ac.kind);
+    const p = padOf(this.site, ac.kind, ac.type.padKey);
     return Math.hypot(ac.fm.pos.x - p.x, ac.fm.pos.z - p.z) < p.radius;
   }
   ready() {
@@ -112,7 +112,7 @@ export class GroundService {
   request(fuelTarget, liquidTarget) {
     const ac = this.game.aircraft, fm = ac.fm;
     this.target.fuel = Math.min(ac.A.fuelCapacity, Math.max(fm.fuel, fuelTarget));
-    this.target.liquid = Math.min(ac.A.hopperCapacity, Math.max(fm.hopper, liquidTarget));
+    this.target.liquid = fm.kitOn === false ? 0 : Math.min(ac.A.hopperCapacity, Math.max(fm.hopper, liquidTarget));
     if (!this.ready()) {
       this.game.toast(this.game.aircraft.kind === 'heli' ? t('Land on the helipad, shut down and wait for the rotor to stop.') : t('Park on the service pad and shut the engine down for service.'));
       return false;
