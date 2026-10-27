@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { FlightModel } from '../flight/flightModel.js';
 import { Assist } from '../flight/assist.js';
+import { planeAid } from '../flight/pilotAid.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
 import { t } from '../i18n/index.js';
@@ -266,6 +267,7 @@ export class Aircraft {
     this.cmd.roll = s.ail;
     this.cmd.yaw = flying ? s.rud : clamp(s.rud + s.ail, -1, 1);
     this.assist.update(fm, this.cmd, opts.assist, h);
+    if (opts.aid) planeAid(fm, this.cmd, opts.aid);
     fm.brake = approach(fm.brake, t.brake, 4, h);
     fm.parkBrake = fm.engine === 'off' && o.groundSpeed < 0.4 && o.onGround;
     fm.flaps = approach(fm.flaps, fm.flapsCmd, 0.22, h);

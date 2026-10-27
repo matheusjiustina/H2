@@ -1,4 +1,6 @@
-// Flight assist — built on the Tidemark control law, retuned for agricultural
+// Flight control laws of the test autopilot (game/autopilot.js flies through
+// them; the player flies 'off', with the light aids of pilotAid.js when
+// Assistance is on) — built on the Tidemark control law, retuned for agricultural
 // flying (pull-ups, steep "balão" reversals at the end of each pass).
 // 'off': raw surfaces. 'normal': rate command with expo, attitude/bank hold
 // when the stick is centred, turn coordination limited to the load factor the

@@ -1,5 +1,6 @@
-// Helicopter control laws (optional assistance), separate from the airplane
-// Assist. The pilot's stick, pedals and collective lever come in; cyclic,
+// Helicopter control laws, separate from the airplane Assist. The player
+// flies 'off' (with the light aids of pilotAid.js when Assistance is on);
+// the other modes remain for the test autopilot and the handling tests. The pilot's stick, pedals and collective lever come in; cyclic,
 // pedal and collective positions go to the HeliModel.
 //  'off'    — raw: stick = cyclic (with longitudinal trim), pedals = tail-rotor
 //             pitch, lever = collective. The aircraft is unstable in hover,

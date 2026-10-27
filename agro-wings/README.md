@@ -2350,3 +2350,33 @@ kit, fuel, hopper and damage stay as they are. Every text that names the
 aircraft (title card, load sheet, office, histories, replays, messages) reads
 the current marks. `test/registration.test.mjs` checks the format rules and
 the per-aircraft storage.
+
+## Assistance: off or on, the physics unchanged
+
+The old Normal / High assistance (control laws that held attitude, limited
+bank, pitch and g, levelled the helicopter and held the hover) is gone from
+the settings. Settings → **Assistência** has one switch per kind of aircraft,
+**off by default**; older saves start off too (`assistV: 2`). With it off the
+keys move the control surfaces, cyclic and pedals directly.
+
+On, `src/flight/pilotAid.js` adds small helps after the raw mapping, each one
+can be unticked:
+
+| Airplane | |
+|---|---|
+| Soft pedal on the ground | expo on the pedal and less travel as the ground speed builds (full at a walk, half from ~45 m/s), light yaw damper — a 0.5 s 60 % jab at 15 m/s on the take-off roll swings the loaded Ipanema 142° raw, 5° with it (AT-502B: 61° / 4°) |
+| Smoothed controls | expo on stick and roll — finer near the centre, full travel at the stop |
+| Light turn coordination | a little rudder against the sideslip |
+| Speed × weight warnings | "slow for the weight — N kt minimum" from the wing's CLmax, the mass, the flaps and the bank (1 / cos φ), and "speed running out in the climb" |
+
+| Helicopter | |
+|---|---|
+| Torque compensation | detailed rotor model: the hover trim measured on each model (pedal = a + b·Q, left cyclic against the tail rotor's drift, `aidTrim` in the config) under the centred keys — hands-off yaw in a hover 188°/s → 2°/s (Bell 203 → 2) |
+| Light stabiliser | rate damper on pitch, roll and yaw; no attitude hold: after a 0.7 s full forward jab the nose still goes on down, at about half the rate (R44 power model −47° → −21° 1.5 s later) |
+| Smoothed controls | expo on the cyclic |
+| Hover warnings | drift over the ground in the pilot's frame, ground effect |
+
+The helicopter flight model stays as it was (Power — one lever — by default,
+Detailed rotor as the option). `Assist` / `HeliAssist` keep their control laws
+only for the test autopilot (`'normal'`, `'auto'`) and the handling tests.
+`test/aids.test.mjs` checks the numbers above.

@@ -26,8 +26,6 @@ export class HeliAutopilot {
 
   engage(plan = 'contract') {
     this.plan = plan;
-    this.prevAssist = this.game.settings.heliAssist;
-    this.game.settings.heliAssist = 'auto';
     const v = this.v;
     v.active = true; v.pitch = 0; v.roll = 0; v.yaw = 0; v.throttle = null; v.leverRate = 0; v.engine = false;
     this.set('service');
@@ -35,7 +33,6 @@ export class HeliAutopilot {
   release() {
     const v = this.v;
     v.pitch = v.roll = v.yaw = 0; v.leverRate = 0; v.engine = false;
-    this.game.settings.heliAssist = this.prevAssist ?? this.game.settings.heliAssist;
     this.phase = null;
   }
   set(p) {

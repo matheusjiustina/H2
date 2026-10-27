@@ -26,7 +26,9 @@ import { BASE, POWERLINE, CONTRACT_FIELDS, MAIN_SITE, SITES, nearestSite, siteBy
 import { smoothstep } from '../core/math.js';
 import { Autopilot } from './autopilot.js';
 import { HeliAutopilot } from './heliAutopilot.js';
+import { allAids, PLANE_AIDS, HELI_AIDS, minSpeed } from '../flight/pilotAid.js';
 import { windAt } from '../flight/env.js';
+import { FlightModel } from '../flight/flightModel.js';
 import { t } from '../i18n/index.js';
 
 const SETTINGS = 'agrowings.settings.v1';
@@ -50,8 +52,14 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'normal', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'high', heliModel: 'power', b206Livery: 0, b206Kit: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
+    // Assistance is off or on (the old Normal / High control laws are gone
+    // from the settings): older saves start without assistance.
+    if (this.settings.assistV !== 2) Object.assign(this.settings, { assist: 'off', heliAssist: 'off', assistV: 2 });
+    for (const k of ['assist', 'heliAssist']) if (this.settings[k] !== 'on') this.settings[k] = 'off';
+    this.settings.aidPlane = { ...allAids(PLANE_AIDS), ...this.settings.aidPlane };
+    this.settings.aidHeli = { ...allAids(HELI_AIDS), ...this.settings.aidHeli };
     const q = new URLSearchParams(location.search).get('q');
     if (q && QUALITY[q]) { this.settings.quality = q; this.qualityForced = true; }
     // Frame-time history (ms) for the FPS overlay and the auto quality check.
@@ -597,7 +605,7 @@ export class Game {
 
     if (dt > 0) {
       if (this.playing) {
-        ac.update(dt, input, { mouse, assist: ac.kind === 'heli' ? this.settings.heliAssist : this.settings.assist, heliModel: this.settings.heliModel, windScale: this.settings.wind, cameraMode: this.cameraMode });
+        ac.update(dt, input, { mouse, ...this._controlLaw(ac), heliModel: this.settings.heliModel, windScale: this.settings.wind, cameraMode: this.cameraMode });
       } else {
         ac.update(dt, { ...input, isDown: () => false, wasPressed: () => false, virtual: { active: false } }, { mouse: { buttons: 0, dx: 0, dy: 0, wheel: 0 }, assist: 'normal', windScale: this.settings.wind, cameraMode: 'orbit' });
       }
@@ -753,6 +761,42 @@ export class Game {
     this.hud.setPrompt(null);
   }
 
+  // The player flies the raw controls, with the pilot aids when assistance
+  // is on; only the test autopilot uses the full control laws ('normal' for
+  // the airplanes, 'auto' for the helicopters).
+  _controlLaw(ac) {
+    const heli = ac.kind === 'heli', s = this.settings;
+    const auto = this.autopilot?.phase && this.autopilot.phase !== 'done' && (heli ? this.autopilot instanceof HeliAutopilot : this.autopilot instanceof Autopilot);
+    if (auto) return { assist: heli ? 'auto' : 'normal', aid: null };
+    const on = (heli ? s.heliAssist : s.assist) === 'on';
+    return { assist: 'off', aid: on ? (heli ? s.aidHeli : s.aidPlane) : null };
+  }
+  assistOn(ac = this.aircraft) { return !!this._controlLaw(ac).aid; }
+  // Assistance cues (warnings only; nothing is flown for the pilot).
+  _aidCues(ac) {
+    const fm = ac.fm, o = fm.out, KT = 1.94384, out = [];
+    const att = FlightModel.attitude(fm, (this._cueAtt ??= {}));
+    if (ac.kind === 'heli') {
+      // Drift over the ground in a hover, in the pilot's frame.
+      const hdg = fm.heading(), fx = Math.sin(hdg), fz = Math.cos(hdg);
+      const vf = fm.vel.x * fx + fm.vel.z * fz, vl = fm.vel.x * fz - fm.vel.z * fx;
+      const v = Math.hypot(vf, vl);
+      if (o.agl < 15 && v > 0.8 && v < 6) {
+        const dir = Math.abs(vf) >= Math.abs(vl) ? (vf > 0 ? t('forward') : t('back')) : (vl > 0 ? t('left') : t('right'));
+        out.push({ text: t('Drifting {0} kt {1}', Math.round(v * KT), dir), cls: 'amber' });
+      }
+      if (o.agl < fm.A.rotor.radius * 1.2 && v < 8) out.push({ text: t('Ground effect — less power to hover'), cls: '' });
+      return out;
+    }
+    // Minimum flying speed for this weight and bank (a level turn needs
+    // 1 / cos φ of the weight), and the energy left in a climb.
+    const n = 1 / Math.max(0.2, Math.cos(att.bank));
+    const vmin = minSpeed(fm, n);
+    if (o.stall <= 0.5 && o.airspeed < vmin * 1.12) out.push({ text: t('Slow for the weight — {0} kt minimum: lower the nose', Math.round(vmin * KT)), cls: 'amber blink' });
+    else if (att.pitch > 0.3 && fm.vel.y > 0 && o.airspeed < minSpeed(fm, 1) * 1.45) out.push({ text: t('Speed running out in the climb — ease the nose down'), cls: 'amber' });
+    return out;
+  }
+
   warnings() {
     const out = [];
     const ac = this.aircraft;
@@ -760,6 +804,7 @@ export class Game {
     const tm = ac.telemetry();
     const fm = ac.fm, o = fm.out;
     if (tm.stall > 0.5 && !o.onGround) out.push({ text: t('Stall'), cls: 'blink' });
+    if (this._controlLaw(ac).aid?.cues && !o.onGround && o.agl > 1.5) out.push(...this._aidCues(ac));
     if (ac.kind === 'heli') {
       if (o.lowRotor) out.push({ text: t('Low rotor RPM {0} % — lower collective', Math.round(o.rotorPct)), cls: 'blink' });
       else if (fm.engine === 'running' && o.rotorPct > 108) out.push({ text: t('Rotor overspeed {0} %', Math.round(o.rotorPct)), cls: 'amber' });

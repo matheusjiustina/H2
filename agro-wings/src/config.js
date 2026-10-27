@@ -475,6 +475,10 @@ export const UNITS = { altOffsetM: 320 }; // field elevation above MSL for the a
 // tread, the ag kit's weight and the 250 L virtual tank (what fits under the
 // MTOW with pilot and ~80 L of fuel — not a certified Robinson option).
 export const FLIGHT_R44 = {
+  // Pilot aid only (Assistance → torque compensation, detailed rotor model):
+  // the hover trim measured on this model — pedal = ped[0] + ped[1]·Q (shaft
+  // torque, N·m) and the left cyclic against the tail rotor's drift.
+  aidTrim: { ped: [0.184, -0.000199], lat: -0.33, q0: 2300 },
   kind: 'heli',
   sim: { dt: 1 / 120, maxSubsteps: 12 },
   emptyMass: 683, // standard empty weight incl. oil and avionics
@@ -558,6 +562,7 @@ export const FLIGHT_R44 = {
 // is filled to what the day's weight allows — the load sheet shows it).
 export const FLIGHT_B206 = {
   kind: 'heli',
+  aidTrim: { ped: [0.0139, -0.0000696], lat: -0.43, q0: 2870 }, // see FLIGHT_R44
   sim: { dt: 1 / 120, maxSubsteps: 12 },
   emptyMass: 771, // equipped empty (1,700 lb) incl. unusable fuel and oil — estimate
   agKitMass: 84, // Simplex 4900, published

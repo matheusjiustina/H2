@@ -140,6 +140,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .seg { display: flex; gap: 4px; flex-wrap: wrap; }
 .seg button { font: 12px var(--sans); color: var(--ink-dim); background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
 .seg button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.aids { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 10px 152px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.aids.off { opacity: .4; pointer-events: none; }
+.aids .aid { font: 12px var(--sans); color: var(--ink-dim); background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 12px; padding: 4px 10px 4px 24px; cursor: pointer; position: relative; }
+.aids .aid::before { content: ''; position: absolute; left: 9px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 2px; border: 1px solid var(--ink-dim); }
+.aids .aid.on { color: var(--ink); border-color: var(--accent); }
+.aids .aid.on::before { background: var(--accent); border-color: var(--accent); }
 .regin { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .regin .seg button { padding: 6px 8px; font-family: var(--mono); }
 .regin input { width: 4.2em; font: 14px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 4px; padding: 5px 6px; }
@@ -191,6 +197,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 @media (max-width: 720px) {
   .readouts { grid-template-columns: repeat(3, auto); }
   .field { grid-template-columns: 1fr; gap: 4px; }
+  .aids { padding-left: 0; }
   .keys { grid-template-columns: 1fr; }
   .panel { padding: 16px; }
 }

@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { HeliModel, hoverPowerFrac } from '../flight/heliModel.js';
 import { HeliAssist } from '../flight/heliAssist.js';
+import { heliAid } from '../flight/pilotAid.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
@@ -196,7 +197,10 @@ export class Helicopter {
     if (gp) rate += gp.throttleUp - gp.throttleDown;
     if (v.active && v.leverRate) rate += v.leverRate;
     this.target.leverRate = clamp(rate, -1, 1);
-    let lv = this.lever + rate * dt * (opts.assist === 'off' ? 0.32 : this.fm.powerModel === 'power' ? 0.9 : 0.55); // quicker lever with the assist (the power model: 0.9/s, the power answers at once)
+    // Lever speed: 0.9/s with the power model (the power answers at once);
+    // the detailed rotor's collective 0.32/s raw, 0.55/s with smoothed
+    // controls or the autopilot's law.
+    let lv = this.lever + rate * dt * (this.fm.powerModel === 'power' ? 0.9 : opts.assist !== 'off' || opts.aid?.smooth ? 0.55 : 0.32);
     if (v.throttle !== null && v.throttle !== undefined) lv = v.throttle;
     this.lever = clamp(lv, 0, 1);
     // Longitudinal cyclic trim (used with the assist off).
@@ -245,7 +249,8 @@ export class Helicopter {
     s.ped = approach(s.ped, t.yaw, t.yaw === 0 ? 3 : 1.8, h);
     const cmd = { pitch: s.lon, roll: s.lat, yaw: s.ped, lever: this.lever, leverRate: t.leverRate };
     this.assist.update(fm, cmd, opts.assist ?? 'normal', h);
-    if (cmd.leverOut !== undefined) this.lever = cmd.leverOut; // 'high' assist moves the lever
+    if (cmd.leverOut !== undefined) this.lever = cmd.leverOut; // the autopilot's law moves the lever
+    if (opts.aid) heliAid(fm, cmd, opts.aid, this.assist);
     windAt(this.windVec, this.simTime, fm.pos, fm.out.agl, opts.windScale ?? 1);
     this.env.wind.copy(this.windVec);
     fm.step(h, this.env);

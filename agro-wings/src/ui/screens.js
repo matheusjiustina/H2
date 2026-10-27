@@ -338,6 +338,7 @@ export class Screens {
     const g = this.game;
     const s = g.settings;
     const seg = (key, opts) => `<div class="seg" data-key="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(s[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    const aidBtns = (key, items) => items.map(([k, l]) => `<button class="aid${s[key]?.[k] !== false ? ' on' : ''}" data-aid="${k}">${l}</button>`).join('');
     const keyRow = ([a, d]) => `<div class="kr"><span>${d.label}</span><button class="keybtn" data-bind="${a}">${g.input.bindings[a].map(keyLabel).join(' / ')}</button></div>`;
     const keyGroup = (scope) => Object.entries(ACTIONS).filter(([, d]) => d.scope === scope).map(keyRow).join('');
     // Registration marks, one row per aircraft: the national prefix and the
@@ -356,11 +357,15 @@ export class Screens {
       <div class="field"><label>${t('Time of day')}</label>${seg('timeOfDay', [...TIME_ORDER.map((k) => [k, t(TIMES[k].label)]), ['flow', t('Passing')]])}<span></span></div>
       <div class="field"><label>${t('Weather')}</label>${seg('weather', [...WEATHER_ORDER.map((k) => [k, t(WEATHER[k].label)]), ['dynamic', t('Dynamic')]])}<span></span></div>
       <h3>${t('Flying')}</h3>
-      <div class="field"><label>${t('Airplane assist')}</label>${seg('assist', [['off', t('Off')], ['normal', t('Normal')], ['high', t('High')]])}<span></span></div>
       <div class="field"><label>${t('Helicopter model')}</label>${seg('heliModel', [['power', t('Power (one lever)')], ['rotor', t('Detailed rotor')]])}<span></span></div>
-      <div class="field"><label>${t('Helicopter assist')}</label>${seg('heliAssist', [['off', t('Off')], ['normal', t('Normal')], ['high', t('High')]])}<span></span></div>
       <div class="field"><label>${t('Wind')}</label>${seg('wind', [[0, t('Calm')], [1, t('Light')], [1.8, t('Moderate')]])}<span></span></div>
       <div class="field"><label>${t('Flight keys')}</label>${seg('keyScheme', [['numpad', t('Numpad + Q/E')], ['classic', 'W/S/A/D + Z/X']])}<span></span></div>
+      <h3>${t('Assistance')} <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">${t('— the physics is the same with it on or off')}</span></h3>
+      <div class="field"><label>${t('Airplane')}</label>${seg('assist', [['off', t('Off')], ['on', t('On')]])}<span></span></div>
+      <div class="aids${s.assist === 'on' ? '' : ' off'}" data-aids="aidPlane">${aidBtns('aidPlane', [['pedal', t('Soft pedal on the ground')], ['smooth', t('Smoothed controls')], ['coord', t('Light turn coordination')], ['cues', t('Speed × weight warnings')]])}</div>
+      <div class="field"><label>${t('Helicopter')}</label>${seg('heliAssist', [['off', t('Off')], ['on', t('On')]])}<span></span></div>
+      <div class="aids${s.heliAssist === 'on' ? '' : ' off'}" data-aids="aidHeli">${aidBtns('aidHeli', [['torque', t('Torque compensation on the pedals')], ['sas', t('Light stabiliser (damper)')], ['smooth', t('Smoothed controls')], ['cues', t('Hover warnings')]])}</div>
+      <div class="note">${t('Off: the controls move the control surfaces, cyclic and pedals directly. On: small helps that never limit an angle or fly for you — the pedal comes in gently on the ground and softens as the speed builds, the stick is finer near the centre (full at the stop), a little rudder against the slip, and warnings for the minimum speed at this weight and bank. Helicopter: the pedal the torque needs (detailed rotor model), a light damper on the rotation rates (it still drifts and still needs you) and drift / ground-effect warnings.')}</div>
       <h3>${t('Registrations')} <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">${t('— PP, PR, PS, PT or PU and three letters (not starting with Q)')}</span></h3>
       ${AIRCRAFT_ORDER.map(regRow).join('')}
       <h3>${t('Audio')}</h3>
@@ -371,7 +376,6 @@ export class Screens {
       <div class="keys">${numKeys}</div>
       <h3>${t('Flight keys — classic scheme')}</h3>
       <div class="keys">${classicKeys}</div>
-      <div class="note">${t('Assist Normal keeps attitude when the stick is centred, coordinates turns and protects against stalls; High also limits bank and pitch. Off gives raw control surfaces. On the ground, assist adds a light yaw damper against ground loops.')}</div>
       <div class="row2"><button class="btn small" data-a="resetKeys">${t('Reset keys')}</button><button class="btn small" data-a="resetSave">${t('Reset career')}</button><button class="btn primary small" data-a="close">${t('Done')}</button></div></div>`);
     // Applies a row's prefix + letters when they make valid, free marks.
     const applyReg = (row) => {
@@ -396,6 +400,14 @@ export class Screens {
         applyReg(rp.closest('[data-reg]'));
         return;
       }
+      const ab = e.target.closest('[data-aid]');
+      if (ab) {
+        const key = ab.parentElement.dataset.aids;
+        const v = { ...g.settings[key], [ab.dataset.aid]: !ab.classList.contains('on') };
+        g.setSetting(key, v);
+        ab.classList.toggle('on', v[ab.dataset.aid]);
+        return;
+      }
       const rd = e.target.closest('[data-regdef]');
       if (rd) { const row = rd.closest('[data-reg]'); g.setRegistration(row.dataset.reg, null); showReg(row); return; }
       const b = e.target.closest('.seg button');
@@ -406,6 +418,8 @@ export class Screens {
         else if (!Number.isNaN(+v) && (key === 'wind' || key === 'shake')) v = +v;
         g.setSetting(key, v);
         b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        const aids = el.querySelector(`[data-aids="${key === 'assist' ? 'aidPlane' : 'aidHeli'}"]`);
+        if (aids && (key === 'assist' || key === 'heliAssist')) aids.classList.toggle('off', v !== 'on');
         return;
       }
       const kb = e.target.closest('[data-bind]');
@@ -456,7 +470,7 @@ export class Screens {
       <div class="sub">${t('Flight keys: {0} / {1} stick forward / back, {2} / {3} roll, {4} / {5} rudder, {6} engine — Settings → Flying → Flight keys switches to {7} ({8} / {9} / {10} / {11}, {12} / {13}, {14}). Mouse: left-drag looks around, right-drag is a virtual stick, wheel zooms the camera. Gamepad: left stick flies, triggers set power, bumpers rudder, A spray, B brakes.', kk('pitchDown'), kk('pitchUp'), kk('rollLeft'), kk('rollRight'), kk('yawLeft'), kk('yawRight'), kk('engine'), other === 'classic' ? t('the Tidemark layout') : t('the numpad layout'), ko('pitchDown'), ko('pitchUp'), ko('rollLeft'), ko('rollRight'), ko('yawLeft'), ko('yawRight'), ko('engine'))}</div>
       <div class="helpgrid">${rows}<div><span>${t('Speed up ground service')}</span><b>${t('T (hold)')}</b></div></div>
       ${g.aircraft?.kind === 'heli' ? `<h3>Robinson R44</h3>
-      <div class="note" style="color:var(--ink-dim)">${g.settings.heliModel !== 'rotor' ? `${t('{0} / {1} / {2} / {3} tilt the helicopter forward / aft / left / right — the tilt keeps growing while the key is held (up to 45°) and levels out when you let go — {4} / {5} turn the nose. The more it tilts, the faster it goes (about 10° for 40–60 kt, 20° for 100 kt); a steep tilt takes lift away, so add power or it sinks. {6}/{7} (or Shift / Ctrl, the triggers) set the <b>power</b> — the one control for up and down: rotor and torque act as one, so the power never swings the nose. The power that hovers is shown next to the POWER readout (about 50–55 % light, 65–70 % with a full tank, less close to the ground); more power climbs, less sinks, and the CLIMB readout shows by how much. Start with the power at zero (hold {8}): the rotor comes up to speed in about 6 s — then raise the power until the skids leave the ground, settle it at the hover figure and ease the cyclic forward. To land, hover low over the spot and take the power a few percent below the hover figure. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> levels it out when the keys are released, then it glides on, slows down and holds the hover. Settings → Helicopter model → <b>Detailed rotor</b> gives the full rotor simulation (governor, rotor droop, torque, autorotation). Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.', kk('pitchDown'), kk('pitchUp'), kk('rollLeft'), kk('rollRight'), kk('yawLeft'), kk('yawRight'), keyLabel(g.input.bindings.throttleUp[0]), keyLabel(g.input.bindings.throttleDown[0]), kk('engine'))}</div>` : `${t('{0} / {1} / {2} / {3} tilt the cyclic forward / aft / left / right, {4} / {5} are the anti-torque pedals, {6}/{7} (or Shift / Ctrl, the triggers) raise and lower the collective; the governor holds the rotor at 101–102 %. Start with the collective full down (hold {8}): the clutch engages and the rotor spins up — wait for the green before lifting. Pull the collective slowly to a hover at about 1 m, then ease the cyclic forward; the aircraft shudders through translational lift. Settings → Helicopter assist: <b>off</b> is the raw helicopter, <b>normal</b> holds attitude and heading, <b>high</b> also holds height and the hover. Watch LOW RPM (horn): lower the collective. Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.', kk('pitchDown'), kk('pitchUp'), kk('rollLeft'), kk('rollRight'), kk('yawLeft'), kk('yawRight'), keyLabel(g.input.bindings.throttleUp[0]), keyLabel(g.input.bindings.throttleDown[0]), kk('engine'))}</div>`}` : ''}
+      <div class="note" style="color:var(--ink-dim)">${g.settings.heliModel !== 'rotor' ? `${t('{0} / {1} / {2} / {3} move the cyclic forward / aft / left / right and {4} / {5} the pedals. The helicopter does not level itself: a tilt you start goes on growing until you take it out with the opposite key, so fly it with small, short inputs. The more it tilts, the faster it goes (about 10° for 40–60 kt, 20° for 100 kt); a steep tilt takes lift away, so add power or it sinks. {6}/{7} (or Shift / Ctrl, the triggers) set the <b>power</b> — the one control for up and down: rotor and torque act as one, so the power never swings the nose. The power that hovers is shown next to the POWER readout (about 50–55 % light, 65–70 % with a full tank, less close to the ground); more power climbs, less sinks, and the CLIMB readout shows by how much. Start with the power at zero (hold {8}): the rotor comes up to speed in about 6 s — then raise the power until the skids leave the ground, settle it at the hover figure and ease the cyclic forward. To land, hover low over the spot and take the power a few percent below the hover figure. Settings → Assistance → Helicopter <b>on</b> adds a light damper on the rotation rates, a finer cyclic near the centre and drift warnings — it never levels or flies the helicopter for you. Settings → Helicopter model → <b>Detailed rotor</b> gives the full rotor simulation (governor, rotor droop, torque, autorotation). Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.', kk('pitchDown'), kk('pitchUp'), kk('rollLeft'), kk('rollRight'), kk('yawLeft'), kk('yawRight'), keyLabel(g.input.bindings.throttleUp[0]), keyLabel(g.input.bindings.throttleDown[0]), kk('engine'))}</div>` : `${t('{0} / {1} / {2} / {3} tilt the cyclic forward / aft / left / right, {4} / {5} are the anti-torque pedals, {6}/{7} (or Shift / Ctrl, the triggers) raise and lower the collective; the governor holds the rotor at 101–102 %. Start with the collective full down (hold {8}): the clutch engages and the rotor spins up — wait for the green before lifting. Pull the collective slowly to a hover at about 1 m, then ease the cyclic forward; the aircraft shudders through translational lift. Settings → Assistance → Helicopter <b>on</b> puts the pedal and cyclic the torque needs under the centred keys, adds a light damper on the rotation rates and drift warnings — it never levels or flies the helicopter for you. Watch LOW RPM (horn): lower the collective. Spray at 2.5–4.5 m over the crop at 40–60 kt; land on the H pad, shut down and wait for the rotor to stop before the crew comes in.', kk('pitchDown'), kk('pitchUp'), kk('rollLeft'), kk('rollRight'), kk('yawLeft'), kk('yawRight'), keyLabel(g.input.bindings.throttleUp[0]), keyLabel(g.input.bindings.throttleDown[0]), kk('engine'))}</div>`}` : ''}
       <h3>${t('Agricultural flying')}</h3>
       <div class="note" style="color:var(--ink-dim)">${t('Work at 2.5–4.5 m over the crop canopy (the HGT readout turns green), around 85–105 kt. Too low narrows the swath and risks a crop strike; too high widens it but liquid drifts and evaporates. Fly along the yellow pass line — the lightbar on the glareshield shows which way to steer. Switch the spray off at the field edge and over gaps. Land back on the strip, taxi to the pad and tap {0} to shut down: the badeco reloads and your coverage is kept.', kk('engine'))}</div>
       <div class="row2"><span></span><button class="btn primary small" data-a="close">${t('Close')}</button></div></div>`);
