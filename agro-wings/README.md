@@ -2380,3 +2380,31 @@ The helicopter flight model stays as it was (Power — one lever — by default,
 Detailed rotor as the option). `Assist` / `HeliAssist` keep their control laws
 only for the test autopilot (`'normal'`, `'auto'`) and the handling tests.
 `test/aids.test.mjs` checks the numbers above.
+
+## Dromader cockpit — layout after the real cabin
+
+The pilot's view is rebuilt after the reference photos (interior only — the
+exterior is unchanged; outside views compared pixel by pixel, only the
+interior seen through the glass differs):
+
+- **Glareshield hood**: an arched black shell with a rolled lip, kept inside
+  the windshield base, the lightbar on its crown. The flight panel sits
+  recessed under it, low enough that the windshield is clear over the cowl
+  (hood lip ≈ 15° below the eye line, at the windshield base; the camera
+  looks 11° down instead of 17°, `cockpitPitch: -0.2`), the nose straight
+  ahead in the centre.
+- **Three boards on one canvas** (`M18_PANEL.up / left / right`): the wide
+  flight panel (ASI km/h, attitude, metric altimeter, DG, variometer, turn
+  coordinator); the lower left board with the eight warning lamps (built
+  into the board — nothing floats above it any more), the switch row, RPM,
+  manifold pressure, fuel, g-meter and flaps; the lower right board with
+  CHT, oil temperature and pressure, fuel flow, hopper, voltage and the
+  spray readout.
+- **Hopper wall** between the lower boards: riveted tan plate with a narrow
+  sight window, the liquid level shown in it, and the litre scale.
+- **GPS**: a tablet on an arm at the right end of the hood, turned toward the
+  pilot; the case sits behind the screen (the old bezel box stood in front of
+  it and covered half the display).
+
+`node test/m18cockpit.mjs <outDir>` renders the parked, level-flight and GPS
+views at 16:9 and 4:3.

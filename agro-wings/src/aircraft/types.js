@@ -122,7 +122,7 @@ export const AIRCRAFT_TYPES = {
     wash: [0, -1.3, -2.8],
     anim: { elev: 0.38, rud: 0.4, ail: 0.36, flap: 0.5, pedalZ: -0.8, propGear: FLIGHT_M18.radial.gear, disc: [420, 1000], wash: [1300, 2100], vib: [800, 2200] },
     vspeeds: { vs0: 58, vs1: 66, vfe: 100, vne: 138 },
-    camera: { dist: 17.5, height: 4.8, orbit: 26 },
+    camera: { dist: 17.5, height: 4.8, orbit: 26, cockpitPitch: -0.2 },
     audio: { profile: 'radial', blades: 4, propGear: FLIGHT_M18.radial.gear },
     fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
     loads: { free: { fuel: 450, hopper: 1300 }, boot: 350 },

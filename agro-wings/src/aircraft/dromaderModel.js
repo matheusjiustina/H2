@@ -993,44 +993,90 @@ export function createDromaderModel(panel, opts = {}) {
     strap.rotation.x = -0.12;
     cockpit.add(strap);
   }
-  // Instrument boards (live canvas, alpha-cut outlines), each toed in, with
-  // the hopper's back wall between them and the glareshield coaming above.
-  const PW = 1.04, PH = PW * (M18_PANEL.H / M18_PANEL.W);
+  // Instrument boards (live canvas, alpha-cut outlines), laid out as in the
+  // real cabin: the wide flight panel recessed under an arched glareshield
+  // hood, low enough to leave the windshield clear over the cowl; below it a
+  // board on each side, toed in, and the riveted hopper wall with its sight
+  // window between them.
   const boardMat = new THREE.MeshStandardMaterial({ map: panel.texture, roughness: 0.55, emissive: 0xffffff, emissiveMap: panel.texture, emissiveIntensity: 0.12, alphaTest: 0.5, side: THREE.DoubleSide });
-  const board = (u0, u1, x, rotY) => {
-    const w = PW * (u1 - u0);
-    const geo = new THREE.PlaneGeometry(w, PH);
+  const board = ([x0, y0, x1, y1], w, x, y, z, rotX, rotY) => {
+    const { W, H } = M18_PANEL;
+    const geo = new THREE.PlaneGeometry(w, (w * (y1 - y0)) / (x1 - x0));
     const uv = geo.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setX(i, u0 + uv.getX(i) * (u1 - u0));
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + uv.getX(i) * (x1 - x0)) / W, 1 - (y1 - uv.getY(i) * (y1 - y0)) / H);
     const m = new THREE.Mesh(geo, boardMat);
-    m.position.set(x, 1.02, -1.0);
-    m.rotation.set(-0.14, Math.PI + rotY, 0, 'YXZ');
+    m.position.set(x, y, z);
+    m.rotation.set(rotX, Math.PI + rotY, 0, 'YXZ');
     cockpit.add(m);
     return m;
   };
-  const panelMesh = board(M18_PANEL.left[0] / M18_PANEL.W, M18_PANEL.split / M18_PANEL.W, 0.27, 0.26);
-  board(M18_PANEL.split / M18_PANEL.W, M18_PANEL.right[1] / M18_PANEL.W, -0.27, -0.26);
-  for (const sx of [1, -1]) addC('gloss', rbox(0.5, 0.02, 0.06, 0.008, sx * 0.27, 0.78, -1.01, 0, sx * 0.26));
+  const HOOD = { hw: 0.42, y: 1.19, crown: 0.05, z0: -1.07, z1: -0.95 };
+  const panelMesh = board(M18_PANEL.up, 0.84, 0, 1.1, -1.045, -0.12, 0);
+  board(M18_PANEL.left, 0.4, 0.3, 0.8, -0.975, -0.3, 0.36);
+  board(M18_PANEL.right, 0.4, -0.3, 0.8, -0.975, -0.3, -0.36);
+  // Hood: an arched shell over the flight panel, its rolled lip toward the
+  // pilot, with cheeks down to the panel's ends. (Kept inside the windshield
+  // base: nothing of it shows outside the glass.)
+  {
+    const nx = 18, nz = 4, pos = [], idx = [];
+    const hy = (x) => HOOD.y + HOOD.crown * (1 - (x / HOOD.hw) ** 2);
+    for (let j = 0; j <= nz; j++) {
+      const t = j / nz, z = HOOD.z0 + (HOOD.z1 - HOOD.z0) * t;
+      for (let i = 0; i <= nx; i++) {
+        const x = -HOOD.hw + (2 * HOOD.hw * i) / nx;
+        pos.push(x, hy(x) - (j === 0 ? 0.018 : 0) + t * 0.006, z);
+      }
+    }
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const p = j * (nx + 1) + i;
+      idx.push(p, p + nx + 1, p + 1, p + 1, p + nx + 1, p + nx + 2);
+    }
+    const hg = new THREE.BufferGeometry();
+    hg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    hg.setIndex(idx);
+    hg.computeVertexNormals();
+    const hood = new THREE.Mesh(hg, new THREE.MeshStandardMaterial({ color: 0x18191a, roughness: 0.85, side: THREE.DoubleSide }));
+    cockpit.add(hood);
+    const lip = new THREE.CatmullRomCurve3(Array.from({ length: 13 }, (_, i) => { const x = -HOOD.hw + (2 * HOOD.hw * i) / 12; return new THREE.Vector3(x, hy(x) - 0.02, HOOD.z0 - 0.004); }));
+    addC('gloss', new THREE.TubeGeometry(lip, 24, 0.012, 8, false));
+    for (const sx of [1, -1]) addC('dark', tx(new THREE.BoxGeometry(0.014, 0.17, 0.12), sx * (HOOD.hw - 0.007), HOOD.y - 0.075, (HOOD.z0 + HOOD.z1) / 2));
+    // Backing behind the flight panel and the bulkhead behind the boards.
+    addC('dark', tx(new THREE.BoxGeometry(0.84, 0.16, 0.02), 0, 1.11, -0.995));
+  }
+  addC('interior', tx(new THREE.BoxGeometry(0.84, 0.46, 0.02), 0, 0.81, -0.88));
+  for (const sx of [1, -1]) addC('gloss', rbox(0.38, 0.018, 0.05, 0.007, sx * 0.3, 0.665, -0.985, 0, sx * 0.36));
   const sightMat = new THREE.MeshStandardMaterial({ map: panel.sightTexture, roughness: 0.6, emissive: 0xffffff, emissiveMap: panel.sightTexture, emissiveIntensity: 0.1 });
-  const hopperWall = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5 * (M18_HOPPER.H / M18_HOPPER.W)), sightMat);
-  hopperWall.position.set(0, 0.82, -0.84);
+  const HW = 0.26;
+  const hopperWall = new THREE.Mesh(new THREE.PlaneGeometry(HW, HW * (M18_HOPPER.H / M18_HOPPER.W)), sightMat);
+  hopperWall.position.set(0, 0.83, -0.9);
   hopperWall.rotation.y = Math.PI;
   cockpit.add(hopperWall);
   addC('interior', tx(new THREE.BoxGeometry(1.1, 0.7, 0.03), 0, FLOOR + 0.35, -0.62)); // footwell bulkhead
   // Glareshield roll just inside the windshield base, following its curve.
   const glareCurve = new THREE.CatmullRomCurve3(wsBase.slice(2, NA - 1).map(([x, y, z]) => new THREE.Vector3(x * 0.94, y + 0.045, z - 0.09)));
   addC('gloss', new THREE.TubeGeometry(glareCurve, 32, 0.035, 12, false));
-  // Glareshield GPS (live guidance) on a bracket at the top centre.
+  // GPS (live guidance): a tablet on an arm at the right end of the hood,
+  // turned toward the pilot. The screen is the front face; the case sits
+  // behind it.
   const gpsMat = new THREE.MeshStandardMaterial({ map: panel.gpsTexture, roughness: 0.4, emissive: 0xffffff, emissiveMap: panel.gpsTexture, emissiveIntensity: 0.35 });
-  const gpsMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.157), gpsMat);
-  gpsMesh.position.set(0.36, 1.27, -1.02);
-  gpsMesh.rotation.set(-0.3, Math.PI + 0.4, 0, 'YXZ');
-  cockpit.add(gpsMesh);
-  addC('gloss', rbox(0.24, 0.175, 0.03, 0.012, 0.365, 1.27, -1.008, -0.3, 0.4));
-  addC('steel', rod([0.36, 1.18, -0.98], [0.36, 1.21, -1.0], 0.012, 6));
-  // Lightbar (the shared spray lightbar LEDs) on the glareshield.
+  const gpsUnit = new THREE.Group();
+  gpsUnit.position.set(-0.42, 0.99, -1.13);
+  gpsUnit.rotation.set(-0.36, -0.55, 0, 'YXZ');
+  {
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.143), gpsMat);
+    scr.rotation.y = Math.PI; // faces the pilot (-z)
+    scr.position.z = -0.0025;
+    const caseM = new THREE.Mesh(new RoundedBoxGeometry(0.222, 0.163, 0.02, 2, 0.008), M.gloss);
+    caseM.position.z = 0.0105;
+    gpsUnit.add(scr, caseM);
+  }
+  cockpit.add(gpsUnit);
+  // Its arm: from the back of the case to the hood's right cheek.
+  addC('steel', rod([-0.405, 0.995, -1.11], [-0.405, 1.06, -1.01], 0.008, 6));
+  addC('steel', ball([-0.405, 1.06, -1.01], 0.014, 8));
+  // Lightbar (the shared spray lightbar LEDs) on the hood crown.
   const lightbar = new THREE.Group();
-  lightbar.position.set(-0.12, 1.27, -0.93);
+  lightbar.position.set(0, HOOD.y + HOOD.crown + 0.018, -1.0);
   const leds = [];
   for (let i = -7; i <= 7; i++) {
     const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.008), new THREE.MeshBasicMaterial({ color: 0x222222 }));

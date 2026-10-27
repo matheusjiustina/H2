@@ -12,8 +12,13 @@ import { gauge, bezel, needle, flapInd, gps, roundRect, glassGlint } from './pan
 import { attitude, heading, turn } from './atPanel.js';
 
 // Canvas layout: left board x 0–500, right board x 524–1024.
-export const M18_PANEL = { W: 1024, H: 512, split: 512, left: [0, 500], right: [524, 1024] };
-export const M18_HOPPER = { W: 512, H: 768, cap: 2500 };
+// One canvas, three boards (canvas rectangles [x0, y0, x1, y1]), laid out as
+// in the real cabin: the wide flight-instrument panel under the glareshield
+// hood, and below it a board on each side of the hopper wall — the left one
+// with the warning lamps, the switches and the engine gauges, the right one
+// with the temperatures, pressures and the spray readout.
+export const M18_PANEL = { W: 1024, H: 512, up: [0, 0, 1024, 164], left: [0, 176, 504, 512], right: [520, 176, 1024, 512] };
+export const M18_HOPPER = { W: 512, H: 640, cap: 2500 };
 
 const KMH = 1.852, MPS = 0.00508, KGCM = 0.0703, MMHG = 25.4;
 
@@ -38,16 +43,16 @@ export function createDromaderPanel({ reg = 'PR-DMD' } = {}) {
   const drawSight = (hopper) => {
     hg.drawImage(hBg, 0, 0);
     // The liquid shows through the translucent wall as a darker band.
-    const top = 60, bot = 720;
+    const { x0, x1, top, bot } = HOPPER_WIN;
     const y = bot - clamp(hopper / M18_HOPPER.cap, 0, 1) * (bot - top);
     if (hopper > 1) {
       const lg = hg.createLinearGradient(0, y, 0, bot);
-      lg.addColorStop(0, 'rgba(70,95,60,0.42)');
-      lg.addColorStop(1, 'rgba(40,60,35,0.55)');
+      lg.addColorStop(0, 'rgba(70,95,60,0.55)');
+      lg.addColorStop(1, 'rgba(40,60,35,0.7)');
       hg.fillStyle = lg;
-      hg.fillRect(0, y, M18_HOPPER.W, bot - y + 48);
-      hg.fillStyle = 'rgba(235,240,210,0.55)';
-      hg.fillRect(0, y - 2, M18_HOPPER.W, 4);
+      hg.fillRect(x0, y, x1 - x0, bot - y);
+      hg.fillStyle = 'rgba(235,240,210,0.7)';
+      hg.fillRect(x0, y - 2, x1 - x0, 3);
     }
     sightTexture.needsUpdate = true;
   };
@@ -59,61 +64,62 @@ export function createDromaderPanel({ reg = 'PR-DMD' } = {}) {
       g.clearRect(0, 0, M18_PANEL.W, M18_PANEL.H);
       g.drawImage(bg, 0, 0);
       annunciators(g, d);
-      // ---- left board: flight instruments (metric).
-      const kmh = d.ias * KMH;
-      gauge(g, 92, 150, 62, {
+      // ---- upper panel: flight instruments (metric), one row.
+      const kmh = d.ias * KMH, UY = 84;
+      gauge(g, 88, UY, 62, {
         label: 'PRĘDKOŚĆ', unit: 'km/h', min: 0, max: 350, value: kmh, major: 50, minor: 10,
         arcs: [[(d.vs0 ?? 58) * KMH, (d.vfe ?? 100) * KMH, '#e8e8e8', 90], [(d.vs1 ?? 65) * KMH, 220, '#3fb24a', 98], [220, (d.vne ?? 140) * KMH, '#f0c020', 98], [(d.vne ?? 140) * KMH, 350, '#d0362a', 98]],
       });
-      attitude(g, 250, 150, 62, d.pitch, d.bank, d.slip);
-      metricAltimeter(g, 408, 150, 62, d.altFt * 0.3048);
-      turn(g, 92, 300, 54, d.yawRate, d.slip);
-      heading(g, 250, 300, 54, d.hdg);
-      gauge(g, 408, 300, 54, {
+      attitude(g, 258, UY, 66, d.pitch, d.bank, d.slip);
+      metricAltimeter(g, 428, UY, 62, d.altFt * 0.3048);
+      heading(g, 596, UY, 60, d.hdg);
+      gauge(g, 766, UY, 60, {
         label: 'WARIOMETR', unit: 'm/s', min: -10, max: 10, value: d.vsFpm * MPS, major: 5, minor: 1, sweep: 320, arcs: [],
       });
-      gauge(g, 92, 430, 42, {
-        label: 'PRZECIĄŻENIE', unit: 'g', min: -2, max: 5, value: d.gLoad, major: 1, minor: 0.5, sweep: 270,
-        arcs: [[3.8, 5, '#d0362a', 98], [-2, -1.0, '#d0362a', 98]],
-      });
-      flapInd(g, 205, 434, d.flaps);
-      gauge(g, 408, 430, 42, {
-        label: 'PALIWO', unit: 'L x100', min: 0, max: Math.ceil(d.fuelCap / 100), value: d.fuel / 100, major: 2, minor: 1, sweep: 240,
-        arcs: [[0, (d.fuelCap * 0.15) / 100, '#d0362a', 98]],
-      });
-      // ---- right board: ASz-62IR engine.
+      turn(g, 936, UY, 58, d.yawRate, d.slip);
+      // ---- left board: lamps, switches, ASz-62IR power.
       const run = d.engine !== 'off' || d.rpm > 30;
-      gauge(g, 610, 150, 62, {
+      gauge(g, 92, 330, 56, {
         label: 'OBROTY', unit: 'obr/min x100', min: 0, max: 26, value: d.rpm / 100, major: 2, minor: 1,
         arcs: [[16, 21, '#3fb24a', 98], [21, 22, '#f0c020', 98], [22, 26, '#d0362a', 98]],
       });
-      gauge(g, 770, 150, 62, {
+      gauge(g, 252, 330, 56, {
         label: 'DOŁADOWANIE', unit: 'mm Hg x100', min: 3, max: 12, value: ((d.mp ?? 29.6) * MMHG) / 100, major: 1, minor: 0.5,
         arcs: [[5, 9.4, '#3fb24a', 98], [9.4, 10.5, '#f0c020', 98], [10.5, 12, '#d0362a', 98]],
       });
-      gauge(g, 930, 150, 62, {
+      gauge(g, 412, 330, 56, {
+        label: 'PALIWO', unit: 'L x100', min: 0, max: Math.ceil(d.fuelCap / 100), value: d.fuel / 100, major: 2, minor: 1, sweep: 240,
+        arcs: [[0, (d.fuelCap * 0.15) / 100, '#d0362a', 98]],
+      });
+      gauge(g, 92, 446, 40, {
+        label: 'PRZECIĄŻENIE', unit: 'g', min: -2, max: 5, value: d.gLoad, major: 1, minor: 0.5, sweep: 270,
+        arcs: [[3.8, 5, '#d0362a', 98], [-2, -1.0, '#d0362a', 98]],
+      });
+      flapInd(g, 410, 418, d.flaps);
+      // ---- right board: temperatures, pressures, hopper, spray readout.
+      gauge(g, 612, 300, 50, {
         label: 'TEMP. GŁOWIC', unit: '°C', min: 0, max: 300, value: d.cht ?? 30, major: 50, minor: 10,
         arcs: [[140, 215, '#3fb24a', 98], [215, 245, '#f0c020', 98], [245, 300, '#d0362a', 98]],
       });
-      gauge(g, 610, 300, 54, {
+      gauge(g, 772, 300, 50, {
         label: 'TEMP. OLEJU', unit: '°C', min: 0, max: 125, value: d.oilT ?? 30, major: 25, minor: 5,
         arcs: [[60, 75, '#3fb24a', 98], [75, 85, '#f0c020', 98], [85, 125, '#d0362a', 98]],
       });
-      gauge(g, 770, 300, 54, {
+      gauge(g, 932, 300, 50, {
         label: 'CIŚN. OLEJU', unit: 'kG/cm²', min: 0, max: 8, value: (d.oilP ?? 0) * KGCM, major: 1, minor: 0.5,
         arcs: [[4, 6, '#3fb24a', 98], [0, 2, '#d0362a', 98]],
       });
-      gauge(g, 930, 300, 54, {
+      gauge(g, 612, 432, 44, {
         label: 'PRZEPŁYW', unit: 'L/h x10', min: 0, max: 40, value: (d.fuelFlow ?? 0) / 10, major: 10, minor: 2, sweep: 260, arcs: [],
       });
-      gauge(g, 610, 430, 42, {
+      gauge(g, 732, 432, 44, {
         label: 'ZBIORNIK', unit: 'L x100', min: 0, max: 25, value: d.hopper / 100, major: 5, minor: 1, sweep: 240, arcs: [], needle: '#9fd8ff',
       });
-      gauge(g, 770, 430, 42, {
+      gauge(g, 852, 432, 38, {
         label: 'NAPIĘCIE', unit: 'V', min: 0, max: 32, value: d.engine === 'running' && d.rpm > 900 ? 28 : run ? 23.5 : 24.4, major: 8, minor: 2, sweep: 240,
         arcs: [[26.5, 29, '#3fb24a', 98]],
       });
-      flowBox(g, 870, 400, d);
+      flowBox(g, 898, 398, d);
       tex.needsUpdate = true;
       gps(gg, 0, 0, 420, 300, d.gps);
       gpsTexture.needsUpdate = true;
@@ -123,54 +129,58 @@ export function createDromaderPanel({ reg = 'PR-DMD' } = {}) {
 }
 
 // Board outlines (the canvas outside them stays transparent: the meshes use
-// an alpha test, so the boards have their real outline in the cockpit).
-function boardPath(g, x0, x1, inner) {
-  const top = 70, bot = 500, ch = 46;
+// an alpha test, so each board keeps its real outline in the cockpit).
+function boardPath(g, [x0, y0, x1, y1], ch) {
   g.beginPath();
-  if (inner === 'right') { g.moveTo(x0, top); g.lineTo(x1 - ch, top); g.lineTo(x1, top + ch); }
-  else { g.moveTo(x0 + ch, top); g.lineTo(x1, top); g.lineTo(x1, top + ch); }
-  g.lineTo(x1, bot); g.lineTo(x0, bot); g.lineTo(x0, inner === 'right' ? top : top + ch);
+  g.moveTo(x0 + ch, y0); g.lineTo(x1 - ch, y0); g.lineTo(x1, y0 + ch);
+  g.lineTo(x1, y1 - ch); g.lineTo(x1 - ch, y1); g.lineTo(x0 + ch, y1); g.lineTo(x0, y1 - ch);
+  g.lineTo(x0, y0 + ch);
   g.closePath();
 }
 
 function drawBackground(g, reg) {
   g.clearRect(0, 0, M18_PANEL.W, M18_PANEL.H);
   const r = rng(181);
-  for (const [x0, x1, side] of [[...M18_PANEL.left, 'left'], [...M18_PANEL.right, 'right']]) {
+  for (const [B, ch] of [[M18_PANEL.up, 14], [M18_PANEL.left, 26], [M18_PANEL.right, 26]]) {
+    const [x0, y0, x1, y1] = B;
     // Black crackle-finish boards.
-    boardPath(g, x0, x1, side === 'left' ? 'left' : 'right');
-    const grd = g.createLinearGradient(0, 70, 0, 500);
+    boardPath(g, B, ch);
+    const grd = g.createLinearGradient(0, y0, 0, y1);
     grd.addColorStop(0, '#1b1c1d'); grd.addColorStop(1, '#232425');
     g.fillStyle = grd; g.fill();
     g.save(); g.clip();
-    for (let i = 0; i < 2600; i++) {
+    const n = ((x1 - x0) * (y1 - y0)) / 80;
+    for (let i = 0; i < n; i++) {
       const v = r() < 0.5 ? 255 : 0;
       g.fillStyle = `rgba(${v},${v},${v},${0.02 + r() * 0.035})`;
-      g.fillRect(x0 + r() * (x1 - x0), 70 + r() * 430, 1 + r() * 3, 1 + r() * 3);
+      g.fillRect(x0 + r() * (x1 - x0), y0 + r() * (y1 - y0), 1 + r() * 3, 1 + r() * 3);
     }
     g.restore();
     g.strokeStyle = 'rgba(120,120,120,0.45)'; g.lineWidth = 3;
-    boardPath(g, x0, x1, side === 'left' ? 'left' : 'right'); g.stroke();
-    // Screws round the edge.
+    boardPath(g, B, ch); g.stroke();
+    // Screws in the corners.
     g.fillStyle = '#6a6d70';
-    for (let k = 0; k < 7; k++) {
-      g.beginPath(); g.arc(x0 + 14 + (k * (x1 - x0 - 28)) / 6, 486, 4, 0, Math.PI * 2); g.fill();
+    for (const [sx, sy] of [[x0 + ch * 0.8, y0 + 9], [x1 - ch * 0.8, y0 + 9], [x0 + ch * 0.8, y1 - 9], [x1 - ch * 0.8, y1 - 9]]) {
+      g.beginPath(); g.arc(sx, sy, 4, 0, Math.PI * 2); g.fill();
     }
   }
   // Placards (white on black), as stencilled on the real boards.
-  g.fillStyle = '#d8d8d2'; g.font = 'bold 11px Arial'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-  g.fillText(reg, 60, 92);
-  g.fillText('PZL M-18B', 395, 92);
-  g.fillText('ASz-62IR-M18', 560, 92);
+  g.fillStyle = '#d8d8d2'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.font = 'bold 11px Arial';
+  g.fillText(reg, 572, 202);
+  g.fillText('PZL M-18B', 572, 218);
   g.font = '9px Arial';
-  g.fillText('VNE 256 km/h · VFE 185 km/h', 170, 92);
-  g.fillText('MAX 2200 obr/min · 1050 mm Hg · 5 min', 680, 92);
-  g.fillText('ZAKAZ PALENIA', 878, 92);
+  g.fillText('VNE 256 km/h · VFE 185 km/h', 660, 202);
+  g.fillText('MAX 2200 obr/min · 1050 mm Hg · 5 min', 660, 218);
+  g.fillText('ZAKAZ PALENIA', 900, 238);
   // Switch row labels on the left board (live toggles drawn per frame).
-  const sw = ['AKU', 'PRĄDN.', 'ISKR.', 'ROZRUCH', 'POMPA', 'NAV', 'BŁYSK.', 'OPRYSK'];
+  const sw = ['AKU', 'PRĄDN.', 'ISKR.', 'ROZR.', 'POMPA', 'NAV', 'BŁYSK.', 'OPRYSK'];
   g.font = 'bold 8px Arial'; g.textAlign = 'center';
-  sw.forEach((t, i) => g.fillText(t, 282 + i * 26 - 3 * 26 + 18, 466));
+  sw.forEach((t, i) => g.fillText(t, SW.x + i * SW.dx, SW.y + 26));
 }
+
+// Switch row on the left board (canvas px).
+const SW = { x: 160, y: 432, dx: 26 };
 
 function annunciators(g, d) {
   const items = [
@@ -184,21 +194,21 @@ function annunciators(g, d) {
     ['OPRYSK', d.spray, '#3dff7a'],
   ];
   items.forEach(([t, on, col], i) => {
-    const left = i < 4;
-    const x = (left ? 26 : 548) + (i % 4) * 116, y = 18, w = 104, h = 30;
+    // Two rows of four lamps across the top of the left board.
+    const x = 22 + (i % 4) * 118, y = 192 + Math.floor(i / 4) * 34, w = 108, h = 26;
     g.fillStyle = '#0f1012';
     roundRect(g, x - 3, y - 3, w + 6, h + 6, 5); g.fill();
     const base = { '#ff3b2a': '#4a1712', '#ffb020': '#4d3a10', '#3dff7a': '#173d22' }[col];
     g.fillStyle = on ? col : base;
     roundRect(g, x, y, w, h, 3); g.fill();
     g.fillStyle = on ? '#111' : 'rgba(255,255,255,0.28)';
-    g.font = 'bold 12px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = 'bold 11px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(t, x + w / 2, y + h / 2 + 1);
   });
   // Switch toggles: battery, generator, magnetos, starter, fuel pump, nav, strobe, spray.
   const on = [true, d.engine === 'running', d.engine !== 'off', d.engine === 'cranking', d.engine !== 'off', true, d.engine !== 'off', d.spray];
   on.forEach((v, i) => {
-    const x = 222 + i * 26, y = 486 - 34;
+    const x = SW.x + i * SW.dx, y = SW.y;
     g.fillStyle = '#d7dadc';
     g.beginPath(); g.arc(x, y, 6.5, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#7d848b';
@@ -252,35 +262,41 @@ function flowBox(g, x, y, d) {
   g.fillText(`${Math.round(d.hopper)} L`, x + 7, y + 60);
 }
 
-// Back wall of the hopper: yellowed translucent fibreglass with the litre
-// scale stencilled in black (2,500 L at the top), seen between the boards.
+// Back wall of the hopper between the lower boards: riveted tan plate with a
+// narrow vertical sight window (the liquid shows through as a darker band)
+// and the litre scale beside it.
+export const HOPPER_WIN = { x0: 196, x1: 266, top: 70, bot: 590 };
 function drawHopperWall(g) {
-  const { W, H, cap } = M18_HOPPER;
-  g.fillStyle = '#cbb27c';
-  g.fillRect(0, 0, W, H);
+  const { W, H, cap } = M18_HOPPER, Wn = HOPPER_WIN;
+  const grd = g.createLinearGradient(0, 0, W, 0);
+  grd.addColorStop(0, '#8d7450'); grd.addColorStop(0.5, '#a88b5f'); grd.addColorStop(1, '#8a714e');
+  g.fillStyle = grd; g.fillRect(0, 0, W, H);
   const r = rng(77);
-  for (let i = 0; i < 5000; i++) {
-    g.strokeStyle = `rgba(${110 + r() * 70},${90 + r() * 50},${50 + r() * 30},${0.18 + r() * 0.2})`;
+  for (let i = 0; i < 4000; i++) {
+    g.strokeStyle = `rgba(${70 + r() * 60},${55 + r() * 40},${30 + r() * 25},${0.12 + r() * 0.15})`;
     g.lineWidth = 1;
     const x = r() * W, y = r() * H, a = r() * Math.PI;
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14); g.stroke();
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 10, y + Math.sin(a) * 10); g.stroke();
   }
-  // Moulding seams and the bonded frame.
-  g.fillStyle = 'rgba(80,60,30,0.35)';
-  g.fillRect(0, 0, W, 10); g.fillRect(0, H - 10, W, 10);
-  g.fillRect(120, 0, 3, H);
-  const top = 60, bot = 720;
+  // Rivet lines along the seams and round the window.
+  const rivet = (x, y) => {
+    g.fillStyle = 'rgba(40,30,18,0.55)'; g.beginPath(); g.arc(x + 1, y + 1, 4, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#c9b18a'; g.beginPath(); g.arc(x, y, 3.4, 0, Math.PI * 2); g.fill();
+  };
+  for (let y = 24; y < H; y += 34) { rivet(18, y); rivet(W - 18, y); rivet(Wn.x0 - 22, y); rivet(Wn.x1 + 22, y); }
+  for (let x = 18; x < W; x += 34) { rivet(x, 18); rivet(x, H - 18); }
+  // Sight window: dark frame, translucent fibreglass behind.
+  g.fillStyle = '#2a2622'; g.fillRect(Wn.x0 - 8, Wn.top - 8, Wn.x1 - Wn.x0 + 16, Wn.bot - Wn.top + 16);
+  g.fillStyle = '#d9c99c'; g.fillRect(Wn.x0, Wn.top, Wn.x1 - Wn.x0, Wn.bot - Wn.top);
   g.fillStyle = '#16110a';
   g.textAlign = 'left'; g.textBaseline = 'middle';
   for (let v = 0; v <= cap; v += 100) {
-    const y = bot - (v / cap) * (bot - top);
+    const y = Wn.bot - (v / cap) * (Wn.bot - Wn.top);
     const major = v % 500 === 0;
-    g.fillRect(140, y - 2.5, major ? 70 : 40, 5);
-    if (v >= 500 && (v % 100 === 0)) {
-      g.font = `bold ${major ? 46 : 34}px Arial`;
-      g.fillText(String(v), 226, y + 1);
-    }
+    g.fillStyle = '#16110a';
+    g.fillRect(Wn.x1 + 4, y - 1.5, major ? 26 : 14, 3);
+    if (major && v > 0) { g.font = 'bold 20px Arial'; g.fillText(String(v), Wn.x1 + 34, y + 1); }
   }
-  g.font = 'bold 22px Arial';
-  g.fillText('ZBIORNIK  2500 L', 140, 30);
+  g.font = 'bold 15px Arial'; g.fillStyle = '#1d150c';
+  g.fillText('ZBIORNIK 2500 L', Wn.x0 - 40, 44);
 }
