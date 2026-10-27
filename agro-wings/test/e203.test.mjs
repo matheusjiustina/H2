@@ -48,7 +48,7 @@ test('203 figures: 13.30 m, 8.00 m, 320 hp at 2,700 rpm, 292 L, 1,050 L, 1,900 k
   assert.ok(lim > 400 && lim < 600 && lim < A.hopperCapacity);
 });
 
-test('203 parked: three wheels, nearly level (≈ 3°), 2.43 m high', () => {
+test('203 parked: three wheels, tail low (≈ 7° three-point), 2.43 m high', () => {
   const sim = makeSim({ A, hopper: 0, fuel: 200, wind: true });
   const { fm } = sim;
   fm.settleOnGround(-420, -50, Math.PI / 2, sim.env);
@@ -60,7 +60,7 @@ test('203 parked: three wheels, nearly level (≈ 3°), 2.43 m high', () => {
   const h = Math.max(...e203Extent().tops.map((p) => new Vector3(...p).applyQuaternion(fm.quat).add(fm.pos).y - g));
   console.log(`  three-point pitch ${deg(a.pitch).toFixed(1)}°, height ${h.toFixed(2)} m, drift ${(fm.pos.distanceTo(p0) * 100).toFixed(1)} cm`);
   assert.equal(fm.out.wheelsOnGround, 3);
-  assert.ok(deg(a.pitch) > 2 && deg(a.pitch) < 5);
+  assert.ok(deg(a.pitch) > 6 && deg(a.pitch) < 9);
   assert.ok(Math.abs(h - 2.43) < 0.08, `height ${h}`);
   assert.ok(fm.pos.distanceTo(p0) < 0.05);
 });

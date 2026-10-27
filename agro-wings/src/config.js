@@ -485,12 +485,13 @@ export const FLIGHT_E203 = {
   // Recommended loads are cut to what the MTOW allows (see the load sheet).
   loadByWeight: true,
 
-  // Tubular V main legs from the lower fuselage ahead of the wing, a long
-  // spring tailwheel under the rudder: the 203 sits nearly level (≈ 3°).
+  // Tubular V main legs from the lower fuselage ahead of the wing, a short
+  // spring tailwheel just under the rudder: the tail sits low, the 203
+  // three-point about 7° nose-up (PS-SAR on the grass; it was ≈ 3°).
   gear: [
     { name: 'mainL', p: [1.08, -1.57, 0.62], k: 100000, c: 10000, travel: 0.2, radius: 0.32, steer: false },
     { name: 'mainR', p: [-1.08, -1.57, 0.62], k: 100000, c: 10000, travel: 0.2, radius: 0.32, steer: false },
-    { name: 'tail', p: [0, -1.27, -5.0], k: 30000, c: 2600, travel: 0.13, radius: 0.13, steer: true },
+    { name: 'tail', p: [0, -0.85, -5.0], k: 30000, c: 2600, travel: 0.13, radius: 0.13, steer: true },
   ],
   tailSteer: 0.42,
 

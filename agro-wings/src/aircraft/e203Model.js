@@ -71,11 +71,12 @@ export const E203_LIVERIES = [
 // Seen from above the body widens steadily to the cabin (0.97 m) and starts
 // narrowing again right behind it.
 const FWD_KEYS = [
-  // (final pass) the last 0.45 m round off into the spinner: the lip's
-  // lower half drawn in, rounder sections, no flat face below the spinner.
-  K(2.14, 0.29, 0.1, -0.17, 0.4, 2.3, 2.2), K(2.02, 0.315, 0.09, -0.235, 0.425, 2.5, 2.4),
-  K(1.7, 0.355, 0.07, -0.32, 0.46, 2.85, 2.75), K(1.2, 0.395, 0.04, -0.41, 0.52, 3.4, 3.2),
-  K(0.6, 0.435, 0.0, -0.5, 0.58, 3.8, 3.6), K(0.0, 0.465, -0.04, -0.56, 0.62, 4.2, 3.8),
+  // The nose slimmer toward the spinner and its top line falling more
+  // steeply to it (on the photographs the cowl rises at an angle from the
+  // spinner to the windshield); the lip just clears the spinner.
+  K(2.14, 0.27, 0.11, -0.16, 0.37, 2.3, 2.2), K(2.02, 0.295, 0.1, -0.225, 0.395, 2.5, 2.4),
+  K(1.7, 0.34, 0.07, -0.315, 0.44, 2.85, 2.75), K(1.2, 0.39, 0.04, -0.41, 0.51, 3.4, 3.2),
+  K(0.6, 0.435, 0.0, -0.5, 0.575, 3.8, 3.6), K(0.0, 0.465, -0.04, -0.56, 0.62, 4.2, 3.8),
   K(-0.5, 0.485, -0.06, -0.58, 0.64, 4.3, 3.8),
 ];
 // Cabin: the lower fuselage keeps the hopper's section; it is cut 30° above
@@ -98,22 +99,22 @@ const WS_Z = -0.5, WS_ZS = -0.62; // windshield base: centre / sides
 // 45° in the middle, concave into the dorsal) to a low dorsal near the sill
 // height, which runs on, rounded and narrowing, to the rudder post.
 const R = (z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT) => ({ z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT });
-// (final pass, after the PS-BYA side photograph) the roof 3 cm higher (as
-// far as the type's 2.43 m parked height allows); the
-// rear fuselage drawn in: narrower from behind the cabin aft (top view),
-// the underside rising toward the tail and the dorsal a little lower, so it
-// no longer runs back as a deep, parallel block.
+// (measured on the PS-SAR side photograph, scaled by the 2.43 m height):
+// the canopy from sill to roof ≈ 0.8 m, so the roof stands at 1.20 m; the
+// fairing drops from it to a dorsal a little under the sill line; the rear
+// fuselage keeps its depth (≈ 0.75 m at the rudder post, the underside
+// nearly straight) while it narrows in plan.
 const AFT_KEYS = [
-  R(-1.78, 0.48, -0.06, -0.57, 3.8, 4.3, 0.64, 0.447, 1.07, 0.345, 0.075),
-  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.03, 0.33, 0.11),
-  R(-2.15, 0.455, -0.062, -0.56, 3.72, 4.1, 0.625, 0.435, 0.88, 0.3, 0.15),
-  R(-2.35, 0.435, -0.065, -0.55, 3.62, 3.9, 0.61, 0.41, 0.67, 0.28, 0.17),
-  R(-2.6, 0.41, -0.07, -0.535, 3.5, 3.7, 0.58, 0.36, 0.5, 0.275, 0.19),
-  R(-3.0, 0.36, -0.07, -0.495, 3.3, 3.4, 0.52, 0.3, 0.43, 0.25, 0.18),
-  R(-3.5, 0.3, -0.06, -0.43, 3.1, 3.1, 0.46, 0.25, 0.38, 0.21, 0.16),
-  R(-4.0, 0.235, -0.04, -0.37, 2.9, 2.9, 0.41, 0.21, 0.35, 0.165, 0.13),
-  R(-4.5, 0.16, -0.02, -0.32, 2.7, 2.7, 0.37, 0.18, 0.33, 0.11, 0.09),
-  R(-5.02, 0.075, 0.0, -0.28, 2.5, 2.5, 0.34, 0.15, 0.31, 0.05, 0.045),
+  R(-1.78, 0.48, -0.06, -0.57, 3.8, 4.3, 0.64, 0.447, 1.2, 0.345, 0.08),
+  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.14, 0.33, 0.12),
+  R(-2.15, 0.455, -0.062, -0.56, 3.72, 4.1, 0.625, 0.435, 0.93, 0.3, 0.15),
+  R(-2.35, 0.435, -0.065, -0.55, 3.62, 3.9, 0.61, 0.41, 0.7, 0.28, 0.17),
+  R(-2.6, 0.41, -0.07, -0.54, 3.5, 3.7, 0.58, 0.36, 0.52, 0.275, 0.19),
+  R(-3.0, 0.36, -0.07, -0.515, 3.3, 3.4, 0.52, 0.31, 0.45, 0.25, 0.18),
+  R(-3.5, 0.3, -0.06, -0.48, 3.1, 3.1, 0.47, 0.27, 0.4, 0.21, 0.16),
+  R(-4.0, 0.235, -0.04, -0.45, 2.9, 2.9, 0.43, 0.24, 0.37, 0.165, 0.13),
+  R(-4.5, 0.16, -0.02, -0.42, 2.7, 2.7, 0.39, 0.21, 0.355, 0.11, 0.09),
+  R(-5.02, 0.075, 0.0, -0.4, 2.5, 2.5, 0.36, 0.18, 0.34, 0.05, 0.045),
 ];
 const CABIN = AFT_KEYS[0];
 // Upper contour of a structured section, left half (x ≥ 0), from the rim up
@@ -214,7 +215,7 @@ const surfX = (st, y) => {
 // ---------------------------------------------------------------------------
 // Livery: side projection of the fuselage, fin and rudder (one half of the
 // canvas per side), with a bump map for the panel lines and rivets.
-const LV = { Z0: -5.6, Z1: 2.6, Y0: -0.75, Y1: 1.25, W: 2048, H: 1024, M: 6 };
+const LV = { Z0: -5.6, Z1: 2.6, Y0: -0.75, Y1: 1.6, W: 2048, H: 1024, M: 6 };
 LV.kx = LV.W / (LV.Z1 - LV.Z0);
 LV.ky = (LV.H / 2 - 2 * LV.M) / (LV.Y1 - LV.Y0);
 const lvPix = (side, z, y) => [
@@ -289,22 +290,24 @@ function liveryTextures(reg, L = E203_LIVERIES[0]) {
       // green ahead and above (the cabin and the top of the fairing).
       const C = [[0.45, -0.66], [-0.3, -0.4], [-0.95, -0.16], [-1.55, 0.08], [-1.98, 0.3], [-2.3, 0.55], [-2.55, 0.85]];
       const off = (dz, dy) => C.map(([z, y]) => [z + dz, y + dy]);
-      poly(off(-0.07, -0.09).concat([[-3.4, 1.4], [-5.8, 1.4], [-5.8, -0.9], [0.5, -0.9]]), BLUE);
+      poly(off(-0.07, -0.09).concat([[-3.4, 1.7], [-5.8, 1.7], [-5.8, -0.9], [0.5, -0.9]]), BLUE);
       band(C, 0.105, GOLD);
       // Fin: green cap over a gold stripe, the white Embraer arrow.
-      poly([[-3.9, 0.975], [-3.9, 1.4], [-5.8, 1.4], [-5.8, 0.975]], GREEN);
-      poly([[-3.9, 0.905], [-3.9, 0.975], [-5.8, 0.975], [-5.8, 0.905]], GOLD);
-      { const [px, py] = P(-5.02, 0.72); arrow(g, px, py, 0.12 * LV.ky, '#f4f4f0', side > 0 ? 1 : -1); }
+      // (proportions of PS-SAR: the cap the top 22 % of the fin, the
+      // stripe the next 10 %).
+      poly([[-3.7, 1.245], [-3.7, 1.7], [-5.8, 1.7], [-5.8, 1.245]], GREEN);
+      poly([[-3.7, 1.13], [-3.7, 1.245], [-5.8, 1.245], [-5.8, 1.13]], GOLD);
+      { const [px, py] = P(-5.0, 0.76); arrow(g, px, py, 0.14 * LV.ky, '#f4f4f0', side > 0 ? 1 : -1); }
     } else {
       // Blue belly from the nose to the tail post; blue rudder.
       poly([[2.7, -0.2], [2.0, -0.25], [1.2, -0.35], [0.2, -0.43], [-1.0, -0.46], [-2.5, -0.43], [-3.8, -0.36], [-4.8, -0.29], [-5.8, -0.24], [-5.8, -0.9], [2.7, -0.9]], BLUE2);
-      poly([[-5.04, -0.5], [-5.04, 1.4], [-5.8, 1.4], [-5.8, -0.5]], BLUE2);
+      poly([[-5.04, -0.5], [-5.04, 1.7], [-5.8, 1.7], [-5.8, -0.5]], BLUE2);
       // Green swoosh, thin at the cabin and broad up the fin, a gold line
       // under it.
-      const S = [[0.35, -0.11], [-0.5, -0.06], [-1.3, 0.0], [-2.1, 0.07], [-2.9, 0.15], [-3.6, 0.25], [-4.15, 0.45], [-4.55, 0.75], [-4.82, 1.02]];
+      const S = [[0.35, -0.11], [-0.5, -0.06], [-1.3, 0.0], [-2.1, 0.07], [-2.9, 0.15], [-3.5, 0.27], [-3.95, 0.5], [-4.25, 0.85], [-4.5, 1.25]];
       band(S, (f) => 0.012 + 0.065 * f ** 1.3, GREEN2);
       band(S.slice(1, 7).map(([z, y]) => [z, y - 0.075]), (f) => 0.008 + 0.012 * f, GOLD2);
-      { const [px, py] = P(-4.86, 1.06); arrow(g, px, py, 0.05 * LV.ky, BLUE2, side > 0 ? 1 : -1); }
+      { const [px, py] = P(-4.75, 1.32); arrow(g, px, py, 0.06 * LV.ky, BLUE2, side > 0 ? 1 : -1); }
     }
     // Belly grime under the hopper gatebox and behind the exhaust.
     const [, belly] = P(0, -0.42);
@@ -326,7 +329,7 @@ function liveryTextures(reg, L = E203_LIVERIES[0]) {
     const seams = [
       [[2.14, -0.2], [2.14, 0.4]], [[1.45, -0.5], [1.45, 0.55]], [[2.1, 0.1], [1.45, 0.08]], [[1.95, 0.32], [1.5, 0.36]],
       [[1.15, -0.55], [1.15, 0.6]], [[0.2, -0.6], [0.2, 0.65]], [[-0.5, -0.6], [-0.5, 0.66]],
-      [[-1.78, -0.58], [-1.78, 1.05]], [[-2.6, -0.56], [-2.6, 0.5]], [[-3.3, -0.52], [-3.3, 0.42]], [[-4.0, -0.48], [-4.0, 0.37]],
+      [[-1.78, -0.58], [-1.78, 1.21]], [[-2.6, -0.56], [-2.6, 0.5]], [[-3.3, -0.52], [-3.3, 0.42]], [[-4.0, -0.48], [-4.0, 0.37]],
       [[-4.5, -0.45], [-4.5, 0.34]], [[0.2, -0.3], [-1.78, -0.34]], [[-1.78, -0.32], [-4.9, -0.2]],
     ];
     if (side > 0) seams.push([[-0.64, 0.43], [-0.64, 0.1], [-1.56, 0.1], [-1.56, 0.43]]);
@@ -484,13 +487,14 @@ function wingletGeometry() {
 // Overall dimensions of the model (for the tests): span over the winglets,
 // length spinner to rudder, and the high points (roof, fin, winglet tops).
 export const E203_DIM = { spinnerZ: 2.53, rudderZ: -5.47 };
+const FIN_TOP_Y = 1.5; // fin and rudder top (body frame)
 export function e203Extent() {
   const wl = wingletGeometry();
   wl.geo.computeBoundingBox();
   const bb = wl.geo.boundingBox;
   return {
     span: 2 * bb.max.x, length: E203_DIM.spinnerZ - E203_DIM.rudderZ,
-    tops: [[0, ROOF.yt, -1.45], [0, 1.15, -5.0], [bb.max.x, bb.max.y, -1.2]],
+    tops: [[0, ROOF.yt, -1.45], [0, FIN_TOP_Y, -4.8], [bb.max.x, bb.max.y, -1.2]],
   };
 }
 
@@ -597,7 +601,7 @@ export function createE203Model(panel, opts = {}) {
     const yb = Math.max(0, 1 - Math.abs(y + 0.42) / 0.2), zb = Math.max(0, 1 - Math.abs(z + 0.43) / 1.1);
     a *= 1 - 0.32 * yb * Math.sqrt(zb);
     // Tailplane root; just behind the spinner.
-    if (z < -3.95 && z > -5.05) a *= 1 - 0.2 * Math.max(0, 1 - Math.abs(y + 0.1) / 0.12);
+    if (z < -3.95 && z > -5.05) a *= 1 - 0.2 * Math.max(0, 1 - Math.abs(y - 0.22) / 0.12);
     if (z > 2.0) a *= 0.82 + 0.18 * clamp((2.14 - z) / 0.14, 0, 1);
     return clamp(a, 0.5, 1);
   };
@@ -636,13 +640,13 @@ export function createE203Model(panel, opts = {}) {
   }, 56, 4, [0, AX, 1.4]))));
   {
     const z = 2.132;
-    add('dark', tx(new THREE.CircleGeometry(0.066, 24), -0.215, AX + 0.03, z));
-    add('dark', tx(new THREE.CylinderGeometry(0.066, 0.066, 0.12, 24, 1, true), -0.215, AX + 0.03, z - 0.06, Math.PI / 2));
-    add('polished', tx(new THREE.TorusGeometry(0.068, 0.009, 8, 28), -0.215, AX + 0.03, z + 0.002), true);
-    add('polished', tx(new THREE.CircleGeometry(0.05, 22), 0.205, AX - 0.04, z + 0.001, 0, 0, 0, [1.3, 0.85, 1]));
-    add('lens', tx(new THREE.SphereGeometry(0.05, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0.205, AX - 0.04, z + 0.003, Math.PI / 2, 0, 0, [1.3, 0.25, 0.85]));
-    add('dark', rbox(0.22, 0.065, 0.05, 0.02, 0, AX - 0.265, 2.112));
-    for (let k = 0; k < 4; k++) add('steel', tx(new THREE.BoxGeometry(0.2, 0.005, 0.005), 0, AX - 0.288 + k * 0.014, 2.14), true);
+    add('dark', tx(new THREE.CircleGeometry(0.05, 24), -0.205, AX + 0.03, z));
+    add('dark', tx(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 24, 1, true), -0.205, AX + 0.03, z - 0.06, Math.PI / 2));
+    add('polished', tx(new THREE.TorusGeometry(0.052, 0.008, 8, 28), -0.205, AX + 0.03, z + 0.002), true);
+    add('polished', tx(new THREE.CircleGeometry(0.045, 22), 0.2, AX - 0.04, z + 0.001, 0, 0, 0, [1.2, 0.85, 1]));
+    add('lens', tx(new THREE.SphereGeometry(0.045, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0.2, AX - 0.04, z + 0.003, Math.PI / 2, 0, 0, [1.2, 0.25, 0.85]));
+    add('dark', rbox(0.2, 0.06, 0.05, 0.02, 0, AX - 0.255, 2.112));
+    for (let k = 0; k < 4; k++) add('steel', tx(new THREE.BoxGeometry(0.18, 0.005, 0.005), 0, AX - 0.276 + k * 0.013, 2.14), true);
   }
   // Exhaust stubs out of the bottom of the cowl, either side.
   for (const sx of [1, -1]) {
@@ -812,20 +816,21 @@ export function createE203Model(panel, opts = {}) {
   // Fin: 45° leading edge from the dorsal, square top; rudder on a
   // straight vertical hinge, running down past the end of the cone. The
   // root reaches down into the low dorsal; the top is where it was.
-  // (final pass) the leading edge easing into a rounded top instead of a
-  // square corner; the top stays at the type's 2.43 m height, now about
-  // level with the raised roof (as on PS-BYA).
-  const finSt = [[0.27, -4.0, 1.04], [0.349, -4.08, 0.96], [0.559, -4.29, 0.75], [0.778, -4.5, 0.54], [0.927, -4.64, 0.4], [1.023, -4.74, 0.3], [1.085, -4.82, 0.22], [1.115, -4.9, 0.14]];
+  // Fin (measured on PS-SAR): a big, almost square surface — the chord at
+  // the top about 0.9 of the root's, the leading edge swept 26°, the top
+  // flat (a small radius at its front corner), 1.16 m above the dorsal.
+  const FIN_TOP = FIN_TOP_Y;
+  const finSt = [[0.25, -3.806, 1.234], [0.34, -3.85, 1.19], [0.6, -3.977, 1.063], [0.9, -4.123, 0.917], [1.2, -4.27, 0.77], [1.4, -4.367, 0.673], [1.46, -4.405, 0.635], [1.49, -4.44, 0.6], [FIN_TOP, -4.49, 0.55]];
   add('livery', liveryUV(tagged(vfin(airfoil(0, 1, 0.12, 0, 0.4, 12), finSt))));
   // Dorsal fillet: a concave rise from the spine that runs into the fin's
   // leading edge (its last station is inside the fin).
   add('livery', liveryUV(tagged(loft(sampleStations([
-    K(-3.4, 0.015, 0.37, 0.36, 0.388, 2.2, 2.2), K(-3.75, 0.035, 0.355, 0.343, 0.43, 2.2, 2.2),
-    K(-4.05, 0.05, 0.345, 0.33, 0.52, 2.2, 2.2), K(-4.32, 0.055, 0.335, 0.32, 0.645, 2.2, 2.2),
+    K(-3.1, 0.015, 0.43, 0.42, 0.445, 2.2, 2.2), K(-3.45, 0.035, 0.4, 0.39, 0.47, 2.2, 2.2),
+    K(-3.72, 0.05, 0.385, 0.372, 0.56, 2.2, 2.2), K(-4.06, 0.055, 0.37, 0.355, 0.72, 2.2, 2.2),
   ], 20), 12, null))));
-  // Rudder: deep chord down past the fuselage's underside (the real one
-  // reaches the tailwheel), the top rounded over the fin's top.
-  const rudSt = [[-0.45, HINGE_Z, 0.36], [-0.3, HINGE_Z, 0.4], [0.0, HINGE_Z, 0.42], [0.45, HINGE_Z, 0.43], [0.9, HINGE_Z, 0.43], [1.02, HINGE_Z, 0.41], [1.1, HINGE_Z - 0.01, 0.35], [1.135, HINGE_Z - 0.04, 0.24], [1.15, HINGE_Z - 0.08, 0.13]];
+  // Rudder: constant chord from the fuselage's underside to the flat top,
+  // square at its trailing-edge corner.
+  const rudSt = [[-0.45, HINGE_Z, 0.38], [-0.3, HINGE_Z, 0.41], [0.0, HINGE_Z, 0.43], [0.5, HINGE_Z, 0.43], [1.0, HINGE_Z, 0.43], [1.42, HINGE_Z, 0.43], [1.48, HINGE_Z, 0.425], [FIN_TOP, HINGE_Z, 0.41]];
   const rudGeo = liveryUV(tagged(vfin(airfoil(0, 1, 0.13, 0, 0.3, 8), rudSt)));
   const rudTab = tagged(tx(new THREE.BoxGeometry(0.012, 0.26, 0.08), 0, 0.15, HINGE_Z - 0.42));
   rudGeo.translate(0, 0, -HINGE_Z); rudTab.translate(0, 0, -HINGE_Z);
@@ -836,11 +841,11 @@ export function createE203Model(panel, opts = {}) {
   rudder.add(rudMesh, new THREE.Mesh(rudTab, M.paint));
   rudder.add(new THREE.Mesh(tagged(ball([0, -0.29, -0.42], 0.022, 8)), M.white)); // tail light
   root.add(rudder);
-  add('beacon', tx(new THREE.SphereGeometry(0.03, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, 1.125, -4.96));
+  add('beacon', tx(new THREE.SphereGeometry(0.03, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, FIN_TOP + 0.005, -4.8));
   // Tailplane: rectangular, low on the cone; elevators with a trim tab;
   // tips in the scheme's tip colour.
-  // (final pass) mid-height on the rear fuselage, as on PS-BYA.
-  const STY = -0.1, SLE = -4.05, SC = 0.92, ELEV = 0.61, STIP = 2.1;
+  // High on the rear fuselage, just under the dorsal at the fin (PS-SAR).
+  const STY = 0.22, SLE = -4.05, SC = 0.92, ELEV = 0.61, STIP = 2.1;
   const sst = (x) => ({ x, y: STY + x * 0.005, le: SLE, chord: SC });
   const elevParts = [];
   for (const side of [1, -1]) {
@@ -919,12 +924,10 @@ export function createE203Model(panel, opts = {}) {
     const g = new THREE.Group();
     const R = cfg.radius;
     const fz = cfg.p[2] + 0.08, fy = cfg.p[1] + R + 0.13;
-    // Ventral keel under the tail carrying the tailwheel mount, a short
-    // leaf spring from it back to the steerable fork (the contact point,
-    // cfg.p, is the flight model's and does not move).
-    add('livery', liveryUV(tagged(vfin(airfoil(0, 1, 0.1, 0, 0.4, 10), [[-0.25, -4.28, 0.66], [-0.5, -4.46, 0.48], [-0.7, -4.6, 0.3]]))));
-    add('ink', bar([0, -0.7, -4.72], [0, fy + 0.03, fz + 0.02], 0.05, 0.018));
-    add('dark', rbox(0.07, 0.05, 0.14, 0.015, 0, -0.71, -4.74));
+    // Short leaf spring from under the cone back to the steerable fork (the
+    // tail sits low: the wheel is just under the rudder, as on the real one).
+    add('ink', bar([0, -0.42, -4.5], [0, fy + 0.03, fz + 0.02], 0.05, 0.018));
+    add('dark', rbox(0.09, 0.04, 0.15, 0.015, 0, -0.41, -4.5));
     add('ink', tx(new THREE.CylinderGeometry(0.03, 0.03, 0.07, 10), 0, fy + 0.03, fz));
     const fork = new THREE.Group();
     fork.position.set(0, fy, fz);

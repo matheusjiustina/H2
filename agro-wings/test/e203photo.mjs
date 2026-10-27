@@ -16,6 +16,7 @@ const SHOTS = [
   ['bya', 984, 586, [6.4, 2.45, 0.2], [0, 1.1, -1.7], 46], // PS-BYA, side from the left wing root
   ['wbm', 447, 447, [5.5, 1.7, -8.5], [0, 1.3, -1.6], 44], // PS-WBM, rear left three-quarter
   ['front34', 1250, 900, [6.5, 1.1, 15.1], [0.15, 1.3, -0.6], 18], // spraying 203, front right
+  ['sar', 960, 540, [-17, 0.3, 1.2], [0, 0.9, -1.4], 19], // PS-SAR, right side from the grass
 ];
 const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',

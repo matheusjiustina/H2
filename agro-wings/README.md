@@ -2476,7 +2476,7 @@ and turns red when the load is over it.
 | check | result | target |
 | --- | --- | --- |
 | model span / length | 13.299 m / 8.00 m | 13.30 / 8.00 |
-| parked height / three-point attitude | 2.43 m / 3.1°, three wheels down | 2.43 m |
+| parked height / three-point attitude | 2.43 m / 7.4°, three wheels down (was 3.1° before the PS-SAR pass) | 2.43 m |
 | start | catches after 1.4 s, idle 650 rpm, 12 L/h | — |
 | full throttle, static | 2,700 rpm, 28.3 inHg, 320 hp, 115 L/h, 6.09 kN thrust | 320 hp at 2,700 rpm |
 | take-off roll 1,270 / 1,900 kg | 196 m / 485 m | inside the 800 m strip |
@@ -2735,29 +2735,32 @@ the yellow grab handles and the lower hopper sight.
   view or with the camera within 9 m; the live textures only when what
   they show changes.
 
-### EMB-203 final geometry pass
+### EMB-203 final geometry pass (measured on PS-SAR)
 
-After the PS-BYA side photograph and the in-game captures
-(`src/aircraft/e203Model.js`; wings, winglets, flaps, ailerons, propeller,
-ag kit, cockpit, physics and contact points unchanged):
-- **Rear fuselage.** Narrower from behind the cabin aft (half width at
-  z −3.5: 0.33 → 0.30 m; at −4.5: 0.185 → 0.16 m); the underside rises
-  toward the tail (−0.50 → −0.43 m at −3.5; −0.38 → −0.28 m at the rudder
-  post) and the dorsal sits 1–2 cm lower, so it no longer runs back as a
-  deep parallel block.
-- **Cabin.** Roof 3 cm higher (1.04 → 1.07 m): as far as the type's 2.43 m
-  parked height allows (the test now reads 2.47 m).
-- **Fin and rudder.** The square top became a rounded one (leading edge
-  easing over into the top, rudder top rounded over it), same height; the
-  rudder runs 13 cm further down, past the fuselage's underside.
-- **Tailplane.** Raised from low on the cone (y −0.28) to mid-height
-  (−0.10), as in the photograph; the elevator turns about the same hinge
-  line, moved with it.
-- **Nose.** The last 0.45 m of the cowl round off into the spinner (lip's
-  lower half drawn in, rounder sections), chin inlet moved up with it.
-- **Tailwheel.** A ventral keel under the tail carries the mount; the leaf
-  spring from it to the fork is about half as long as before. The contact
-  point is the flight model's and did not move.
+Measured on the side photograph of PS-SAR on the grass, scaled by the
+type's 2.43 m height (`src/aircraft/e203Model.js`, `src/config.js`; wings,
+winglets, flaps, ailerons, propeller, ag kit, cockpit and paints kept):
+- **Tail on the ground.** The real 203 sits with its tail low, the
+  tailwheel just under the rudder on a short spring: the tailwheel contact
+  point moved up 0.42 m (`FLIGHT_E203.gear.tail`, −1.27 → −0.85), so the
+  three-point attitude is 7.4° (was 3.1°). The take-off, climb and speed
+  tests still pass. No extra structure: the earlier ventral keel is gone.
+- **Fin and rudder.** Big and nearly square, as on the photograph: the
+  chord at the top 0.9 of the root's (was a narrow point), the leading
+  edge swept 26°, a flat top 1.16 m above the dorsal with a small radius at
+  its front corner, the rudder of constant chord with a square trailing-edge
+  corner. Green cap and gold stripe in the photograph's proportions.
+- **Cabin.** Sill to roof 0.8 m as measured (was 0.6 m): roof 1.04 →
+  1.20 m, the fairing behind it rebuilt to drop to a dorsal a little under
+  the sill line. With the tail low, the parked height is 2.43 m (test).
+- **Rear fuselage.** Narrower in plan from behind the cabin; its depth kept
+  to about 0.74 m at the rudder post with a nearly straight underside, as
+  on the photograph.
+- **Tailplane.** High on the rear fuselage, just under the dorsal at the
+  fin (y −0.28 → 0.22).
+- **Nose.** Slimmer toward the spinner (lip 0.58 → 0.54 m wide) and its top
+  line falling more steeply to it — the cowl rising at an angle from the
+  spinner to the windshield; inlets and the landing light sized to fit.
 
 ## Robinson R44 — exterior reconstruction and paint B
 
