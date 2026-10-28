@@ -7,7 +7,10 @@ import { clamp, damp, smoothstep } from '../core/math.js';
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 const Y = new THREE.Vector3(0, 1, 0);
 const FLIP = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI);
-const NO_KEYS = { x: 0, y: 0, zoom: 0, reset: false };
+const NO_KEYS = { x: 0, y: 0, zoom: 0, reset: false, eye: 0 };
+// Pilot's eye height (Shift + Up / Down): how far the cockpit eye may move
+// from the type's eye point, and how fast.
+export const EYE_RANGE = 0.15, EYE_RATE = 0.15;
 
 export class CameraRig {
   constructor(camera) {
@@ -24,6 +27,9 @@ export class CameraRig {
     // Scroll zoom (1 = default view): cockpit field of view / head position,
     // chase distance.
     this.zoom = { cockpit: 1, chase: 1 };
+    // Eye height (m) over the type's eye point: a taller or shorter pilot.
+    // Kept by the game in the settings; the default view leaves it alone.
+    this.eyeHeight = 0;
     this.shake = 0;
     this.initialized = false;
   }
@@ -71,6 +77,7 @@ export class CameraRig {
         this.look.yaw = clamp(this.look.yaw - K.x * r * dt, -2.6, 2.6);
         this.look.pitch = clamp(this.look.pitch + K.y * r * 0.75 * dt, -1.1, 0.9);
       }
+      if (K.eye) this.eyeHeight = clamp(this.eyeHeight + K.eye * EYE_RATE * dt, -EYE_RANGE, EYE_RANGE);
       // Vibration: engine (rpm) + ground roughness; g-load sinks the head.
       const eng = fm.rpm > 300 ? 0.0009 + 0.0008 * smoothstep(vib[0], vib[1], fm.rpm) * (ac.A?.turbine ? 0.5 : 1) : 0;
       const ground = o.onGround ? 0.004 * smoothstep(1, 25, o.groundSpeed) * (o.surface === 'runway' ? 0.6 : 1) : 0;
@@ -79,6 +86,7 @@ export class CameraRig {
       const ks = this.shakeScale ?? 1;
       const amp = (eng + ground) * ks + this.shake * 0.02;
       _v.copy(ac.model.eye);
+      _v.y += this.eyeHeight;
       if (ac.kind === 'heli') {
         // Two-per-rev shake of the teetering rotor: strongest through
         // translational lift (~15–25 kt), rising again at high speed and in

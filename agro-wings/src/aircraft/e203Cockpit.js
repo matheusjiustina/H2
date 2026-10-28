@@ -158,7 +158,6 @@ export function buildE203Cockpit(ctx) {
     blue: std(0x1e3f8a, { roughness: 0.4, metalness: 0.1 }),
     yellow: std(0xf0c020, { roughness: 0.5 }),
     hopper: std(0xffffff, { map: panel.hopper.tex, roughness: 0.7, emissive: 0xffffff, emissiveMap: panel.hopper.tex, emissiveIntensity: 0.38 }),
-    fg: std(0xe9b922, { roughness: 0.7, emissive: 0x4a3606, emissiveIntensity: 0.5 }),
     trimGrey: std(0x737980, { roughness: 0.85, metalness: 0.05 }),
     door: std(0x676d74, { roughness: 0.82, metalness: 0.05 }),
     post: std(0x34383c, { roughness: 0.75, metalness: 0.1 }),
@@ -427,15 +426,16 @@ export function buildE203Cockpit(ctx) {
       return g;
     };
     addB('hopper', plane(-0.2, 0.2, HW.top[0], 0.585, HZ, 0, HW.split));
-    // Lower part between the legs: its aft face with the low scale, sides.
-    addB('hopper', plane(-0.15, 0.15, FLOOR, 0.2, -0.84, HW.split + (1 - (0.2 - HW.low[0]) / (HW.low[1] - HW.low[0])) * (HW.H - HW.split), HW.H));
-    for (const sx of [1, -1]) addB('fg', at(new THREE.PlaneGeometry(0.24, 0.68), sx * 0.15, (FLOOR + 0.2) / 2, -0.72, 0, sx * Math.PI / 2, 0));
+    // Lower part: its aft face with the low scale, flush in the footwell's
+    // front wall between the closures (they stand at z -0.5).
+    const LZ = -0.501, LY = P0.y;
+    addB('hopper', plane(-0.15, 0.15, FLOOR, LY, LZ, HW.split + (1 - (LY - HW.low[0]) / (HW.low[1] - HW.low[0])) * (HW.H - HW.split), HW.H));
     // The sight slot's aluminium frame, standing proud of the lower face.
     const SL = HOPPER_SLOT, hw = (SL.w / 2 + 5) / 800, rr = hw, pts = [];
     for (let i = 0; i <= 12; i++) { const a = Math.PI + (i / 12) * Math.PI; pts.push([Math.cos(a) * rr, SL.y0 + rr + Math.sin(a) * rr]); }
     for (let i = 0; i <= 12; i++) { const a = (i / 12) * Math.PI; pts.push([Math.cos(a) * rr, SL.y1 - rr + Math.sin(a) * rr]); }
     const path = new THREE.CurvePath();
-    for (let i = 0; i < pts.length; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length]; path.add(new THREE.LineCurve3(new THREE.Vector3(x0, y0, -0.8435), new THREE.Vector3(x1, y1, -0.8435))); }
+    for (let i = 0; i < pts.length; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length]; path.add(new THREE.LineCurve3(new THREE.Vector3(x0, y0, LZ - 0.0035), new THREE.Vector3(x1, y1, LZ - 0.0035))); }
     addB('alu', new THREE.TubeGeometry(path, 52, 0.0035, 6, true));
   }
 
@@ -601,6 +601,19 @@ export function buildE203Cockpit(ctx) {
       wall(sx, DW.z0, DW.z1, FLOOR, DW.y0, 'door');
       wall(sx, DW.z0, DW.z1, DW.y1, SILL.y, 'door');
       wall(sx, DW.z1, BPOST + 0.02, FLOOR, SILL.y, 'door');
+      // The door's lower window from inside: a trim frame round the cut-out,
+      // the reveal out to the glass and the rubber seal (without them the
+      // cut-out reads as a hole in the wall).
+      const fw = 0.024, wx = (z, y, d) => sx * (halfX(z, y) - inset - d), gx = (y) => sx * (halfX(DW.z1, y) + 0.004);
+      for (const [z0, z1, y0, y1] of [[DW.z0 + fw, DW.z1 - fw, DW.y0 - fw, DW.y0], [DW.z0 + fw, DW.z1 - fw, DW.y1, DW.y1 + fw], [DW.z0 + fw, DW.z0, DW.y0, DW.y1], [DW.z1, DW.z1 - fw, DW.y0, DW.y1]]) {
+        addB('post', skin((u, v) => { const z = lerp(z0, z1, u), y = lerp(y0, y1, v); return [wx(z, y, 0.005), y, z]; }, Math.max(1, Math.round(Math.abs(z0 - z1) * 12)), 2, inside));
+      }
+      const rim = [[DW.z0, DW.y0], [DW.z1, DW.y0], [DW.z1, DW.y1], [DW.z0, DW.y1], [DW.z0, DW.y0]];
+      for (let k = 0; k < 4; k++) {
+        const [za, ya] = rim[k], [zb, yb] = rim[k + 1], c = [0, 0.3, (DW.z0 + DW.z1) / 2];
+        addB('rubber', skin((u, v) => { const z = lerp(za, zb, u), y = lerp(ya, yb, u); return [lerp(wx(z, y, 0.005), gx(y), v), y, z]; }, 6, 1, [c[0], (DW.y0 + DW.y1) / 2, c[2]]));
+        addB('rubber', rod([wx(za, ya, 0.008), ya, za], [wx(zb, yb, 0.008), yb, zb], 0.004, 6), true);
+      }
       wall(sx, BPOST + 0.02, ROOF.zR + 0.02, FLOOR, SILL.y, 'trimGrey');
     } else wall(sx, -0.5, ROOF.zR + 0.02, FLOOR, SILL.y, 'trimGrey');
     // Scuffed kick strip along the floor.

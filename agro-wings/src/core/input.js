@@ -15,6 +15,11 @@ import { t } from '../i18n/index.js';
 // scope are used by both schemes and conflict with everything. `shares`
 // names an intended overlap: E is the right rudder in the numpad scheme and
 // still the service key, which only acts with the engine off.
+//
+// A binding may be a chord, 'Shift+ArrowUp' (either Shift key, then the
+// key). While a bound chord is held its keys count for the chord only, so
+// Shift + Up raises the pilot's eye without adding power (Shift) or, in the
+// classic scheme, pushing the stick (Up).
 export const ACTIONS = {
   pitchDown: { get label() { return t('Pitch down (stick forward)'); }, keys: ['KeyW', 'ArrowUp'], scope: 'classic' },
   pitchUp: { get label() { return t('Pitch up (stick back)'); }, keys: ['KeyS', 'ArrowDown'], scope: 'classic' },
@@ -41,6 +46,8 @@ export const ACTIONS = {
   lookReset: { get label() { return t('Default view'); }, keys: ['Numpad0', 'Home'] },
   zoomIn: { get label() { return t('Zoom in'); }, keys: ['NumpadAdd', 'Equal'] },
   zoomOut: { get label() { return t('Zoom out'); }, keys: ['NumpadSubtract', 'Minus'] },
+  eyeUp: { get label() { return t('Pilot eye higher (taller pilot)'); }, keys: ['Shift+ArrowUp'] },
+  eyeDown: { get label() { return t('Pilot eye lower (shorter pilot)'); }, keys: ['Shift+ArrowDown'] },
   interact: { get label() { return t('Interact / service'); }, keys: ['KeyE'], shares: ['nYawRight'] },
   map: { get label() { return t('Map'); }, keys: ['KeyM'] },
   coverage: { get label() { return t('Coverage overlay'); }, keys: ['KeyK'] },
@@ -65,6 +72,31 @@ export const KEY_SCHEMES = {
   classic: {},
 };
 export const DEFAULT_KEY_SCHEME = 'numpad';
+
+// Chords: 'Mod+Code' -> [modifier keys, code]; null for a plain key code.
+const MODS = { Shift: ['ShiftLeft', 'ShiftRight'], Ctrl: ['ControlLeft', 'ControlRight'], Alt: ['AltLeft', 'AltRight'] };
+const MOD_OF = { ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl', AltLeft: 'Alt', AltRight: 'Alt' };
+export function chordOf(code) {
+  const i = code.indexOf('+');
+  return i > 0 && MODS[code.slice(0, i)] ? [MODS[code.slice(0, i)], code.slice(i + 1)] : null;
+}
+// A plain key that is part of a bound chord being held counts for the
+// chord only.
+const inChord = (code, down, chords) => chords.some(([mods, k]) => (k === code || mods.includes(code)) && down.has(k) && mods.some((m) => down.has(m)));
+// Is the binding `code` held, given the keys down and the chords bound?
+// (A chord pressed as one code, as the touch buttons do, counts too.)
+export function keyHeld(code, down, chords) {
+  const c = chordOf(code);
+  if (c) return down.has(code) || (c[0].some((m) => down.has(m)) && down.has(c[1]));
+  return down.has(code) && !inChord(code, down, chords);
+}
+// Did the binding `code` go down this frame? (A key tapped within one frame
+// is no longer down but still counts.)
+export function keyPressed(code, pressed, down, chords) {
+  const c = chordOf(code);
+  if (c) return pressed.has(code) || (pressed.has(c[1]) && c[0].some((m) => down.has(m) || pressed.has(m)));
+  return pressed.has(code) && !inChord(code, down, chords);
+}
 
 const STORE = 'agrowings.keys.v1';
 const BIND_REV = 2; // bumped when saved bindings need a clean-up on load
@@ -102,9 +134,13 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       if (this.capture) {
         e.preventDefault();
+        // A modifier alone is taken on its release (it may start a chord).
+        if (MOD_OF[e.code]) { this._capMod = e.code; return; }
+        const mod = e.shiftKey ? 'Shift' : e.ctrlKey ? 'Ctrl' : e.altKey ? 'Alt' : null;
         const cb = this.capture;
         this.capture = null;
-        cb(e.code);
+        this._capMod = null;
+        cb(mod && e.code !== 'Escape' ? `${mod}+${e.code}` : e.code);
         return;
       }
       if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
@@ -113,6 +149,12 @@ export class Input {
       this.down.add(e.code);
     });
     window.addEventListener('keyup', (e) => {
+      if (this.capture && this._capMod === e.code) {
+        const cb = this.capture;
+        this.capture = null;
+        this._capMod = null;
+        cb(e.code);
+      }
       this.down.delete(e.code);
       this.released.add(e.code);
     });
@@ -168,6 +210,7 @@ export class Input {
   }
 
   load() {
+    this._chords = null;
     try {
       const s = JSON.parse(localStorage.getItem(STORE) || 'null');
       if (s) {
@@ -177,6 +220,7 @@ export class Input {
     } catch { /* storage unavailable */ }
   }
   save() {
+    this._chords = null;
     try { localStorage.setItem(STORE, JSON.stringify({ ...this.bindings, _rev: BIND_REV })); } catch { /* ignore */ }
   }
   resetBindings() {
@@ -206,9 +250,12 @@ export class Input {
   // reads. Empty: the actions read themselves (classic).
   setAlias(map) { this.alias = map || {}; }
   keysOf(a) { return this.bindings[this.alias[a] ?? a] ?? []; }
+  // The chords bound to any action (dropped by save / load, which every
+  // change of the bindings goes through).
+  get chords() { return (this._chords ??= Object.values(this.bindings).flat().map(chordOf).filter(Boolean)); }
 
-  isDown(a) { return this.enabled && this.keysOf(a).some((c) => this.down.has(c)); }
-  wasPressed(a) { return this.enabled && this.keysOf(a).some((c) => this.pressed.has(c)); }
+  isDown(a) { return this.enabled && this.keysOf(a).some((c) => keyHeld(c, this.down, this.chords)); }
+  wasPressed(a) { return this.enabled && this.keysOf(a).some((c) => keyPressed(c, this.pressed, this.down, this.chords)); }
   wasReleased(a) { return this.keysOf(a).some((c) => this.released.has(c)); }
   press(code) { if (!this.down.has(code)) this.pressed.add(code); this.down.add(code); }
   release(code) { this.down.delete(code); this.released.add(code); }
@@ -248,6 +295,8 @@ export class Input {
 
 export function keyLabel(code) {
   if (!code) return '—';
+  const c = chordOf(code);
+  if (c) return `${code.slice(0, code.indexOf('+'))} + ${keyLabel(c[1])}`;
   return code.replace(/^Numpad/, 'Num ').replace(/^Key/, '').replace(/^Digit/, '').replace('Arrow', '').replace('Left', ' L').replace('Right', ' R')
     .replace('Bracket R', ']').replace('Bracket L', '[').replace('Control', 'Ctrl').replace('Backspace', '⌫').replace('Escape', 'Esc')
     .replace('Divide', '÷').replace('Multiply', '×').replace('Add', '+').replace('Subtract', '−').replace('Equal', '=').replace('Minus', '-');

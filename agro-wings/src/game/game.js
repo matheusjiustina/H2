@@ -7,7 +7,7 @@ import { Input, KEY_SCHEMES, DEFAULT_KEY_SCHEME, keyLabel } from '../core/input.
 import { ParticlePool } from '../core/particles.js';
 import { Aircraft } from '../aircraft/aircraft.js';
 import { Helicopter } from '../aircraft/helicopter.js';
-import { CameraRig } from '../aircraft/cameras.js';
+import { CameraRig, EYE_RANGE } from '../aircraft/cameras.js';
 import { Sprayer } from '../spray/sprayer.js';
 import { Guidance } from '../spray/guidance.js';
 import { CoverageOverlay } from '../spray/overlay.js';
@@ -52,7 +52,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, r44Livery: 0, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, r44Livery: 0, eyeHeight: 0, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -115,6 +115,8 @@ export class Game {
     this._applyAircraftOptions();
     this.rig = new CameraRig(this.camera);
     this.rig.shakeScale = this.settings.shake;
+    this.rig.eyeHeight = Math.max(-EYE_RANGE, Math.min(EYE_RANGE, +this.settings.eyeHeight || 0));
+    this.settings.eyeHeight = this.rig.eyeHeight;
     this.sprayer = new Sprayer(this);
     this.guidance = new Guidance(this);
     this.replay = new ReplayManager(this);
@@ -645,8 +647,15 @@ export class Game {
         const live = this.playing && !this.controlsLocked;
         // Head look / zoom keys ride along with the mouse.
         const ax = (a, b) => (input.isDown(a) ? 1 : 0) - (input.isDown(b) ? 1 : 0);
-        if (live) mouse.keys = { x: ax('lookRight', 'lookLeft'), y: ax('lookUp', 'lookDown'), zoom: ax('zoomOut', 'zoomIn'), reset: input.wasPressed('lookReset') };
+        const eye = live && this.rig.mode === 'cockpit' ? ax('eyeUp', 'eyeDown') : 0;
+        if (live) mouse.keys = { x: ax('lookRight', 'lookLeft'), y: ax('lookUp', 'lookDown'), zoom: ax('zoomOut', 'zoomIn'), reset: input.wasPressed('lookReset'), eye };
         this.rig.update(pdt, ac, live ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
+        // The eye height is kept once the keys are let go.
+        if (!eye && this.rig.eyeHeight !== this.settings.eyeHeight) {
+          const v = (this.rig.eyeHeight = Math.round(this.rig.eyeHeight * 1000) / 1000), cm = Math.round(v * 100);
+          this.setSetting('eyeHeight', v);
+          if (this.playing) this.toast(t('Pilot eye height: {0} cm', `${cm > 0 ? '+' : ''}${cm}`));
+        }
       }
       // Parked aircraft: drawn only within 1.2 km (a few pixels beyond that).
       // The flown aircraft is never culled (it may have been hidden while

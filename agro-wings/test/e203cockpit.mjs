@@ -44,6 +44,10 @@ for (const [W, H, tag] of sizes) {
       ['right', 'air', { yaw: -1.15, pitch: -0.25, zoom: 1 }],
       ['up', 'air', { yaw: 0.2, pitch: 0.75, zoom: 1 }],
       ['down', 'air', { yaw: 0, pitch: -0.75, zoom: 1 }],
+      ['downPad', 'pad', { yaw: 0.05, pitch: -0.5, zoom: 1.15 }],
+      ['downLeft', 'pad', { yaw: 0.55, pitch: -0.65, zoom: 1.1 }],
+      ['downRight', 'pad', { yaw: -0.55, pitch: -0.65, zoom: 1.1 }],
+      ['doorLow', 'pad', { yaw: 1.15, pitch: -0.7, zoom: 1 }],
       ['back', 'air', { yaw: 2.4, pitch: -0.1, zoom: 1 }],
       ['instruments', 'air', { yaw: 0.2, pitch: -0.42, zoom: 0.42 }],
       ['gps', 'air', { yaw: -0.38, pitch: -0.44, zoom: 0.4 }],
@@ -146,6 +150,35 @@ for (const [W, H, tag] of sizes) {
       return { y0: r(y0), yL: r(yL), p0: r(p0), pD: r(pD), z: r(z), yR: r(g.rig.look.yaw), pR: r(g.rig.look.pitch), zR: g.rig.zoom.cockpit, moved: r(moved) };
     });
     check(lk.yL > lk.y0 + 0.5 && lk.pD < lk.p0 - 0.2 && lk.z < 0.8 && lk.yR === 0 && lk.pR === lk.p0 && lk.zR === 1 && lk.moved < 0.02, 'look keys: left, down, zoom, reset (eye fixed)', JSON.stringify(lk));
+    // Pilot eye height with real key events: Shift + Up held raises the
+    // eye (a taller pilot) without adding power or pitching, Shift + Down
+    // lowers it, both within the range; the height is kept in the settings.
+    const eyeAt = () => page.evaluate(() => {
+      const g = window.__agro, ac = g.aircraft;
+      for (let i = 0; i < 3; i++) g.tick(1 / 30);
+      const e = g.camera.position.clone().sub(ac.rPos).applyQuaternion(ac.rQuat.clone().invert());
+      return { y: +e.y.toFixed(3), h: +g.rig.eyeHeight.toFixed(3), thr: +ac.fm.throttle.toFixed(3), saved: g.settings.eyeHeight };
+    });
+    const hold = async (keys, n) => {
+      for (const k of keys) await page.keyboard.down(k);
+      await page.evaluate((n) => { for (let i = 0; i < n; i++) window.__agro.tick(1 / 30); }, n);
+      for (const k of keys.slice().reverse()) await page.keyboard.up(k);
+    };
+    await page.evaluate(() => { const g = window.__agro; g.setSetting('shake', 0); g.rig.eyeHeight = 0; g.setSetting('eyeHeight', 0); g.aircraft.fm.throttle = 0.3; });
+    const ey0 = await eyeAt();
+    // 15 cm/s at 30 ticks/s: 10 ticks = 5 cm.
+    await hold(['Shift', 'ArrowUp'], 10);
+    const eyU = await eyeAt();
+    await hold(['Shift', 'ArrowUp'], 60);
+    const eyMax = await eyeAt();
+    await hold(['Shift', 'ArrowDown'], 90);
+    const eyMin = await eyeAt();
+    await hold(['Shift', 'ArrowUp'], 30);
+    const eyBack = await eyeAt();
+    const eyInfo = JSON.stringify({ ey0, eyU, eyMax, eyMin, eyBack });
+    check(Math.abs(eyU.h - 0.05) < 0.005 && Math.abs(eyU.y - ey0.y - eyU.h) < 0.005 && eyU.thr === ey0.thr && eyU.saved === eyU.h, 'Shift + Up: eye higher, power untouched, height saved', eyInfo);
+    check(eyMax.h === 0.15 && eyMin.h === -0.15 && Math.abs(eyBack.h) < 0.005 && Math.abs(eyMin.y - ey0.y + 0.15) < 0.005, 'Shift + Up / Down: within ±15 cm, back to the middle', eyInfo);
+    await page.evaluate(() => { const g = window.__agro; g.rig.eyeHeight = 0; g.setSetting('eyeHeight', 0); g.setSetting('shake', 1); });
   }
   check(errors.length === 0, `${tag}: no page errors`, errors.slice(0, 3).join(' | '));
   await page.close();

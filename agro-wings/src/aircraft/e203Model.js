@@ -715,7 +715,7 @@ export function createE203Model(panel, opts = {}) {
     add('livery', liveryUV(tagged(grid((u, v) => sideAt(sx, u, v, BPOST, ROOF.zR), 4, 6, [0, 0.6, -1.7]))));
   }
   // Lower window in the left door, under the side window's front half.
-  const DW = { z0: -0.72, z1: -1.2, y0: 0.2, y1: 0.38 };
+  const DW = { z0: -0.72, z1: -1.2, y0: 0.1, y1: 0.32 }; // clear of the power quadrant inside
   const doorWin = grid((u, v) => { const y = lerp(DW.y0, DW.y1, v); return [surfX(stCab, y) + 0.005, y, lerp(DW.z0, DW.z1, u)]; }, 6, 4);
   // Frames: slim painted tubes in the scheme colour.
   const fr = (pts, r) => add('frame', tube(pts, r, Math.max(6, pts.length * 3), 8));

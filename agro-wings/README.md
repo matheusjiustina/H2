@@ -83,6 +83,7 @@ scheme). Everything else is the same in both.
 | Spray valve | C (Enter) |
 | Cockpit / chase | V |
 | Free external camera | O |
+| Pilot's eye higher / lower (taller or shorter pilot, cockpit view) | Shift + ↑ / Shift + ↓ |
 | Service / interact | E |
 | Map / coverage overlay / contracts | M / K / J |
 | Minimap: farm map ↔ GPS guidance page | N (or click the minimap) |
@@ -2761,6 +2762,31 @@ winglets, flaps, ailerons, propeller, ag kit, cockpit and paints kept):
 - **Nose.** Slimmer toward the spinner (lip 0.58 → 0.54 m wide) and its top
   line falling more steeply to it — the cowl rising at an angle from the
   spinner to the windshield; inlets and the landing light sized to fit.
+
+### EMB-203 cockpit fixes — hopper sight, door window, eye height
+
+- **Hopper sight on its wall.** The yellow lower face of the hopper with
+  the VÔO / SOLO scales and the sight slot stood 34 cm aft of the footwell
+  (z −0.84, a board in front of the pilot's legs, with yellow sides). It is
+  now flush in the footwell's front wall, between the grey closures
+  (z −0.501), up to the panel's lower edge; its side panels are gone and
+  the slot's aluminium frame moved with it.
+- **Door's lower window.** The real 203's door is glazed low down (it shows
+  on PS-WBM with the door open), but from inside the cut-out had no frame,
+  so it read as a hole in the wall with the ground behind it. It now has a
+  dark trim frame round it on the inner skin, a rubber reveal out to the
+  glass and a rubber seal, and it sits lower (y 0.10–0.32, was 0.20–0.38)
+  so the power quadrant no longer covers its top edge (inside and outside
+  move together).
+- **Pilot's eye height (every aircraft).** Shift + ↑ raises the cockpit eye
+  and Shift + ↓ lowers it — a taller or a shorter pilot — 15 cm/s, up to
+  ±15 cm from the type's eye point. It is kept in the settings when the
+  keys are let go (a short message gives the height); the default view
+  (Num 0 / Home) resets the look and the zoom, not the eye height. While
+  Shift + ↑ / ↓ is held, Shift does not add power and ↑ / ↓ do not move the
+  stick (classic scheme); either key alone works as before. Bindings can be
+  chords now: in Settings, hold Shift (or Ctrl / Alt) and press the key; a
+  modifier alone is taken when it is released.
 
 ## Robinson R44 — exterior reconstruction and paint B
 
