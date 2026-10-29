@@ -52,7 +52,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -344,6 +344,17 @@ export class Game {
     if (!site.main && this.playing) this.toast(t('{0}: the local service truck is waiting at the pad.', site.farm.name));
   }
 
+  // The course chosen on the map: a marker and a line on every map.
+  setWaypoint(p) {
+    this.waypoint = p ? { x: p.x, z: p.z } : null;
+    if (p) { const a = this.aircraft.fm.pos, d = Math.hypot(p.x - a.x, p.z - a.z); this.toast(t('Course set: {0}', d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`)); }
+    this.hud.miniT = 0;
+  }
+  // Reached: within 80 m of the marker.
+  _waypointUpdate() {
+    const w = this.waypoint, a = this.aircraft?.fm.pos;
+    if (w && a && Math.hypot(w.x - a.x, w.z - a.z) < 80) { this.waypoint = null; this.toast(t('Course reached')); }
+  }
   // Touch camera pill: free = the orbit camera (O), fixed = the chase view.
   setTouchCamera(free) {
     if (free === (this.cameraMode === 'orbit')) return;
@@ -683,6 +694,7 @@ export class Game {
       if (!headless) this._audio(rawDt);
       if (this.playing) this._prompts();
       this.hud.update(pdt);
+      this._waypointUpdate();
       this.touch.update();
     }
     this.saveT -= rawDt;

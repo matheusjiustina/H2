@@ -183,6 +183,30 @@ export function drawMap(g, w, h, base, game, view) {
       g.setLineDash([]);
     }
   }
+  // The chosen course: a dashed line from the aircraft to the marker, the
+  // distance beside it (kept upright on a track-up map).
+  const wp = game.waypoint;
+  if (wp) {
+    const a = game.aircraft.fm.pos;
+    g.strokeStyle = '#38e1ff';
+    g.lineWidth = 2.5 / scale;
+    g.setLineDash([12 / scale, 7 / scale]);
+    g.beginPath(); g.moveTo(a.x, a.z); g.lineTo(wp.x, wp.z); g.stroke();
+    g.setLineDash([]);
+    g.save();
+    g.translate(wp.x, wp.z);
+    g.rotate(-rot);
+    g.scale(1 / scale, 1 / scale);
+    const m = Math.max(6, (view.labelPx ?? 13) * 0.55);
+    g.fillStyle = '#38e1ff'; g.strokeStyle = 'rgba(0,0,0,.8)'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(0, -m * 1.5); g.lineTo(m, 0); g.lineTo(0, m * 1.5); g.lineTo(-m, 0); g.closePath(); g.fill(); g.stroke();
+    const d = Math.hypot(wp.x - a.x, wp.z - a.z);
+    g.font = `bold ${view.labelPx ?? 13}px Arial`; g.textAlign = 'center';
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.7)'; g.fillStyle = '#38e1ff';
+    const txt = d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`;
+    g.strokeText(txt, 0, m * 1.5 + (view.labelPx ?? 13) + 2); g.fillText(txt, 0, m * 1.5 + (view.labelPx ?? 13) + 2);
+    g.restore();
+  }
   // Service pad marker (where the crew is now).
   const pad = game.site?.pad ?? BASE.pad;
   g.strokeStyle = '#7fd0ff';
@@ -241,6 +265,12 @@ export function drawMap(g, w, h, base, game, view) {
   g.fill();
   g.stroke();
   g.restore();
+}
+
+// World point under a pointer event on a north-up map canvas.
+export function mapPoint(canvas, view, e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: view.cx + ((e.clientX - r.left) / r.width - 0.5) * 2 * view.range, z: view.cz + ((e.clientY - r.top) / r.height - 0.5) * 2 * view.range };
 }
 
 // Mouse-wheel zoom (about the cursor, out to the whole 12 km map) and

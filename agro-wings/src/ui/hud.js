@@ -52,7 +52,20 @@ export class HUD {
     this.$.prompt.addEventListener('click', () => this.promptAction?.());
     // Click the minimap to switch it between the farm map and the GPS page.
     this.$.mini.parentElement.classList.add('interactive');
-    this.$.mini.addEventListener('click', () => this.toggleGps());
+    // On a touch screen a tap folds the minimap small and back; a long press
+    // switches it between the farm map and the GPS page.
+    let hold = null, held = false;
+    this.$.mini.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      held = false;
+      hold = setTimeout(() => { held = true; this.toggleGps(); }, 550);
+    });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) this.$.mini.addEventListener(ev, () => clearTimeout(hold));
+    this.$.mini.addEventListener('click', (e) => {
+      if (!game.touch?.active) { this.toggleGps(); return; }
+      if (held) { held = false; return; }
+      this.$.mini.parentElement.classList.toggle('folded');
+    });
     // Mouse wheel over the minimap: zoom out to ~6 km across, in to ~500 m.
     this.miniRange = 650;
     this.$.mini.addEventListener('wheel', (e) => {

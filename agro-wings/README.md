@@ -2822,6 +2822,20 @@ the O key on a PC: drag to place it round the aircraft, pinch to zoom
 multi-touch events at 844×390: drag, free, orbit drag, pinch both ways,
 back to fixed, no page errors.
 
+**Course on the map (PC and phone).** Click / tap on the full map (M, or the
+MAPA button) sets a course: a cyan marker with its distance and a dashed
+line from the aircraft, drawn on the full map and on the minimap while
+flying; it clears itself within 80 m of the marker or with "Limpar rumo".
+The map has + / − zoom buttons and a close button (the wheel and drag still
+work); the map no longer closes on a click. On a phone, tapping the minimap
+folds it small and back (a long press switches farm map ↔ GPS page).
+
+**Touch HUD extras.** A small button right of the readout strip hides it
+and brings it back (kept in the settings); the virtual stick goes more
+transparent after the thumb has been on it for a moment. On short
+landscape screens the map shows only its four buttons over the chart (the
+legend and hint are hidden).
+
 ## Robinson R44 — exterior reconstruction and paint B
 
 Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor

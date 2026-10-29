@@ -30,6 +30,7 @@ export class TouchControls {
         <button class="tb" data-hold="engine">${t('ENG')}</button><button class="tb" data-tap="camera">${t('CAM')}</button>
         <button class="tb small" data-tap="flapsDown">FLP+</button><button class="tb small" data-tap="flapsUp">FLP−</button>
       </div>
+      <button class="t-strip" aria-label="${t('Show / hide the readouts')}"></button>
       <div class="t-top"><div class="t-look"><button data-look="1">${t('FREE')}</button><button data-look="0">${t('FIXED')}</button></div><button class="tb small" data-tap="interact">E</button><button class="tb small" data-tap="map">${t('MAP')}</button><button class="tb small" data-tap="pause">II</button></div>
     </div>`);
     root.appendChild(this.el);
@@ -48,9 +49,12 @@ export class TouchControls {
       v.roll = x;
       v.pitch = y; // drag down = stick back = nose up
     };
-    stick.addEventListener('pointerdown', (e) => { sid = e.pointerId; stick.setPointerCapture(e.pointerId); setStick(e); });
+    // Held for a while, the stick turns more transparent (the view behind it
+    // matters more than the ring once the thumb is on it).
+    let fade = null;
+    stick.addEventListener('pointerdown', (e) => { sid = e.pointerId; stick.setPointerCapture(e.pointerId); setStick(e); clearTimeout(fade); fade = setTimeout(() => stick.classList.add('faded'), 1500); });
     stick.addEventListener('pointermove', (e) => { if (e.pointerId === sid) setStick(e); });
-    const endStick = (e) => { if (e.pointerId !== sid) return; sid = null; v.roll = 0; v.pitch = 0; knob.style.transform = ''; };
+    const endStick = (e) => { if (e.pointerId !== sid) return; clearTimeout(fade); stick.classList.remove('faded'); sid = null; v.roll = 0; v.pitch = 0; knob.style.transform = ''; };
     stick.addEventListener('pointerup', endStick);
     stick.addEventListener('pointercancel', endStick);
     const thr = this.el.querySelector('.t-thr'), thrBar = thr.querySelector('span');
@@ -92,6 +96,9 @@ export class TouchControls {
     }
     // Free / fixed camera: a finger dragged on the view looks around or not.
     for (const b of this.el.querySelectorAll('[data-look]')) b.addEventListener('pointerdown', (e) => { e.preventDefault(); game.setTouchCamera(b.dataset.look === '1'); this.syncCamera(); });
+    // Small button beside the readout strip: hides it / brings it back.
+    this.stripBtn = this.el.querySelector('.t-strip');
+    this.stripBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); game.setSetting('touchStrip', game.settings.touchStrip === false); this.applySettings(); });
     this.tiltBtn = this.el.querySelector('[data-tilt]');
     this.tiltBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.startTilt(true); });
     this.neutral = null;
@@ -122,6 +129,10 @@ export class TouchControls {
     if (mode !== this.mode) { v.roll = 0; v.pitch = 0; this.dpad.x = this.dpad.y = 0; }
     this.mode = mode;
     for (const m of ['stick', 'tilt', 'buttons']) this.el.classList.toggle(`m-${m}`, m === mode);
+    const strip = s.touchStrip !== false;
+    this.game.uiRoot.classList.toggle('strip-off', !strip);
+    this.stripBtn.textContent = strip ? '›' : '‹';
+    this.stripBtn.classList.toggle('off', !strip);
     if (mode === 'tilt') this.startTilt(false); else this.stopTilt();
   }
 
@@ -174,6 +185,11 @@ export class TouchControls {
     // Tilt is zeroed to the pose the phone is held in when the flight starts,
     // and reported as missing when the sensor never answers.
     this.syncCamera();
+    // Keep the little button just right of the strip (or centred when it is hidden).
+    if ((this._pl = (this._pl || 0) + 1) % 20 === 0 || this._pl === 1) {
+      const ro = this.game.uiRoot.querySelector('.readouts'), r = ro?.getBoundingClientRect();
+      this.stripBtn.style.left = r && r.width ? `${r.right + 6}px` : '';
+    }
     if (this.game.playing && !this._wasPlaying) this.neutral = null;
     this._wasPlaying = this.game.playing;
     if (this.mode === 'tilt') {

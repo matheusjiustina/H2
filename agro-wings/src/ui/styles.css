@@ -231,6 +231,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .touch-mode .ro .u { font-size: 8px; margin-left: 1px; }
 .touch-mode .ro .bar { width: 100%; height: 2px; margin-top: 1px; }
 .touch-mode .minimap { width: 116px; height: 116px; top: max(10px, env(safe-area-inset-top)); bottom: auto; right: auto; left: var(--edge); }
+.t-strip { position: absolute; bottom: max(6px, env(safe-area-inset-bottom)); left: calc(50% + 214px); width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,.4); background: rgba(8,14,10,.4); color: var(--ink-dim); font: 700 13px/1 var(--sans); }
+.t-strip.off { left: 50% !important; margin-left: -11px; }
+.touch-mode.strip-off .readouts { display: none; }
+.t-stick { transition: opacity .5s; } .t-stick.faded { opacity: .28; }
+.touch-mode .minimap { transition: width .18s, height .18s; }
+.touch-mode .minimap.folded, .touch-mode .minimap.gps.folded { width: 62px; height: 62px; }
+.mapbtns { position: absolute; right: 10px; top: 10px; display: flex; gap: 6px; }
+.mapbtns button { min-width: 38px; height: 38px; padding: 0 10px; border-radius: 19px; border: 1px solid rgba(255,255,255,.5); background: rgba(8,14,10,.6); color: var(--ink); font: 700 18px var(--sans); }
+.mapbtns button[data-clear] { font: 600 11px var(--sans); letter-spacing: .06em; }
 .touch-mode .jobcard { top: 136px; width: 170px; }
 .touch-mode .prompt { bottom: 52px; }
 @media (max-width: 720px) {
@@ -321,3 +330,5 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .mapwrap canvas:active, .os-mapbox canvas:active { cursor: grabbing; }
 .os-mapbox { position: relative; max-width: 520px; }
 .os-mapbox canvas { width: 100%; height: auto; border-radius: 6px; background: #3d5a24; display: block; }
+/* Short (landscape phone) screens: the map keeps its buttons and nothing else on top of it. */
+@media (max-height: 500px) { .mapwrap .legend, .mapwrap .maphint { display: none; } }

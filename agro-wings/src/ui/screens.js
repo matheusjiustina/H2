@@ -5,12 +5,12 @@ import { h } from './hud.js';
 import { TIMES, WEATHER, TIME_ORDER, WEATHER_ORDER } from '../world/atmosphere.js';
 import { CONTRACTS, LEVELS } from '../game/contracts.js';
 import { fieldsTerrain } from '../world/terrainInfo.js';
-import { BASE } from '../world/layout.js';
+import { BASE, WORLD_HALF } from '../world/layout.js';
 import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER, REG_PREFIXES, normalizeReg, regTaken, productLimit } from '../aircraft/types.js';
 import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
-import { drawMap, mapControls } from './maps.js';
+import { drawMap, mapControls, mapPoint } from './maps.js';
 import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
 
@@ -494,12 +494,22 @@ export class Screens {
 
   map() {
     const g = this.game;
-    const el = h(`<div class="mapwrap"><canvas width="1400" height="1400"></canvas><div class="maphint">${t('Mouse wheel: zoom · drag: move · click: close')}</div>
+    const el = h(`<div class="mapwrap"><canvas width="1400" height="1400"></canvas><div class="maphint">${t('Tap / click: set course · drag: move · wheel or + −: zoom')}</div>
+      <div class="mapbtns"><button data-z="in" aria-label="${t('Zoom in')}">+</button><button data-z="out" aria-label="${t('Zoom out')}">−</button><button data-clear title="${t('Clear course')}">${t('Clear course')}</button><button data-x aria-label="${t('Close')}">✕</button></div>
       <div class="legend"><div><i style="background:#3f8f2c"></i>${t('Soy')}</div><div><i style="background:#2f7224"></i>${t('Corn')}</div><div><i style="background:#5f8f4a"></i>${t('Cotton')}</div><div><i style="background:#9a3a1c"></i>${t('Roads / fallow')}</div><div><i style="background:#1f3a18"></i>${t('Forest')}</div><div><i style="background:#c83228"></i>${t('Not covered')}</div><div><i style="background:#46c85a"></i>${t('Covered')}</div><div><i style="background:#9650dc"></i>${t('Overlap')}</div><div><i style="background:#ffe14a"></i>${t('Next pass')}</div></div></div>`);
     const c = el.querySelector('canvas');
     // Framed automatically until the wheel or a drag takes over.
     const view = { cx: 0, cz: 0, range: 1900, manual: false };
-    mapControls(c, view, { onClick: () => this.close() });
+    // Click / tap sets the course; the buttons zoom, clear it or close.
+    mapControls(c, view, { onClick: (e) => g.setWaypoint(mapPoint(c, view, e)) });
+    el.querySelector('.mapbtns').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      e.stopPropagation();
+      if (b.dataset.z) { view.range = Math.min(WORLD_HALF, Math.max(250, view.range * (b.dataset.z === 'in' ? 0.7 : 1.43))); view.manual = true; }
+      else if (b.hasAttribute('data-clear')) g.setWaypoint(null);
+      else this.close();
+    });
     const draw = () => {
       if (this.open !== 'map') return;
       if (view.manual) {
