@@ -7,8 +7,9 @@
 //   buttons four arrow buttons, no stick and no tilt
 // Rudder, power slider (right edge, middle), spray, brakes, engine, camera,
 // flaps, service, map and pause are the same in all three. The camera pill
-// chooses whether a finger dragged on the view looks around (free) or not
-// (fixed).
+// is the camera: fixed (the default) is the chase / cockpit view that a
+// dragged finger looks around, free is the orbit camera (the O key on a PC):
+// drag to place it, pinch to zoom.
 import { h } from './hud.js';
 import { t } from '../i18n/index.js';
 
@@ -90,7 +91,7 @@ export class TouchControls {
       });
     }
     // Free / fixed camera: a finger dragged on the view looks around or not.
-    for (const b of this.el.querySelectorAll('[data-look]')) b.addEventListener('pointerdown', (e) => { e.preventDefault(); game.setSetting('touchLook', b.dataset.look === '1'); });
+    for (const b of this.el.querySelectorAll('[data-look]')) b.addEventListener('pointerdown', (e) => { e.preventDefault(); game.setTouchCamera(b.dataset.look === '1'); this.syncCamera(); });
     this.tiltBtn = this.el.querySelector('[data-tilt]');
     this.tiltBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.startTilt(true); });
     this.neutral = null;
@@ -108,6 +109,11 @@ export class TouchControls {
     this.game.uiRoot.classList.add('touch-mode');
   }
 
+  syncCamera() {
+    const free = this.game.cameraMode === 'orbit';
+    for (const b of this.el.querySelectorAll('[data-look]')) b.classList.toggle('on', (b.dataset.look === '1') === free);
+  }
+
   // Layout and camera choice from the settings.
   applySettings() {
     const s = this.game.settings;
@@ -116,9 +122,6 @@ export class TouchControls {
     if (mode !== this.mode) { v.roll = 0; v.pitch = 0; this.dpad.x = this.dpad.y = 0; }
     this.mode = mode;
     for (const m of ['stick', 'tilt', 'buttons']) this.el.classList.toggle(`m-${m}`, m === mode);
-    const free = s.touchLook !== false;
-    this.game.input.touchLook = free;
-    for (const b of this.el.querySelectorAll('[data-look]')) b.classList.toggle('on', (b.dataset.look === '1') === free);
     if (mode === 'tilt') this.startTilt(false); else this.stopTilt();
   }
 
@@ -170,6 +173,7 @@ export class TouchControls {
     if (!this.active) return;
     // Tilt is zeroed to the pose the phone is held in when the flight starts,
     // and reported as missing when the sensor never answers.
+    this.syncCamera();
     if (this.game.playing && !this._wasPlaying) this.neutral = null;
     this._wasPlaying = this.game.playing;
     if (this.mode === 'tilt') {

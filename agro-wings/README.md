@@ -2814,6 +2814,14 @@ tap at 844×390). Phone tilt is zeroed to the pose held when the flight
 starts and, if the sensor never answers (some embedded pages and browsers
 block it), the badge says "sem sensor".
 
+**Touch camera.** The pill is now FIXA (default) / LIVRE. Fixed is the
+chase / cockpit view with what free used to do: a finger dragged on the
+view looks around (double tap: default view). Free is the orbit camera of
+the O key on a PC: drag to place it round the aircraft, pinch to zoom
+(spread = in). Pinch also zooms the fixed views. Checked with real
+multi-touch events at 844×390: drag, free, orbit drag, pinch both ways,
+back to fixed, no page errors.
+
 ## Robinson R44 — exterior reconstruction and paint B
 
 Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor

@@ -163,15 +163,25 @@ export class Input {
     // Touch: one finger dragged on the view (the touch controls are their
     // own elements over it) looks around like the mouse; a double tap
     // brings the default view back.
+    // A second finger makes a pinch: spreading zooms in, pinching zooms out
+    // (the same zoom as the mouse wheel; the first finger's look pauses).
     let touchId = null, tx = 0, ty = 0, lastTap = 0;
+    const fingers = new Map();
+    let pinchD = 0;
+    const span = () => { const [a, b] = [...fingers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
     const touchEnd = (e) => {
+      if (e.pointerType === 'touch') { fingers.delete(e.pointerId); pinchD = 0; }
       if (e.pointerId !== touchId) return;
       touchId = null;
       this.mouse.buttons &= ~1;
       this.release(this.keysOf('lookReset')[0]);
     };
     el.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'touch' || touchId !== null || this.touchLook === false) return;
+      if (e.pointerType === 'touch') {
+        fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (fingers.size === 2) { pinchD = span(); return; }
+      }
+      if (e.pointerType !== 'touch' || touchId !== null) return;
       touchId = e.pointerId; tx = e.clientX; ty = e.clientY;
       this.mouse.buttons |= 1;
       const now = performance.now();
@@ -179,6 +189,14 @@ export class Input {
       lastTap = now;
     });
     el.addEventListener('pointermove', (e) => {
+      if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (fingers.size >= 2) {
+        const d = span();
+        if (pinchD) this.mouse.wheel -= (d - pinchD) / 45;
+        pinchD = d;
+        tx = e.clientX; ty = e.clientY;
+        return;
+      }
       if (e.pointerId !== touchId) return;
       this.mouse.dx += (e.clientX - tx) * 0.0035;
       this.mouse.dy += (e.clientY - ty) * 0.0035;

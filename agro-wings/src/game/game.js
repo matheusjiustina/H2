@@ -52,7 +52,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', touchLook: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -185,7 +185,7 @@ export class Game {
       this.resize();
     }
     if (k === 'keyScheme') this._applyKeyScheme();
-    if (k === 'touchMode' || k === 'touchLook') this.touch?.applySettings();
+    if (k === 'touchMode') this.touch?.applySettings();
     if (k === 'volume') this.audio.setVolume(v);
     if (k === 'shake') this.rig.shakeScale = v;
     // Visual/audio only: the flight model's wind is not touched by weather.
@@ -344,6 +344,12 @@ export class Game {
     if (!site.main && this.playing) this.toast(t('{0}: the local service truck is waiting at the pad.', site.farm.name));
   }
 
+  // Touch camera pill: free = the orbit camera (O), fixed = the chase view.
+  setTouchCamera(free) {
+    if (free === (this.cameraMode === 'orbit')) return;
+    this.cameraMode = free ? 'orbit' : 'chase';
+    this.rig.setMode(this.cameraMode, this.aircraft);
+  }
   toast(msg) { this.toastLog = this.toastLog || []; this.toastLog.push(msg); this.hud?.toast(msg); }
   crewMessage(msg) { void msg; }
   charge(amount) { this.career.money -= amount; }
