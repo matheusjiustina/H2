@@ -177,23 +177,50 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .note { color: var(--ink-faint); font-size: 12px; line-height: 1.5; margin-top: 12px; }
 
 /* ---------- touch ---------- */
-.touch { position: absolute; inset: 0; display: none; touch-action: none; }
+.touch { position: absolute; inset: 0; display: none; touch-action: none; --edge: max(12px, env(safe-area-inset-left)); --edger: max(12px, env(safe-area-inset-right)); --bot: max(12px, calc(env(safe-area-inset-bottom) + 6px)); }
 .touch.on { display: block; }
-.t-stick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: max(110px, calc(env(safe-area-inset-bottom) + 96px)); width: 132px; height: 132px; border-radius: 50%; background: rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.35); pointer-events: auto; }
-.t-knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,.35); }
-.t-thr { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(210px, calc(env(safe-area-inset-bottom) + 196px)); width: 46px; height: 170px; border-radius: 23px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.35); pointer-events: auto; }
-.t-thr span { position: absolute; left: 4px; right: 4px; bottom: 4px; border-radius: 19px; background: rgba(242,179,27,.55); }
-.t-btns { position: absolute; right: max(74px, calc(env(safe-area-inset-right) + 74px)); bottom: max(200px, calc(env(safe-area-inset-bottom) + 186px)); display: grid; grid-template-columns: repeat(2, 54px); gap: 8px; pointer-events: auto; }
-.t-top { position: absolute; top: max(60px, calc(env(safe-area-inset-top) + 56px)); right: max(12px, env(safe-area-inset-right)); display: flex; gap: 6px; pointer-events: auto; }
-.t-rud { position: absolute; left: max(160px, calc(env(safe-area-inset-left) + 160px)); bottom: max(118px, calc(env(safe-area-inset-bottom) + 104px)); display: flex; gap: 8px; pointer-events: auto; }
-.tb { width: 54px; height: 54px; border-radius: 50%; border: 1px solid rgba(255,255,255,.45); background: rgba(8,14,10,.35); color: var(--ink); font: 600 11px var(--sans); letter-spacing: .04em; -webkit-tap-highlight-color: transparent; }
-.tb.small { width: 44px; height: 44px; font-size: 10px; }
+.touch > * { pointer-events: auto; }
+.t-stick, .t-dpad, .t-tilt { display: none; position: absolute; left: var(--edge); bottom: var(--bot); }
+.m-stick .t-stick { display: block; width: 116px; height: 116px; border-radius: 50%; background: rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.35); }
+.t-knob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px; border-radius: 50%; background: rgba(255,255,255,.35); }
+/* Arrow buttons: a cross of four. */
+.m-buttons .t-dpad { display: grid; grid-template-columns: repeat(3, 36px); grid-template-rows: repeat(3, 36px); gap: 4px; }
+.t-dpad .tb { width: 36px; height: 36px; font-size: 12px; }
+.t-dpad [data-hold=pitchDn] { grid-area: 1 / 2; } .t-dpad [data-hold=rollL] { grid-area: 2 / 1; } .t-dpad [data-hold=rollR] { grid-area: 2 / 3; } .t-dpad [data-hold=pitchUp] { grid-area: 3 / 2; }
+/* Tilt: a badge with a level bar that moves with the phone. */
+.m-tilt .t-tilt { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 104px; padding: 6px 8px; border-radius: 14px; border: 1px solid var(--accent); background: rgba(242,179,27,.18); color: var(--ink); font: 600 10px var(--sans); letter-spacing: .12em; bottom: calc(var(--bot) + 52px); }
+.t-tilt b { color: var(--accent); }
+.t-tilt i { position: relative; display: block; width: 84px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.25); }
+.t-tilt u { position: absolute; left: 50%; top: -2px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--accent); }
+.t-tilt em { font-style: normal; font-weight: 400; letter-spacing: .04em; color: var(--ink-dim); }
+.t-tilt[data-state=none] { border-color: var(--bad); background: rgba(0,0,0,.3); }
+.t-tilt[data-state=none] b { color: var(--bad); }
+.t-rud { position: absolute; left: var(--edge); bottom: var(--bot); display: flex; gap: 4px; }
+.t-rud .tb { width: 34px; height: 34px; }
+.m-stick .t-rud { left: calc(var(--edge) + 122px); }
+.m-buttons .t-rud { left: calc(var(--edge) + 122px); }
+.t-thr { position: absolute; right: var(--edger); top: 96px; bottom: 96px; width: 34px; border-radius: 17px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.35); }
+.t-thr span { position: absolute; left: 3px; right: 3px; bottom: 3px; border-radius: 14px; background: rgba(242,179,27,.55); }
+.t-btns { position: absolute; right: calc(var(--edger) + 44px); bottom: var(--bot); display: grid; grid-template-columns: repeat(2, 46px); gap: 6px; }
+.t-btns .tb { width: 46px; height: 46px; font-size: 10px; }
+.t-btns .tb.small { height: 36px; border-radius: 18px; width: 46px; }
+.t-top { position: absolute; top: max(10px, env(safe-area-inset-top)); right: var(--edger); display: flex; gap: 6px; align-items: center; }
+.t-look { display: flex; flex-direction: column; gap: 2px; padding: 3px; border-radius: 15px; border: 1px solid rgba(255,255,255,.45); background: rgba(8,14,10,.35); margin-right: 4px; }
+.t-look button { border: 0; border-radius: 12px; background: transparent; color: var(--ink-dim); font: 600 9px var(--sans); letter-spacing: .08em; padding: 3px 9px; }
+.t-look button.on { background: var(--accent); color: #1b1405; }
+.tb { width: 46px; height: 46px; border-radius: 50%; border: 1px solid rgba(255,255,255,.45); background: rgba(8,14,10,.35); color: var(--ink); font: 600 10px var(--sans); letter-spacing: .04em; -webkit-tap-highlight-color: transparent; padding: 0; }
+.tb.small { width: 40px; height: 40px; font-size: 10px; }
 .tb.down, .tb.on { background: rgba(242,179,27,.45); border-color: var(--accent); }
-.touch-mode .readouts { grid-template-columns: repeat(3, auto); padding: 6px 10px; gap: 2px 10px; bottom: max(8px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); }
-.touch-mode .ro .v { font-size: 16px; }
-.touch-mode .minimap { width: 112px; height: 112px; top: max(56px, env(safe-area-inset-top)); bottom: auto; right: auto; left: max(12px, env(safe-area-inset-left)); }
-.touch-mode .jobcard { top: max(176px, env(safe-area-inset-top)); width: 180px; }
-.touch-mode .prompt { bottom: 70px; }
+/* HUD on touch: a thin strip, the six readouts in one row. */
+.touch-mode .readouts { grid-template-columns: repeat(6, auto); padding: 3px 10px; gap: 0 8px; border-radius: 12px; bottom: max(4px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); }
+.touch-mode .ro { min-width: 0; flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 0 4px; }
+.touch-mode .ro .l { font-size: 7px; letter-spacing: .1em; }
+.touch-mode .ro .v { font-size: 13px; line-height: 1.1; }
+.touch-mode .ro .u { font-size: 8px; margin-left: 1px; }
+.touch-mode .ro .bar { width: 100%; height: 2px; margin-top: 1px; }
+.touch-mode .minimap { width: 116px; height: 116px; top: max(10px, env(safe-area-inset-top)); bottom: auto; right: auto; left: var(--edge); }
+.touch-mode .jobcard { top: 136px; width: 170px; }
+.touch-mode .prompt { bottom: 52px; }
 @media (max-width: 720px) {
   .readouts { grid-template-columns: repeat(3, auto); }
   .field { grid-template-columns: 1fr; gap: 4px; }

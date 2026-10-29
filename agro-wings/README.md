@@ -2788,6 +2788,25 @@ winglets, flaps, ailerons, propeller, ag kit, cockpit and paints kept):
   chords now: in Settings, hold Shift (or Ctrl / Alt) and press the key; a
   modifier alone is taken when it is released.
 
+### Touch interface — three control layouts
+
+Only the touch controls and the touch HUD changed (no physics, aircraft,
+camera base or game logic): Settings → Flying → **Touch controls** (shown
+on touch devices) picks the layout, kept in the settings.
+- **Virtual stick** — stick bottom left, rudder beside it.
+- **Phone tilt** — no stick: the phone's orientation (relative to its pose
+  when chosen; tap the badge to recentre) gives roll and pitch; a badge
+  shows the mode is on. iOS asks for permission on the tap. Written from
+  the sensor's axes, not tried on a real phone here.
+- **Buttons** — four arrow buttons in a cross, no stick, no tilt.
+All three share: minimap top left (116 px); power slider vertical on the
+right edge, mid-screen; spray, brakes, engine, camera, flaps in a 2-column
+block bottom right; free / fixed camera pill (a finger dragged on the view
+looks around or not), service (E), map and pause top right; and a thin
+strip of the six readouts (speed, height, load, power, fuel, hopper)
+along the bottom. Checked at 844×390 with touch emulation in Chromium:
+the three layouts, arrow / tilt / free-fixed input, no page errors.
+
 ## Robinson R44 — exterior reconstruction and paint B
 
 Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor

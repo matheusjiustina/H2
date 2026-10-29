@@ -171,7 +171,7 @@ export class Input {
       this.release(this.keysOf('lookReset')[0]);
     };
     el.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'touch' || touchId !== null) return;
+      if (e.pointerType !== 'touch' || touchId !== null || this.touchLook === false) return;
       touchId = e.pointerId; tx = e.clientX; ty = e.clientY;
       this.mouse.buttons |= 1;
       const now = performance.now();

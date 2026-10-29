@@ -372,6 +372,7 @@ export class Screens {
       <div class="field"><label>${t('Helicopter model')}</label>${seg('heliModel', [['power', t('Power (one lever)')], ['rotor', t('Detailed rotor')]])}<span></span></div>
       <div class="field"><label>${t('Wind')}</label>${seg('wind', [[0, t('Calm')], [1, t('Light')], [1.8, t('Moderate')]])}<span></span></div>
       <div class="field"><label>${t('Flight keys')}</label>${seg('keyScheme', [['numpad', t('Numpad + Q/E')], ['classic', 'W/S/A/D + Z/X']])}<span></span></div>
+      ${g.touch?.active ? `<div class="field"><label>${t('Touch controls')}</label>${seg('touchMode', [['stick', t('Virtual stick')], ['tilt', t('Phone tilt')], ['buttons', t('Buttons')]])}<span></span></div>` : ''}
       <h3>${t('Assistance')} <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">${t('— the physics is the same with it on or off')}</span></h3>
       <div class="field"><label>${t('Airplane')}</label>${seg('assist', [['off', t('Off')], ['on', t('On')]])}<span></span></div>
       <div class="aids${s.assist === 'on' ? '' : ' off'}" data-aids="aidPlane">${aidBtns('aidPlane', [['pedal', t('Soft pedal on the ground')], ['smooth', t('Smoothed controls')], ['coord', t('Light turn coordination')], ['cues', t('Speed × weight warnings')]])}</div>
