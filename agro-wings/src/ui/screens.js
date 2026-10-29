@@ -99,6 +99,7 @@ export class Screens {
       const on = el.dataset.ac === this.game.aircraftId;
       el.classList.toggle('sel', on);
       el.setAttribute('aria-checked', String(on));
+      if (on && this.game.touch?.active) { const row = el.parentElement; row.scrollLeft = el.offsetLeft - (row.clientWidth - el.offsetWidth) / 2; }
     }
     const S = this.game.settings;
     for (const el of this.title.querySelectorAll('[data-livery]')) el.classList.toggle('on', +el.dataset.livery === (S[el.dataset.lk ?? 'b206Livery'] ?? 0));

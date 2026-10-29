@@ -136,6 +136,8 @@ export class TouchControls {
     this._asked = true;
     this._onTilt ??= (e) => {
       if (e.beta === null || e.gamma === null) return;
+      if (!this._gotTilt && this._tiltOn) this._setTiltState('on');
+      this._gotTilt = true;
       const a = ((screen.orientation?.angle ?? window.orientation ?? 90) + 360) % 360;
       // Roll: the phone turned like a steering wheel; pitch: its top edge
       // toward you = stick back. Signs per screen rotation.
@@ -166,7 +168,12 @@ export class TouchControls {
 
   update() {
     if (!this.active) return;
+    // Tilt is zeroed to the pose the phone is held in when the flight starts,
+    // and reported as missing when the sensor never answers.
+    if (this.game.playing && !this._wasPlaying) this.neutral = null;
+    this._wasPlaying = this.game.playing;
     if (this.mode === 'tilt') {
+      if (this._tiltOn && this.tiltState === 'on' && !this._gotTilt && (this._tiltT = (this._tiltT || 0) + 1) > 240) this._setTiltState('none');
       const v = this.game.input.virtual;
       v.roll = this.tilt.x; v.pitch = this.tilt.y;
       this.tiltBtn.querySelector('u').style.transform = `translate(${this.tilt.x * 36}px, 0)`;

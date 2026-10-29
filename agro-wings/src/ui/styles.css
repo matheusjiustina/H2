@@ -56,6 +56,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .ac-opt { font: 600 10px var(--mono); padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); color: var(--ink-faint); cursor: pointer; }
 .ac-opt.on { background: var(--accent); border-color: var(--accent); color: #10140f; }
 .ac-opt.kit { margin-left: 6px; }
+/* Phones: the title scrolls, and the aircraft are a row to swipe (the page
+   itself never scrolls, so the title is its own scroller). */
+@media (pointer: coarse), (max-width: 720px) {
+  .title { overflow-y: auto; overflow-x: hidden; touch-action: pan-y; -webkit-overflow-scrolling: touch; align-items: flex-start; }
+  .title-inner { width: 100%; box-sizing: border-box; min-height: 100%; justify-content: flex-end; padding-top: max(44px, env(safe-area-inset-top)); padding-bottom: max(14px, env(safe-area-inset-bottom)); gap: 6px; }
+  .title-sub { margin-bottom: 6px; font-size: 12px; }
+  .title .brand { font-size: clamp(26px, 8vh, 44px); }
+  .ac-select { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; width: 100%; box-sizing: border-box; touch-action: pan-x pan-y; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; padding: 0 max(16px, env(safe-area-inset-left)) 8px; margin-bottom: 4px; scrollbar-width: none; }
+  .ac-select::-webkit-scrollbar { display: none; }
+  .ac-card { flex: 0 0 auto; width: min(220px, 58vw); scroll-snap-align: center; touch-action: pan-x pan-y; }
+  .title-keys { margin-top: 6px; }
+}
 /* Seven aircraft on one row on wide screens. */
 @media (min-width: 1200px) { .ac-card { width: min(222px, calc(14.2vw - 14px)); padding: 10px 10px 11px; } .ac-label { font-size: clamp(14px, 1.15vw, 17px); } }
 @media (max-width: 900px) { .ac-card { width: min(300px, calc(50vw - 26px)); } }

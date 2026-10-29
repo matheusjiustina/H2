@@ -2807,6 +2807,13 @@ strip of the six readouts (speed, height, load, power, fuel, hopper)
 along the bottom. Checked at 844×390 with touch emulation in Chromium:
 the three layouts, arrow / tilt / free-fixed input, no page errors.
 
+**Touch follow-up.** On phones the title screen is its own scroller and the
+seven aircraft are one row to swipe (snap, the chosen one centred), so the
+list is no longer stuck under the overlay (checked with a real swipe and a
+tap at 844×390). Phone tilt is zeroed to the pose held when the flight
+starts and, if the sensor never answers (some embedded pages and browsers
+block it), the badge says "sem sensor".
+
 ## Robinson R44 — exterior reconstruction and paint B
 
 Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor
