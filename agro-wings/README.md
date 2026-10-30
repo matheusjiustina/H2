@@ -2845,6 +2845,11 @@ airborne all the buttons turn more transparent (they stay); on the ground
 they are normal. Checked at 844×390 on the ground and in flight, with no
 overlap between any two controls.
 
+**Smaller messages on touch screens.** Only with touch controls: the
+action prompt, toasts, warnings, tutorial card, job card, ground-crew card,
+spray / trim badges and key caps are about 60–70 % of their size, so they
+cover less of the view (the cockpit above all). The PC sizes are unchanged.
+
 ## Robinson R44 — exterior reconstruction and paint B
 
 Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor
