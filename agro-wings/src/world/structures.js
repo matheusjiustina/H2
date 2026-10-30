@@ -2,8 +2,9 @@
 // power line and creek water. Static parts are merged per material.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BASE, RUNWAY, HQ, FENCES, POWERLINE, CREEK, FARM_SITES, WATER } from './layout.js';
+import { BASE, RUNWAY, HQ, GRAIN_POINTS, FENCES, POWERLINE, CREEK, FARM_SITES, WATER } from './layout.js';
 import { canvas, canvasTexture, makeLabel } from '../core/textures.js';
+import { grainSilo, grainDryer, grainStore } from './grain.js';
 import { rng } from '../core/math.js';
 import { pickup, tractor, sprayer, harvester, ibc, drumPallet, officeContainer } from './vehicles.js';
 
@@ -694,17 +695,11 @@ function buildProp(B, M, g, Hl, kind, x, z, rot, site, far, dyn) {
   const at = (lx, lz) => [x + lx * cs + lz * sn, z - lx * sn + lz * cs];
   switch (kind) {
     case 'silo': {
-      B.cyl(5.5, 5.5, 14, M.galv, x, y + 7, z, 28);
-      B.add(new THREE.ConeGeometry(5.7, 3.2, 28), M.galv, x, y + 15.6, z);
-      B.box(0.12, 14, 0.5, M.steel, x + 5.6, y + 7, z); // ladder
-      B.collider(x - 5.8, x + 5.8, z - 5.8, z + 5.8, y + 18, 'silo');
+      grainSilo(B, M, Hl, x, z, { face: rot + Math.PI / 2, side: rot + Math.PI, line1: (site.farm?.short ?? 'AGRO WINGS').toUpperCase(), line2: 'SILO' });
       break;
     }
     case 'dryer': {
-      B.box(4, 22, 4, M.galv, x, y + 11, z, 0, 4);
-      B.box(1, 30, 1, M.steel, x + 4, y + 15, z);
-      B.box(3, 2.4, 3, M.steel, x, y + 23.2, z);
-      B.collider(x - 2.5, x + 5, z - 2.5, z + 2.5, y + 30, 'dryer');
+      grainDryer(B, M, Hl, x, z);
       break;
     }
     case 'bigShed': {
@@ -869,21 +864,9 @@ function buildHQ(B, M, group, H) {
   const s1 = HQ.sheds[1], sy1 = H(s1.x, s1.z);
   sprayer(B, M, s1.x - 6, sy1, s1.z + 1.5, 0);
   tractor(B, M, s1.x + 7, sy1, s1.z + 2.5, 0.15);
-  // Silos + dryer + elevator
-  for (const si of HQ.silos) {
-    const yy = H(si.x, si.z);
-    B.cyl(5.5, 5.5, 14, M.galv, si.x, yy + 7, si.z, 32);
-    B.add(new THREE.ConeGeometry(5.7, 3.2, 32), M.galv, si.x, yy + 15.6, si.z);
-    B.collider(si.x - 5.8, si.x + 5.8, si.z - 5.8, si.z + 5.8, yy + 18, 'silo');
-  }
-  const d = HQ.dryer, dy = H(d.x, d.z);
-  B.box(4, 22, 4, M.galv, d.x, dy + 11, d.z, 0, 4);
-  B.box(1, 30, 1, M.steel, d.x + 4, dy + 15, d.z, 0);
-  for (const si of HQ.silos) {
-    const len = Math.hypot(si.x - d.x - 4, si.z - d.z);
-    B.add(new THREE.BoxGeometry(0.6, 0.6, len), M.steel, (si.x + d.x + 4) / 2, dy + 22, (si.z + d.z) / 2, Math.atan2(si.x - d.x - 4, si.z - d.z), -0.12);
-  }
-  B.collider(d.x - 2.5, d.x + 5, d.z - 2.5, d.z + 2.5, dy + 30, 'dryer');
+  // Grain store: silos in a line, elevator tower, gallery and dryer.
+  grainStore(B, M, H, HQ.silos[0].x, HQ.silos[0].z, { n: HQ.silos.length, axis: 'z', name: 'AGRO WINGS' });
+  for (const gp of GRAIN_POINTS) grainStore(B, M, H, gp.x, gp.z, { n: gp.n, axis: gp.axis, name: gp.name, dir: gp.dir ?? 1 });
   // Corral
   const c = HQ.corral, cy = H(c.x, c.z);
   for (let i = 0; i <= 10; i++) for (const [ox, oz, ry] of [[-15 + i * 3, -12, 0], [-15 + i * 3, 12, 0]]) B.box(0.15, 1.6, 0.15, M.wood, c.x + ox, cy + 0.8, c.z + oz, ry);

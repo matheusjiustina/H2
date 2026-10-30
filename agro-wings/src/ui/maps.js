@@ -1,5 +1,5 @@
 // Farm map rendering for the minimap and the full map (M).
-import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ, WORLD_HALF, FARM_SITES, SITES, WATER, pondRadius } from '../world/layout.js';
+import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ, GRAIN_POINTS, WORLD_HALF, FARM_SITES, SITES, WATER, pondRadius } from '../world/layout.js';
 import { rawHeight } from '../world/terrainData.js';
 
 const EXT = WORLD_HALF - 100; // half extent of the base map (m)
@@ -131,6 +131,7 @@ export function buildBaseMap(size = 1024) {
     g.fillRect(st.hangar.x - 10, st.hangar.z - 7, 20, 14);
   }
   for (const si of HQ.silos) { g.beginPath(); g.arc(si.x, si.z, 6, 0, Math.PI * 2); g.fill(); }
+  for (const gp of GRAIN_POINTS) for (let i = 0; i < gp.n; i++) { g.beginPath(); g.arc(gp.x + (gp.axis === 'x' ? i * 28 : 0), gp.z + (gp.axis === 'z' ? i * 28 : 0), 6, 0, Math.PI * 2); g.fill(); }
   g.strokeStyle = '#ff8a2a';
   g.setLineDash([16, 12]);
   g.lineWidth = 6;

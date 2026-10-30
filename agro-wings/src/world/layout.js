@@ -348,10 +348,21 @@ ROADS.push(
 export const HQ = {
   house: { x: -1260, z: -260, rot: 0.0 },
   sheds: [{ x: -1120, z: -380, rot: 0, w: 40, d: 18 }, { x: -1060, z: -380, rot: 0, w: 30, d: 16 }],
-  silos: [{ x: -980, z: -300 }, { x: -980, z: -270 }, { x: -980, z: -240 }, { x: -955, z: -285 }],
-  dryer: { x: -955, z: -250 },
+  silos: [{ x: -980, z: -300 }, { x: -980, z: -272 }, { x: -980, z: -244 }], // in a line, 28 m apart; the elevator is beyond the last
+  dryer: { x: -967, z: -214 },
   corral: { x: -1350, z: -360 },
 };
+
+// Grain stores (silos in a line from x, z along `axis`, elevator tower with its
+// gallery and a dryer at the end) at spots beside the roads, clear of fields,
+// forests, farm strips and the power line.
+export const GRAIN_POINTS = [
+  { x: -620, z: -500, axis: 'z', n: 2, name: 'COOPERVALE' },
+  { x: 660, z: -500, axis: 'x', n: 3, name: 'AGRO WINGS' },
+  { x: -400, z: 980, axis: 'z', n: 3, name: 'CEREALISTA' },
+  { x: -1280, z: 200, axis: 'x', n: 2, name: 'COOPERVALE' },
+  { x: 1560, z: -180, axis: 'x', n: 2, name: 'AGRO WINGS' },
+];
 
 // Fences with gates (porteiras) along the base and HQ approaches.
 export const FENCES = [

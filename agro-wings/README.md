@@ -2850,6 +2850,21 @@ action prompt, toasts, warnings, tutorial card, job card, ground-crew card,
 spray / trim badges and key caps are about 60–70 % of their size, so they
 cover less of the view (the cockpit above all). The PC sizes are unchanged.
 
+**Grain stores (`src/world/grain.js`).** The old silos (cylinders with a
+floating pole and loose rods) are replaced by one coherent model: each silo
+stands on a concrete slab that reaches below the terrain, with corrugated
+walls and ribs, a cone roof with hatch and vent cap, a ladder and a door, and
+painted lettering (name and "SILO 01…") on a curved panel; the elevator
+tower (concrete shaft, ladder, head house with roof, intake pit) feeds a
+gallery that rests on each silo's hatch and, sloping, on the tower head and
+a trestle; the dryer (body, burner house, flue, chimney) joins the tower by a
+duct. The HQ store has three silos in a line; five more stores
+(`GRAIN_POINTS` in `layout.js`) stand beside roads, picked by a script to be
+clear of fields, forests, farm strips, the runway, the power line and roads;
+they are on the full map. The farm sites' silo and dryer props use the same
+parts. Everything is merged per material (one extra material per lettering),
+with one collider per structure.
+
 ## Robinson R44 — exterior reconstruction and paint B
 
 Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor
