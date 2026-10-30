@@ -23,15 +23,15 @@ export class TouchControls {
       <div class="t-stick"><div class="t-knob"></div></div>
       <div class="t-dpad"><button class="tb small" data-hold="pitchDn">▲</button><button class="tb small" data-hold="rollL">◀</button><button class="tb small" data-hold="rollR">▶</button><button class="tb small" data-hold="pitchUp">▼</button></div>
       <button class="t-tilt" data-tilt><b>${t('TILT')}</b><i><u></u></i><em>${t('recentre')}</em></button>
-      <div class="t-rud"><button class="tb small" data-hold="yawL">◀ ${t('R')}</button><button class="tb small" data-hold="yawR">${t('R')} ▶</button></div>
+      <div class="t-rud"><button class="tb tiny" data-hold="yawL" aria-label="${t('Rudder left / steer')}">L</button><button class="tb tiny" data-hold="yawR" aria-label="${t('Rudder right / steer')}">R</button></div>
       <div class="t-thr"><span style="height:0%"></span></div>
       <div class="t-btns">
-        <button class="tb" data-tap="spray">${t('SPRAY')}</button><button class="tb" data-hold="brake">${t('BRAKE')}</button>
-        <button class="tb" data-hold="engine">${t('ENG')}</button><button class="tb" data-tap="camera">${t('CAM')}</button>
-        <button class="tb small" data-tap="flapsDown">FLP+</button><button class="tb small" data-tap="flapsUp">FLP−</button>
+        <button class="tb" data-tap="spray">${t('SPRAY')}</button><button class="tb" data-hold="engine">${t('ENG')}</button><button class="tb" data-hold="brake">${t('BRAKE')}</button>
       </div>
+      <div class="t-flaps"><button class="tb pill" data-tap="flapsDown">FLP+</button><button class="tb pill" data-tap="flapsUp">FLP−</button></div>
+      <div class="t-trim"><button class="tb pill" data-hold="trimUp">TRIM+</button><button class="tb pill" data-hold="trimDown">TRIM−</button></div>
       <button class="t-strip" aria-label="${t('Show / hide the readouts')}"></button>
-      <div class="t-top"><div class="t-look"><button data-look="1">${t('FREE')}</button><button data-look="0">${t('FIXED')}</button></div><button class="tb small" data-tap="interact">E</button><button class="tb small" data-tap="map">${t('MAP')}</button><button class="tb small" data-tap="pause">II</button></div>
+      <div class="t-top"><div class="t-look"><button data-look="1">${t('FREE')}</button><button data-look="0">${t('FIXED')}</button></div><button class="tb small cam" data-tap="camera" aria-label="${t('CAM')}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button><button class="tb small" data-tap="map">${t('MAP')}</button><button class="tb small" data-tap="pause">II</button></div>
     </div>`);
     root.appendChild(this.el);
     const input = game.input;
@@ -76,6 +76,7 @@ export class TouchControls {
         if (k === 'engine') v.engine = on;
         if (k === 'yawL') v.yaw = on ? -1 : 0;
         if (k === 'yawR') v.yaw = on ? 1 : 0;
+        if (k === 'trimUp' || k === 'trimDown') input[on ? 'pressAction' : 'releaseAction'](k);
         // Arrow buttons (buttons layout): full deflection while held.
         if (k === 'rollL') this.dpad.x = on ? -1 : (this.dpad.x < 0 ? 0 : this.dpad.x);
         if (k === 'rollR') this.dpad.x = on ? 1 : (this.dpad.x > 0 ? 0 : this.dpad.x);
@@ -185,6 +186,8 @@ export class TouchControls {
     // Tilt is zeroed to the pose the phone is held in when the flight starts,
     // and reported as missing when the sensor never answers.
     this.syncCamera();
+    // In flight the buttons turn more transparent (not hidden).
+    this.el.classList.toggle('flying', !!this.game.aircraft && !this.game.aircraft.fm.out.onGround);
     // Keep the little button just right of the strip (or centred when it is hidden).
     if ((this._pl = (this._pl || 0) + 1) % 20 === 0 || this._pl === 1) {
       const ro = this.game.uiRoot.querySelector('.readouts'), r = ro?.getBoundingClientRect();

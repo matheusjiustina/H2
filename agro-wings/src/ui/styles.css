@@ -207,13 +207,19 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .t-tilt em { font-style: normal; font-weight: 400; letter-spacing: .04em; color: var(--ink-dim); }
 .t-tilt[data-state=none] { border-color: var(--bad); background: rgba(0,0,0,.3); }
 .t-tilt[data-state=none] b { color: var(--bad); }
-.t-rud { position: absolute; left: var(--edge); bottom: var(--bot); display: flex; gap: 4px; }
-.t-rud .tb { width: 34px; height: 34px; }
-.m-stick .t-rud { left: calc(var(--edge) + 122px); }
-.m-buttons .t-rud { left: calc(var(--edge) + 122px); }
-.t-thr { position: absolute; right: var(--edger); top: 96px; bottom: 96px; width: 34px; border-radius: 17px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.35); }
+.t-rud { position: absolute; right: var(--edger); bottom: calc(var(--bot) + 48px); display: flex; gap: 4px; }
+.tb.tiny { width: 30px; height: 30px; font-size: 11px; }
+.t-flaps { position: absolute; right: var(--edger); bottom: var(--bot); display: flex; gap: 6px; }
+.tb.pill { width: 56px; height: 38px; border-radius: 19px; font-size: 10px; }
+.t-trim { position: absolute; left: calc(var(--edge) + 126px); bottom: var(--bot); display: flex; flex-direction: column; gap: 6px; }
+.t-trim .tb.pill { width: 54px; height: 34px; border-radius: 17px; }
+.t-btns .tb { transition: opacity .4s; }
+.touch .tb, .touch .t-look { transition: opacity .4s; }
+.touch.flying .tb, .touch.flying .t-look { opacity: .45; }
+.touch.flying .tb.down, .touch.flying .tb.on { opacity: .9; }
+.t-thr { position: absolute; right: var(--edger); top: 66px; bottom: calc(var(--bot) + 90px); width: 34px; border-radius: 17px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.35); }
 .t-thr span { position: absolute; left: 3px; right: 3px; bottom: 3px; border-radius: 14px; background: rgba(242,179,27,.55); }
-.t-btns { position: absolute; right: calc(var(--edger) + 44px); bottom: var(--bot); display: grid; grid-template-columns: repeat(2, 46px); gap: 6px; }
+.t-btns { position: absolute; right: calc(var(--edger) + 44px); bottom: calc(var(--bot) + 90px); display: flex; flex-direction: column; gap: 8px; }
 .t-btns .tb { width: 46px; height: 46px; font-size: 10px; }
 .t-btns .tb.small { height: 36px; border-radius: 18px; width: 46px; }
 .t-top { position: absolute; top: max(10px, env(safe-area-inset-top)); right: var(--edger); display: flex; gap: 6px; align-items: center; }

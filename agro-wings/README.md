@@ -2836,6 +2836,15 @@ transparent after the thumb has been on it for a moment. On short
 landscape screens the map shows only its four buttons over the chart (the
 legend and hint are hidden).
 
+**Touch layout, final arrangement.** Top right: free / fixed pill, camera,
+MAPA, pause (service is the on-screen prompt, tap it). Right edge: the
+power slider with the rudder pair (L / R) under it; left of the slider, APLIC /
+MOTOR / FREIO stacked; flaps bottom right. Left: the stick (or arrows, or
+the tilt badge) with TRIM+ / TRIM− beside it (held, as the keys). While
+airborne all the buttons turn more transparent (they stay); on the ground
+they are normal. Checked at 844×390 on the ground and in flight, with no
+overlap between any two controls.
+
 ## Robinson R44 — exterior reconstruction and paint B
 
 Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor
