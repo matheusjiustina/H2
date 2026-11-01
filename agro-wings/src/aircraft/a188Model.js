@@ -77,10 +77,14 @@ export const A188_LIVERIES = [
 // down (the sump); the cowl top almost level at 0.6 m back to the
 // windshield; the belly falling steadily to the cabin. Boxy sections (high
 // exponents): flat sides and top with rounded corners.
+// Geometry correction (2026-11): the chin no longer drops straight off the
+// lip — it falls back gradually as on PR-AAQ / N5324B (0.72 m under the cowl
+// top at the lip, 0.96 m at z 1.3, 1.1 m at z 0.9), so the nose face is
+// smaller and the cowl reads slimmer from the side and three-quarter views.
 const FWD_KEYS = [
-  K(1.68, 0.27, 0.3, -0.2, 0.6, 2.5, 2.2), K(1.55, 0.36, 0.23, -0.34, 0.615, 3.2, 2.6),
-  K(1.3, 0.42, 0.15, -0.48, 0.625, 4.0, 3.0), K(0.9, 0.455, 0.08, -0.58, 0.63, 4.6, 3.2),
-  K(0.4, 0.47, 0.03, -0.66, 0.625, 5.0, 3.4), K(-0.2, 0.475, 0.0, -0.73, 0.615, 5.0, 3.4),
+  K(1.68, 0.27, 0.3, -0.12, 0.6, 2.5, 2.2), K(1.55, 0.35, 0.24, -0.23, 0.615, 3.0, 2.5),
+  K(1.3, 0.415, 0.16, -0.36, 0.625, 3.8, 2.9), K(0.9, 0.452, 0.09, -0.5, 0.63, 4.5, 3.2),
+  K(0.4, 0.468, 0.04, -0.62, 0.625, 5.0, 3.4), K(-0.2, 0.475, 0.0, -0.72, 0.615, 5.0, 3.4),
   K(-0.93, 0.475, -0.02, -0.78, 0.6, 5.0, 3.4),
 ];
 // Under the cabin the body keeps the hopper's section, cut at the low sill
@@ -167,15 +171,21 @@ function loftR(stations, colorFn) {
 // 0.93 m up), the fairing dropping from the roof to a low dorsal at
 // z ≈ −3.1, then the deep cone — its underside almost straight at −0.85 —
 // narrowing to the rudder post.
+// Geometry correction (2026-11): the cabin roof stands 1.0 m over the
+// datum (was 0.93) with a crowned section (narrower top, 0.16 m corner
+// radius instead of a flat lid), and the fairing behind it falls in one long
+// progressive slope to the cone (was a steep drop then a flat spine), the
+// sections tapering continuously in plan and side view to the rudder post.
 const AFT_KEYS = [
-  R(-2.22, 0.465, -0.02, -0.81, 3.4, 5.0, 0.6, SILL_Y, 0.93, 0.36, 0.08),
-  R(-2.38, 0.455, -0.02, -0.815, 3.4, 4.8, 0.58, 0.18, 0.86, 0.34, 0.1),
-  R(-2.6, 0.44, -0.03, -0.82, 3.3, 4.5, 0.55, 0.17, 0.67, 0.31, 0.13),
-  R(-2.85, 0.415, -0.04, -0.83, 3.2, 4.0, 0.45, 0.14, 0.41, 0.27, 0.15),
-  R(-3.1, 0.385, -0.06, -0.84, 3.1, 3.6, 0.3, 0.06, 0.2, 0.24, 0.15),
-  R(-3.6, 0.33, -0.1, -0.85, 3.0, 3.2, 0.12, -0.02, 0.07, 0.19, 0.13),
-  R(-4.2, 0.25, -0.16, -0.86, 2.8, 2.9, 0.0, -0.08, -0.04, 0.13, 0.1),
-  R(-4.8, 0.17, -0.24, -0.86, 2.6, 2.6, -0.12, -0.17, -0.15, 0.08, 0.07),
+  R(-2.22, 0.465, -0.02, -0.81, 3.4, 5.0, 0.6, SILL_Y, 1.0, 0.3, 0.16),
+  R(-2.42, 0.455, -0.02, -0.815, 3.4, 4.8, 0.58, 0.18, 0.95, 0.29, 0.16),
+  R(-2.68, 0.438, -0.03, -0.82, 3.3, 4.4, 0.53, 0.16, 0.8, 0.27, 0.17),
+  R(-2.95, 0.412, -0.04, -0.83, 3.2, 4.0, 0.44, 0.13, 0.6, 0.25, 0.17),
+  R(-3.25, 0.38, -0.06, -0.84, 3.1, 3.6, 0.32, 0.07, 0.4, 0.22, 0.16),
+  R(-3.6, 0.335, -0.09, -0.85, 3.0, 3.3, 0.18, 0.0, 0.22, 0.19, 0.14),
+  R(-4.0, 0.285, -0.13, -0.855, 2.9, 3.0, 0.07, -0.05, 0.09, 0.15, 0.11),
+  R(-4.5, 0.21, -0.2, -0.86, 2.7, 2.7, -0.05, -0.12, -0.06, 0.1, 0.08),
+  R(-5.0, 0.145, -0.28, -0.86, 2.6, 2.6, -0.17, -0.21, -0.19, 0.065, 0.055),
   R(-5.35, 0.1, -0.34, -0.86, 2.5, 2.5, -0.26, -0.29, -0.28, 0.045, 0.04),
   R(-5.62, 0.065, -0.42, -0.85, 2.4, 2.4, -0.32, -0.35, -0.33, 0.03, 0.028),
 ];
@@ -210,7 +220,7 @@ const surfX = (st, y) => {
 
 // ---------------------------------------------------------------------------
 // Livery: side projection of the fuselage, fin and rudder.
-const LV = { Z0: -6.0, Z1: 2.2, Y0: -0.95, Y1: 1.15, W: 2048, H: 1024, M: 6 };
+const LV = { Z0: -6.0, Z1: 2.2, Y0: -0.95, Y1: 1.38, W: 2048, H: 1024, M: 6 };
 LV.kx = LV.W / (LV.Z1 - LV.Z0);
 LV.ky = (LV.H / 2 - 2 * LV.M) / (LV.Y1 - LV.Y0);
 const lvPix = (side, z, y) => [
@@ -437,7 +447,8 @@ const TIP_ST = [[0, 0, 0, 0], [0.13, -0.025, -0.012, -0.04], [0.23, -0.06, -0.04
 // Overall dimensions (for the tests): span, length spinner to rudder, the
 // high points (roof, fin top).
 export const A188_DIM = { spinnerZ: 2.075, rudderZ: -5.87 };
-const FIN_TOP_Y = 1.12; // fin top: 2.36 m over the ground on three wheels
+const FIN_TOP_Y = 1.19; // fin top: ≈ 2.49 m over the ground on three wheels (A188B figure; was 1.12 → 2.42 m)
+const FK = FIN_TOP_Y / 1.12; // the fin and rudder stations below were measured for a 1.12 m top
 export function a188Extent() {
   return { span: 2 * W.half, length: A188_DIM.spinnerZ - A188_DIM.rudderZ, tops: [[0, ROOF.yt, -1.8], [0, FIN_TOP_Y, -5.3]].map(a188ToBody) };
 }
@@ -546,6 +557,8 @@ export function createA188Model(panel, opts = {}) {
   const fwdSt = sampleStations(FWD_KEYS, 22);
   const cabSt = sampleStations(CAB_KEYS, 10);
   const aftSt = sampleR(AFT_KEYS, 16);
+  // Top of the rear fuselage (spine) at z.
+  const spineY = (z) => { let i = 1; while (i < aftSt.length - 1 && aftSt[i].z > z) i++; const a = aftSt[i - 1], b = aftSt[i]; return lerp(a.yt, b.yt, clamp((a.z - z) / (a.z - b.z || 1), 0, 1)); };
   add('livery', liveryUV(tagged(loft(fwdSt, 64, fusAO))));
   add('livery', liveryUV(tagged(loft(cabSt, 56, fusAO, CAB_ARC))));
   add('livery', liveryUV(tagged(loftR(aftSt, fusAO))));
@@ -580,12 +593,12 @@ export function createA188Model(panel, opts = {}) {
   {
     const z = 1.685;
     for (const sx of [1, -1]) {
-      add('polished', tx(new THREE.CircleGeometry(0.048, 22), sx * 0.13, -0.02, z + 0.001));
-      add('lens', tx(new THREE.SphereGeometry(0.046, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), sx * 0.13, -0.02, z + 0.003, Math.PI / 2, 0, 0, [1, 0.3, 1]));
+      add('polished', tx(new THREE.CircleGeometry(0.048, 22), sx * 0.13, 0.05, z + 0.001));
+      add('lens', tx(new THREE.SphereGeometry(0.046, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), sx * 0.13, 0.05, z + 0.003, Math.PI / 2, 0, 0, [1, 0.3, 1]));
       add('dark', tx(new THREE.CircleGeometry(0.075, 20, 0, Math.PI), sx * 0.2, AX - 0.02, z - 0.004, 0, 0, sx > 0 ? -1.2 : 1.2 - Math.PI, [1, 0.7, 1]));
     }
-    add('dark', rbox(0.17, 0.08, 0.04, 0.015, 0, -0.13, z - 0.005));
-    for (let k = 0; k < 4; k++) add('steel', tx(new THREE.BoxGeometry(0.15, 0.005, 0.005), 0, -0.155 + k * 0.016, z + 0.016), true);
+    add('dark', rbox(0.17, 0.07, 0.04, 0.015, 0, -0.045, z - 0.005));
+    for (let k = 0; k < 4; k++) add('steel', tx(new THREE.BoxGeometry(0.15, 0.005, 0.005), 0, -0.07 + k * 0.016, z + 0.016), true);
   }
   // Exhaust stacks out of both sides of the lower cowl, straight back.
   for (const sx of [1, -1]) {
@@ -631,7 +644,8 @@ export function createA188Model(panel, opts = {}) {
     return [sx * lerp(sillX(z), RAIL.x, v), lerp(SILL.y, RAIL.y, v), z];
   };
   // Roof.
-  add('livery', liveryUV(tagged(grid((u, v) => lerp3(roofAt(u, false), roofAt(u, true), v), 26, 6, [0, 0.5, -1.8]))));
+  const ROOF_CROWN = 0.035;
+  add('livery', liveryUV(tagged(grid((u, v) => { const p = lerp3(roofAt(u, false), roofAt(u, true), v); p[1] += ROOF_CROWN * Math.sin(Math.PI * v) * Math.max(0, 1 - (p[0] / RAIL.x) ** 2); return p; }, 26, 8, [0, 0.5, -1.8]))));
   // Painted panel either side between the A-post and the side glass's front
   // edge, down to the sill.
   const quarter = [];
@@ -707,7 +721,7 @@ export function createA188Model(panel, opts = {}) {
 
   // ---------------- wing ----------------
   const leY = (x) => a188WingY(x);
-  const mainProf = airfoil(0, 0.74, 0.15, 0.035, 0.4, 18), aftProf = airfoil(0.76, 1.0, 0.15, 0.035, 0.4, 6), fullProf = airfoil(0, 1, 0.15, 0.035, 0.4, 18);
+  const mainProf = airfoil(0, 0.74, 0.13, 0.03, 0.4, 18), aftProf = airfoil(0.76, 1.0, 0.13, 0.03, 0.4, 6), fullProf = airfoil(0, 1, 0.13, 0.03, 0.4, 18);
   const flaps = [], ailerons = [];
   const wingAO = (x, xc, lower) => (lower ? 1 : 1 - 0.25 * Math.max(0, 1 - (x - 0.5) / 0.55));
   const st = (x) => ({ x, y: leY(x), le: W.le, chord: W.chord });
@@ -741,7 +755,18 @@ export function createA188Model(panel, opts = {}) {
   for (const side of [1, -1]) {
     add('wing', a188WingPanel([0.3, W.rootX, 1.5, 2.6, 3.7, 4.8, W.tipX].map(st), mainProf, side, wingAO));
     for (const [a, b] of [[0.3, FLAP[0]], [FLAP[1], AIL[0]], [AIL[1], W.tipX]]) add('wing', a188WingPanel([st(a), st(b)], aftProf, side, wingAO));
-    add('wing', a188WingPanel(tipSt, fullProf, side, wingAO));
+    // Drooped tip: the section thins toward the end (to 55 % at the tip) so
+    // it reads as the AgTruck's sheet-metal conical tip, not a rounded pod.
+    {
+      const tg = a188WingPanel(tipSt, fullProf, side, wingAO), tp = tg.attributes.position;
+      const dyAt = (dx) => { let i = 1; while (i < TIP_ST.length - 1 && TIP_ST[i][0] < dx) i++; const a = TIP_ST[i - 1], b = TIP_ST[i]; return lerp(a[1], b[1], clamp((dx - a[0]) / (b[0] - a[0] || 1), 0, 1)); };
+      for (let i = 0; i < tp.count; i++) {
+        const dx = Math.abs(tp.getX(i)) - W.tipX, t = clamp(dx / 0.33, 0, 1), cy = y0T + dyAt(dx);
+        tp.setY(i, cy + (tp.getY(i) - cy) * (1 - 0.45 * t * t));
+      }
+      tg.computeVertexNormals();
+      add('wing', tg);
+    }
     flaps.push(surfaceMesh(a188WingPanel([FLAP[0], 2.0, FLAP[1]].map(st), aftProf, side, wingAO), FLAP[0], FLAP[1], side));
     ailerons.push(surfaceMesh(a188WingPanel([AIL[0], 4.8, AIL[1]].map(st), aftProf, side), AIL[0], AIL[1], side));
     // Nav light in the drooped tip, strobe beside it.
@@ -787,15 +812,24 @@ export function createA188Model(panel, opts = {}) {
   // Fin (PR-LEO): the leading edge swept ≈ 31° from the dorsal, the top
   // rounded over to the rudder; the fixed part's chord down to the hinge.
   const FIN_TOP = FIN_TOP_Y;
-  const finSt = [[-0.12, -4.36, 1.13], [0.107, -4.48, 1.01], [0.373, -4.64, 0.85], [0.64, -4.79, 0.7], [0.875, -4.93, 0.56], [1.003, -5.02, 0.47], [1.067, -5.1, 0.39], [1.104, -5.19, 0.3], [FIN_TOP, -5.29, 0.2]];
+  const finSt = [[-0.12, -4.36, 1.13], [0.107, -4.48, 1.01], [0.373, -4.64, 0.85], [0.64, -4.79, 0.7], [0.875, -4.93, 0.56], [1.003, -5.02, 0.47], [1.067, -5.1, 0.39], [1.104, -5.19, 0.3], [1.12, -5.29, 0.2]]
+    .map(([h, le, c]) => [h > 0 ? h * FK : h, le, c]);
   add('livery', liveryUV(tagged(vfin(airfoil(0, 1, 0.12, 0, 0.4, 12), finSt))));
   // Dorsal fillet: a low strake from the spine into the fin's leading edge.
-  add('livery', liveryUV(tagged(loft(sampleStations([
-    K(-3.7, 0.012, 0.06, 0.05, 0.075, 2.2, 2.2), K(-4.0, 0.03, 0.0, -0.01, 0.06, 2.2, 2.2),
-    K(-4.25, 0.045, -0.04, -0.05, 0.08, 2.2, 2.2), K(-4.45, 0.05, -0.07, -0.08, 0.2, 2.2, 2.2),
-  ], 20), 12, null))));
+  // It grows out of the spine (no step) and rises into the fin's leading edge.
+  {
+    const sp = (z) => spineY(z);
+    add('livery', liveryUV(tagged(loft(sampleStations([
+      K(-3.55, 0.01, sp(-3.55) - 0.03, sp(-3.55) - 0.05, sp(-3.55) + 0.004, 2.2, 2.2),
+      K(-3.85, 0.025, sp(-3.85) - 0.04, sp(-3.85) - 0.07, sp(-3.85) + 0.03, 2.2, 2.2),
+      K(-4.12, 0.04, sp(-4.12) - 0.05, sp(-4.12) - 0.09, sp(-4.12) + 0.075, 2.2, 2.2),
+      K(-4.34, 0.05, sp(-4.34) - 0.06, sp(-4.34) - 0.1, sp(-4.34) + 0.15, 2.2, 2.2),
+      K(-4.5, 0.052, sp(-4.5) - 0.06, sp(-4.5) - 0.1, 0.16 * FK, 2.2, 2.2),
+    ], 20), 12, null))));
+  }
   // Rudder: from below the cone to the rounded top.
-  const rudSt = [[-0.72, HINGE_Z, 0.3], [-0.55, HINGE_Z, 0.34], [-0.2, HINGE_Z, 0.37], [0.32, HINGE_Z, 0.38], [0.8, HINGE_Z, 0.37], [1.013, HINGE_Z, 0.33], [1.088, HINGE_Z, 0.26], [FIN_TOP, HINGE_Z, 0.16]];
+  const rudSt = [[-0.72, HINGE_Z, 0.3], [-0.55, HINGE_Z, 0.34], [-0.2, HINGE_Z, 0.37], [0.32, HINGE_Z, 0.38], [0.8, HINGE_Z, 0.37], [1.013, HINGE_Z, 0.33], [1.088, HINGE_Z, 0.26], [1.12, HINGE_Z, 0.16]]
+    .map(([h, z, c]) => [h > 0 ? h * FK : h, z, c]);
   const rudGeo = liveryUV(tagged(vfin(airfoil(0, 1, 0.13, 0, 0.3, 8), rudSt)));
   const rudTab = tagged(tx(new THREE.BoxGeometry(0.012, 0.22, 0.07), 0, -0.3, HINGE_Z - 0.36));
   rudGeo.translate(0, 0, -HINGE_Z); rudTab.translate(0, 0, -HINGE_Z);
@@ -854,13 +888,15 @@ export function createA188Model(panel, opts = {}) {
   };
   for (const [name, sx] of [['mainL', 1], ['mainR', -1]]) {
     const cfg = gearCfg[name];
-    const R = cfg.radius, Wd = 0.2;
+    // Visual tyre 8.50-10 (Ø 0.64 m) standing on the same ground contact point
+    // as the physics wheel (its axle rises accordingly); contact radius unchanged.
+    const R = 0.32, Wd = 0.22;
     const ax = cfg.p[0], ay = cfg.p[1] + R, az = cfg.p[2];
     const g = new THREE.Group();
     // Spring-steel leg: a flat tapered bar from the lower fuselage side out,
     // down and a little forward to the axle on the inboard side of the
     // wheel; the axle, the brake line along its back.
-    const top = [sx * (halfX(0.42, -0.62) - 0.04), -0.66, 0.42];
+    const top = [sx * (halfX(0.42, -0.58) - 0.04), -0.6, 0.42];
     const attachY = top[1];
     const leg = new THREE.Group();
     leg.position.y = attachY;
