@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { World } from '../world/world.js';
 import { GAME } from '../config.js';
 import { AircraftAssets } from '../aircraft/assetManager.js';
+import { Lifecycle } from '../core/lifecycle.js';
 import { PerfManager } from '../core/perfManager.js';
 import { PROFILES } from '../core/perfProfiles.js';
 import { AIRCRAFT_ORDER, aircraftType, setRegistration } from '../aircraft/types.js';
@@ -57,7 +58,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -151,7 +152,7 @@ export class Game {
     const start = this.fleet[this.settings.aircraft] && aircraftUnlocked(aircraftType(this.settings.aircraft)) ? this.settings.aircraft : AIRCRAFT_ORDER[0];
     this._activate(start);
     this.canStartEngine = () => this.service.engineVeto();
-    window.addEventListener('resize', () => this.resize());
+    this.lifecycle = new Lifecycle(this); // visibility, orientation / resize, WebGL context loss, audio interruptions
     const startAudio = () => this.audio.start();
     window.addEventListener('pointerdown', startAudio);
     // A click (no drag) in the cockpit view: switches and soft keys the
@@ -574,6 +575,7 @@ export class Game {
   // ------------------------------------------------------------------ frame
   frame() {
     const now = performance.now();
+    if (this.lifecycle?.suspended) { this.last = now; return; } // WebGL context lost: nothing to draw, nothing to integrate
     if (this.perf.gate(now)) return; // optional FPS cap: skip this callback, keep `last`
     const dtMs = now - this.last;
     this.frameMs[this.frameN++ % this.frameMs.length] = dtMs;

@@ -104,6 +104,9 @@ export class TouchControls {
     this.tiltBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.startTilt(true); });
     this.neutral = null;
     this.tilt = { x: 0, y: 0 };
+    // Turning the phone changes which axis is which: the neutral pose is taken again.
+    screen.orientation?.addEventListener?.('change', () => { this.neutral = null; });
+    window.addEventListener('orientationchange', () => { this.neutral = null; });
     this.applySettings();
     window.addEventListener('touchstart', () => this.enable(), { once: true, passive: true });
     if (matchMedia('(pointer: coarse)').matches) this.enable();
@@ -129,6 +132,7 @@ export class TouchControls {
     const v = this.game.input.virtual;
     if (mode !== this.mode) { v.roll = 0; v.pitch = 0; this.dpad.x = this.dpad.y = 0; }
     this.mode = mode;
+    this._eff = null; // class set again in update()
     for (const m of ['stick', 'tilt', 'buttons']) this.el.classList.toggle(`m-${m}`, m === mode);
     const strip = s.touchStrip !== false;
     this.game.uiRoot.classList.toggle('strip-off', !strip);
@@ -160,7 +164,9 @@ export class TouchControls {
       if (a === 90) { roll = e.beta; pitch = -e.gamma; } else if (a === 270) { roll = -e.beta; pitch = e.gamma; } else if (a === 180) { roll = -e.gamma; pitch = -e.beta; } else { roll = e.gamma; pitch = e.beta; }
       const cur = { roll, pitch };
       if (!this.neutral) this.neutral = cur;
-      const f = (d) => { d = Math.abs(d) < 3 ? 0 : d - Math.sign(d) * 3; return Math.max(-1, Math.min(1, d / 22)); };
+      // 22° from the neutral pose is full deflection at Normal; the setting scales that range (input only, not the physics).
+      const span = 22 / Math.max(0.4, Math.min(2.5, +this.game.settings.tiltSens || 1));
+      const f = (d) => { d = Math.abs(d) < 3 ? 0 : d - Math.sign(d) * 3; return Math.max(-1, Math.min(1, d / span)); };
       this.tilt.x = f(cur.roll - this.neutral.roll);
       this.tilt.y = f(cur.pitch - this.neutral.pitch);
     };
@@ -195,8 +201,18 @@ export class TouchControls {
     }
     if (this.game.playing && !this._wasPlaying) this.neutral = null;
     this._wasPlaying = this.game.playing;
+    // Tilt without a usable sensor (none, permission refused, or never answering) falls back to the
+    // virtual stick, so the flight is never left without pitch and roll.
+    const eff = this.mode === 'tilt' && this.tiltState === 'none' ? 'stick' : this.mode;
+    if (eff !== this._eff) {
+      for (const m of ['stick', 'tilt', 'buttons']) this.el.classList.toggle(`m-${m}`, m === eff);
+      if (eff === 'stick' && this.mode === 'tilt' && this.game.playing) this.game.toast?.(t('Tilt sensor unavailable: using the virtual stick.'));
+      this._eff = eff;
+    }
     if (this.mode === 'tilt') {
       if (this._tiltOn && this.tiltState === 'on' && !this._gotTilt && (this._tiltT = (this._tiltT || 0) + 1) > 240) this._setTiltState('none');
+    }
+    if (eff === 'tilt') {
       const v = this.game.input.virtual;
       v.roll = this.tilt.x; v.pitch = this.tilt.y;
       this.tiltBtn.querySelector('u').style.transform = `translate(${this.tilt.x * 36}px, 0)`;
