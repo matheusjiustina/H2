@@ -15,7 +15,7 @@
 //     dark firewall; the power quadrant on the left wall (throttle black,
 //     propeller blue, mixture red) with the flap lever on the floor;
 //   - the AGROWINGS NAV unit on a bracket under the right of the panel;
-//   - the compass on top of the windshield's centre post;
+//   - the compass on its stand on the deck under the windshield;
 //   - cream-painted inner walls and roof, the door with its triangular
 //     vent window, padded black window posts, the seat with its harness;
 //     the guidance lightbar on the cowl ahead of the windshield.
@@ -33,7 +33,14 @@ import { NAV_PAGES } from './agroNav.js';
 
 const P = A188_PANEL;
 const TILT = (10 * Math.PI) / 180;
-const P0 = new THREE.Vector3(0, 0.02, -1.085); // the lower panel's bottom edge, centre
+// Cockpit geometry (2026-11 reconstruction, on the corrected cabin): the
+// whole panel stack stands 0.15 m higher and 0.075 m further aft than before,
+// so that — as in the photographs — the grey panel's top is just under the
+// windshield base (cowl top 0.6), the padded roll sits right below the
+// glass and the doghouse rises above the line of the visible cowl from the
+// pilot's eye, inside the windshield (not through it). A grey deck closes
+// the gap between the windshield base and the roll.
+const P0 = new THREE.Vector3(0, 0.17, -1.16); // the lower panel's bottom edge, centre
 const PU = new THREE.Vector3(-1, 0, 0), PV = new THREE.Vector3(0, Math.cos(TILT), Math.sin(TILT));
 const PW = new THREE.Vector3().crossVectors(PU, PV); // toward the pilot
 const FLOOR = -0.6;
@@ -152,6 +159,7 @@ export function buildA188Cockpit(ctx) {
     cream: std(0xffffff, { map: cream, roughness: 0.85, metalness: 0.02 }),
     firewall: std(0x4a2a1e, { roughness: 0.8, metalness: 0.05 }),
     floor: std(0x3c3f42, { roughness: 0.8, metalness: 0.35 }),
+    deck: std(0x5a5e5c, { roughness: 0.82, metalness: 0.12 }),
     tread: std(0xffffff, { map: chevronTex(), roughness: 0.8 }),
     pedal: std(0x2b2d30, { roughness: 0.45, metalness: 0.5 }),
     alu: std(0xb9bec3, { roughness: 0.35, metalness: 0.85 }),
@@ -175,7 +183,7 @@ export function buildA188Cockpit(ctx) {
   // ---------------- lower panel plate ----------------
   // A rectangle across the cabin with clipped top corners, inside the walls.
   {
-    const hw = Math.min(P.w / 2, wallX(panelZ(0.12), panelY(0.12)) - 0.005);
+    const hw = wallX(panelZ(0.12), panelY(0.12)) - 0.004; // wall to wall (the plate's texture edge is plain grey)
     const sh = new THREE.Shape([[-hw, 0], [hw, 0], [hw, P.h - 0.03], [hw - 0.03, P.h], [-hw + 0.03, P.h], [-hw, P.h - 0.03]].map(([u, v]) => new THREE.Vector2(u, v)));
     const circleHole = (u, v, r) => { const h = new THREE.Path(); h.absarc(u, v, r, 0, Math.PI * 2, true); sh.holes.push(h); };
     for (const d of Object.values(P.dials)) circleHole(d.u, d.v, d.f + 0.0025);
@@ -270,7 +278,7 @@ export function buildA188Cockpit(ctx) {
   {
     // Hood: a box rounded over the top, reaching forward under the
     // windshield (in the dog frame +z is toward the pilot).
-    const depth = 0.2;
+    const depth = 0.13; // shallow enough to stay behind the windshield
     const hood = new RoundedBoxGeometry(D.w + 0.04, D.h + 0.03, depth, 3, 0.03);
     hood.translate(0, D.h / 2 + 0.006, -depth / 2 - 0.0125); // its front just behind the gauges' cans
     addD('hood', hood);
@@ -285,6 +293,22 @@ export function buildA188Cockpit(ctx) {
     for (const [id, d] of Object.entries(D.dials)) instrument(dog, id, d, addD, dogGlass);
     const r = D.dials.rpm;
     addD('hobbs', at(new THREE.PlaneGeometry(r.f * 0.6, r.f * 0.16), r.u, r.v - r.f * 0.35, -0.0085));
+  }
+
+  // ---------------- deck under the windshield ----------------
+  // Grey painted shelf from the windshield's base (just under the glass)
+  // back down to the top of the roll, wall to wall: it closes the cabin to
+  // the hopper bay ahead (the cockpit used to look into the open fuselage
+  // there) and carries the doghouse.
+  {
+    const yF = 0.592, zF = WS_Z - 0.03, yR = ROLL.y + ROLL.r * 0.75, zR = ROLL.z - 0.02;
+    addB('deck', skin((u, v) => {
+      const z = lerp(zF, zR, v), y = lerp(yF, yR, v);
+      const xw = wallX(z, Math.min(y, 0.58)) - 0.002;
+      return [lerp(-xw, xw, u), y, z];
+    }, 12, 4, [0, 1.2, -1.6]));
+    // The deck's front edge: a rubber strip against the glass.
+    addB('rubber', rod([-(wallX(zF, 0.58) - 0.01), yF + 0.004, zF + 0.005], [wallX(zF, 0.58) - 0.01, yF + 0.004, zF + 0.005], 0.006, 6), true);
   }
 
   // ---------------- lamps, toggles, knobs, breakers ----------------
@@ -482,9 +506,9 @@ export function buildA188Cockpit(ctx) {
     }
     // Padded black posts: A-post, the side glass's front frame, B-post.
     const c0 = wsBase(sx > 0 ? 0 : 1), aTop = [sx * (RAIL.x - 0.02), RAIL.y - 0.015, ROOF.zF - 0.02];
-    addB('foam', rod([c0[0] - sx * 0.025, c0[1], c0[2] - 0.03], aTop, 0.03, 10));
-    addB('foam', rod([sx * (sillX(SG.zB) - 0.03), SILL.y, SG.zB - 0.01], [sx * (RAIL.x - 0.025), RAIL.y - 0.015, SG.zT - 0.01], 0.022, 10));
-    addB('foam', rod([sx * (sillX(BPOST) - 0.03), SILL.y, BPOST], [sx * (RAIL.x - 0.025), RAIL.y - 0.015, BPOST], 0.024, 10));
+    addB('foam', rod([c0[0] - sx * 0.02, c0[1], c0[2] - 0.03], aTop, 0.017, 10));
+    addB('foam', rod([sx * (sillX(SG.zB) - 0.022), SILL.y, SG.zB - 0.01], [sx * (RAIL.x - 0.02), RAIL.y - 0.015, SG.zT - 0.01], 0.013, 10));
+    addB('foam', rod([sx * (sillX(BPOST) - 0.022), SILL.y, BPOST], [sx * (RAIL.x - 0.02), RAIL.y - 0.015, BPOST], 0.015, 10));
     addB('rubber', rod([sx * (sillX(SG.zB) - 0.012), SILL.y + 0.004, SG.zB], [sx * (sillX(BPOST) - 0.012), SILL.y + 0.004, BPOST], 0.0045, 6), true);
   }
   // Door (left): handle, the "DO NOT OPEN DOORS IN FLIGHT" plate, the vent
@@ -502,14 +526,16 @@ export function buildA188Cockpit(ctx) {
     addB('cream', new THREE.ShapeGeometry(new THREE.Shape(ring)).translate(0, 0, ROOF.zR + 0.035));
     addB('red', at(new THREE.CylinderGeometry(0.045, 0.045, 0.28, 16), -0.3, -0.25, ROOF.zR + 0.09)); // extinguisher
   }
-  // Compass on top of the windshield's centre post, the post's padding.
+  // Compass: on its thin stand rising from the deck just behind the glass,
+  // left of centre (the AgTruck's installation; it used to hang from the
+  // roof on a thick padded centre post that filled the middle of the view).
   {
-    const top = roofAt(0.5, false);
-    addB('foam', rod(lerp3(wsBase(0.5), top, 0.05).map((q, i) => q + [0, 0, -0.02][i]), [top[0], top[1] - 0.06, top[2] - 0.02], 0.018, 10));
-    const cz = top[2] - 0.05, cy = top[1] - 0.09;
-    addB('compass', at(new RoundedBoxGeometry(0.075, 0.06, 0.06, 2, 0.012), 0, cy, cz));
-    addB('card', at(cellUV(new THREE.PlaneGeometry(0.04, 0.02), 3), 0, cy - 0.003, cz - 0.031, 0, Math.PI, 0));
-    addB('compass', rod([0, cy + 0.03, cz], [0, top[1] - 0.01, top[2]], 0.006, 8));
+    const cx = 0.13, base = [cx, 0.592, -1.0], top = [cx, 0.74, -1.2];
+    addB('compass', rod(base, top, 0.005, 8));
+    addB('compass', at(new THREE.CylinderGeometry(0.02, 0.024, 0.008, 14), base[0], base[1] + 0.004, base[2]));
+    const cy = top[1] + 0.032, cz = top[2] - 0.02;
+    addB('compass', at(new RoundedBoxGeometry(0.07, 0.055, 0.055, 2, 0.012), cx, cy, cz));
+    addB('card', at(cellUV(new THREE.PlaneGeometry(0.038, 0.019), 3), cx, cy - 0.003, cz - 0.0285, 0, Math.PI, 0));
   }
 
   // ---------------- guidance lightbar (on the cowl) ----------------

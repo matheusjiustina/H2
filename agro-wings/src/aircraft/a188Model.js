@@ -18,7 +18,7 @@
 // of the nose (the prop shaft high, the sump and chin below), a chrome
 // spinner, the two landing lights and the chin inlet in the nose face; the
 // hopper behind it with its square lid; the cabin standing high on the
-// hopper section — windshield raked back to the roof, a centre post, the
+// hopper section — a one-piece windshield raked back to the roof, the
 // big side windows reaching down to a low sill, the left door, a flat roof —
 // and the fairing that drops from the roof to a low dorsal; a deep rear
 // fuselage, nearly straight underneath, tapering to the rudder post; the
@@ -625,7 +625,7 @@ export function createA188Model(panel, opts = {}) {
 
   // ---------------- cabin ----------------
   // Windshield from the cowl's top (between its rounded corners) back to the
-  // roof's front edge, split by the centre post; the side windows from the
+  // roof's front edge in one piece; the side windows from the
   // low sill to the roof rails, their front edge leaning back; the door
   // (left) and the small quarter window behind the B-post; the flat roof.
   const stWS = CAB_KEYS[0];
@@ -671,13 +671,14 @@ export function createA188Model(panel, opts = {}) {
     }, 6, 8, [0, 0.4, -1.4]))));
   }
   const glassG = [...quarter];
-  // Windshield: two panes either side of the centre post.
-  for (const [u0, u1] of [[0, 0.485], [0.515, 1]]) {
+  // One-piece windshield (the cabin photographs: no centre post; the post
+  // the first model had, padded inside, filled the middle of the pilot's view).
+  for (const [u0, u1] of [[0, 1]]) {
     glassG.push(grid((uu, v) => {
       const u = lerp(u0, u1, uu);
       const b = wsBase(u), t = roofAt(u, false);
       return lerp3(b, t, v);
-    }, 12, 8));
+    }, 24, 8));
   }
   for (const sx of [1, -1]) {
     glassG.push(grid((u, v) => sideAt(sx, u, v, 'F', BPOST), 10, 6));
@@ -688,7 +689,6 @@ export function createA188Model(panel, opts = {}) {
   const N = 16;
   fr(Array.from({ length: N + 1 }, (_, i) => wsBase(i / N)), 0.013);
   fr(Array.from({ length: N + 1 }, (_, i) => roofAt(i / N, false)), 0.017);
-  fr([wsBase(0.5), roofAt(0.5, false)], 0.016); // centre post
   for (const sx of [1, -1]) {
     const c0 = wsBase(sx > 0 ? 0 : 1), aTop = [sx * RAIL.x, RAIL.y, ROOF.zF];
     fr([c0, lerp3(c0, aTop, 0.5), aTop], 0.02); // A-post

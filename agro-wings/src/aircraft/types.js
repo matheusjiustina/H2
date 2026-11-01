@@ -385,7 +385,10 @@ AIRCRAFT_TYPES.a188 = {
   wash: [0, -1.0, -2],
   anim: { elev: 0.35, rud: 0.42, ail: 0.33, flap: 0.35, pedalZ: -0.94, disc: [380, 900], wash: [1500, 2700], vib: [1500, 2850] },
   vspeeds: { vs0: 47, vs1: 53, vfe: 95, vne: 136 },
-  camera: { dist: 13, height: 3.7, orbit: 19, cockpitPitch: -0.12, cockpitFov: 68 },
+  // AgTruck cockpit: 58° (vertical) — the 68° the other types use made the
+  // panel look small and far; looking 11° down shows the cowl, the doghouse,
+  // the panel and the stick grip. The eye is the pilot figure's eyes (a188Cockpit.js).
+  camera: { dist: 13, height: 3.7, orbit: 19, cockpitPitch: -0.3, cockpitFov: 58 },
   // An air-cooled flat six with a three-blade prop: the IO-540 sound.
   audio: { profile: 'ipanema', blades: 3, cfg: { blades: 3, propDiameter: 2.13 } },
   fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
