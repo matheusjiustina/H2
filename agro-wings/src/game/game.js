@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { World } from '../world/world.js';
 import { GAME } from '../config.js';
+import { AircraftAssets } from '../aircraft/assetManager.js';
 import { PerfManager } from '../core/perfManager.js';
 import { PROFILES } from '../core/perfProfiles.js';
 import { AIRCRAFT_ORDER, aircraftType, setRegistration } from '../aircraft/types.js';
@@ -120,6 +121,8 @@ export class Game {
       this.fleet[id] = ac;
     }
     this._applyAircraftOptions();
+    this.assets = new AircraftAssets(this);
+    this.assets.register();
     this.rig = new CameraRig(this.camera);
     this.rig.shakeScale = this.settings.shake;
     this.rig.eyeHeight = Math.max(-EYE_RANGE, Math.min(EYE_RANGE, +this.settings.eyeHeight || 0));
@@ -230,13 +233,17 @@ export class Game {
     // Parked spots: the helicopter waits on its pad; the airplanes take the
     // west apron spots in order.
     const spots = [BASE.parking, BASE.parking2, BASE.parking3, BASE.parking4, BASE.parking5, BASE.parking6];
+    const idOf = (a) => Object.keys(this.fleet).find((k) => this.fleet[k] === a);
+    this.assets?.thaw(id);
     for (const ac of Object.values(this.fleet)) {
       if (ac === next) continue;
+      this.assets?.thaw(idOf(ac)); // re-parked below: the baked copy is rebuilt
       ac.onSimStep = null; ac.onEvent = null;
       // The AT-802s (18 m span) have their own spots on the grass west of
       // the apron; everyone else keeps the apron spots in order.
       ac.park(ac.kind === 'heli' ? ac.type.servicePad : BASE[ac.type.parkSpot] ?? spots.shift());
     }
+    for (const ac of Object.values(this.fleet)) if (ac !== next) this.assets?.freeze(idOf(ac));
     this.aircraft = next;
     this.aircraftId = id;
     next.parked = false;
@@ -290,6 +297,7 @@ export class Game {
     b.fm.kitOn = on;
     if (!on) { b.fm.hopper = 0; if (this.aircraft === b) this.sprayer.on = false; }
     b.fm.updateMass();
+    this.assets?.refreshAll();
   }
   // Registration marks of one aircraft (Settings): only the letters change —
   // the livery canvas and the panel placard are redrawn, nothing else.
@@ -303,6 +311,7 @@ export class Game {
     const ac = this.fleet?.[id];
     ac?.model.setReg?.(r);
     ac?.panel.setReg?.(r);
+    this.assets?.refresh(id);
     return r;
   }
   setAircraftOption(k, v) {

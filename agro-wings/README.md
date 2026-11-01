@@ -3344,3 +3344,29 @@ Visual: terrain blocks are pixel-identical; static views differ from phase 2 by 
 noise. Crop / road merging changes culling granularity and blend order of overlapping road pieces only.
 Rollback: `git revert` the phase-3 commit, or remove the calls in `world.js` (`freezeStatic`, `terrainMesh.update`);
 the tag / branch `ultra-original-v73` remains the untouched reference.
+
+## Aircraft asset management (performance work, phase 4)
+
+Branch `perf/fase-4` (from `perf/fase-3`). No model, cockpit, instrument, physics, camera or
+access rule was changed; all ten aircraft (Ipanema, AT-502, R44, M-18, Thrush, Bell 206B,
+EMB-203, AgTruck, AT-802, AT-802 Fire Boss) stay in the scene as before, parked ones visible
+(the locked Fire Boss included). The fleet is procedural (no glTF/GLB, no external textures),
+so Meshopt/Draco/KTX2 do not apply and nothing was converted.
+
+`src/aircraft/assetManager.js` (`game.assets`, wired in `game._activate`):
+
+* **Freeze (parked aircraft):** static, opaque, single-material meshes are baked into one mesh per
+  material (same geometry, materials, shadow flags, expressed in the aircraft's own frame); the
+  originals are hidden, not deleted. Node matrices stop being recomputed. Transparent, instanced,
+  multi-material, custom-depth and hidden (cockpit / pilot) meshes are left alone.
+* **GPU release:** geometries / textures that only that aircraft's cockpit or pilot use are
+  `dispose()`d on the GPU when it parks (three.js re-uploads them when drawn again); sources stay in memory.
+* **Thaw:** on selection, re-parking, livery / registration / spray-kit changes the originals are drawn
+  again (`refresh`), so the active aircraft is exactly the previous model.
+* Probes: `test/p4audit.mjs` (resources per aircraft), `test/p4verify.mjs` (frozen vs original pixel
+  diff; switching loop), `test/p4flow.mjs` (select → cockpit → engine start → cameras → title, twice, readings diffed
+  against the previous build). Unit tests: `test/phase4.test.mjs`.
+
+Measured (software renderer; Ultra `?q=high`): see the phase 4 report in the pull request / session.
+Known costs: the baked copies add ≈ 45 MB of JS heap (≈ 560 → 607 MB), and a baked aircraft is
+culled as one mesh. Rollback: `git revert` the phase-4 commit, or remove `this.assets` calls in `game.js`.
