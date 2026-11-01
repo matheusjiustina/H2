@@ -3452,3 +3452,10 @@ memory are **not** read: browsers do not expose them reliably. `?q=high` / manua
 
 Tests (`test/p7mobile.mjs <out> layout|modes|life`, `test/p7perm.mjs`) use Chromium with device metrics and touch
 emulation. There is no Safari / WebKit / Firefox / real phone in the build environment: those are listed as untested.
+
+## Final validation and release (performance work, phase 8)
+
+See `docs/RELEASE_REPORT.md` (before/after, device matrix, known issues), `docs/EXPANSION_CHECKLIST.md`
+(mandatory procedure for new aircraft / farms / crops) and `docs/DEPLOY.md` (hosting). New continuous protection:
+`test/golden.test.mjs` (in `npm test`) fails if any recorded flight, helicopter or spray trace changes, or if a registered
+aircraft has no physics scenarios. Probes added: `test/p8startup.mjs` (start-up timing).
