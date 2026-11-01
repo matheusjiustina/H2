@@ -2911,3 +2911,109 @@ in near-orthographic and three-quarter views (`test/r44ortho.mjs`).
 **Not changed, and why.** The overall height is 3.05 m to the hub against
 the R44's 3.28 m: the hub height is part of the flight model
 (`FLIGHT_R44.rotor.hubHeight`) and was left alone.
+
+## Aircraft 08 — Cessna A188B AgTruck (PR-AGT)
+
+An eighth aircraft with its own geometry (`src/aircraft/a188Model.js`),
+cockpit (`a188Cockpit.js`, `a188Panel.js`), flight figures (`FLIGHT_A188`,
+`SPRAY_A188` in `src/config.js`) and registry entry (`AIRCRAFT_TYPES.a188`).
+No global system was changed: it uses the existing piston /
+constant-speed-prop branch of the flight model, spray, service, GPS, camera
+and sound code. PR-AGT is a fictional registration.
+
+**References.** Only the images sent with the brief: PR-LEO (orange, side
+view, measured at 154.4 px/m for the profile), red AgTrucks spraying and
+close up, the yellow N5324B from the front and rear quarter, the blue
+N6324R, the orange N87622 from above and below, and simulator renders used
+for proportions and the cockpit. No local Flight Simulator files were
+accessible, so none were used.
+
+**Figures.** Continental IO-520-D, 300 hp at 2,850 rpm, three-blade McCauley
+constant-speed prop of 2.13 m; span 12.70 m; length 7.95 m; wing 19.05 m²;
+MTOW 1,905 kg; 204 L of avgas; hopper 1,060 L; flaps to 20°; single seat.
+Estimated: empty mass 1,000 kg, CD0 0.058 with booms, fuel flow 100 L/h at
+full power. Like the 203, the hopper volume is not payload: with full fuel
+the MTOW allows about 673 kg of product (`loadByWeight`).
+
+**Stance.** The geometry is built in the frame of the PR-LEO photo (the
+three-point attitude) and the whole model sits in a `stance` group pitched
+7° (`A188_STANCE`); `a188ToBody()` maps photo-frame points to body axes,
+and the gear contact points, hard points, boom, spray, collision and
+servicing points go through the same rotation. In level flight the
+fuselage is therefore close to level and the wing has the incidence of the
+real aircraft.
+
+**Exterior parts** (`createA188Model`):
+- tall flat-topped cowl with the chrome spinner, two landing lights and
+  the chin inlet in the nose, cooling inlets beside the spinner, exhaust
+  stacks, FUEL INJECTION lettering;
+- tall angular cabin: two-pane windshield with centre post, quarter panes
+  above the A-post, side glass to the B-post, rear quarter glass, door with
+  frame and handle, frames painted in the top colour;
+- hopper lid and filler in front of the windshield;
+- deep fuselage fairing behind the cabin running into the tail cone;
+- strut-braced low wing (12.70 m, 5.5° dihedral) with jury strut, drooped
+  tips, flaps and ailerons;
+- tall swept fin with a rounded top and rudder, low tailplane with
+  elevators;
+- spring-steel main legs and a long tail spring with the tailwheel;
+- spray booms on four hangers, 18 nozzles per side, the wind-driven pump
+  under the belly, wire cutter, beacon and antennas.
+
+**Paints** (same meshes; only the livery and wing canvases and a few
+colours change; chosen on the title card, Paint A / B, and saved):
+- **A — Red** (simulator scheme): silver-white base, red top and cowl, navy
+  band along the fuselage, white flashes, red wing leading-edge band and
+  tips.
+- **B — Orange** (after PR-LEO): white lower fuselage, orange top, cabin and
+  wings, black band widening into the black rear fuselage, red pinstripe,
+  three red stripes behind the door, white tail, registration in white on
+  black, RESTRICTED placard.
+
+**Cockpit** (`buildA188Cockpit`):
+- black doghouse on the glareshield with six engine gauges (fuel pressure,
+  oil temperature, manifold pressure, rpm, oil pressure, CHT);
+- crash roll with the placards (manoeuvring speed, flap speed, etc.);
+- grey lower panel: ASI, altimeter, turn coordinator, DG, two fuel gauges,
+  warning lamps, rocker switches, knobs, circuit breakers, master and
+  magneto switches, starter, fuel valve;
+- the game's AgroWings GPS on a bracket, kept small;
+- magnetic compass on the windshield centre post and the guidance light
+  bar on the cowl;
+- stick, pedals with treads, throttle quadrant (throttle, prop, mixture) on
+  the left wall, flap lever, red spray valve handle;
+- tubular frame, firewall, floor, seat with harness, cream inner walls,
+  headliner, rear bulkhead, extinguisher, door frame and glass.
+The needles follow the flight model (fuel pressure is derived from rpm).
+The eye point sits so the pilot sees over the cowl and between the posts.
+
+**Optimisation.** One merged mesh per material (paint, frame, glass,
+metal, rubber, gear…); the livery is one canvas projected from the side
+with a bump map; ambient occlusion is baked into vertex colours; the dials
+share one 4×3 atlas, and the GPS screen redraws only when its page
+changes. Frame time was not measured for this build.
+
+**Measured** (`node --test test/a188.test.mjs`, run in this container):
+
+| check | result |
+| --- | --- |
+| span / length | 12.700 m / 7.95 m |
+| parked | three wheels down, pitch 7.2°, height 2.42 m |
+| start | catches after 1.3 s, idle 650 rpm |
+| full throttle, static | 2,850 rpm, 300 hp, 100 L/h, 5.66 kN |
+| take-off roll 1,157 / 1,905 kg | 147 m @ 59 kt / 429 m @ 72 kt |
+| climb at 68 kt, 1,350 / 1,905 kg | 1,347 / 771 ft/min |
+| level at 1,600 kg, full power | 116 kt |
+
+Also run: `test/a188cockpit.mjs` (cockpit views, GPS keys, lamps, needles,
+stick, look keys, eye height), `test/a188ortho.mjs` (side, top, front,
+rear and cabin views against the photos), `test/fleetswitch.mjs` (112
+switches with the six aeroplanes parked; a sixth parking spot was added).
+
+**Not done.**
+- The 285 hp continuous limit is not modelled: full power is 300 hp
+  for as long as it is held.
+- The sound reuses the Ipanema IO-540 profile, set to a 2.13 m
+  three-blade prop.
+- The GPS is the game's AgroWings unit, not a specific Satloc model.
+- No end-to-end mission run or frame-time measurement for this build.

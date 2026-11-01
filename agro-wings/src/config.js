@@ -527,6 +527,106 @@ export const SPRAY_E203 = {
   flow: 4.4,
 };
 
+// Cessna A188B AgTruck (fictional Brazilian marks): Continental IO-520-D,
+// 300 hp for take-off (5 min) at 2,850 rpm, 285 hp continuous at 2,700;
+// McCauley three-blade constant-speed prop (2.13 m); span 12.70 m, length
+// 7.94 m, wing 19.05 m²; hopper 280 US gal (1,060 L); fuel 54 US gal
+// (52 usable, the panel placard), avgas; MTOW 1,905 kg (restricted
+// category) on ≈ 1,000 kg empty; flaps to 20°; stall ≈ 47 kt flaps down,
+// 53 kt clean; agricultural working limit 120 mph (placard).
+// The AgTruck's points are measured in its photograph's frame (three-point
+// attitude) and pitched into the body frame by its stance (a188Model.js).
+const A188_ST = (7 * Math.PI) / 180;
+const a188 = (x, y, z) => [x, y * Math.cos(A188_ST) - z * Math.sin(A188_ST), y * Math.sin(A188_ST) + z * Math.cos(A188_ST)];
+export const FLIGHT_A188 = {
+  ...FLIGHT,
+  emptyMass: 1000,
+  mtow: 1905,
+  pilotMass: 85,
+  wingArea: 19.05,
+  span: 12.7,
+  chord: 1.62,
+  oswald: 0.8,
+  inertiaEmpty: [2900, 4100, 3000],
+
+  CL0: 0.38, CLa: 4.9, alphaStall: 0.25, alphaStallNeg: -0.21,
+  CD0: 0.058, // struts, gear legs and the boom
+  CDflap: 0.045, CLflap: 0.6,
+  Cm0: 0.045, CmaWB: 0.25, CmaTail: -1.3, Cmq: -14, Cmde: 0.44, Cmflap: -0.045,
+  Clb: -0.1, Clp: -0.52, Clr: 0.11, Clda: 0.084,
+  Cnb: 0.088, Cnr: -0.17, Cndr: 0.082, Cnda: -0.012,
+  CYb: -0.6, CYdr: 0.12,
+
+  engineType: 'piston-cs',
+  maxPower: 223.7e3, // 300 hp (take-off)
+  propRadius: 1.07, // McCauley 84 in, three blades
+  maxRpm: 2850,
+  idleRpm: 650,
+  radial: {
+    gear: 1.0,
+    crank: 1.3,
+    crankRpm: 290,
+    govThrottle: 0.36,
+    mpIdle: 12, mpMax: 28.6, mpAmbient: 28.8,
+    idleFrac: 0.03,
+    govFrac: 0.32,
+    etaStatic: 0.7,
+    etaCruise: 0.81,
+    discDrag: 0.1,
+    spool: 0.6,
+  },
+  fuelFlowFull: 100 / 3600, // L/s of avgas at take-off power (≈ 26 gal/h)
+  fuelFlowIdle: 10 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.72,
+
+  fuelCapacity: 204,
+  hopperCapacity: 1060,
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.35, // hopper between the firewall and the cabin, ahead of the CG
+  fuelTankSpanY: 2.4,
+  loadByWeight: true,
+
+  // Spring-steel main legs from the lower fuselage ahead of the wing, a long
+  // spring tailwheel under the rudder: the PR-LEO photograph's stance, the
+  // body datum ≈ 7° nose-up on the three wheels.
+  gear: [
+    { name: 'mainL', p: a188(1.27, -1.37, 0.76), k: 95000, c: 9500, travel: 0.2, radius: 0.25, steer: false },
+    { name: 'mainR', p: a188(-1.27, -1.37, 0.76), k: 95000, c: 9500, travel: 0.2, radius: 0.25, steer: false },
+    { name: 'tail', p: a188(0, -1.34, -5.78), k: 28000, c: 2400, travel: 0.14, radius: 0.12, steer: true },
+  ],
+  tailSteer: 0.42,
+
+  hard: [
+    { name: 'wingtipL', p: a188(6.35, 0.03, -0.4) },
+    { name: 'wingtipR', p: a188(-6.35, 0.03, -0.4) },
+    { name: 'boomL', p: a188(5.2, -0.6, -1.15) },
+    { name: 'boomR', p: a188(-5.2, -0.6, -1.15) },
+    { name: 'prop', p: a188(0, -0.65, 1.85) },
+    { name: 'spinner', p: a188(0, 0.42, 2.07) },
+    { name: 'belly', p: a188(0, -0.8, 0.0) },
+    { name: 'tail', p: a188(0, -0.86, -5.5) },
+    { name: 'fin', p: a188(0, 1.04, -5.3) },
+    { name: 'stabL', p: a188(1.95, -0.62, -5.0) },
+    { name: 'stabR', p: a188(-1.95, -0.62, -5.0) },
+    { name: 'roof', p: a188(0, 0.93, -1.8) },
+  ],
+  hardLandingVs: 2.6,
+  crashVs: 5.0,
+
+  wheelPoint: a188(0, -1.37, 0.76),
+  aglOffset: 1.45,
+  wingDrop: 0.45,
+  assistSpeedScale: 0.95,
+};
+
+export const SPRAY_A188 = {
+  // ≈ 10.4 m boom (four hangers a side): the PR-AGW's swath scaled by the
+  // boom span, and the flow that gives its dose at the AgTruck's speed.
+  swath: 24,
+  flow: 3.8,
+};
+
 export const ASSIST = {
   modes: ['off', 'normal', 'high'],
   default: 'normal',

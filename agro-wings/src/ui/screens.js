@@ -39,7 +39,8 @@ export class Screens {
             <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B', 'C'].map((l, i) => `<span class="ac-opt" data-livery="${i}" title="${[t('Agricultural Classic'), t('Dark Green Agricultural'), t('Red Utility')][i]}">${l}</span>`).join('')}<span class="ac-opt kit" data-kit="1">${t('Spray kit')}</span></span>` : ''}${id === 'm18' ? `
             <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B'].map((l, i) => `<span class="ac-opt" data-lk="m18Livery" data-livery="${i}" title="${[t('Agro Wings yellow'), t('Hellenic fire-fighter')][i]}">${l}</span>`).join('')}</span>` : ''}${id === 'r44' ? `
             <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B'].map((l, i) => `<span class="ac-opt" data-lk="r44Livery" data-livery="${i}" title="${[t('Original'), t('Black Agricultural')][i]}">${l}</span>`).join('')}</span>` : ''}${id === 'e203' ? `
-            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['01', '02'].map((l, i) => `<span class="ac-opt" data-lk="e203Livery" data-livery="${i}" title="${[t('Green, blue and gold'), t('White, green and blue')][i]}">${l}</span>`).join('')}</span>` : ''}
+            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['01', '02'].map((l, i) => `<span class="ac-opt" data-lk="e203Livery" data-livery="${i}" title="${[t('Green, blue and gold'), t('White, green and blue')][i]}">${l}</span>`).join('')}</span>` : ''}${id === 'a188' ? `
+            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B'].map((l, i) => `<span class="ac-opt" data-lk="a188Livery" data-livery="${i}" title="${[t('Red'), t('Orange')][i]}">${l}</span>`).join('')}</span>` : ''}
           </button>`;
         }).join('')}</div>
         <div class="btn-row">

@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createE203Panel } from './e203Panel.js';
@@ -17,6 +17,8 @@ import { createThrushPanel } from './thrushPanel.js';
 import { createB206Model, B206_SHADOW, B206_KIT } from './b206Model.js';
 import { createB206Panel } from './b206Panel.js';
 import { createE203Model, E203_SHADOW, e203WingY } from './e203Model.js';
+import { createA188Model, A188_SHADOW, a188WingY, a188ToBody } from './a188Model.js';
+import { createA188Panel } from './a188Panel.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
 
@@ -357,7 +359,57 @@ AIRCRAFT_TYPES.e203 = {
   createShadow: () => createContactShadow(E203_SHADOW),
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203'];
+// Cessna A188B AgTruck (FLIGHT_A188 on the piston + constant-speed branch):
+// its own exterior (a188Model.js) and cockpit (a188Cockpit.js, panel
+// a188Panel.js). Fictional Brazilian registration. Points are given in
+// its photograph's frame and pitched into the body frame (a188ToBody).
+const tb = (pts) => pts.map(a188ToBody);
+AIRCRAFT_TYPES.a188 = {
+  id: 'a188',
+  slot: '08',
+  label: 'AgTruck',
+  reg: 'PR-AGT',
+  name: 'Cessna A188B AgTruck',
+  get role() { return t('Classic Agricultural Aircraft · strut-braced'); },
+  get engineName() { return t('Continental IO-520-D · 300 hp · McCauley 3-blade'); },
+  get summary() { return t('1,060 L hopper · 204 L fuel · 12.70 m span · 1,905 kg MTOW'); },
+  flight: FLIGHT_A188,
+  spray: { swath: SPRAY_A188.swath, flow: SPRAY_A188.flow, boom: a188ToBody([5.2, -0.42, -1.15]) },
+  work: tb([[0, -1.37, 0.76], [5.2, -0.54, -1.18], [-5.2, -0.54, -1.18]]),
+  collide: tb([[0, 0.42, 2.07], [6.35, -0.1, -0.3], [-6.35, -0.1, -0.3], [0, 1.12, -5.3], [0, -0.86, -5.5], [0, -1.35, 0.76], [0, 0.93, -1.8]]),
+  wire: tb([[0, 0.42, 2.07], [6.35, -0.1, -0.3], [-6.35, -0.1, -0.3], [0, 1.12, -5.3], [0, -1.35, 0.76], [1.75, 0.22, -0.32], [-1.75, 0.22, -0.32], [0, 0.93, -1.8]]),
+  smoke: a188ToBody([-0.62, -0.09, 1.0]),
+  wash: [0, -1.0, -2],
+  anim: { elev: 0.35, rud: 0.42, ail: 0.33, flap: 0.35, pedalZ: -0.94, disc: [380, 900], wash: [1500, 2700], vib: [1500, 2850] },
+  vspeeds: { vs0: 47, vs1: 53, vfe: 95, vne: 136 },
+  camera: { dist: 13, height: 3.7, orbit: 19, cockpitPitch: -0.12, cockpitFov: 68 },
+  // An air-cooled flat six with a three-blade prop: the IO-540 sound.
+  audio: { profile: 'ipanema', blades: 3, cfg: { blades: 3, propDiameter: 2.13 } },
+  fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
+  loads: { free: { fuel: 160, hopper: 450 }, boot: 110 },
+  loadSheet: { bankKt: 85, roll: [230, 1400, 2.25] },
+  service: {
+    rates: { fuel: 4.5, liquid: 15 },
+    local: { A: [7.2, -2.1], B: [4.2, -1.8], F: [2.0, -1.5], P: [1.15, -1.45] },
+    keepOut: { wing: [6.4, -1.4, 0.6], wingY: a188WingY, fus: [0.52, -0.86, 0.95, -5.7, 2.1], stab: [1.95, -0.7, -0.5, -5.7, -4.6] },
+    veto: 9,
+  },
+  stub: { eye: a188ToBody([0, 0.72, -1.88]), fuelFiller: a188ToBody([1.7, -0.29, -0.17]), hopperPort: a188ToBody([0.5, -0.3, -0.55]) },
+  // Boxes measured in the photograph's frame, as their body-frame bounds.
+  bounds: [
+    [-0.5, 0.5, -1.11, 1.64, -5.76, 2.2],
+    [-6.35, 6.35, -0.67, 0.3, -1.32, 0.46],
+    [-0.06, 0.06, -0.18, 1.83, -5.94, -4.18],
+    [-1.95, 1.95, -0.13, 0.2, -5.74, -4.63],
+    [-1.45, 1.45, -1.49, -0.64, 0.18, 0.97],
+    [-0.95, 0.95, -0.54, 0.52, -0.67, -0.39],
+  ],
+  createModel: (panel, opts) => createA188Model(panel, opts),
+  createPanel: (opts) => createA188Panel(opts),
+  createShadow: () => createContactShadow(A188_SHADOW),
+};
+
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
 
 // Registrations: each type keeps its factory marks as `reg0`; `reg` reads the

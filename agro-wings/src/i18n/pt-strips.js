@@ -164,6 +164,11 @@ export default {
   'Hellenic fire-fighter': 'Combate a incêndio (Grécia)',
   // Embraer EMB-203 Ipanema
   'Ethanol Agricultural Aircraft · winglets': 'Aeronave agrícola a etanol · winglets',
+  'Classic Agricultural Aircraft · strut-braced': 'Avião agrícola clássico · asa com montantes',
+  'Continental IO-520-D · 300 hp · McCauley 3-blade': 'Continental IO-520-D · 300 hp · McCauley tripá',
+  '1,060 L hopper · 204 L fuel · 12.70 m span · 1,905 kg MTOW': 'Hopper 1.060 L · 204 L de combustível · envergadura 12,70 m · PMD 1.905 kg',
+  'Red': 'Vermelha',
+  'Orange': 'Laranja',
   'Lycoming IO-540-K1J5 · 320 hp (ethanol) · Hartzell 3-blade': 'Lycoming IO-540-K1J5 · 320 hp (etanol) · Hartzell tripá',
   '1,050 L hopper · 292 L ethanol · 13.30 m span · 1,900 kg MTOW': 'Hopper 1.050 L · 292 L de etanol · envergadura 13,30 m · PMD 1.900 kg',
   'Green, blue and gold': 'Verde, azul e dourado',
