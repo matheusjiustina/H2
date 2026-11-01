@@ -3394,3 +3394,35 @@ Probes: `test/p5verify.mjs` (streamed vs everything resident, same camera: pixel
 (long scripted session: heap, GPU counts, hole checks, listeners), `test/p5heap.mjs`, `test/p5audit.mjs`.
 Unit tests: `test/phase5.test.mjs`. Rollback: `git revert` the phase-5 commit, or set
 `world.streaming.enabled = false` and build all cells (as `p5verify` does).
+
+## Simulation performance and stability (performance work, phase 6)
+
+Branch `perf/fase-6` (from `perf/fase-5`). **No physics, aerodynamics, engine, mass, control, wind,
+helicopter, spraying or reward value was changed.** Audit: the simulation was already decoupled from the
+frame rate — `Aircraft.update` / `Helicopter.update` integrate with a fixed 1/120 s step from an
+accumulator (at most 24 sub-steps per frame, accumulator dropped if exceeded), the frame time is clamped
+to 0.1 s, pauses give dt = 0, and the render pose is interpolated between the last two steps. The spray
+**deposition** (`Sprayer.step`, coverage, hopper, on/off-target) runs inside that fixed step; only the
+visible mist (`Sprayer.emit`, per frame, limited by the graphics profile) is separate. So no integration
+change was made or needed.
+
+Optimisations (equal results by construction and by test):
+
+* `terrainData.surfaceAt` (called for every wheel at 120 Hz) tested every segment of every road; a
+  256 m grid now tests only the segments whose box covers the point (`onRoad`, test `phase6.test.mjs`
+  compares 60 000+ points with the original scan, identical answers).
+* `crops.update` skips its patch scan / sort / diff when the camera moved < 1.5 m with nothing waiting.
+
+Evidence (all run in this repository):
+
+* `test/p6golden.mjs` — 28 reproducible scenarios on the real flight / helicopter / spray code (loaded
+  take-offs of 8 aeroplanes with and without wind, short-field landings, 1500 m density altitude, climb /
+  hover / forward flight of R44 and Bell 206B in both power models, spraying with crosswind and coverage):
+  every trace and checksum is **identical on the v73 tag and on this branch** (Math.random of the stall
+  wobble is seeded in the test only).
+* `test/p6fps.mjs` — one spraying pass through the game's tick at 144 / 60 / 30 / 15 fps and with the mist
+  limited to 1800 / 6000 particles: dose, hopper, on / off-target **identical to the last digit**.
+* `test/p6fps2.mjs` — 20 s of flight of 6 aircraft (planes and helicopters) at 144 / 60 / 30 / 15 fps:
+  positions agree within 0.018 m once the stop time is aligned.
+* `test/p6prof.mjs` — CPU profile of the game logic per tick (no rendering); `test/p6audio.mjs` — audio
+  graph node counts while switching aircraft.

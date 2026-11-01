@@ -190,15 +190,22 @@ export function createCrops(terrain, quality) {
   }
 
   const tmp = [];
+  let lastR = -1, lastX = 1e9, lastZ = 1e9, pending = false;
   return {
     group,
-    setQuality(q) { radius = q.cropRadius; radiusU.value = radius; },
+    setQuality(q) { radius = q.cropRadius; radiusU.value = radius; lastR = -1; },
     update(cameraPos) {
       // Only build fins when the camera is reasonably low; from high up the
       // canopy texture carries the look.
       const ground = terrain.heightAt(cameraPos.x, cameraPos.z);
       const alt = cameraPos.y - ground;
       const r = alt > 380 ? 0 : radius;
+      // Phase 6: the patch set only changes when the camera has moved a little (or the radius / the
+      // 'too high' state changed, or a patch is still waiting for its build budget): skip the
+      // scan, sort and diff otherwise. 1.5 m is far inside the half-diagonal margin patches
+      // are loaded with, and the fins dissolve to nothing at the radius anyway.
+      if (!pending && r === lastR && Math.abs(cameraPos.x - lastX) < 1.5 && Math.abs(cameraPos.z - lastZ) < 1.5) return;
+      lastR = r; lastX = cameraPos.x; lastZ = cameraPos.z; pending = false;
       const need = new Set();
       if (r > 0) {
         const pcx = Math.floor(cameraPos.x / PATCH), pcz = Math.floor(cameraPos.z / PATCH);
@@ -217,7 +224,7 @@ export function createCrops(terrain, quality) {
           const key = patchKey(px, pz);
           need.add(key);
           if (!cache.has(key)) {
-            if (budget-- <= 0) { need.delete(key); continue; }
+            if (budget-- <= 0) { need.delete(key); pending = true; continue; }
             cache.set(key, buildPatch(px, pz));
           }
         }

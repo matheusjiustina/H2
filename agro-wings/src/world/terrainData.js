@@ -165,6 +165,51 @@ hqLevel = (() => {
   return s / n;
 })();
 
+// Road proximity (phase 6): the same test as before — a point is on a road when
+// segDist(...) < width / 2 for some segment — but only the segments whose
+// (slightly enlarged) box covers the point's 256 m cell are tested. Any segment
+// that can satisfy the test is in that cell's list, so the answer is identical;
+// the surface lookup runs for every wheel at 120 Hz.
+const ROAD_CELL = 256;
+let roadGrid = null;
+function buildRoadGrid() {
+  const grid = new Map();
+  for (const r of ROADS) {
+    const hw = r.w / 2, m = hw + 1e-6;
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+      const i0 = Math.floor((Math.min(ax, bx) - m) / ROAD_CELL), i1 = Math.floor((Math.max(ax, bx) + m) / ROAD_CELL);
+      const j0 = Math.floor((Math.min(az, bz) - m) / ROAD_CELL), j1 = Math.floor((Math.max(az, bz) + m) / ROAD_CELL);
+      const seg = [ax, az, bx, bz, hw];
+      for (let j = j0; j <= j1; j++) for (let i2 = i0; i2 <= i1; i2++) {
+        const k = i2 + ',' + j;
+        let a = grid.get(k); if (!a) grid.set(k, (a = []));
+        a.push(seg);
+      }
+    }
+  }
+  return grid;
+}
+export function onRoad(x, z) {
+  roadGrid ??= buildRoadGrid();
+  const list = roadGrid.get(Math.floor(x / ROAD_CELL) + ',' + Math.floor(z / ROAD_CELL));
+  if (!list) return false;
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i];
+    if (segDist(x, z, s[0], s[1], s[2], s[3]) < s[4]) return true;
+  }
+  return false;
+}
+// The original linear scan, kept for the equivalence test.
+export function onRoadSlow(x, z) {
+  for (const r of ROADS) {
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      if (segDist(x, z, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < r.w / 2) return true;
+    }
+  }
+  return false;
+}
+
 export class TerrainData {
   constructor() {
     const N = GRID_N + 1;
@@ -255,11 +300,7 @@ export class TerrainData {
       if ((x >= a2.x0 && x <= a2.x1 && z >= a2.z0 && z <= a2.z1) || (x >= t2.x0 && x <= t2.x1 && z >= t2.z0 && z <= t2.z1)) return 'dirt';
       if (Math.abs(x - s.helipad2.x) <= 7.5 && Math.abs(z - s.helipad2.z) <= 7.5) return 'dirt';
     }
-    for (const r of ROADS) {
-      for (let i = 0; i < r.pts.length - 1; i++) {
-        if (segDist(x, z, r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]) < r.w / 2) return 'dirt';
-      }
-    }
+    if (onRoad(x, z)) return 'dirt';
     const f = fieldAt(x, z);
     if (f) {
       if (f.crop === 'pasture') return 'grass';
