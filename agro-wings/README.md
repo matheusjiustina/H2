@@ -3017,3 +3017,132 @@ switches with the six aeroplanes parked; a sixth parking spot was added).
   three-blade prop.
 - The GPS is the game's AgroWings unit, not a specific Satloc model.
 - No end-to-end mission run or frame-time measurement for this build.
+
+## Aircraft 09 / 10 — Air Tractor AT-802A (PR-AWX) and AT-802AF Fire Boss (PR-FBS, premium)
+
+One airframe module (`src/aircraft/at802Model.js`) and two configurations
+with their own flight configs (`FLIGHT_AT802`, `FLIGHT_FIREBOSS` in
+`src/config.js`), equipment and systems. No other aircraft's model, physics
+or cockpit was changed; the additions to shared code are guarded so the
+other aircraft never reach them (see *Shared code touched*).
+
+**References.** The photographs sent with the brief: VH-LII side-on (the
+profile, measured at 88 px/m, spinner tip to rudder 10.9 m), PR-CUN, the
+NT-802 drawing, yellow 802s from the front, three-quarters and spraying,
+VH-NIZ from above; for the Fire Boss LX-AFF, 4O-EAB scooping, EC-KRT
+dropping, EC-JTZ and the Fire Boss on a wet runway from the front; five
+cockpit photographs for the cockpit.
+
+**Figures used.** AT-802A (Air Tractor): PT6A-65AG 1,295 shp; span 18.04 m;
+wing 37.29 m²; MTOW 7,257 kg; empty with spray equipment ≈ 3,062 kg; hopper
+3,028 L; fuel 961 L. Fire Boss (Fire Boss LLC): PT6A-67F 1,600 shp (the
+option chosen), Wipline 10000 amphibious floats, 3,104 L of water, MTOW 7,257
+kg on land, 5,216 kg from water, 7,257 kg while scooping, maximum cruise 150
+KIAS. **Estimated** (and marked so in the config): the Fire Boss empty mass
+with floats (3,800 kg), inertias, the aerodynamic derivatives, fuel flows,
+the float stations (no Wipline drawings were available), cabin and cowl
+widths.
+
+**Geometry.** Fuselage stations from the VH-LII profile converted from its
+three-point attitude to the body frame (10° ground angle): the long
+slab-sided PT6 nose with the exhaust stacks behind the prop and the chin
+inlet, the deep hopper section, the tall glasshouse (three-piece windshield,
+≈ 0.6 m of side glass under a 0.14 m roof), the fairing dropping onto a
+straight turtle deck, the tall fin with a long rudder, a strut-braced
+tailplane, an 18.04 m constant-chord wing with squared tips (closed upper
+and lower surfaces, flaps and ailerons on their hinge lines), a five-blade
+Hartzell with feathering. AT-802A: spring-steel main legs, tailwheel, booms
+with 30 nozzles a side, wind-driven pump. Fire Boss: two lofted Wipline
+hulls (V bottom, step aft of the CG, bows ≈ 0.8 m ahead of the spinner),
+N-struts and spreader bars, retractable wheels (nose pairs at the bows swing
+up over the deck, mains aft of the step swing up and aft), scoop probes,
+drop doors, fins on the stabiliser tips. Paint A: yellow with the green
+band between navy lines (green rudder and tip bands); paint B: the LX-AFF /
+4O-EAB Fire Boss scheme (red cheat line edged black, red rudder, FIRE BOSS
+on the floats).
+
+**Physics** (the fixed-wing flight model; new branches only run for an
+aircraft whose config has them):
+- *Turboprop*: the existing PT6 branch with each engine's figures.
+- *Retractable gear* (`g.retract`, `A.gearTime`): retracted wheels leave
+  the contact model; a squat switch keeps the gear down with weight on the
+  wheels.
+- *Floats on water* (`A.floats`): each hull cut into stations; at each, the
+  submerged V section gives buoyancy, a speed-dependent dynamic lift
+  (planing), heave damping, keel side force and water resistance as a share
+  of the weight the water carries (displacement drag, the hump near 17 kt,
+  planing drag, skin friction); water rudders at taxi speed. Touching the
+  water with the gear down crashes the aircraft; a hard touch damages it.
+- *Water systems* (`fireboss.js`): probes fill only on the water, gear up,
+  wings level, between 41 and 82 kt, up to what the 7,257 kg scooping limit
+  leaves, and the water taken in costs its momentum (ṁ·v drag); from rest
+  the floats will not plane above 5,216 kg; the drop door releases water
+  progressively (full or partial), and the mass and CG moment follow the
+  litres actually released.
+
+**Fire suppression test scenario** (`src/world/fires.js`, active only
+while the Fire Boss is flown): five fire spots on open ground west of a new
+reservoir (*Represa do Norte*, ≈ 1 km east–west, 4 km north of the base,
+built with the existing water system). Released water falls as packets
+with drag, lands on a footprint that grows with the fall time and is handed
+to the spots it covers (`applyWater(x, z, litres, radius)`); intensity falls
+with the water per burning area; the spots reignite two minutes after the
+last one is out. Not a mission system: no spread, no rewards.
+
+**Premium lock** (`src/game/expansions.js`). The Fire Boss belongs to the
+expansion `expansion.at802f-fireboss`. There is no payment, checkout,
+account or Pix code anywhere in this change; the platform's existing premium
+system installs an entitlement source with `setEntitlementSource(fn)`. Until
+it does, the Fire Boss is locked: its card shows the lock, and
+`selectAircraft` / `_activate` refuse it (not only the UI). In a browser
+game a client-side check can be bypassed; the authoritative check belongs
+to the server side of the premium system.
+
+**Controls.** `U` gear up / down, `T` scoop probes, the spray key (`C`)
+opens / closes the drop door (tap again for a partial drop). On the Fire
+Boss panel the gear handle and the probe and door switches can be clicked.
+
+**Cockpit** (`at802Cockpit.js`, textures and screens `at802Panel.js`), after
+the five cockpit photographs. Shared by both configurations:
+- the wide matte-black panel in three facets with real thickness and
+  cut-outs: the centre facet with the guidance unit under its hood, the two
+  wings turned 35° toward the pilot whose tops fall away outboard to rounded
+  corners; bolted seams and screws; the glareshield deck to the windshield;
+- left wing: an engine monitor (Ng, ITT, torque, Np arcs, fuel flow, fuel,
+  g, flight timer, alerts — the flight model's PT6 values; oil pressure and
+  temperature, fuel pressure, volts and OAT are not simulated and read
+  `---` N/S), master warning / caution lamps, boost pump switch, placards;
+- centre: the game's AGROWINGS NAV in a recessed housing with its four soft
+  keys (clickable) and the compass under it — the same unit and state as
+  the other cockpits, not a copy;
+- right wing: electronic attitude indicator, airspeed (knots, arcs from each
+  configuration's V-speeds), red LED readout, auxiliary display, altimeter,
+  vent;
+- the lower console with two labelled switch strips each side (toggles
+  instanced, the simulated ones animated), a Hobbs meter and the red
+  shut-off handle;
+- the stick (black column, Air Tractor grip), Air Tractor pedals, the yellow
+  hopper wall with the hopper sight in the footwell, PT6 quadrant on the left
+  wall, the spray / drop handle on the right, seat and harness, dark side
+  walls with the tube frame, black canopy frames inside.
+Configuration-specific: AT-802A — dispersal strip (valve switch clickable:
+the sprayer), flow monitor, LED = spray flow L/min, hopper sight in US gal;
+Fire Boss — water-system strip (gear handle, probe and door switches,
+clickable), gear lamps (green down, blue up, amber transit), probe / scoop /
+door / water-contact lamps, the water mission display (water, probes, door,
+gear, surface, nearest test fire), LED = water litres, hopper sight in
+litres of water.
+Optimisation: screens redraw only when their rounded values change, at most
+15 Hz and only in the cockpit view; small parts sit in a LOD level dropped
+beyond 25 m; static toggles and screws are instanced; the rest is merged per
+material.
+
+**Shared code touched (guarded).** `flightModel.js` (gear retraction, nose
+casters, the floats branch, an optional external force, a tailwheel-or-nose
+form of the three-point settle that is identical for tailwheels); `env.js`
+(water level query); `aircraft.js` (the water systems hook, water contact
+events, `placeOnWater`, extra fields in `instruments()`); `game.js`
+(premium guard, the AT-802 parking spots, fire field, keys, Fire Boss
+warnings); `input.js` (two actions); `layout.js` / `terrainData.js` /
+`vegetation.js` (the reservoir, with optional bank and tree parameters that
+default to the old behaviour); `screens.js` / `styles.css` (premium badge).

@@ -20,6 +20,7 @@ import { createE203Model, E203_SHADOW, e203WingY } from './e203Model.js';
 import { createA188Model, A188_SHADOW, a188WingY, a188ToBody } from './a188Model.js';
 import { createA188Panel } from './a188Panel.js';
 import { createAT802Model, AT802_SHADOW, FIREBOSS_SHADOW, at802WingY, AT802_EYE } from './at802Model.js';
+import { createAT802Panel } from './at802Panel.js';
 import { FIREBOSS_EXPANSION } from '../game/expansions.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
@@ -417,8 +418,11 @@ AIRCRAFT_TYPES.a188 = {
 // Fictional Brazilian registrations.
 const AT802_BASE = {
   wash: [0, -1.4, -3.0],
-  anim: { elev: 0.36, rud: 0.4, ail: 0.34, flap: 0.52, pedalZ: 0.0, disc: [450, 950], wash: [1150, 1700], vib: [900, 1700] },
-  camera: { dist: 18, height: 5.0, orbit: 27, cockpitPitch: -0.14, cockpitFov: 70 },
+  // pedalZ: the pedals' rest z in the body frame (the cockpit is 1.42 m aft of the PR-AGW's).
+  anim: { elev: 0.36, rud: 0.4, ail: 0.34, flap: 0.52, pedalZ: -1.0, disc: [450, 950], wash: [1150, 1700], vib: [900, 1700] },
+  // Own pilot view: eye 0.33 m under the roof, looking 14° down so the
+  // panel top, the screens and the nose share the frame.
+  camera: { dist: 18, height: 5.0, orbit: 27, cockpitPitch: -0.24, cockpitFov: 70 },
   audio: { profile: 'turboprop', blades: 5 },
   fuel: { name: 'Jet-A', price: GAME.fuelPrice * 1.35 },
   smoke: [-0.6, 0.12, 2.7],
@@ -454,7 +458,7 @@ AIRCRAFT_TYPES.at802 = {
     [-3.0, 3.0, 0.5, 0.75, -7.0, -5.55], [-1.9, 1.9, -2.02, -0.9, 0.3, 1.05], [-1.42, 1.42, -1.35, 1.48, 3.3, 3.48],
   ],
   createModel: (panel, opts) => createAT802Model(panel, { ...opts, variant: 'ag' }),
-  createPanel: (opts) => createTurbinePanel(opts),
+  createPanel: (opts) => createAT802Panel({ ...opts, variant: 'ag', vspeeds: { vs0: 79, vs1: 92, vfe: 120, vne: 180 }, A: FLIGHT_AT802 }),
   createShadow: () => createContactShadow(AT802_SHADOW),
 };
 // AT-802AF Fire Boss — premium expansion (FIREBOSS_EXPANSION.id). Locked
@@ -495,7 +499,7 @@ AIRCRAFT_TYPES.at802f = {
     [-3.0, 3.0, 0.5, 0.75, -7.0, -5.55], [1.1, 2.15, -2.65, -1.6, -4.5, 4.75], [-2.15, -1.1, -2.65, -1.6, -4.5, 4.75], [-1.42, 1.42, -1.35, 1.48, 3.3, 3.48],
   ],
   createModel: (panel, opts) => createAT802Model(panel, { ...opts, variant: 'fireboss' }),
-  createPanel: (opts) => createTurbinePanel(opts),
+  createPanel: (opts) => createAT802Panel({ ...opts, variant: 'fireboss', vspeeds: { vs0: 77, vs1: 91, vfe: 120, vne: 165 }, A: FLIGHT_FIREBOSS }),
   createShadow: () => createContactShadow(FIREBOSS_SHADOW),
 };
 

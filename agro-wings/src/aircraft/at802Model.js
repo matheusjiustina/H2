@@ -38,7 +38,7 @@ import {
   loft, K, sampleStations, airfoil, wingPanel, flipWinding, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, grid,
   speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, WING_SPAN_UV, buildPilot,
 } from './model.js';
-import { AT_PANEL } from './atPanel.js';
+import { buildAT802Cockpit } from './at802Cockpit.js';
 
 const DIH = Math.tan((4 * Math.PI) / 180);
 export const AT802_WING = { rootX: 0.64, tipX: 8.86, half: 9.02, rootY: -0.47, le: 0.6, chord: 2.07 };
@@ -66,7 +66,7 @@ export const AT802_LIVERIES = {
 // eye point ≈ 0.28 m under the roof, 1 m aft of the windshield base.
 const OFF = new THREE.Vector3(0, 0.58, -1.42);
 const o3 = (x, y, z) => [x + OFF.x, y + OFF.y, z + OFF.z];
-export const AT802_EYE = [0, 1.58, -1.92];
+export const AT802_EYE = [0, 1.53, -1.92]; // ≈ 0.33 m under the roof, 0.75 m from the panel
 
 // Ground shadow planforms for createContactShadow().
 export const AT802_SHADOW = { W: 19.6, L: 12.4, wing: [9.0, -1.47, 0.6], fus: [0.62, -1.0, 6.4], tail: [3.0, -7.0, -5.6], core: [6.4, 3.8] };
@@ -527,7 +527,7 @@ export function createAT802Model(panel, opts = {}) {
     glass: new THREE.MeshPhysicalMaterial({ color: 0xa8bcc6, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.17, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.5, depthWrite: false, side: THREE.DoubleSide }),
     lens: new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.35, clearcoat: 1, depthWrite: false }),
     interior: new THREE.MeshStandardMaterial({ color: 0x4c5258, roughness: 0.7, metalness: 0.12, vertexColors: true }),
-    frameIn: new THREE.MeshStandardMaterial({ color: new THREE.Color(L.base).multiplyScalar(0.68), roughness: 0.55, metalness: 0.05, vertexColors: true }),
+    frameIn: new THREE.MeshStandardMaterial({ color: 0x1f2124, roughness: 0.6, metalness: 0.1, vertexColors: true }), // frames painted black inside (photographs)
     floor: new THREE.MeshStandardMaterial({ color: 0xffffff, map: ribTexture('#3c4248', 'rgba(0,0,0,0.5)', 24, 64, 256), roughness: 0.8, metalness: 0.4, vertexColors: true }),
     seat: new THREE.MeshStandardMaterial({ color: 0xffffff, map: ribTexture('#26292e', 'rgba(0,0,0,0.5)'), roughness: 0.88, vertexColors: true }),
     harness: new THREE.MeshStandardMaterial({ color: 0x17191c, roughness: 0.8 }),
@@ -1091,155 +1091,16 @@ export function createAT802Model(panel, opts = {}) {
   prop.add(disc);
   root.add(prop);
 
-  // ---------------- cockpit (provisional) ----------------
-  // The detailed cockpit is a later phase. Here: the reference points it
-  // will be built around (seat, eye point, canopy limits, panel anchor) and
-  // a plain working interior — walls, floor, seat, stick, pedals, the PT6
-  // power quadrant, the spray / drop handle, and a provisional black panel
-  // that carries the existing turbine instrument texture and guidance box.
-  const cockpit = new THREE.Group();
-  const ci = {};
-  const addC = (mat, g) => { (ci[mat] ||= []).push(tagged(g)); };
-  const cabAO = (x, y, z) => 0.5 + 0.5 * smoothstep(0.1, 1.3, y);
-  const wallX = (z, y) => fusX(z, y) - 0.022;
-  const Z0 = -0.95, Z1 = CAN.zR + 0.03, YF = 0.32;
-  for (const sx of [1, -1]) {
-    addC('frameIn', grid((u, v) => { const z = lerp(Z0, Z1, u), y = lerp(YF, SILL - 0.008, v); return [sx * wallX(z, y), y, z]; }, 18, 8, [sx * 3, 0.6, -1.6]));
-    const Wp = (z, y) => [sx * (wallX(z, y) - 0.016), y, z];
-    for (const [a, b] of [[[-0.95, 0.85], [-2.3, 0.85]], [[-0.95, 0.45], [-1.55, 1.2]], [[-1.55, 0.45], [-1.55, 1.2]], [[-1.55, 0.45], [-2.1, 1.2]]]) {
-      addC('frameIn', tube(Array.from({ length: 6 }, (_, i) => Wp(lerp(a[0], b[0], i / 5), lerp(a[1], b[1], i / 5))), 0.017, 10, 8));
-    }
-  }
-  {
-    const r = new THREE.Shape();
-    const xr = (y) => (y <= SILL ? wallX(Z1, y) : canW(y) - 0.02);
-    r.moveTo(-xr(YF), YF);
-    for (let i = 0; i <= 14; i++) { const y = YF + ((SILL + 0.32 - YF) * i) / 14; r.lineTo(xr(y), y); }
-    for (let i = 14; i >= 0; i--) { const y = YF + ((SILL + 0.32 - YF) * i) / 14; r.lineTo(-xr(y), y); }
-    addC('frameIn', tx(new THREE.ShapeGeometry(r, 2), 0, 0, Z1));
-  }
-  addC('frameIn', grid((u, v) => { const z = lerp(Z0, Z1, v), x = lerp(-1, 1, u) * wallX(z, YF); return [x, YF, z]; }, 6, 8, [0, -1, -1.6]));
-  addC('floor', rbox(0.56, 0.012, 0.5, 0.004, 0, YF + 0.006, -1.05));
-  addC('seat', rbox(0.5, 0.12, 0.5, 0.045, ...o3(0, 0.05, -0.55)));
-  addC('seat', rbox(0.5, 0.82, 0.12, 0.05, ...o3(0, 0.45, -0.8), -0.12));
-  addC('seat', rbox(0.42, 0.22, 0.09, 0.04, ...o3(0, 0.98, -0.87), -0.12));
-  addC('dark', rbox(0.54, 0.05, 0.52, 0.01, ...o3(0, -0.04, -0.55)));
-  for (const sx of [1, -1]) {
-    addC('steel', rod(o3(sx * 0.2, -0.24, -0.4), o3(sx * 0.2, -0.04, -0.55), 0.016, 8));
-    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.64, 0.01), M.harness);
-    strap.position.set(...o3(sx * 0.12, 0.48, -0.74));
-    strap.rotation.x = -0.12;
-    cockpit.add(strap);
-  }
-  // Provisional panel: a plain plate (the panel anchor of the next phase)
-  // at the windshield base, tilted toward the eye, carrying the turbine
-  // panel texture (engine and flight instruments, guidance box).
-  const P = AT_PANEL;
-  const PANEL = { y0: 0.6, z0: -1.0, w: 0.84, tilt: (12 * Math.PI) / 180 };
-  const faceH = (P.FACE.h / P.W) * PANEL.w;
-  const pAnchor = new THREE.Group();
-  pAnchor.position.set(0, PANEL.y0, PANEL.z0);
-  pAnchor.rotation.set(-PANEL.tilt, Math.PI, 0, 'YXZ');
-  cockpit.add(pAnchor);
-  const faceGeo = new THREE.PlaneGeometry(PANEL.w, faceH);
-  {
-    const uv = faceGeo.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i), 1 - (1 - uv.getY(i)) * (P.FACE.h / P.H));
-  }
-  faceGeo.translate(0, faceH / 2, 0);
-  const panelMat = new THREE.MeshStandardMaterial({ map: panel.texture, roughness: 0.6, metalness: 0.15, emissive: 0xffffff, emissiveMap: panel.texture, emissiveIntensity: 0.1 });
-  const panelMesh = new THREE.Mesh(faceGeo, panelMat);
-  panelMesh.position.z = 0.002;
-  panelMesh.rotation.y = Math.PI;
-  pAnchor.add(panelMesh);
-  const backG = new RoundedBoxGeometry(PANEL.w + 0.04, faceH + 0.04, 0.05, 2, 0.015);
-  backG.translate(0, faceH / 2, 0.026);
-  pAnchor.add(new THREE.Mesh(backG, M.gloss));
-  // Glareshield over it, up to the windshield base.
-  addC('pad', rbox(PANEL.w + 0.06, 0.05, 0.3, 0.02, 0, PANEL.y0 + faceH * Math.cos(PANEL.tilt) + 0.03, PANEL.z0 + 0.08));
-  // Guidance lightbar on the glareshield.
-  const lightbar = new THREE.Group();
-  lightbar.position.set(0, PANEL.y0 + faceH * Math.cos(PANEL.tilt) + 0.075, PANEL.z0 + 0.0);
-  lightbar.rotation.x = -0.3;
-  const leds = [];
-  for (let i = -7; i <= 7; i++) {
-    const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.008), new THREE.MeshBasicMaterial({ color: 0x222222 }));
-    led.position.set(-i * 0.0155, 0, -0.016);
-    lightbar.add(led);
-    leds.push(led);
-  }
-  lightbar.add(new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.032, 0.03, 2, 0.006), M.dark));
-  cockpit.add(lightbar);
-  // Stick, pedals, power quadrant (power, prop, condition), spray/drop valve.
-  const stick = new THREE.Group();
-  stick.position.set(...o3(0, -0.22, -0.12));
-  {
-    const boot = new THREE.Mesh(lathe([[0.085, 0], [0.078, 0.02], [0.058, 0.06], [0.034, 0.1], [0.019, 0.14]], 16), M.rubber);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.56, 12), M.polished);
-    shaft.position.y = 0.3;
-    const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.029, 0.12, 6, 14), M.gloss);
-    grip.position.set(0, 0.63, 0.012);
-    grip.rotation.x = 0.22;
-    const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.016, 12), M.red);
-    btn.position.set(0, 0.718, 0.03);
-    stick.add(boot, shaft, grip, btn);
-  }
-  cockpit.add(stick);
-  const pedals = [];
-  for (const sx of [1, -1]) {
-    const p = new THREE.Group();
-    p.position.set(...o3(sx * 0.17, -0.12, 0.42));
-    p.rotation.x = -0.6;
-    p.add(new THREE.Mesh(new RoundedBoxGeometry(0.11, 0.17, 0.025, 2, 0.008), M.steel));
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.22, 8), M.steel);
-    arm.position.set(0, -0.13, 0.03);
-    p.add(arm);
-    cockpit.add(p);
-    pedals.push(p);
-  }
-  const THR = [0.33, 0.47, 0.08];
-  addC('gloss', rbox(0.11, 0.045, 0.38, 0.015, ...o3(0.36, 0.425, -0.02), 0.08));
-  addC('gloss', rbox(0.09, 0.16, 0.42, 0.015, ...o3(0.4, 0.33, -0.04)));
-  const throttle = new THREE.Group();
-  throttle.position.set(...o3(...THR));
-  {
-    const tl = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.17, 8), M.steel);
-    tl.position.y = 0.085;
-    const tk = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.032, 0.036, 2, 0.01), M.gloss);
-    tk.position.y = 0.17;
-    throttle.add(tl, tk);
-  }
-  cockpit.add(throttle);
-  for (const [lx, col, rot] of [[0.375, M.accent, 0.38], [0.405, M.red, 0.42]]) {
-    const lv = new THREE.Group();
-    lv.position.set(...o3(lx, 0.45, 0.02));
-    lv.rotation.x = rot;
-    const s2 = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.15, 8), M.steel);
-    s2.position.y = 0.075;
-    const k = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), col);
-    k.position.y = 0.15;
-    lv.add(s2, k);
-    cockpit.add(lv);
-  }
-  addC('gloss', rbox(0.11, 0.06, 0.42, 0.015, ...o3(-0.36, 0.4, -0.2)));
-  const valve = new THREE.Group();
-  valve.position.set(...o3(-0.34, 0.44, -0.1));
-  {
-    const vl = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.18, 8), M.steel);
-    vl.position.y = 0.09;
-    const vk = new THREE.Mesh(new RoundedBoxGeometry(0.055, 0.032, 0.032, 2, 0.008), M.red);
-    vk.position.y = 0.18;
-    valve.add(vl, vk);
-  }
-  cockpit.add(valve);
-  for (const [mat, parts] of Object.entries(ci)) {
-    const g = mergeGeometries(parts);
-    if (g.attributes.color) shade(g, cabAO);
-    const m = new THREE.Mesh(g, M[mat]);
-    m.receiveShadow = true;
-    cockpit.add(m);
-  }
-  cockpit.add(new THREE.Mesh(headliner, new THREE.MeshStandardMaterial({ color: new THREE.Color(L.base).multiplyScalar(0.6), roughness: 0.92, side: THREE.DoubleSide })));
+  // ---------------- cockpit ----------------
+  // at802Cockpit.js: the panel, consoles, controls and cabin interior of
+  // the configuration (shared base, configuration-specific equipment).
+  const ck = buildAT802Cockpit({
+    variant, panel, M,
+    cab: { SILL, CAN, canW, fusX, OFF },
+  });
+  const { cockpit, stick, pedals, throttle, valve, leds, THR } = ck;
+  // Roof lining (inside of the painted roof), matt dark grey.
+  cockpit.add(new THREE.Mesh(headliner, new THREE.MeshStandardMaterial({ color: 0x2c2f33, roughness: 0.95, side: THREE.DoubleSide })));
   root.add(cockpit);
 
   // ---------------- pilot ----------------
@@ -1269,8 +1130,9 @@ export function createAT802Model(panel, opts = {}) {
   let bladeAngle = 1.3, t = 0;
   const FEATHER = 1.3;
   const state = { probes: 0, door: 0 };
-  const update = (dt, fm) => {
+  const update = (dt, fm, ac) => {
     t += dt;
+    ck.update(dt, fm, ac);
     const o = fm.out;
     let target;
     if (fm.engine === 'off' && (o.onGround || fm.rpm < 150)) target = FEATHER;
@@ -1303,7 +1165,7 @@ export function createAT802Model(panel, opts = {}) {
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, flaps, elevator, rudder,
     gear: gearGroups,
-    stick, pedals, throttle, valve, leds, panelMesh, panelAnchor: pAnchor,
+    stick, pedals, throttle, valve, leds, panelMesh: cockpit, inst: { pick: ck.pick, pickables: ck.pickables },
     pumpFan, nozzles, pilot, cockpit, glassMesh,
     eye: new THREE.Vector3(...AT802_EYE),
     seat: new THREE.Vector3(...o3(0, 0.05, -0.55)),
