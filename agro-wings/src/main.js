@@ -9,3 +9,6 @@ game.boot().catch((err) => {
   const el = document.getElementById('ui');
   el.innerHTML = `<div class="fatal"><h1>${t('Agro Wings could not start')}</h1><p>${String(err && err.message || err)}</p></div>`;
 });
+
+// Benchmark instrumentation: loaded only with ?bench (see src/core/bench.js).
+if (new URLSearchParams(location.search).has('bench')) import('./core/bench.js').then((m) => m.installBench());

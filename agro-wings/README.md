@@ -3202,3 +3202,46 @@ shaders (a 1–9 s stall under SwiftShader, once).
   scooping / drop sounds.
 - There is no premium store in this repository: the entitlement source is
   the integration point for the platform's existing system.
+
+## Benchmark (performance work, phase 1)
+
+Reference for all optimisation: the tag **`ultra-original-v73`** (commit
+`aa84723`, the game as published in v73). Optimisations are developed only
+on the branch `perf/fase-2`; the Ultra look (`QUALITY.high`) must stay
+identical, and every change must be revertible by returning to the tag.
+(The tag could not be pushed from the build environment — HTTP 403 on tag
+refs — so the remote also has a branch `ultra-original-v73` at the same
+commit; re-push the tag from a normal machine:
+`git push origin ultra-original-v73`.)
+
+`src/core/bench.js` is loaded **only** with `?bench` in the URL
+(dynamic import in `main.js`); without it nothing runs and the game renders
+as before. It reuses the game's own pieces (`renderer.info`, the live loop,
+`performance.memory`) and the scene setups of `test/perf.mjs`, and it
+changes no setting, quality, rendering or physics.
+
+Per scenario (A hangar, B take-off, C low pass, D spraying, E Air Tractor
+cockpit, F strip approach, G1 R44, G2 Bell 206B, H weather / time changes,
+I long flight, J repeated aircraft / camera / menu changes — B, G and I are
+scripted proxies): frame time avg / P50 / P95 / P99 / max, FPS avg and 1 %
+low, frames over 33 and 50 ms, long tasks, draw calls, triangles,
+geometries, textures, JS heap, and the device (GPU string, pixel ratio,
+canvas, quality preset).
+
+- **Real PC / phone:** open `<game url>?bench&q=high` (`q=` fixes the
+  preset so the automatic quality check does not change it); tap *Run all*
+  (about two minutes, `&dur=10` seconds per scenario), then *Copy JSON*
+  (also kept in localStorage `agro-bench-last`). Use the same quality,
+  window size and power mode for before and after.
+- **Headless (this container, software renderer — frame times are NOT GPU
+  figures, only draw calls / triangles / heap are comparable):**
+  `AGRO_URL=http://localhost:5173/ node test/bench.mjs out.json high 10`
+  (optional 5th argument: scenarios, e.g. `A_hangar,E_cockpit`).
+- **Compare before / after:** `node test/benchcompare.mjs before.json
+  after.json [tolerance%]` — refuses results from different GPU, quality or
+  canvas size, flags frame-time / draw-call / long-task increases beyond the
+  tolerance as WORSE (exit code 1).
+
+Procedure for phase 2: run the benchmark on the tag's build and on the
+branch's build on the same device, compare, and compare screenshots at the
+same camera positions before merging anything.
