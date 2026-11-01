@@ -3370,3 +3370,27 @@ so Meshopt/Draco/KTX2 do not apply and nothing was converted.
 Measured (software renderer; Ultra `?q=high`): see the phase 4 report in the pull request / session.
 Known costs: the baked copies add ≈ 45 MB of JS heap (≈ 560 → 607 MB), and a baked aircraft is
 culled as one mesh. Rollback: `git revert` the phase-4 commit, or remove `this.assets` calls in `game.js`.
+
+## World streaming and memory (performance work, phase 5)
+
+Branch `perf/fase-5` (from `perf/fase-4`). The world stays one continuous coordinate system;
+physics, `terrain.heightAt`, tree / building colliders, missions, sites, strips and saves never
+depend on what is drawn — only GRAPHICS resources of far regions are created late and released early.
+
+`src/world/worldStreaming.js` (`world.streaming`, called from `World.update`) scans every 0.2 s
+(at once after a teleport / site change) for what is wanted, from **anchors**: the camera (needed now),
+a point ahead on the flight path (ground speed × 6 s) and two route-change points ±0.5 rad
+(prefetch), the current farm's strip and the active contract's first field (prefetch, only within 6 km).
+
+| Region | What streams | Rule |
+|---|---|---|
+| Forest cells (`vegetation.js`, 500 m cells) | the instanced meshes (near + far copy) of a cell | built when the cell can be drawn (≤ 1800 m + slack) — prefetch 3 cells / scan by distance, anything needed now at once; released > 800 m beyond reach |
+| Terrain finest level (`terrain.js`, 750 m chunks) | step-1 geometry (the bulk of terrain memory) | built when the LOD can pick it (+120 m) or ahead on the route (1 / scan); a placeholder draws nothing while far; released 700 m beyond. The 3 coarser levels and the far ring stay resident: the ground is visible from any altitude, no hole |
+
+Not streamed (measured, not worth it): crop plants (already streamed per 4 m cell, bounded cache),
+structures (merged per material, small), aircraft (phase 4), audio (procedural, no buffers),
+render targets (none created at run time). `hitTest` / `obstacleAt` / `treeHit` read data, not meshes.
+Probes: `test/p5verify.mjs` (streamed vs everything resident, same camera: pixel diff), `test/p5long.mjs`
+(long scripted session: heap, GPU counts, hole checks, listeners), `test/p5heap.mjs`, `test/p5audit.mjs`.
+Unit tests: `test/phase5.test.mjs`. Rollback: `git revert` the phase-5 commit, or set
+`world.streaming.enabled = false` and build all cells (as `p5verify` does).

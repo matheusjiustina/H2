@@ -105,6 +105,7 @@ export class Game {
       si = Math.max(si, steps.indexOf(label) + 1);
       this.screens.setLoading(si / (steps.length + 2), t(label));
     });
+    this.world.streamHints = () => ({ site: this.site, job: this.job });
     this.marks = new GroundMarks(this.scene, this.world.terrain);
     this.weatherCycle = new WeatherCycle(this);
     this._startWeather(true);

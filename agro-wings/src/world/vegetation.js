@@ -558,12 +558,15 @@ export function createVegetation(terrain, quality) {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3();
   const UP = new THREE.Vector3(0, 1, 0);
   const cellObjs = [];
-  for (const [key, list] of cells) {
-    const [cx, cz] = key.split(',').map(Number);
-    const center = new THREE.Vector3((cx + 0.5) * CELL, 0, (cz + 0.5) * CELL);
+  // Phase 5: a cell's instanced meshes are built when the cell comes within
+  // reach (see stream()) and released when it is far behind — the tree list
+  // (and the collision index made from it) stays whole, so nothing physical
+  // depends on what is drawn. The variant geometries are shared by every
+  // cell and are never disposed here.
+  function buildCellMeshes(c) {
     const hi = new THREE.Group(), lo = new THREE.Group();
     const byVar = new Map();
-    for (const t of list) {
+    for (const t of c.list) {
       const k = t.kind + ':' + t.v;
       if (!byVar.has(k)) byVar.set(k, []);
       byVar.get(k).push(t);
@@ -586,11 +589,24 @@ export function createVegetation(terrain, quality) {
         im.computeBoundingSphere();
         im.castShadow = grp === hi && kind !== 'bush' && kind !== 'mound';
         im.receiveShadow = grp === hi;
+        im.matrixAutoUpdate = false;
         grp.add(im);
       }
     }
+    for (const g of [hi, lo]) { g.matrixAutoUpdate = false; g.visible = false; }
     group.add(hi); group.add(lo);
-    cellObjs.push({ center, hi, lo });
+    c.hi = hi; c.lo = lo; c.built = true;
+  }
+  function releaseCellMeshes(c) {
+    for (const g of [c.hi, c.lo]) {
+      group.remove(g);
+      g.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); // instance buffers only; geometry is shared
+    }
+    c.hi = c.lo = null; c.built = false;
+  }
+  for (const [key, list] of cells) {
+    const [cx, cz] = key.split(',').map(Number);
+    cellObjs.push({ key, list, center: new THREE.Vector3((cx + 0.5) * CELL, 0, (cz + 0.5) * CELL), hi: null, lo: null, built: false });
   }
   // Forest roofs merged per 3 km region (frustum culling per region).
   if (canopyParts.length) {
@@ -607,15 +623,25 @@ export function createVegetation(terrain, quality) {
 
   let near = quality.treeNear;
   const far = 1800;
+  const vis = { built: 0, released: 0 };
   return {
     group,
     atlas,
     colliders,
     count: trees.length,
     setQuality(qq) { near = qq.treeNear; },
+    // Streaming interface (src/world/worldStreaming.js).
+    cells: cellObjs,
+    cellRadius: () => far + CELL,
+    build: buildCellMeshes,
+    release: (c) => { releaseCellMeshes(c); vis.released++; },
+    // Cells the draw test would show (near / far) but whose meshes are not built (must be 0).
+    missing: (cam) => cellObjs.filter((c) => !c.built && Math.hypot(c.center.x - cam.x, c.center.z - cam.z) - CELL * 0.6 < far).length,
+    stats: () => ({ cells: cellObjs.length, built: cellObjs.filter((c) => c.built).length, releasedTotal: vis.released }),
     update(camera) {
       const p = camera.position;
       for (const c of cellObjs) {
+        if (!c.built) continue;
         const d = Math.hypot(c.center.x - p.x, c.center.z - p.z) - CELL * 0.6;
         c.hi.visible = d < near;
         c.lo.visible = !c.hi.visible && d < far;

@@ -492,12 +492,16 @@ function buildChunk(td, cx, cz, size, step) {
   return g;
 }
 
+const EMPTY = new THREE.BufferGeometry();
+EMPTY.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+
 export function createTerrain(td, noiseTex) {
   const group = new THREE.Group();
   group.name = 'terrain';
   const mat = createTerrainMaterial(noiseTex, makeGroundDetail(256));
   const CH = 48; // cells per chunk (750 m)
   const chunks = GRID_N / CH;
+  const fine = [];
   const levels = [[1, 0], [2, 1075], [4, 2125], [8, 4325]];
   for (let j = 0; j < chunks; j++) {
     for (let i = 0; i < chunks; i++) {
@@ -506,7 +510,11 @@ export function createTerrain(td, noiseTex) {
       // (Distances from the chunk centre: a 750 m chunk keeps its finest
       // level until its near edge is ~700 m away, as the 500 m chunks did.)
       for (const [step, dist] of levels) {
-        const m = new THREE.Mesh(buildChunk(td, cx, cz, CH, step), mat);
+        // Phase 5: the finest level (step 1, the bulk of the terrain memory) is
+        // built when the chunk comes within reach — see stream() — and a
+        // placeholder (draws nothing) stands in while it is far.
+        const m = new THREE.Mesh(step === 1 ? EMPTY : buildChunk(td, cx, cz, CH, step), mat);
+        if (step === 1) fine.push({ mesh: m, cx, cz, built: false, lod });
         m.receiveShadow = true;
         m.matrixAutoUpdate = false;
         lod.addLevel(m, dist, 0.15);
@@ -554,6 +562,40 @@ export function createTerrain(td, noiseTex) {
     group,
     material: mat,
     blocks,
+    // Chunks the LOD would draw at the finest level for this camera but whose geometry is not built (must be 0).
+    fineMissing(cam) { return fine.filter((f) => !f.built && Math.hypot(f.lod.position.x - cam.x, cam.y - f.lod.position.y, f.lod.position.z - cam.z) < levels[1][1]).length; },
+    fineStats: () => ({ chunks: fine.length, built: fine.filter((f) => f.built).length }),
+    // Finest-level streaming. anchors: [{x, y, z, extra}] — a chunk whose centre is
+    // closer than (1075 + extra) to an anchor needs its fine level (1075 m is where the
+    // LOD switches to the next one); beyond (1075 + extra + keep) it is released.
+    // Chunks needed now are built immediately (a hole is never an option); chunks
+    // wanted soon (ahead of the flight) are built within `maxPrefetch` per call.
+    stream(anchors, { maxPrefetch = 1, keep = 700 } = {}) {
+      const T = levels[1][1];
+      let pre = 0;
+      const out = { built: 0, released: 0 };
+      for (const f of fine) {
+        const c = f.lod.position;
+        let dNeed = Infinity, dSoon = Infinity;
+        for (const a of anchors) {
+          const d = Math.hypot(c.x - a.x, (a.y ?? 0) - c.y, c.z - a.z) - a.extra;
+          if (a.soon) dSoon = Math.min(dSoon, d); else dNeed = Math.min(dNeed, d);
+        }
+        if (!f.built) {
+          const need = dNeed < T + 120; // a little before the LOD can pick it
+          if (need || (dSoon < T && pre < maxPrefetch)) {
+            if (!need) pre++;
+            f.mesh.geometry = buildChunk(td, f.cx, f.cz, CH, 1);
+            f.built = true; out.built++;
+          }
+        } else if (Math.min(dNeed, dSoon) > T + keep) {
+          f.mesh.geometry.dispose();
+          f.mesh.geometry = EMPTY;
+          f.built = false; out.released++;
+        }
+      }
+      return out;
+    },
     update(camera) {
       const p = camera.position, z = camera.zoom || 1;
       for (const b of blocks) {
