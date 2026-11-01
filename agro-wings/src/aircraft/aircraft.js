@@ -7,12 +7,26 @@ import { Assist } from '../flight/assist.js';
 import { planeAid } from '../flight/pilotAid.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
+import { WaterSystem, FireBossFx } from './fireboss.js';
 import { t } from '../i18n/index.js';
 import { FLIGHT, UNITS } from '../config.js';
 import { POWERLINE, MAIN_SITE, padOf, WORLD_HALF } from '../world/layout.js';
 import { approach, clamp, smoothstep, damp, KT, FT } from '../core/math.js';
 
 const FLAP_NOTCHES = [0, 1 / 3, 2 / 3, 1];
+const fm_gearDown = (fm) => (fm.A.gearTime ? fm.gearDown : 1);
+// Fire Boss system messages (toasts).
+const WATER_MSG = {
+  gearUp: () => t('Gear up — water configuration.'),
+  gearDown: () => t('Gear down — runway configuration.'),
+  gearWeight: () => t('Gear stays down with weight on the wheels.'),
+  probesDown: () => t('Scoop probes down.'),
+  probesUp: () => t('Scoop probes up.'),
+  dropOpen: () => t('Drop door open.'),
+  dropClose: () => t('Drop door closed (partial drop).'),
+  dropEmpty: () => t('Tank empty — door closed.'),
+  empty: () => t('Tank empty — scoop water first.'),
+};
 
 // Minimal stand-in for the visual model (headless simulation / tests).
 function stubModel(type) {
@@ -35,6 +49,8 @@ export class Aircraft {
     this.type = aircraftType(type);
     this.A = this.type.flight;
     this.fm = new FlightModel(this.A);
+    // Amphibian water systems (Fire Boss): gear, scoop probes, drop door.
+    this.water = this.A.firefight ? new WaterSystem(this.fm) : null;
     this.assist = new Assist();
     if (headless) {
       this.panel = { draw() {}, texture: null };
@@ -46,6 +62,7 @@ export class Aircraft {
     }
     game.scene.add(this.model.root);
     if (!headless) { this.contactShadow = this.type.createShadow(); game.scene.add(this.contactShadow); }
+    this.waterFx = this.water && !headless ? new FireBossFx(this) : null;
     this.env = createFlightEnv(this.world.terrain);
     this.shaped = { elev: 0, ail: 0, rud: 0 };
     this.cmd = { pitch: 0, roll: 0, yaw: 0 };
@@ -105,6 +122,13 @@ export class Aircraft {
     this.fm.trim = 0.1;
     this.fm.throttle = 0.7;
     this._afterPlace();
+  }
+  // Amphibians: afloat at rest, wheels up (gear in the floats).
+  placeOnWater(x, z, heading) {
+    if (!this.A.floats) return false;
+    this.fm.settleOnWater(x, z, heading, this.env);
+    this._afterPlace();
+    return true;
   }
   repair() { this.damage = 0; this.fm.roughness = 0; this.fm.extraDrag = 0; }
 
@@ -275,13 +299,35 @@ export class Aircraft {
     this.env.wind.copy(this.windVec);
     fm.step(h, this.env);
     for (const e of fm.events) this._event(e);
+    if (this.water) this._waterStep(h);
     this.onSimStep?.(h);
     fm.updateMass();
+  }
+
+  // Fire Boss: water systems after the flight step; released water goes to
+  // the fire field, messages to the toasts.
+  _waterStep(h) {
+    const ws = this.water, fm = this.fm;
+    const dp = this.model.dropPoint ? _v2.copy(this.model.dropPoint).applyQuaternion(fm.quat).add(fm.pos) : null;
+    ws.step(h, dp);
+    if (ws.packets.length && this.game.fires) for (const p of ws.packets) this.game.fires.addPacket(p);
+    for (const m of ws.msgs) this._toast('water-' + m, WATER_MSG[m]?.() ?? m, 0.5);
+    ws.msgs.length = 0;
   }
 
   _event(e) {
     const g = this.game;
     const A = this.A;
+    if (e.kind === 'water') {
+      // Touching the water: with the wheels down the floats trip over them;
+      // too fast a sink is a hard water landing.
+      if (fm_gearDown(this.fm) > 0.5 && e.speed > 8) return this.crash('Gear down on the water');
+      if (e.vs > A.crashVs) return this.crash('Hard water landing');
+      if (e.vs > A.hardLandingVs) { this.hurt((e.vs - A.hardLandingVs) * 20); this._toast('hardw', t('Hard water landing ({0} m/s).', e.vs.toFixed(1))); }
+      this.game.audio?.play('thump', { volume: Math.min(1, 0.2 + e.vs * 0.2) });
+      this.onEvent?.(e);
+      return;
+    }
     if (e.kind === 'touch') {
       if (e.part !== 'tail') this.lastTouch = { vs: e.speed, t: this.simTime };
       // The tailwheel sits 4.5 m behind the CG: when the mains touch first it
@@ -516,7 +562,8 @@ export class Aircraft {
     m.throttle.rotation.x = -0.5 + fm.throttle * 0.95;
     const spraying = this.game.sprayer?.on;
     this._pilotHead(dt, spraying);
-    m.valve.rotation.x = spraying ? 0.6 : -0.3;
+    m.valve.rotation.x = spraying || this.water?.dropping ? 0.6 : -0.3;
+    if (this.water) { m.setWaterGear?.(this.water.probes, this.water.door); this.waterFx?.update(dt); }
     m.pumpFan.rotation.z += (spraying ? fm.out.airspeed * 1.6 : fm.out.airspeed * 0.3) * dt;
     // Instrument panel at 15 Hz while visible.
     m.update?.(dt, fm, this);

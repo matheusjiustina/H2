@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_AT802, FLIGHT_FIREBOSS, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_AT802, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createE203Panel } from './e203Panel.js';
@@ -19,6 +19,8 @@ import { createB206Panel } from './b206Panel.js';
 import { createE203Model, E203_SHADOW, e203WingY } from './e203Model.js';
 import { createA188Model, A188_SHADOW, a188WingY, a188ToBody } from './a188Model.js';
 import { createA188Panel } from './a188Panel.js';
+import { createAT802Model, AT802_SHADOW, FIREBOSS_SHADOW, at802WingY, AT802_EYE } from './at802Model.js';
+import { FIREBOSS_EXPANSION } from '../game/expansions.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
 
@@ -409,7 +411,95 @@ AIRCRAFT_TYPES.a188 = {
   createShadow: () => createContactShadow(A188_SHADOW),
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188'];
+// Air Tractor AT-802 family: one airframe module (at802Model.js), two
+// configurations with their own flight config, equipment and systems.
+// Cockpit: provisional interior (the detailed one is a later phase).
+// Fictional Brazilian registrations.
+const AT802_BASE = {
+  wash: [0, -1.4, -3.0],
+  anim: { elev: 0.36, rud: 0.4, ail: 0.34, flap: 0.52, pedalZ: 0.0, disc: [450, 950], wash: [1150, 1700], vib: [900, 1700] },
+  camera: { dist: 18, height: 5.0, orbit: 27, cockpitPitch: -0.14, cockpitFov: 70 },
+  audio: { profile: 'turboprop', blades: 5 },
+  fuel: { name: 'Jet-A', price: GAME.fuelPrice * 1.35 },
+  smoke: [-0.6, 0.12, 2.7],
+  stub: { eye: AT802_EYE, fuelFiller: [2.6, -0.2, -0.55], hopperPort: [0.72, -0.25, -2.0] },
+};
+AIRCRAFT_TYPES.at802 = {
+  ...AT802_BASE,
+  id: 'at802',
+  slot: '09',
+  parkSpot: 'parking7',
+  label: 'AT-802A',
+  reg: 'PR-AWX',
+  name: 'Air Tractor AT-802A',
+  get role() { return t('Large Agricultural Turboprop'); },
+  get engineName() { return t('P&WC PT6A-65AG turboprop · 1,295 shp · Hartzell 5-blade'); },
+  get summary() { return t('3,028 L hopper · 961 L fuel · 18.04 m span · 7,257 kg MTOW'); },
+  flight: FLIGHT_AT802,
+  spray: { swath: SPRAY_AT802.swath, flow: SPRAY_AT802.flow, boom: [8.25, -0.3, -1.5] },
+  work: [[0, -2.01, 0.67], [8.3, -0.32, -1.52], [-8.3, -0.32, -1.52]],
+  collide: [[0, 0.07, 3.94], [9.02, 0.18, -0.45], [-9.02, 0.18, -0.45], [0, 2.75, -6.2], [0, 0.45, -6.9], [0, -2.01, 0.67], [0, 1.86, -2.1], [3.0, 0.62, -6.3], [-3.0, 0.62, -6.3]],
+  wire: [[0, 0.07, 3.94], [9.02, 0.18, -0.45], [-9.02, 0.18, -0.45], [0, 2.75, -6.2], [0, -2.01, 0.67], [4.5, -0.2, -0.45], [-4.5, -0.2, -0.45], [0, 1.86, -2.1]],
+  vspeeds: { vs0: 79, vs1: 92, vfe: 120, vne: 180 },
+  loads: { free: { fuel: 600, hopper: 2200 }, boot: 450 },
+  loadSheet: { bankKt: 120, roll: [227, 838, 2.0] },
+  service: {
+    rates: { fuel: 8, liquid: 32 },
+    local: { A: [9.9, -2.7], B: [5.8, -2.5], F: [2.6, -1.95], P: [1.45, -2.55] },
+    keepOut: { wing: [9.0, -1.5, 0.65], wingY: at802WingY, fus: [0.64, -1.0, 1.9, -6.8, 3.95], stab: [3.0, 0.45, 0.8, -7.0, -5.55] },
+    veto: 13,
+  },
+  bounds: [
+    [-0.64, 0.64, -1.02, 1.88, -6.8, 3.95], [-9.02, 9.02, -0.62, 0.34, -1.5, 0.66], [-0.13, 0.13, 0.85, 2.8, -7.05, -5.3],
+    [-3.0, 3.0, 0.5, 0.75, -7.0, -5.55], [-1.9, 1.9, -2.02, -0.9, 0.3, 1.05], [-1.42, 1.42, -1.35, 1.48, 3.3, 3.48],
+  ],
+  createModel: (panel, opts) => createAT802Model(panel, { ...opts, variant: 'ag' }),
+  createPanel: (opts) => createTurbinePanel(opts),
+  createShadow: () => createContactShadow(AT802_SHADOW),
+};
+// AT-802AF Fire Boss — premium expansion (FIREBOSS_EXPANSION.id). Locked
+// until the existing entitlement source grants it (game/expansions.js);
+// the game refuses to fly it while locked, whatever the UI shows.
+AIRCRAFT_TYPES.at802f = {
+  ...AT802_BASE,
+  id: 'at802f',
+  slot: '10',
+  parkSpot: 'parking8',
+  label: 'Fire Boss',
+  reg: 'PR-FBS',
+  name: 'Air Tractor AT-802AF Fire Boss',
+  premium: FIREBOSS_EXPANSION.id,
+  amphibian: true,
+  get role() { return t('Amphibious Fire-Fighter · premium expansion'); },
+  get engineName() { return t('P&WC PT6A-67F turboprop · 1,600 shp · Hartzell 5-blade'); },
+  get summary() { return t('3,104 L water · Wipline 10000 amphibious floats · 5,216 kg MTOW from water'); },
+  flight: FLIGHT_FIREBOSS,
+  // No spray booms: the spray key opens the drop door (fireboss.js). The
+  // entry stays for the systems that read it (swath for guidance only).
+  spray: { swath: 30, flow: 0, boom: [0, -1.05, -0.15], none: true },
+  work: [[0, -3.06, -0.9], [1.62, -2.64, -0.5], [-1.62, -2.64, -0.5]],
+  collide: [[0, 0.07, 3.94], [9.02, 0.18, -0.45], [-9.02, 0.18, -0.45], [0, 2.75, -6.2], [0, 0.45, -6.9], [0, 1.86, -2.1], [3.0, 0.62, -6.3], [-3.0, 0.62, -6.3]],
+  wire: [[0, 0.07, 3.94], [9.02, 0.18, -0.45], [-9.02, 0.18, -0.45], [0, 2.75, -6.2], [1.62, -2.64, -0.5], [-1.62, -2.64, -0.5], [0, 1.86, -2.1]],
+  vspeeds: { vs0: 77, vs1: 91, vfe: 120, vne: 165 },
+  camera: { ...AT802_BASE.camera, height: 5.6, orbit: 29, dist: 19 },
+  loads: { free: { fuel: 500, hopper: 0 }, boot: 450 },
+  loadSheet: { bankKt: 110, roll: [297, 876, 2.0] },
+  service: {
+    rates: { fuel: 8, liquid: 34 },
+    local: { A: [9.9, -2.7], B: [5.8, -2.5], F: [2.9, -1.95], P: [0.62, -2.75] },
+    keepOut: { wing: [9.0, -1.5, 0.65], wingY: at802WingY, fus: [0.64, -1.0, 1.9, -6.8, 3.95], stab: [3.0, 0.45, 0.8, -7.0, -5.55] },
+    veto: 13,
+  },
+  bounds: [
+    [-0.64, 0.64, -1.02, 1.88, -6.8, 3.95], [-9.02, 9.02, -0.62, 0.34, -1.5, 0.66], [-0.13, 0.13, 0.85, 2.8, -7.05, -5.3],
+    [-3.0, 3.0, 0.5, 0.75, -7.0, -5.55], [1.1, 2.15, -2.65, -1.6, -4.5, 4.75], [-2.15, -1.1, -2.65, -1.6, -4.5, 4.75], [-1.42, 1.42, -1.35, 1.48, 3.3, 3.48],
+  ],
+  createModel: (panel, opts) => createAT802Model(panel, { ...opts, variant: 'fireboss' }),
+  createPanel: (opts) => createTurbinePanel(opts),
+  createShadow: () => createContactShadow(FIREBOSS_SHADOW),
+};
+
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'at802', 'at802f'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
 
 // Registrations: each type keeps its factory marks as `reg0`; `reg` reads the

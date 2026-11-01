@@ -11,6 +11,8 @@ export function createFlightEnv(terrain) {
     surface: (x, z) => terrain.surfaceAt(x, z),
     cropHeight: (x, z) => cropHeight(fieldAt(x, z)),
     top: (x, z) => terrain.heightAt(x, z) + cropHeight(fieldAt(x, z)),
+    // Water surface height, or -1e9 where there is none (amphibians).
+    water: (x, z) => terrain.waterLevel(x, z),
   };
   return env;
 }

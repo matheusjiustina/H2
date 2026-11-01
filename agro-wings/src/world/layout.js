@@ -42,6 +42,10 @@ export const BASE = {
   // east of the first, west of the taxiway: used when a helicopter is
   // flown and all six airplanes wait parked.
   parking6: { x: -404, z: -45, heading: Math.PI / 2 },
+  // AT-802A and Fire Boss (18.04 m span): on the grass west of the apron,
+  // clear of the other spots and of the taxi route.
+  parking7: { x: -472, z: -58, heading: Math.PI / 2 },
+  parking8: { x: -472, z: -88, heading: Math.PI / 2 },
   // Helicopter pad (R44): gravel pad with a painted H at the east end of the
   // apron, clear of the taxi route, the service pad and the fuel slab.
   helipad: { x: -323, z: -48, heading: Math.PI / 2, radius: 6 },
@@ -225,6 +229,12 @@ export const WATER = {
     { name: 'Lago de Baixo', ring: true, x: -4130, z: -4245, r: 34, depth: 1.8, ph: 3.3 },
     // Small dam where the Vale Verde creek leaves the valley.
     { name: 'Represa do Vale Verde', ring: true, x: 4070, z: 4850, r: 62, depth: 2.6, ph: 0.4 },
+    // Large reservoir north of the main base, long axis east–west (into the
+    // prevailing easterly): the open water an amphibian needs to land, scoop
+    // and take off (≈ 1 km long). Gentle banks (bank: rise per metre beyond
+    // the shore, blend: where the natural ground takes over, in radii), and
+    // open shores at both ends of the long axis (few trees on the approaches).
+    { name: 'Represa do Norte', x: 450, z: -3950, r: 430, depth: 4.5, ph: Math.PI / 2, bank: 0.045, blend: 1.7, trees: 0.3, open: -0.1, big: true },
   ],
 };
 // Radius of a pond's shoreline towards angle a.
@@ -503,7 +513,7 @@ function makeSite(f) {
     apron: mvr(BASE.apron, dx, dz),
     taxiway: { ...mvr(BASE.taxiway, dx, dz), z1: dz - f.width / 2 },
     hangar: mv(BASE.hangar, dx, dz),
-    pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz), parking3: mv(BASE.parking3, dx, dz), parking4: mv(BASE.parking4, dx, dz), parking5: mv(BASE.parking5, dx, dz), parking6: mv(BASE.parking6, dx, dz),
+    pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz), parking3: mv(BASE.parking3, dx, dz), parking4: mv(BASE.parking4, dx, dz), parking5: mv(BASE.parking5, dx, dz), parking6: mv(BASE.parking6, dx, dz), parking7: mv(BASE.parking7, dx, dz), parking8: mv(BASE.parking8, dx, dz),
     helipad: mv(BASE.helipad, dx, dz), helipad2: mv(BASE.helipad2, dx, dz),
     fuelTank: mv(BASE.fuelTank, dx, dz), mixTank: mv(BASE.mixTank, dx, dz),
     reservoirs: BASE.reservoirs.map((r) => mv(r, dx, dz)),

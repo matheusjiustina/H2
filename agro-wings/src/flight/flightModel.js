@@ -50,6 +50,9 @@ export class FlightModel {
     this.fuel = A.fuelCapacity * 0.6;
     this.hopper = 0;
     this.extraDrag = 0; // spray valve, damage
+    this.extForce = null; // optional world-frame force from an aircraft system (e.g. water probes)
+    // Retractable gear (amphibious floats): 1 = down and locked, 0 = up.
+    this.gearDown = 1; this.gearCmd = true;
     this.stallWobble = 0;
     this.gear = A.gear.map((g) => ({
       ...g, pv: new Vector3(...g.p), compression: 0, onGround: false, spin: 0, steerAngle: 0, prevPen: -1, load: 0,
@@ -58,6 +61,7 @@ export class FlightModel {
     this.out = {
       airspeed: 0, groundSpeed: 0, alpha: 0, beta: 0, stall: 0, stallWarn: 0, agl: 100, onGround: false, wheelsOnGround: 0,
       thrust: 0, gLoad: 1, vs: 0, cropDepth: 0, surface: 'grass', density: 1.225, mass: 0,
+      onWater: false, waterClear: 1e9, waterSupport: 0, waterSpeed: 0,
     };
     this.events = [];
     this._force = new Vector3(); this._torque = new Vector3(); this._accel = new Vector3();
@@ -106,6 +110,8 @@ export class FlightModel {
     }
     this.brake = 0;
     this.stallWobble = 0;
+    this.extForce = null;
+    this._wasWet = false;
     for (const g of this.gear) { g.prevPen = -1; g.compression = 0; g.onGround = false; }
     for (const h of this.hard) h.prev = -1;
     this.updateMass();
@@ -117,10 +123,12 @@ export class FlightModel {
     const m = A.gear[0].p, t = A.gear[2].p;
     // Three-point attitude from the gear geometry with nominal static compression.
     const sm = 0.06, st = 0.04;
-    const pitch = Math.atan2((t[1] + st) - (m[1] + sm), m[2] - t[2]); // positive = nose up
+    // (atan of the slope: a tailwheel behind the mains or nose wheels ahead.)
+    const pitch = Math.atan(((t[1] + st) - (m[1] + sm)) / (m[2] - t[2])); // positive = nose up
     const q = new Quaternion().setFromAxisAngle(UP, heading);
     const qp = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -pitch);
     this.reset(new Vector3(x, 0, z), heading);
+    this.gearDown = 1; this.gearCmd = true;
     this.quat.copy(q).multiply(qp);
     // Lift until the main wheels sit at their static compression.
     const r = _r.set(...m).applyQuaternion(this.quat);
@@ -135,6 +143,7 @@ export class FlightModel {
     const torque = this._torque.set(0, 0, 0);
     _qInv.copy(q).invert();
     this.events.length = 0;
+    if (A.gearTime) this.gearDown = clamp(this.gearDown + (this.gearCmd ? dt : -dt) / A.gearTime, 0, 1);
 
     this._engine(dt, env);
 
@@ -203,6 +212,7 @@ export class FlightModel {
     aero.z += thrust;
     aero.applyQuaternion(q);
     force.add(aero);
+    if (this.extForce) force.add(this.extForce);
     force.y -= this.mass * G;
 
     // Hopper weight acts slightly ahead of the reference CG.
@@ -254,6 +264,12 @@ export class FlightModel {
       const steerMax = A.tailSteer * (1 - 0.75 * smoothstep(3, 25, speedGround));
       const yawCmd = this.rudder;
       for (const g of this.gear) {
+        if (g.retract && this.gearDown < 0.98) {
+          // Retracted (or travelling): the wheel is not in the airflow or on the ground.
+          g.onGround = false; g.compression = 0; g.prevPen = -1; g.load = 0;
+          g.spin *= 1 - Math.min(1, dt * 0.4);
+          continue;
+        }
         const r = _r.copy(g.pv).applyQuaternion(q);
         const cx = this.pos.x + r.x, cy = this.pos.y + r.y, cz = this.pos.z + r.z;
         const st = env.surface(cx, cz);
@@ -294,13 +310,13 @@ export class FlightModel {
         let b = 0;
         if (g.name === 'mainL') b = this.brake * clamp(1 - yawCmd * 0.9, 0, 1);
         else if (g.name === 'mainR') b = this.brake * clamp(1 + yawCmd * 0.9, 0, 1);
-        if (this.parkBrake && g.name !== 'tail') b = 1;
+        if (this.parkBrake && (g.name === 'mainL' || g.name === 'mainR')) b = 1;
         const muR = A.rollingResistance[st] ?? 0.05;
         const Flong = -clamp(vLong / 0.25, -1, 1) * muR * Fn - clamp(vLong / 0.06, -1, 1) * b * A.brakeMu * Fn;
         // Tailwheel: steerable within its range, full-castering (unlocked) when
         // the pilot pivots on a braked main wheel with full rudder.
         const unlocked = g.steer && this.brake * Math.abs(yawCmd) > 0.5;
-        const muLat = g.steer ? (unlocked ? 0.05 : A.lateralMu * 0.6) : A.lateralMu;
+        const muLat = g.caster ? 0.05 : g.steer ? (unlocked ? 0.05 : A.lateralMu * 0.6) : A.lateralMu;
         const Flat = -clamp(vLat / 0.18, -1, 1) * muLat * Fn;
         const F = _f.copy(n).multiplyScalar(Fn).addScaledVector(_fw, Flong).addScaledVector(_side, Flat);
         force.add(F);
@@ -332,6 +348,13 @@ export class FlightModel {
     } else {
       for (const g of this.gear) { g.prevPen = -1; g.onGround = false; g.compression = 0; g.spin *= 1 - Math.min(1, dt * 0.4); }
       for (const h of this.hard) h.prev = -1;
+    }
+
+    // Floats on water (amphibians only).
+    out.onWater = false;
+    if (A.floats) {
+      this._floats(dt, env, force, torque, wOmega);
+      if (out.onWater) out.onGround = true;
     }
 
     // Crop canopy: wheels, booms and belly brushing through the plants.
@@ -378,11 +401,84 @@ export class FlightModel {
     const aWarn = A.alphaStall - this.flaps * 0.035 - 0.07;
     out.stallWarn = u > 12 && !out.onGround ? smoothstep(aWarn, aWarn + 0.015, alpha) : 0;
     out.agl = nearGround ? Math.max(0, minClear) : this.pos.y - A.aglOffset - env.ground(this.pos.x, this.pos.z);
+    if (A.floats && out.waterClear < 1e8) out.agl = Math.max(0, Math.min(out.agl, out.waterClear));
     out.vs = this.vel.y;
     out.density = rho;
     out.gLoad = _v4.copy(this._accel).add(_v1.set(0, G, 0)).applyQuaternion(_qInv).y / G;
     out.CL = CL;
     if (!Number.isFinite(this.pos.x + this.pos.y + this.pos.z + this.vel.x + this.quat.w + this.omega.x)) this._recover();
+  }
+
+  // Amphibious floats on water (simplified hydrodynamics, no CFD). Each
+  // float is cut into stations; at each one the submerged depth of the V
+  // keel gives the displaced section: buoyancy ρ·g·A·Δz, plus a dynamic
+  // lift that grows with speed (planing: the hulls climb out of the water as
+  // they speed up), heave damping, keel side force, and water resistance as
+  // a share of the weight the water carries — displacement drag, the hump
+  // near 17 kt, then the much lower planing drag, plus skin friction.
+  // Forces act at the stations, so pitch and roll come out of the same
+  // sums. Water rudders help at taxi speed.
+  _floats(dt, env, force, torque, wOmega) {
+    const A = this.A, F = A.floats, q = this.quat, out = this.out;
+    out.waterClear = 1e9; out.waterSupport = 0; out.waterSpeed = 0;
+    const wl = env.water ? env.water(this.pos.x, this.pos.z) : -1e9;
+    if (wl < -1e8 || this.pos.y - wl > 10) { this._wasWet = false; return; }
+    const t = performance.now() * 0.001;
+    const fwd = _v1.set(0, 0, 1).applyQuaternion(q); fwd.y = 0;
+    if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, 1);
+    fwd.normalize();
+    const side = _v2.set(fwd.z, 0, -fwd.x); // body +X (left) on the water plane
+    const S = F.stations, n = S.length, rhoG = F.waterDensity * G;
+    let wetCount = 0, support = 0;
+    for (const sx of [1, -1]) {
+      for (let k = 0; k < n; k++) {
+        const [z, ky, beam, dy] = S[k];
+        const z0 = k > 0 ? (S[k - 1][0] + z) / 2 : z, z1 = k < n - 1 ? (S[k + 1][0] + z) / 2 : z;
+        const dz = z0 - z1;
+        if (dz <= 0) continue;
+        const r = _r.set(sx * F.x, ky, z).applyQuaternion(q);
+        const px = this.pos.x + r.x, pz = this.pos.z + r.z;
+        const lvl = (env.water(px, pz) > -1e8 ? env.water(px, pz) : wl) + 0.03 * Math.sin(px * 0.31 + t * 1.3) * Math.sin(pz * 0.27 - t * 1.1);
+        const d = lvl - (this.pos.y + r.y);
+        out.waterClear = Math.min(out.waterClear, -d);
+        if (d <= 0) continue;
+        wetCount++;
+        const h = dy - ky, dd = Math.min(d, h);
+        const area = dd < F.vee ? (beam * dd * dd) / (2 * F.vee) : beam * (dd - F.vee / 2);
+        const vc = _vc.copy(wOmega).cross(r).add(this.vel);
+        const vL = vc.dot(fwd), vLat = vc.dot(side), speed = Math.hypot(vL, vLat);
+        const wet = dd / h;
+        const plane = Math.min(F.planeMax, (speed / F.planeV) ** 2);
+        const Fb = rhoG * area * dz;
+        const Fup = Fb * (1 + plane);
+        support += Fup;
+        const Fy = Fup - F.vertC * vc.y * wet * dz;
+        const Dr = F.drag;
+        const fRes = Dr.base + Dr.hump * Math.exp(-(((speed - Dr.vHump) / Dr.wHump) ** 2)) + Dr.skin * speed * speed;
+        const FL = -Math.tanh(vL / 0.6) * Fup * fRes;
+        let Flat = -F.latK * vLat * wet * dz;
+        if (z < -3.5) Flat += F.waterRudder * this.rudder * Math.min(1, 0.35 + Math.abs(vL) / 4) * Math.min(1, wet * 3);
+        const f = _f.set(0, Fy, 0).addScaledVector(fwd, FL).addScaledVector(side, Flat);
+        force.add(f);
+        _t.crossVectors(r, f).applyQuaternion(_qInv);
+        torque.add(_t);
+      }
+    }
+    out.onWater = wetCount > 0;
+    out.waterSupport = support / (this.mass * G);
+    out.waterSpeed = out.onWater ? Math.hypot(this.vel.x, this.vel.z) : 0;
+    if (out.onWater && !this._wasWet) this.events.push({ kind: 'water', speed: out.waterSpeed, vs: -this.vel.y, x: this.pos.x, y: wl, z: this.pos.z });
+    this._wasWet = out.onWater;
+  }
+
+  // Afloat at rest: level on the water, the floats at their static draft.
+  settleOnWater(x, z, heading, env) {
+    this.reset(new Vector3(x, 0, z), heading);
+    const wl = env.water(x, z);
+    this.pos.y = wl + 2.25;
+    this.gearDown = 0; this.gearCmd = false;
+    for (let i = 0; i < 600; i++) this.step(1 / 120, env);
+    this.vel.set(0, 0, 0); this.omega.set(0, 0, 0);
   }
 
   _engine(dt, env) {

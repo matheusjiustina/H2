@@ -13,6 +13,7 @@ import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap, mapControls, mapPoint } from './maps.js';
 import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
+import { aircraftUnlocked } from '../game/expansions.js';
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -31,7 +32,9 @@ export class Screens {
         <div class="title-sub">${t('Agricultural aviation · Fazenda Boa Esperança, Mato Grosso')}</div>
         <div class="ac-select" role="radiogroup" aria-label="${t('Aircraft')}">${AIRCRAFT_ORDER.map((id) => {
           const ty = AIRCRAFT_TYPES[id];
-          return `<button class="ac-card" role="radio" aria-checked="false" data-ac="${id}">
+          const locked = !aircraftUnlocked(ty);
+          return `<button class="ac-card${ty.premium ? ' premium' : ''}${locked ? ' locked' : ''}" role="radio" aria-checked="false" data-ac="${id}"${locked ? ` aria-disabled="true" title="${t('Premium expansion — not unlocked on this account.')}"` : ''}>${ty.premium ? `
+            <span class="ac-premium">${locked ? `<svg viewBox="0 0 12 14" aria-hidden="true"><path d="M3 6V4a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="1.5" y="6" width="9" height="7" rx="1.2" fill="currentColor"/></svg>${t('Premium expansion · locked')}` : t('Premium expansion')}</span>` : ''}
             <span class="ac-slot">${t('Aircraft {0}', ty.slot)}</span>
             <span class="ac-label">${ty.label}</span>
             <span class="ac-reg">${ty.reg} · ${ty.name}</span>${ty.role ? `<span class="ac-role">${ty.role}</span>` : ''}

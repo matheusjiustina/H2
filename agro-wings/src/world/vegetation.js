@@ -372,11 +372,11 @@ export function createVegetation(terrain, quality) {
     }
   };
   const pondMargin = (p, rw, add) => {
-    const n = Math.round(p.r * 0.7);
+    const n = Math.round(p.r * 0.7 * (p.trees ?? 1));
     for (let i = 0; i < n; i++) {
       const a = rw() * Math.PI * 2;
       // Two open stretches of shore (access), trees in clumps elsewhere.
-      if (Math.sin(a * 2 + p.ph) > 0.55) continue;
+      if (Math.sin(a * 2 + p.ph) > (p.open ?? 0.55)) continue;
       const d = pondRadius(p, a) * (1.18 + rw() * 0.55);
       const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
       if (avoid(x, z, 4)) continue;

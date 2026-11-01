@@ -627,6 +627,202 @@ export const SPRAY_A188 = {
   flow: 3.8,
 };
 
+// ---------------------------------------------------------------------------
+// Air Tractor AT-802 family (fictional registrations): one airframe, two
+// configurations with their own mass, engine, equipment and physics.
+//
+// AT-802A agricultural — Air Tractor published figures: P&WC PT6A-65AG,
+// 1,295 shp; span 18.04 m; wing area 37.29 m²; maximum take-off 7,257 kg;
+// empty with spray equipment ≈ 3,062 kg; hopper 3,028 L (800 US gal);
+// fuel 961 L; cruise 166 kt; working speed 113–139 kt; stall at 7,257 kg
+// 92 kt clean / 79 kt flaps down; climb at 7,257 kg ≈ 780 ft/min; take-off
+// roll at 7,257 kg ≈ 610 m. Length ≈ 10.9 m (from the published drawings;
+// the side profile itself is measured on the photographs, see at802Model).
+// These figures are calibration targets, not constants for every condition.
+// Estimated (marked): inertias, the aerodynamic derivatives, fuel flow.
+const AT802_COMMON = {
+  ...FLIGHT,
+  pilotMass: 85,
+  wingArea: 37.29,
+  span: 18.04,
+  chord: 2.07, // 37.29 / 18.04, constant chord
+  oswald: 0.76, // estimate: long-span wing with booms and gear
+  // Clean stall at 7,257 kg 92 kt → CLmax 1.39; flaps 79 kt → 1.89.
+  CL0: 0.44, CLa: 5.0, alphaStall: 0.19, alphaStallNeg: -0.2, // three-point attitude ≈ the flaps-1/3 stall angle
+  CDflap: 0.07, CLflap: 0.68,
+  Cm0: 0.04, CmaWB: 0.25, CmaTail: -1.45, Cmq: -17, Cmde: 0.44, Cmflap: -0.06,
+  Clb: -0.085, Clp: -0.54, Clr: 0.11, Clda: 0.074,
+  Cnb: 0.09, Cnr: -0.19, Cndr: 0.075, Cnda: -0.012,
+  CYb: -0.6, CYdr: 0.12,
+  engineType: 'turboprop',
+  propRadius: 1.4, // Hartzell five-blade, 2.79 m (estimate of the fitted diameter)
+  maxRpm: 1700, // governed prop rpm (PT6A-65 series reduction gearbox)
+  idleRpm: 1000,
+  fuelDensity: 0.8,
+  fuelCapacity: 961,
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.35, // the hopper sits between the firewall and the cabin, ahead of the CG
+  fuelTankSpanY: 3.6, // integral wing tanks
+  loadByWeight: true,
+  brakeMu: 0.4,
+  hardLandingVs: 3.0,
+  crashVs: 5.5,
+  wingDrop: 0.45,
+};
+const AT802_TURBINE = {
+  idleNg: 52, maxNg: 101.5,
+  accel: 12, decel: 20, // a bigger gas generator spools a little slower than the -34
+  idleFrac: 0.02,
+  lightoff: 3.5,
+  govFrac: 0.3,
+  etaStatic: 0.8, // five wide blades: a high static figure of merit (estimate)
+  etaCruise: 0.82,
+  discDrag: 0.1,
+  flatSigma: 0.82,
+};
+
+export const FLIGHT_AT802 = {
+  ...AT802_COMMON,
+  emptyMass: 3062, // empty with spray equipment (published)
+  mtow: 7257,
+  inertiaEmpty: [15800, 23000, 16300], // estimate: the AT-502's scaled by mass, length² and span²
+  CD0: 0.047, // booms, nozzles, fixed gear (fits 166 kt cruise at mid weight)
+  maxPower: 966e3, // 1,295 shp, flat rated
+  turbine: { ...AT802_TURBINE, betaDrag: 4400, maxTorque: 4000 }, // ft·lb at 1,295 shp / 1,700 rpm
+  fuelFlowFull: 430 / 3600, // L/s of Jet-A at full power (estimate, SFC ≈ 0.6 lb/shp·h)
+  fuelFlowIdle: 85 / 3600,
+  fuelBurnScale: 2.5,
+  hopperCapacity: 3028,
+
+  // Spring-steel main legs from the gear box under the wing root, a steerable
+  // tailwheel under the rudder post: ≈ 10.4° three-point attitude (the
+  // VH-LII photograph's stance; contact points in the body frame).
+  gear: [
+    { name: 'mainL', p: [1.6, -2.01, 0.67], k: 330000, c: 33000, travel: 0.26, radius: 0.37, steer: false },
+    { name: 'mainR', p: [-1.6, -2.01, 0.67], k: 330000, c: 33000, travel: 0.26, radius: 0.37, steer: false },
+    { name: 'tail', p: [0, -0.66, -6.69], k: 80000, c: 7000, travel: 0.14, radius: 0.18, steer: true },
+  ],
+  tailSteer: 0.36,
+  hard: [
+    { name: 'wingtipL', p: [9.02, 0.18, -0.45] },
+    { name: 'wingtipR', p: [-9.02, 0.18, -0.45] },
+    { name: 'boomL', p: [8.2, -0.3, -1.52] },
+    { name: 'boomR', p: [-8.2, -0.3, -1.52] },
+    { name: 'prop', p: [0, -1.33, 3.36] },
+    { name: 'spinner', p: [0, 0.07, 3.94] },
+    { name: 'belly', p: [0, -1.02, -0.2] },
+    { name: 'tail', p: [0, 0.4, -6.8] },
+    { name: 'fin', p: [0, 2.75, -6.2] },
+    { name: 'stabL', p: [2.95, 0.62, -6.3] },
+    { name: 'stabR', p: [-2.95, 0.62, -6.3] },
+    { name: 'roof', p: [0, 1.86, -2.1] },
+  ],
+  wheelPoint: [0, -2.01, 0.67],
+  aglOffset: 2.0,
+  assistGain: { pitch: 2.5, roll: 1.9 },
+  assistSpeedScale: 1.62, // stall speed ratio to the PR-AGW at max weight
+};
+
+export const SPRAY_AT802 = {
+  // ≈ 16.6 m of boom: the PR-AGW's swath scaled by the boom span, and the
+  // flow that gives the same dose at a 62 m/s (120 kt) working speed.
+  swath: 38,
+  flow: 8.4,
+};
+
+// Wipline 10000 amphibious floats (Fire Boss): two hulls in the body frame
+// of the AT-802. Each station [z, keel y, beam, deck y]: a pointed bow,
+// the deepest section just ahead of the step (behind the CG), the keel
+// rising aft of the step to a narrow stern. Measured off the Fire Boss
+// photographs against the airframe (EC-KRT side-on: the bows ≈ 0.8 m ahead
+// of the spinner, the sterns under the turtle deck; length ≈ 9.25 m, beam
+// ≈ 1.05 m, keels ≈ 3.24 m apart); the Wipline drawings were not
+// available, so the stations are proportional estimates.
+export const FLOATS_W10000 = {
+  x: 1.62,
+  stepZ: -0.6,
+  stations: [
+    [4.75, -1.86, 0.16, -1.8], [4.36, -2.12, 0.5, -1.72], [3.85, -2.33, 0.78, -1.66], [3.07, -2.5, 0.96, -1.63],
+    [1.9, -2.6, 1.04, -1.62], [0.6, -2.63, 1.05, -1.62], [-0.55, -2.64, 1.02, -1.62],
+    [-0.67, -2.54, 0.98, -1.62], [-1.51, -2.46, 0.9, -1.63], [-2.54, -2.33, 0.74, -1.65], [-3.56, -2.17, 0.52, -1.68], [-4.5, -1.98, 0.26, -1.72],
+  ],
+  vee: 0.22, // deadrise depth of the V bottom
+  waterDensity: 1000,
+  // Hydrodynamic resistance as a share of the weight the water carries:
+  // displacement drag, the hump near 17 kt, then planing (estimates tuned to
+  // a water take-off run of ≈ 25–35 s light).
+  drag: { base: 0.05, hump: 0.2, vHump: 9, wHump: 5, skin: 0.00006 },
+  latK: 2600, // N per (m/s) per station when wet: the keels resist side-slip
+  vertC: 2600, // N per (m/s) per station when wet: heave/pitch damping
+  planeV: 13, // m/s where the dynamic lift equals the static buoyancy share
+  planeMax: 1.6,
+  waterRudder: 900, // N per unit rudder at the stern (slow taxi)
+};
+
+// AT-802AF Fire Boss (premium expansion): the AT-802 airframe on Wipline
+// 10000 amphibious floats, PT6A-67F of 1,600 shp (the option chosen here),
+// 3,104 L (820 US gal) of water. Fire Boss LLC figures: maximum take-off on
+// land 7,257 kg, from water 5,216 kg, maximum while scooping 7,257 kg;
+// maximum cruise 150 KIAS; retractable wheels in the floats.
+// Estimated (marked): empty mass with the floats, drag, inertias.
+export const FLIGHT_FIREBOSS = {
+  ...AT802_COMMON,
+  emptyMass: 3800, // estimate: AT-802 airframe + Wipline 10000 amphibious floats, no spray kit
+  mtow: 7257,
+  mtowWater: 5216,
+  mtowScoop: 7257,
+  inertiaEmpty: [21500, 29000, 21500], // floats far below and long: more pitch, yaw and roll inertia
+  CD0: 0.072, // floats, struts and spreader bars (fits ≈ 150 kt at full power)
+  Cnb: 0.085, // more side area ahead of the CG (floats), partly offset by the stabiliser fins
+  CmaWB: 0.28,
+  maxPower: 1193e3, // 1,600 shp
+  turbine: { ...AT802_TURBINE, accel: 11, betaDrag: 5200, maxTorque: 4940, etaCruise: 0.77 },
+  fuelFlowFull: 520 / 3600,
+  fuelFlowIdle: 95 / 3600,
+  fuelBurnScale: 2.5,
+  hopperCapacity: 3104, // water
+  // Amphibious gear in the floats: castering nose wheels at the bows, main
+  // wheels just aft of the step; retracted, the floats meet the ground.
+  gear: [
+    { name: 'mainL', p: [1.62, -3.06, -0.9], k: 300000, c: 30000, travel: 0.2, radius: 0.28, steer: false, retract: true },
+    { name: 'mainR', p: [-1.62, -3.06, -0.9], k: 300000, c: 30000, travel: 0.2, radius: 0.28, steer: false, retract: true },
+    { name: 'noseL', p: [1.62, -3.1, 4.25], k: 160000, c: 16000, travel: 0.16, radius: 0.19, steer: false, caster: true, retract: true },
+    { name: 'noseR', p: [-1.62, -3.1, 4.25], k: 160000, c: 16000, travel: 0.16, radius: 0.19, steer: false, caster: true, retract: true },
+  ],
+  gearTime: 9, // s for the hydraulic gear to travel
+  tailSteer: 0,
+  floats: FLOATS_W10000,
+  hard: [
+    { name: 'wingtipL', p: [9.02, 0.18, -0.45] },
+    { name: 'wingtipR', p: [-9.02, 0.18, -0.45] },
+    { name: 'prop', p: [0, -1.33, 3.36] },
+    { name: 'spinner', p: [0, 0.07, 3.94] },
+    { name: 'tail', p: [0, 0.4, -6.8] },
+    { name: 'fin', p: [0, 2.75, -6.2] },
+    { name: 'stabL', p: [2.95, 0.62, -6.3] },
+    { name: 'stabR', p: [-2.95, 0.62, -6.3] },
+    { name: 'roof', p: [0, 1.86, -2.1] },
+    // Float keels: on a runway with the wheels up these take the weight.
+    { name: 'floatL', p: [1.62, -2.64, -0.5] }, { name: 'floatR', p: [-1.62, -2.64, -0.5] },
+    { name: 'floatBowL', p: [1.62, -2.33, 3.85] }, { name: 'floatBowR', p: [-1.62, -2.33, 3.85] },
+    { name: 'floatSternL', p: [1.62, -2.17, -3.56] }, { name: 'floatSternR', p: [-1.62, -2.17, -3.56] },
+  ],
+  wheelPoint: [0, -3.06, -0.9],
+  aglOffset: 3.05,
+  assistGain: { pitch: 2.7, roll: 2.0 },
+  assistSpeedScale: 1.6,
+  // Water systems (game rules, calibrated for play; not an operating procedure).
+  firefight: {
+    capacity: 3104,
+    scoopRate: 250, // L/s through the two probes (≈ 12 s for a full load)
+    scoopMin: 21, // m/s on the water (≈ 41 kt) before the probes fill
+    scoopMax: 42, // m/s
+    scoopBank: 0.17, // rad: wings level on the water
+    dropRate: 1300, // L/s with the door open (≈ 2.4 s for a full load)
+    dropZ: -0.2, // door under the hopper
+  },
+};
+
 export const ASSIST = {
   modes: ['off', 'normal', 'high'],
   default: 'normal',

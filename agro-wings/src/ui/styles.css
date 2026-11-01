@@ -51,6 +51,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .ac-reg { font: 600 12px var(--mono); color: var(--ink-dim); }
 .ac-spec { font-size: 11px; line-height: 1.5; color: var(--ink-faint); margin-top: 2px; }
 .ac-role { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.ac-premium { display: inline-flex; align-items: center; gap: 5px; font: 700 9.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #1a1305; background: linear-gradient(90deg, #f2b31b, #ffd76a); border-radius: 3px; padding: 2px 6px; }
+.ac-premium svg { width: 9px; height: 11px; }
+.ac-card.premium { border-left-color: #f2b31b; }
+.ac-card.locked { cursor: not-allowed; }
+.ac-card.locked .ac-label, .ac-card.locked .ac-reg, .ac-card.locked .ac-spec { opacity: .62; }
 .ac-opts { display: flex; gap: 4px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
 .ac-opt-l { font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); margin-right: 2px; }
 .ac-opt { font: 600 10px var(--mono); padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(255,255,255,.25); color: var(--ink-faint); cursor: pointer; }

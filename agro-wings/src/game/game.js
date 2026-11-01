@@ -30,6 +30,8 @@ import { allAids, PLANE_AIDS, HELI_AIDS, minSpeed } from '../flight/pilotAid.js'
 import { windAt } from '../flight/env.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { t } from '../i18n/index.js';
+import { aircraftUnlocked } from './expansions.js';
+import { FireField } from '../world/fires.js';
 
 const SETTINGS = 'agrowings.settings.v1';
 const GPS_PAGE_NAMES = { map: 'MAP', dest: 'DESTINATION', mission: 'MISSION', cov: 'COVERAGE' };
@@ -127,6 +129,8 @@ export class Game {
     this.scene.add(this.mist.points, this.dust.points);
     this.world.dust = this.dust;
     this.world.mist = this.mist;
+    // Fire-suppression test scenario (active while the Fire Boss is flown).
+    this.fires = new FireField(this.scene, this.world.terrain);
     this.mist.limit = SPRAY.maxParticles[this.settings.quality];
     this.audio = new GameAudio();
     this.audio.setVolume(this.settings.volume);
@@ -134,7 +138,9 @@ export class Game {
     this.hud = new HUD(this, this.uiRoot);
     this.touch = new TouchControls(this, this.uiRoot);
     this.tutorial = new Tutorial(this);
-    this._activate(this.fleet[this.settings.aircraft] ? this.settings.aircraft : AIRCRAFT_ORDER[0]);
+    // A premium aircraft that is not unlocked never starts as the flown one.
+    const start = this.fleet[this.settings.aircraft] && aircraftUnlocked(aircraftType(this.settings.aircraft)) ? this.settings.aircraft : AIRCRAFT_ORDER[0];
+    this._activate(start);
     this.canStartEngine = () => this.service.engineVeto();
     window.addEventListener('resize', () => this.resize());
     const startAudio = () => this.audio.start();
@@ -169,6 +175,7 @@ export class Game {
     this.camera.updateProjectionMatrix();
     const ph = h * this.renderer.getPixelRatio();
     this.mist?.setScale(ph, 62);
+    this.fires?.setScale(ph, 62);
     this.dust?.setScale(ph, 62);
   }
 
@@ -216,6 +223,8 @@ export class Game {
   // Make `id` the flown aircraft (placed on the pad, inputs and spray hooked
   // up); every other aircraft is parked and becomes an obstacle.
   _activate(id) {
+    // Premium expansions: refused here, not only hidden in the UI.
+    if (!aircraftUnlocked(aircraftType(id))) id = AIRCRAFT_ORDER.find((k) => aircraftUnlocked(aircraftType(k)));
     const next = this.fleet[id];
     // Parked spots: the helicopter waits on its pad; the airplanes take the
     // west apron spots in order.
@@ -223,7 +232,9 @@ export class Game {
     for (const ac of Object.values(this.fleet)) {
       if (ac === next) continue;
       ac.onSimStep = null; ac.onEvent = null;
-      ac.park(ac.kind === 'heli' ? ac.type.servicePad : spots.shift());
+      // The AT-802s (18 m span) have their own spots on the grass west of
+      // the apron; everyone else keeps the apron spots in order.
+      ac.park(ac.kind === 'heli' ? ac.type.servicePad : BASE[ac.type.parkSpot] ?? spots.shift());
     }
     this.aircraft = next;
     this.aircraftId = id;
@@ -236,6 +247,7 @@ export class Game {
     next.onEvent = (e) => this._acEvent(e);
     next.placeAtPad();
     next.stuck = false;
+    this.fires?.setActive(!!next.water);
     this._parked = Object.values(this.fleet).filter((ac) => ac !== next);
     this.world.extraObstacle = (x, y, z) => {
       for (const ac of Object.values(this.fleet)) if (ac !== this.aircraft && ac.hitTest(x, y, z)) return `parked ${ac.type.reg}`;
@@ -301,6 +313,11 @@ export class Game {
   // each aircraft; the chosen one is towed to the pad.
   selectAircraft(id) {
     if (!this.fleet[id] || id === this.aircraftId) return;
+    if (!aircraftUnlocked(aircraftType(id))) {
+      this.toast(t('{0}: premium expansion — locked.', aircraftType(id).name));
+      this.audio?.play('ui');
+      return false;
+    }
     if (this.service.busy()) this.service.abort(t('Aircraft change — service stopped.'));
     this.sprayer.on = false;
     this._activate(id);
@@ -637,6 +654,7 @@ export class Game {
       this.sprayer.emit(dt);
       this.mist.update(dt, ac.windVec, (x, z) => ac.env.top(x, z));
       this.dust.update(dt, ac.windVec, (x, z) => ac.env.ground(x, z));
+      this.fires?.update(dt, ac.windVec);
       this.guidance.update(dt);
       if (this.playing) this.replay.record(dt);
       if (this.playing && this.weatherCycle.update(dt)) this.world.atmo.set(this.weatherCycle.time, this.weatherCycle.weather);
@@ -707,7 +725,12 @@ export class Game {
   _playInput(input) {
     const ac = this.aircraft;
     if (input.wasPressed('spray')) {
-      if (ac.state === 'ok') this.sprayer.toggle();
+      // The Fire Boss has no booms: the key works its drop door.
+      if (ac.state === 'ok') { if (ac.water) ac.water.toggleDrop(); else this.sprayer.toggle(); }
+    }
+    if (ac.water && ac.state === 'ok') {
+      if (input.wasPressed('gear')) ac.water.toggleGear();
+      if (input.wasPressed('scoop')) ac.water.toggleProbes();
     }
     if (input.wasPressed('camera')) {
       this.cameraMode = this.cameraMode === 'cockpit' ? 'chase' : 'cockpit';
@@ -843,6 +866,7 @@ export class Game {
     const tm = ac.telemetry();
     const fm = ac.fm, o = fm.out;
     if (tm.stall > 0.5 && !o.onGround) out.push({ text: t('Stall'), cls: 'blink' });
+    if (ac.water) out.push(...this._waterStatus(ac));
     if (this._controlLaw(ac).aid?.cues && !o.onGround && o.agl > 1.5) out.push(...this._aidCues(ac));
     if (ac.kind === 'heli') {
       if (o.lowRotor) out.push({ text: t('Low rotor RPM {0} % — lower collective', Math.round(o.rotorPct)), cls: 'blink' });
@@ -876,6 +900,28 @@ export class Game {
     if (this.sprayer.on && o.onGround) out.push({ text: t('Spray on the ground'), cls: 'amber' });
     if (tm.fuel < ac.A.fuelCapacity * 0.12 && fm.engine === 'running') out.push({ text: t('Low fuel'), cls: 'amber' });
     if (tm.damage > 50) out.push({ text: t('Damage {0}%', Math.round(tm.damage)), cls: 'amber' });
+    return out;
+  }
+
+  // Fire Boss: gear position against the surface below, scoop and drop
+  // state, water on board and the nearest test fire.
+  _waterStatus(ac) {
+    const out = [], fm = ac.fm, o = fm.out, ws = ac.water;
+    const wl = ac.env.water(fm.pos.x, fm.pos.z);
+    const overWater = wl > -1e8;
+    if (!o.onGround && o.agl < 60) {
+      if (overWater && fm.gearDown > 0.02) out.push({ text: t('GEAR DOWN — water landing!'), cls: 'blink' });
+      else if (!overWater && fm.gearDown < 0.98) out.push({ text: t('GEAR UP — runway landing!'), cls: 'blink' });
+    }
+    if (fm.gearDown > 0.02 && fm.gearDown < 0.98) out.push({ text: t('Gear in transit'), cls: 'amber' });
+    const L = Math.round(fm.hopper);
+    if (ws.scooping) out.push({ text: t('Scooping {0} L / {1} L', L, Math.round(ws.scoopLimit())), cls: 'amber' });
+    else if (ws.probesCmd) out.push({ text: o.onWater ? t('Probes down — {0}–{1} kt, wings level, gear up', Math.round(fm.A.firefight.scoopMin * 1.944), Math.round(fm.A.firefight.scoopMax * 1.944)) : t('Probes down'), cls: 'amber' });
+    if (ws.dropping) out.push({ text: t('Dropping — {0} L left', L), cls: 'amber' });
+    if (ws.overload) out.push({ text: t('Too heavy for a water take-off ({0} kg > {1} kg)', Math.round(fm.mass), fm.A.mtowWater), cls: 'blink' });
+    const nf = this.fires?.nearest(fm.pos);
+    if (nf && !o.onGround) out.push({ text: t('Fire {0}: {1} m, {2}° · {3} %', nf.fire.id, Math.round(nf.dist), String(Math.round(nf.bearing)).padStart(3, '0'), Math.round(nf.fire.intensity * 100)), cls: '' });
+    else if (!nf && this.fires?.active) out.push({ text: t('All test fires out'), cls: '' });
     return out;
   }
 

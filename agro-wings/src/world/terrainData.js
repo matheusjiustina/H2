@@ -101,8 +101,9 @@ function naturalHeight(x, z) {
     const dx = x - p.x, dz = z - p.z;
     if (Math.abs(dx) > p.r * 2.6 || Math.abs(dz) > p.r * 2.6 || p.level === undefined) continue;
     const d = Math.hypot(dx, dz) / pondRadius(p, Math.atan2(dz, dx));
+    const blend = p.blend ?? 2.2, bankK = p.bank ? p.bank * p.r : 1.2;
     if (d < 1) h = Math.min(h, p.level - 0.15 - p.depth * (1 - d * d));
-    else if (d < 2.2) h = lerp(Math.min(h, p.level + 0.35 + (d - 1) * 1.2), h, smoothstep(1, 2.2, d));
+    else if (d < blend) h = lerp(Math.min(h, p.level + 0.35 + (d - 1) * bankK), h, smoothstep(1, blend, d));
   }
   return h;
 }
