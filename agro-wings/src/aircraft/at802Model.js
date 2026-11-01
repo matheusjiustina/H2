@@ -116,6 +116,56 @@ const AFT_KEYS = [
   S(-6.2, 0.42, 0.48, 0.74, 0.84, 0.13, 0.1, 0.7, 2.5, 2.5, 0.18),
   S(-6.75, 0.52, 0.56, 0.66, 0.7, 0.025, 0.02, 0.7, 2.4, 2.4, 0.02),
 ];
+// AT-802A agricultural (land) hull only — the Fire Boss keeps the keys above
+// untouched. Refitted to the N4025M side photograph (110 px/m, three-point
+// attitude converted to the body frame with the 10.5° ground angle):
+//   keel z 3.09 -0.24 · 2.13 -0.38 · 0.66 -0.74 (hopper, deepest) ·
+//        -0.25 -0.65 · -1.16 -0.52 · -2.07 -0.39 · -2.98 -0.27 ·
+//        -3.89 -0.15 · -4.8 -0.04 · -5.71 0.09 (straight to the tail)
+//   fairing behind the roof: rounded shoulder, then down onto the turtle
+//        deck ≈ 0.15 m sooner than before.
+// The old keel hung 0.25–0.35 m lower under the wing and the cabin and rose
+// steeply to a shallow tail cone: that was the "belly". Only the keel side
+// of the sections moves (yb, and ys aft); walls, crown and cabin are kept.
+const AG_KEEL = { 3.26: -0.35, 3.0: -0.44, 2.5: -0.46, 1.95: -0.46, 1.5: -0.5, 1.05: -0.61, 0.5: -0.75, 0.0: -0.74, '-0.45': -0.69, '-0.92': -0.59 };
+const AG_FWD_KEYS = FWD_KEYS.map((k) => (AG_KEEL[k.z] !== undefined ? { ...k, yb: AG_KEEL[k.z] } : k));
+const AG_CAB_KEYS = [[-0.92, -0.59, 0.62], [-1.6, -0.48, 0.62], [CAN.zR, -0.37, 0.6]].map(([z, yb, hw]) => S(z, yb, -0.04, SILL, SILL, hw, CAN.ww, 0.72, 4.5, 2, 0));
+const AG_AFT_KEYS = [
+  S(CAN.zR, -0.37, -0.02, SILL, 1.72, 0.6, CAN.ww, 0.74, 4.5, CAN.pU, CAN.lean * (CAN.yt - SILL) / (1.72 - SILL)),
+  S(-2.52, -0.35, 0.0, 1.1, 1.62, 0.59, 0.495, 0.74, 4.4, 3.9, 0.22),
+  S(-2.72, -0.32, 0.02, 1.08, 1.46, 0.575, 0.483, 0.74, 4.2, 3.5, 0.22),
+  S(-2.95, -0.29, 0.04, 1.04, 1.27, 0.555, 0.465, 0.74, 3.95, 3.2, 0.22),
+  S(-3.2, -0.255, 0.05, 1.0, 1.12, 0.53, 0.45, 0.74, 3.8, 3.05, 0.22),
+  S(-3.48, -0.22, 0.06, 0.96, 1.065, 0.505, 0.425, 0.74, 3.6, 3.0, 0.22),
+  S(-4.3, -0.11, 0.08, 0.92, 1.05, 0.41, 0.34, 0.73, 3.2, 2.9, 0.24),
+  S(-5.0, -0.02, 0.16, 0.86, 1.0, 0.31, 0.25, 0.72, 2.8, 2.7, 0.25),
+  S(-5.6, 0.08, 0.25, 0.8, 0.94, 0.22, 0.17, 0.71, 2.6, 2.6, 0.24),
+  S(-6.2, 0.25, 0.4, 0.74, 0.84, 0.13, 0.1, 0.7, 2.5, 2.5, 0.18),
+  S(-6.75, 0.45, 0.52, 0.66, 0.7, 0.025, 0.02, 0.7, 2.4, 2.4, 0.02),
+];
+// The side glazing of the agricultural cabin ends here: behind it the cabin
+// side is painted skin running into the fairing (one window per side
+// between the A-post and this edge, as on the photographs).
+const AG_GLASS_REAR = -2.15;
+// Agricultural cabin roof: full height over the pilot, then it rolls down
+// into the fairing (rounded shoulder, no square corner at the cabin end);
+// the canopy above the sill is scaled down toward the rear to follow it.
+const AG_ROOF_Z0 = -1.9, AG_ROOF_R = 1.72;
+const agRoofTop = (z) => {
+  const t = clamp((AG_ROOF_Z0 - z) / (AG_ROOF_Z0 - CAN.zR), 0, 1);
+  return (2 * t ** 3 - 3 * t ** 2 + 1) * CAN.yt + (3 * t ** 2 - 2 * t ** 3) * AG_ROOF_R - 0.29 * (t ** 3 - t ** 2);
+};
+const agRoofK = (z) => (agRoofTop(z) - SILL) / (CAN.yt - SILL);
+function agRoofDrop(geo) {
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i), z = p.getZ(i);
+    if (y > SILL && z < AG_ROOF_Z0) p.setY(i, SILL + (y - SILL) * agRoofK(z));
+  }
+  p.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
 function sampleSt(keys, per) {
   const out = [];
   const P = Object.keys(keys[0]);
@@ -178,21 +228,26 @@ function loftSt(sts, colorFn, open = false, ringFn = sectionRing) {
   g.computeVertexNormals();
   return g;
 }
-const ALL_ST = [...sampleSt(FWD_KEYS, 20), ...sampleSt(AFT_KEYS, 14)].sort((a, b) => b.z - a.z);
-function fusX(z, y) {
-  const xAt = (st) => {
-    const h = halfSection(st);
-    if (y <= h[0][1]) return 0;
-    for (let i = 1; i < h.length; i++) {
-      if (y <= h[i][1]) { const [x0, y0] = h[i - 1], [x1, y1] = h[i]; return x0 + ((y - y0) / Math.max(1e-6, y1 - y0)) * (x1 - x0); }
-    }
-    return 0;
+// Hull lookups per configuration: fusX(z, y) = half-width of the skin.
+function hullOf(fwdKeys, aftKeys) {
+  const ALL_ST = [...sampleSt(fwdKeys, 20), ...sampleSt(aftKeys, 14)].sort((a, b) => b.z - a.z);
+  const fusX = (z, y) => {
+    const xAt = (st) => {
+      const h = halfSection(st);
+      if (y <= h[0][1]) return 0;
+      for (let i = 1; i < h.length; i++) {
+        if (y <= h[i][1]) { const [x0, y0] = h[i - 1], [x1, y1] = h[i]; return x0 + ((y - y0) / Math.max(1e-6, y1 - y0)) * (x1 - x0); }
+      }
+      return 0;
+    };
+    let i = ALL_ST.findIndex((st) => st.z <= z);
+    if (i <= 0) return xAt(ALL_ST[Math.max(0, i)]);
+    const a = ALL_ST[i - 1], b = ALL_ST[i], t = (a.z - z) / Math.max(1e-6, a.z - b.z);
+    return lerp(xAt(a), xAt(b), t);
   };
-  let i = ALL_ST.findIndex((st) => st.z <= z);
-  if (i <= 0) return xAt(ALL_ST[Math.max(0, i)]);
-  const a = ALL_ST[i - 1], b = ALL_ST[i], t = (a.z - z) / Math.max(1e-6, a.z - b.z);
-  return lerp(xAt(a), xAt(b), t);
+  return { fusX, aftTop: sampleSt(aftKeys, 14).map((st) => [st.z, st.yt]) };
 }
+const HULL = { fireboss: hullOf(FWD_KEYS, AFT_KEYS), ag: hullOf(AG_FWD_KEYS, AG_AFT_KEYS) };
 const canW = (y) => {
   const u = clamp((y - SILL) / (CAN.yt - SILL), 0, 1);
   return Math.max(0, CAN.ww - CAN.lean * (y - SILL)) * Math.max(0, 1 - u ** CAN.pU) ** (1 / CAN.pU);
@@ -224,7 +279,6 @@ function liveryUV(geo) {
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   return geo;
 }
-const aftTop = sampleSt(AFT_KEYS, 14).map((st) => [st.z, st.yt]);
 // Fin: [height y, leading edge z, chord] — tall, LE swept only ≈ 7°, the top
 // nearly straight; rudder hinge at 62 % chord.
 const FIN_ST = [[0.9, -5.36, 1.66], [1.6, -5.47, 1.42], [2.3, -5.58, 1.18], [2.62, -5.64, 1.04], [2.73, -5.68, 0.95], [2.765, -5.72, 0.86]];
@@ -254,7 +308,7 @@ function liveryTextures(reg, L) {
     // to the top (the coloured tail of both schemes), edged with a line.
     const fr = FIN_ST[0], ft = FIN_ST[FIN_ST.length - 1];
     const d0 = [fr[1] - fr[2] * 0.42, 0.6], d1 = [ft[1] - ft[2] * 0.12, 3.0];
-    poly([d0, d1, [-7.3, 3.0], [-7.3, 0.45]], L.tail);
+    poly([d0, d1, [-7.3, 3.0], [-7.3, L.id === 'ag' ? 0.3 : 0.45]], L.tail);
     line(g, [d0, d1], L.tailLine, 0.03 * LV.ky);
     line(g, [[d0[0] + 0.07, d0[1]], [d1[0] + 0.07, d1[1]]], WHITE, 0.012 * LV.ky);
     // Cheat line: the band between two lines, nose to tail, rising aft.
@@ -549,6 +603,9 @@ export function createAT802Model(panel, opts = {}) {
 
   const B = {};
   const add = (mat, g, fine = false) => { const k = (fine ? 'fine:' : '') + mat; (B[k] ||= []).push(tagged(g)); };
+  // Hull of this configuration (the agricultural one has its own keel line
+  // and fairing; the Fire Boss keeps the original sections).
+  const { fusX, aftTop } = HULL[variant];
 
   // ---------------- fuselage ----------------
   const fusAO = (x, y, z) => {
@@ -561,9 +618,9 @@ export function createAT802Model(panel, opts = {}) {
     if (z > 3.2) a *= 0.86 + 0.14 * clamp((3.38 - z) / 0.18, 0, 1);
     return clamp(a, 0.5, 1);
   };
-  const fwdSt = sampleSt(FWD_KEYS, 20);
-  const cabSt = sampleSt(CAB_KEYS, 8);
-  const aftSt = sampleSt(AFT_KEYS, 14);
+  const fwdSt = sampleSt(FB ? FWD_KEYS : AG_FWD_KEYS, 20);
+  const cabSt = sampleSt(FB ? CAB_KEYS : AG_CAB_KEYS, 8);
+  const aftSt = sampleSt(FB ? AFT_KEYS : AG_AFT_KEYS, 14);
   add('livery', liveryUV(loftSt(fwdSt, fusAO)));
   add('livery', liveryUV(loftSt(cabSt, fusAO, true)));
   add('livery', liveryUV(loftSt(aftSt, fusAO)));
@@ -602,8 +659,10 @@ export function createAT802Model(panel, opts = {}) {
     add('dark', tx(new THREE.CylinderGeometry(0.08, 0.08, 0.11, 18), sx * (cx + 0.02), -0.25, -2.0, 0, 0, Math.PI / 2));
     add('brass', tx(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 18), sx * (cx + 0.085), -0.25, -2.0, 0, 0, Math.PI / 2));
   }
-  add('alu', tube([[-2.0, -0.28], [-1.3, -0.5], [-0.4, -0.7], [0.3, -0.75]].map(([z, y]) => [fusX(z, y) + 0.035, y, z]), 0.045, 18, 8));
-  const gy = -1.0;
+  // (Agricultural: the pipe and the gatebox follow its higher keel.)
+  const pipePts = FB ? [[-2.0, -0.28], [-1.3, -0.5], [-0.4, -0.7], [0.3, -0.75]] : [[-2.0, -0.26], [-1.3, -0.38], [-0.4, -0.52], [0.3, -0.58]];
+  add('alu', tube(pipePts.map(([z, y]) => [fusX(z, y) + 0.035, y, z]), 0.045, 18, 8));
+  const gy = FB ? -1.0 : -0.75;
   if (!FB) {
     add('alu', rbox(0.72, 0.04, 1.0, 0.014, 0, gy, 0.15));
     add('alu', rbox(0.62, 0.17, 0.88, 0.045, 0, gy - 0.085, 0.15));
@@ -687,12 +746,13 @@ export function createAT802Model(panel, opts = {}) {
   };
   const glassYs = Array.from({ length: 9 }, (_, j) => SILL + 0.005 + ((CAN.glassTop - SILL - 0.005) * j) / 8);
   const roofYs = Array.from({ length: 8 }, (_, j) => CAN.glassTop + (CAN.yt - CAN.glassTop) * Math.sin((j / 7) * (Math.PI / 2)));
+  const roofFit = FB ? (g) => g : agRoofDrop;
   const glassMesh = new THREE.Group();
-  const gm = new THREE.Mesh(tagged(ringSurface(glassYs)), M.glass);
+  const gm = new THREE.Mesh(tagged(roofFit(ringSurface(glassYs))), M.glass);
   gm.renderOrder = 10;
   glassMesh.add(gm);
-  add('livery', liveryUV(ringSurface(roofYs)));
-  const headliner = tagged(ringSurface(roofYs.map((y) => y - 0.012), 0.012));
+  add('livery', liveryUV(roofFit(ringSurface(roofYs))));
+  const headliner = tagged(roofFit(ringSurface(roofYs.map((y) => y - 0.012), 0.012)));
   {
     const s = new THREE.Shape();
     const y0 = SILL + 0.32, n = 14;
@@ -700,20 +760,27 @@ export function createAT802Model(panel, opts = {}) {
     for (let i = 1; i <= n; i++) { const y = y0 + ((CAN.yt - y0) * i) / n; s.lineTo(-canW(y), y); }
     for (let i = n - 1; i >= 0; i--) { const y = y0 + ((CAN.yt - y0) * i) / n; s.lineTo(canW(y), y); }
     s.closePath();
-    add('interior', tx(new THREE.ShapeGeometry(s, 4), 0, 0, CAN.zR - 0.004));
+    add('interior', roofFit(tx(new THREE.ShapeGeometry(s, 4), 0, 0, CAN.zR - 0.004)));
   }
   const cabC = new THREE.Vector3(0, 1.45, -1.6);
   const frame = (pts, r = 0.028, rIn = r * 0.85) => {
-    add('paint', tube(pts, r, Math.max(6, pts.length * 3), 10));
+    add('paint', roofFit(tube(pts, r, Math.max(6, pts.length * 3), 10)));
     const mid = new THREE.Vector3(...pts[Math.floor(pts.length / 2)]);
     const inw = cabC.clone().sub(mid).normalize().multiplyScalar(r * 0.5);
     // Inside, the frame is painted black: the inner tube covers the outer
     // one as seen from the seat.
     void rIn;
-    add('frameIn', tube(pts.map((p) => [p[0] + inw.x, p[1] + inw.y, p[2] + inw.z]), r * 1.02, Math.max(6, pts.length * 3), 8));
+    add('frameIn', roofFit(tube(pts.map((p) => [p[0] + inw.x, p[1] + inw.y, p[2] + inw.z]), r * 1.02, Math.max(6, pts.length * 3), 8)));
   };
   const hs = (f) => Array.from({ length: 7 }, (_, j) => f(SILL + 0.01 + ((CAN.glassTop - SILL - 0.01) * j) / 6));
-  const ringEdge = (y) => { const r = ringAt(y); return r.filter((_, i) => i % 2 === 0 || i === r.length - 1); };
+  const ringEdge = (y) => {
+    const r = ringAt(y).filter((_, i, a) => i % 2 === 0 || i === a.length - 1);
+    if (FB) return r;
+    // Agricultural: the frame stops at the window's rear edge (painted skin
+    // behind it, no frame round a window that is not there).
+    const w = canW(y), keep = r.filter((p) => p[2] > AG_GLASS_REAR + 0.02);
+    return [[w, y, AG_GLASS_REAR], ...keep, [-w, y, AG_GLASS_REAR]];
+  };
   frame(ringEdge(SILL + 0.012), 0.027, 0.018);
   frame(ringEdge(CAN.glassTop), 0.031, 0.024);
   { const r = ringAt(SILL + 0.022); add('paint', tube(r.slice(RN.side, r.length - RN.side), 0.036, 32, 10)); }
@@ -721,9 +788,39 @@ export function createAT802Model(panel, opts = {}) {
     frame(hs((y) => [sx * Math.min(wsC(y), canW(y) * 0.6), y, canF(y) + 0.004]), 0.025, 0.02);
     const aPost = (y) => { const p = aPostAt(y); return [sx * p[0], p[1], p[2]]; };
     frame(hs(aPost), 0.031, 0.024);
-    frame(hs((y) => [sx * canW(y), y, DOOR_Z]), 0.027, 0.02);
-    frame(hs((y) => [sx * canW(y), y, CAN.zR + 0.03]), 0.031, 0.024);
-    for (const p of [aPost(SILL + 0.012), aPost(CAN.glassTop), [sx * canW(SILL), SILL + 0.012, DOOR_Z], [sx * canW(CAN.glassTop), CAN.glassTop, DOOR_Z]]) add('paint', ball(p, 0.033));
+    if (FB) {
+      frame(hs((y) => [sx * canW(y), y, DOOR_Z]), 0.027, 0.02);
+      frame(hs((y) => [sx * canW(y), y, CAN.zR + 0.03]), 0.031, 0.024);
+      for (const p of [aPost(SILL + 0.012), aPost(CAN.glassTop), [sx * canW(SILL), SILL + 0.012, DOOR_Z], [sx * canW(CAN.glassTop), CAN.glassTop, DOOR_Z]]) add('paint', ball(p, 0.033));
+    } else {
+      // Agricultural: no post in the middle of the side window (that bar is
+      // not on the aircraft); the window's rear edge sits forward of the
+      // cabin end and the skin behind it is painted (the fairing side).
+      frame(hs((y) => [sx * canW(y), y, AG_GLASS_REAR]), 0.031, 0.024);
+      for (const p of [aPost(SILL + 0.012), aPost(CAN.glassTop)]) add('paint', ball(p, 0.033));
+      const nu = 4, nv = 8, out = [], inn = [];
+      for (const [arr, dx] of [[out, 0.003], [inn, -0.004]]) {
+        for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
+          const y = SILL + ((CAN.glassTop + 0.01 - SILL) * j) / nv, z = lerp(AG_GLASS_REAR, CAN.zR, i / nu);
+          arr.push(sx * (canW(y) + dx), y, z);
+        }
+      }
+      const skin = (pos, flip) => {
+        const idx = [];
+        for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+          const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1;
+          if ((sx > 0) === flip) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0.92), 3));
+        g.setIndex(idx);
+        g.computeVertexNormals();
+        return g;
+      };
+      add('livery', liveryUV(agRoofDrop(skin(out, false))));
+      add('interior', agRoofDrop(skin(inn, true)));
+    }
     add('steel', rod([sx * (canW(SILL + 0.18) + 0.012), SILL + 0.18, DOOR_Z + 0.16], [sx * (canW(SILL + 0.18) + 0.012), SILL + 0.18, DOOR_Z + 0.3], 0.01, 6));
     for (const hz of [-1.2, -1.55]) add('steel', tx(new THREE.CylinderGeometry(0.013, 0.013, 0.05, 8), sx * (canW(CAN.glassTop) - 0.01), CAN.glassTop + 0.02, hz, 0, 0, Math.PI / 2));
   }
@@ -731,9 +828,10 @@ export function createAT802Model(panel, opts = {}) {
   // dome and whip antennas.
   add('dark', rod([0, 1.22, -0.55], [0, 2.1, -1.42], 0.013, 8));
   add('steel', tx(new THREE.BoxGeometry(0.014, 0.5, 0.07), 0, 2.02, -1.36, 0.78));
-  add('steel', rod([0, CAN.yt + 0.02, -1.95], [0, 2.78, -6.0], 0.006, 5));
-  add('dark', tx(new THREE.SphereGeometry(0.068, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, CAN.yt - 0.005, -2.05, 0, 0, 0, [1, 0.45, 1]), true);
-  add('steel', rod([0.15, CAN.yt - 0.03, -2.0], [0.15, CAN.yt + 0.42, -2.3], 0.005, 5), true);
+  const roofAt = (z) => (FB ? CAN.yt : agRoofTop(z));
+  add('steel', rod([0, roofAt(-1.95) + 0.02, -1.95], [0, 2.78, -6.0], 0.006, 5));
+  add('dark', tx(new THREE.SphereGeometry(0.068, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, roofAt(-2.05) - 0.005, -2.05, 0, 0, 0, [1, 0.45, 1]), true);
+  add('steel', rod([0.15, roofAt(-2.0) - 0.03, -2.0], [0.15, roofAt(-2.0) + 0.42, -2.3], 0.005, 5), true);
   for (const zz of [-3.4, -4.4]) add('steel', rod([0, aftTop.find(([z]) => z <= zz)[1], zz], [0, aftTop.find(([z]) => z <= zz)[1] + 0.32, zz - 0.25], 0.005, 5), true);
 
   // ---------------- wing ----------------
@@ -846,7 +944,9 @@ export function createAT802Model(panel, opts = {}) {
   rudder.rotation.x = tilt;
   rudder.updateMatrix();
   // The rudder runs down below the tail cone to the bottom of the post.
-  const rudSt = [[0.7, FIN_ST[0][1] + 0.04, FIN_ST[0][2] - 0.04], ...FIN_ST];
+  // (Agricultural: down to the bottom of its deeper tail cone, as on the
+  // photographs.)
+  const rudSt = [FB ? [0.7, FIN_ST[0][1] + 0.04, FIN_ST[0][2] - 0.04] : [0.5, FIN_ST[0][1] + 0.07, FIN_ST[0][2] - 0.07], ...FIN_ST];
   const rudGeo = liveryUV((vfin(airfoil(HINGE + 0.02, 1, 0.11, 0, 0.4, 5), rudSt)));
   const rudTab = tagged(tx(new THREE.BoxGeometry(0.014, 0.38, 0.1), 0, 1.05, -5.4 - 1.5));
   const inv = rudder.matrix.clone().invert();
@@ -969,7 +1069,7 @@ export function createAT802Model(panel, opts = {}) {
       }
     }
     add('alu', rod([0.95, leY(0.95) - boomDrop, boomZ], [-0.95, leY(0.95) - boomDrop, boomZ], 0.046, 12));
-    add('alu', tube([[0, gy - 0.1, -0.3], [0, gy - 0.05, -0.8], [0, -0.9, -1.2], [0, leY(0.95) - boomDrop, boomZ]], 0.046, 24, 10));
+    add('alu', tube([[0, gy - 0.1, -0.3], [0, gy - 0.05, -0.8], [0, -0.79, -1.2], [0, leY(0.95) - boomDrop, boomZ]], 0.046, 24, 10));
     const pump = new THREE.Group();
     pump.position.set(0, gy - 0.28, 0.95);
     const pumpBody = lathe([[0.0, -0.26], [0.09, -0.25], [0.12, -0.16], [0.13, 0.06], [0.11, 0.19], [0.065, 0.25], [0.0, 0.26]], 24);
