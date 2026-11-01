@@ -6,10 +6,12 @@
 // grass, the middle carries the two tyre ruts and a strip of grass.
 // (The farm-core roads are painted by the ground shader instead.)
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ROADS } from './layout.js';
 
 const STEP = 5; // m between cross-sections
-const CHUNK = 64; // cross-sections per mesh (frustum culling)
+const CHUNK = 64; // cross-sections per ribbon piece
+const REGION = 1500; // m: ribbon pieces of a region are merged into one mesh
 const LIFT = 0.07; // m above the ground
 
 function roadTexture() {
@@ -99,6 +101,7 @@ export function createRoads(terrain) {
     depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
   const meshes = [];
+  const regions = new Map();
   for (const road of ROADS) {
     if (!road.mesh) continue;
     // Smooth the polyline further (Catmull-Rom) and respace it evenly.
@@ -107,13 +110,24 @@ export function createRoads(terrain) {
     const pts = curve.getSpacedPoints(Math.max(2, Math.round(total / STEP)));
     for (let from = 0; from < pts.length - 1; from += CHUNK - 1) {
       const to = Math.min(pts.length - 1, from + CHUNK - 1);
-      const m = new THREE.Mesh(ribbon(terrain, pts, road.w, from, to), mat);
-      m.receiveShadow = true;
-      m.renderOrder = 2;
-      m.matrixAutoUpdate = false;
-      group.add(m);
-      meshes.push(m);
+      const g = ribbon(terrain, pts, road.w, from, to);
+      // Phase 3: the ribbons of one REGION share a single draw call (same
+      // material, same geometry; culling per region instead of per 320 m).
+      const c = g.boundingSphere.center;
+      const key = Math.floor(c.x / REGION) + ',' + Math.floor(c.z / REGION);
+      if (!regions.has(key)) regions.set(key, []);
+      regions.get(key).push(g);
     }
+  }
+  for (const parts of regions.values()) {
+    const g = parts.length > 1 ? mergeGeometries(parts) : parts[0];
+    g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, mat);
+    m.receiveShadow = true;
+    m.renderOrder = 2;
+    m.matrixAutoUpdate = false;
+    group.add(m);
+    meshes.push(m);
   }
   return { group, meshes };
 }

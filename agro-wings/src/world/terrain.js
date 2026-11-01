@@ -3,6 +3,7 @@
 // analytically from the farm layout (crisp edges at any distance, no huge
 // splat textures).
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ATMO_U } from './atmosphere.js';
 import { GRID_N, CELL, RELIEF_SHADE } from './terrainData.js';
 import {
@@ -497,13 +498,13 @@ export function createTerrain(td, noiseTex) {
   const mat = createTerrainMaterial(noiseTex, makeGroundDetail(256));
   const CH = 48; // cells per chunk (750 m)
   const chunks = GRID_N / CH;
+  const levels = [[1, 0], [2, 1075], [4, 2125], [8, 4325]];
   for (let j = 0; j < chunks; j++) {
     for (let i = 0; i < chunks; i++) {
       const lod = new THREE.LOD();
       const cx = i * CH, cz = j * CH;
       // (Distances from the chunk centre: a 750 m chunk keeps its finest
       // level until its near edge is ~700 m away, as the 500 m chunks did.)
-      const levels = [[1, 0], [2, 1075], [4, 2125], [8, 4325]];
       for (const [step, dist] of levels) {
         const m = new THREE.Mesh(buildChunk(td, cx, cz, CH, step), mat);
         m.receiveShadow = true;
@@ -521,7 +522,53 @@ export function createTerrain(td, noiseTex) {
     }
   }
   group.add(createFarRing(mat));
-  return { group, material: mat };
+  // Phase 3: far chunks are drawn in blocks. Where EVERY chunk of a block
+  // would be showing the same level on its own (distance from each chunk
+  // centre inside [dist, next level's dist·(1−hysteresis)) — the range in
+  // which the LOD objects cannot choose otherwise), one merged mesh made of
+  // those very geometries replaces the individual draws. Same triangles,
+  // same positions, fewer draw calls; at the borders the chunks stay
+  // individual. Merges use the LOD levels' own geometries.
+  const blocks = [];
+  const lods = group.children.filter((o) => o.isLOD);
+  const cOf = (lod) => lod.position;
+  const addBlocks = (levelIdx, size) => {
+    const lo = levels[levelIdx][1], hi = levelIdx + 1 < levels.length ? levels[levelIdx + 1][1] * 0.85 : Infinity;
+    for (let bj = 0; bj < chunks; bj += size) for (let bi = 0; bi < chunks; bi += size) {
+      const members = [];
+      for (let j = bj; j < Math.min(chunks, bj + size); j++) for (let i = bi; i < Math.min(chunks, bi + size); i++) members.push(lods[j * chunks + i]);
+      if (members.length < 2) continue;
+      const mesh = new THREE.Mesh(mergeGeometries(members.map((l) => l.levels[levelIdx].object.geometry)), mat);
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      mesh.visible = false;
+      mesh.name = 'terrainBlock' + levelIdx;
+      mesh.geometry.computeBoundingSphere();
+      group.add(mesh);
+      blocks.push({ mesh, members, lo, hi });
+    }
+  };
+  addBlocks(2, 2);
+  addBlocks(3, 4);
+  return {
+    group,
+    material: mat,
+    blocks,
+    update(camera) {
+      const p = camera.position, z = camera.zoom || 1;
+      for (const b of blocks) {
+        let all = true;
+        for (const l of b.members) {
+          const d = Math.hypot(cOf(l).x - p.x, cOf(l).y - p.y, cOf(l).z - p.z) / z;
+          if (!(d >= b.lo && d < b.hi)) { all = false; break; }
+        }
+        if (all !== b.mesh.visible) {
+          b.mesh.visible = all;
+          for (const l of b.members) l.visible = !all;
+        }
+      }
+    },
+  };
 }
 
 function createFarRing(mat) {

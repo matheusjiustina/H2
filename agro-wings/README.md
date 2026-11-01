@@ -3295,3 +3295,52 @@ The "High" trims are predicted from pixel counts and ranges, **not measured on a
 
 `npm test` includes `test/adaptive.test.mjs` (Ultra identical to v73 numbers, controller behaviour on
 synthetic frame times) and `test/perfmanager.test.mjs`; `test/perfui.mjs` drives the menu in a browser.
+
+## World rendering optimisation (performance work, phase 3)
+
+Branch `perf/fase-3` (from `perf/fase-2`). Rule: the Ultra Original image does not
+change — every item below keeps the same geometry, materials and ranges and only
+removes CPU / draw-call work. Probes: `test/p3probe.mjs` (draw calls per scene
+group, slow), `test/p3cpu.mjs` (calls, triangles, JS time), `test/p3verify.mjs`
+(altitude sweep, terrain blocks on/off pixel diff).
+
+### Audit result (what was already optimised, and left alone)
+
+* Crop plants: already one instanced draw per crop variant, streamed in 4 m cells,
+  density thins and dissolves with distance (`cropPlants.js`) — no per-frame rebuild.
+* Trees: instanced in 500 m cells with near/far LOD (`vegetation.js`); grass and
+  forest crowns instanced; terrain already in 750 m chunks with 4 LOD levels and skirts.
+* Structures are already merged per material (`Builder`); the remaining draws are
+  animated parts (doors, windsocks, turbines) and per-farm groups. Aircraft, cockpits,
+  physics, missions and progression were not touched.
+
+### Changes
+
+| # | Technique | Where | Effect |
+|---|---|---|---|
+| 1 | Static subtrees skip the per-frame matrix update (compose + multiply of ~9000 forest nodes etc.) | `staticFreeze.js`, `world.js` | scene matrix update 2.5–2.7 → 0.8–0.9 ms/frame (JS) |
+| 2 | Road ribbons merged per 1.5 km region | `roads.js` | −19 … −54 draw calls |
+| 3 | Crop canopy surfaces and edge walls merged per crop and 2 km region (field limits, vertices, shading unchanged) | `crops.js` | −30 … −60 draw calls |
+| 4 | Far terrain chunks drawn in blocks (2×2 chunks at LOD 4, 4×4 at LOD 8) only where every chunk would show that same level anyway; same geometries merged | `terrain.js` | −40 … −220 draw calls; **pixel-identical** (diff 0 in 16 altitude/heading views) |
+
+Tried and dropped: merging far trees into 3×3-cell blocks — the far ring is too thin
+for a whole block to fit inside, no draw call saved (reverted).
+
+### Measured (software renderer; calls/triangles are exact, JS ms are this container's CPU)
+
+| View (Ultra, `?q=high`) | Draw calls before → after | Triangles before → after |
+|---|---|---|
+| Low pass over crops | 540 → 473 | 3.345 M → 3.376 M |
+| 250 m high | 443 → 392 | 0.744 M → 0.782 M |
+| Cockpit, low | 522 → 450 | 3.351 M → 3.385 M |
+| Strip approach | 909 → 690 | 4.688 M → 4.689 M |
+
+Triangles rise ≤ 5 % because merged crop regions are culled per region instead of per field.
+Frame time on a GPU was not measurable here (no GPU); `matrixWorld` update fell about 1.7 ms/frame.
+
+### Regressions / rollback
+
+Visual: terrain blocks are pixel-identical; static views differ from phase 2 by ≤ the build-to-build
+noise. Crop / road merging changes culling granularity and blend order of overlapping road pieces only.
+Rollback: `git revert` the phase-3 commit, or remove the calls in `world.js` (`freezeStatic`, `terrainMesh.update`);
+the tag / branch `ultra-original-v73` remains the untouched reference.

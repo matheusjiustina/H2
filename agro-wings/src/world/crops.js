@@ -8,6 +8,7 @@
 //    in 48 m patches around the camera. They shrink into the canopy toward the
 //    edge of the detail radius so there is no visible pop.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FIELDS, CROPS, cropHeight } from './layout.js';
 import { makeCropCard, makeCanopyTop } from '../core/textures.js';
 import { fbm } from '../core/math.js';
@@ -128,10 +129,38 @@ export function createCrops(terrain, quality) {
   }
 
   const fields = FIELDS.filter((f) => CROP_KINDS.includes(f.crop));
+  // Phase 3: the canopy surfaces and the edge walls of the fields of one crop
+  // and one 2 km region are merged into a single mesh each (same material,
+  // same attributes) — a draw call per region instead of per field. Field
+  // limits, vertices and shading are untouched.
+  const REGION = 2000;
+  const canopyParts = new Map(), edgeParts = new Map(), edgeMatOf = new Map();
+  const bucket = (map, f, g) => {
+    const key = f.crop + ':' + Math.floor((f.x0 + f.x1) / 2 / REGION) + ',' + Math.floor((f.z0 + f.z1) / 2 / REGION);
+    if (!map.has(key)) map.set(key, { crop: f.crop, geos: [] });
+    map.get(key).geos.push(g);
+  };
   for (const f of fields) {
     const h = cropHeight(f);
-    group.add(buildCanopy(f, h, terrain, canopyMats[f.crop]));
-    group.add(buildEdges(f, h, terrain, cardMats[f.crop]));
+    bucket(canopyParts, f, buildCanopy(f, h, terrain, canopyMats[f.crop]).geometry);
+    const e = buildEdges(f, h, terrain, cardMats[f.crop]);
+    bucket(edgeParts, f, e.geometry);
+    edgeMatOf.set(f.crop, e.material);
+  }
+  for (const [key, { crop, geos }] of canopyParts) {
+    const m = new THREE.Mesh(geos.length > 1 ? mergeGeometries(geos) : geos[0], canopyMats[crop]);
+    m.receiveShadow = true;
+    m.name = 'canopy ' + key;
+    m.geometry.computeBoundingSphere();
+    group.add(m);
+  }
+  for (const [key, { crop, geos }] of edgeParts) {
+    const m = new THREE.Mesh(geos.length > 1 ? mergeGeometries(geos) : geos[0], edgeMatOf.get(crop));
+    m.receiveShadow = true;
+    m.castShadow = false;
+    m.name = 'edges ' + key;
+    m.geometry.computeBoundingSphere();
+    group.add(m);
   }
 
   // --- row fin patches around the camera ---------------------------------

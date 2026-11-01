@@ -15,6 +15,7 @@ import { createGrass } from './grass.js';
 import { createFieldActivity } from './fieldActivity.js';
 import { createWater } from './water.js';
 import { createForestCrowns } from './forestCrowns.js';
+import { freezeStatic } from './staticFreeze.js';
 
 export class World {
   constructor(renderer, scene, quality) {
@@ -54,6 +55,8 @@ export class World {
     this.activity = createFieldActivity(this.scene, this.structures.M, this.terrain);
     // The harrowing tractor on T-08 (audio, older checks).
     const tr = this.activity.units[0];
+    // Phase 3: static subtrees are skipped by the per-frame matrix update.
+    for (const g of [this.terrainMesh.group, this.roads.group, this.vegetation.group, this.crops.group]) freezeStatic(g);
     this.farm = { root: tr.model.root, pose: (t) => tr.route.pose(tr.s0 + t * tr.K.speed) };
   }
 
@@ -103,6 +106,7 @@ export class World {
   update(camera, focus, dt, time) {
     this.atmo.update(dt, camera, this.visualWind, time);
     this.sky.update(camera, focus, dt, time);
+    this.terrainMesh.update?.(camera);
     this.cropPlants.update(camera.position, this.terrain.heightAt(camera.position.x, camera.position.z));
     this.crops.update(camera.position);
     this.vegetation.update(camera);
