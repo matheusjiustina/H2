@@ -244,4 +244,12 @@ export default {
   'Ground effect — less power to hover': 'Efeito solo — menos potência para pairar',
   'Slow for the weight — {0} kt minimum: lower the nose': 'Pouca velocidade para o peso — mínimo {0} kt: baixe o nariz',
   'Speed running out in the climb — ease the nose down': 'A velocidade está acabando na subida — baixe o nariz aos poucos',
+  'Graphics profile': 'Perfil gráfico',
+  'Automatic': 'Automático',
+  'Economy': 'Econômico',
+  'Ultra Original': 'Ultra Original',
+  'FPS limit': 'Limite de FPS',
+  'Restore graphics defaults': 'Restaurar padrões gráficos',
+  'Automatic picks a profile for this device and adjusts the render resolution (never the interface) if the frame rate drops, recovering slowly. A profile chosen by hand only adjusts the resolution; Ultra Original is never reduced.': 'O automático escolhe um perfil para este aparelho e ajusta a resolução de renderização (nunca a interface) se o FPS cair, recuperando devagar. Um perfil escolhido à mão só ajusta a resolução; o Ultra Original nunca é reduzido.',
+  'Automatic quality: {0}': 'Qualidade automática: {0}',
 };

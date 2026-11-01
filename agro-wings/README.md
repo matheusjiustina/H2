@@ -3245,3 +3245,53 @@ canvas, quality preset).
 Procedure for phase 2: run the benchmark on the tag's build and on the
 branch's build on the same device, compare, and compare screenshots at the
 same camera positions before merging anything.
+
+## Adaptive Performance System (performance work, phase 2)
+
+Graphics menu → **Graphics profile**: Automatic · Economy · Medium · High · **Ultra Original**.
+Code: `src/core/perfProfiles.js` (parameters), `capabilities.js` (feature detection),
+`adaptive.js` (pure controller), `perfManager.js` (glue to the game loop and settings).
+
+### Profiles
+
+| Profile | Quality object | Render scale | Particles | Dynamic-res floor | Pixel ceiling |
+|---|---|---|---|---|---|
+| Ultra Original | the very object `QUALITY.high` (v73 look) | `min(dpr,2) × 1.5` | 6000 | none when chosen manually (0.85 in Automatic) | none |
+| High | Ultra minus: scale 1.25, grass 68 m / density 0.9, tree crowns 470 m, rain 3200, clouds 40 (shadows 4096, crop shadows, near trees kept) | 1.25 | 5000 | 0.85 | 5.0 Mpx |
+| Medium | `QUALITY.medium` unchanged | as before | 3500 | 0.7 | 2.8 Mpx |
+| Economy | `QUALITY.low` unchanged | as before | 1800 | 0.6 | 1.4 Mpx |
+
+The "High" trims are predicted from pixel counts and ranges, **not measured on a GPU**
+(none was available); tune them in `perfProfiles.js`.
+
+### How Automatic decides
+
+* **Start**: feature-based (WebGL2, max texture size, MSAA samples, anisotropy, float
+  render targets, software-renderer GPU string, coarse pointer, DPR, cores, memory only as a
+  hint). No WebGL2 / software renderer / small textures / weak hints → Economy; strong desktop → High;
+  otherwise Medium. Automatic never *starts* above High; the last auto profile is saved (`autoLast`) and reused.
+* **Measure**: moving window of 3 s (2 s while calibrating the first 15 s) of real frame times against
+  the budget (60 Hz, or the FPS limit). Bad: mean > budget×1.25 or >25 % frames slower than 1.5×budget.
+  Good: mean < budget×0.72 and ≤2 % slow frames. In between = hysteresis, nothing changes.
+* **Act**: down needs 2 consecutive bad windows (1 while calibrating) and ≥4 s since the last change;
+  resolution first (steps of 0.05 down to the floor), then the next lower profile. Up needs 15 s of good
+  windows and ≥20 s since the last change, multiplied by a back-off.
+* **Protection**: a drop within 60 s of a rise doubles the back-off (max ×8) and a profile that failed after
+  a rise is barred for 5 min; frames >250 ms (loading, tab switch), hidden page and aircraft changes are ignored;
+  the controller costs ≈0.03 µs/frame in isolation (<1 µs in the page).
+* **Manual profiles** only use dynamic resolution (UI, text and GPS stay in CSS pixels; only the 3D canvas
+  resolution changes); **manual Ultra Original is inert**: no change at all.
+* **FPS limit** (Off/30/60) skips animation-frame callbacks; physics keeps its fixed 1/120 s step.
+* Saved settings: `profile`, `fpsLimit`, `autoLast` (plus the existing `showFps`). Old saves (`quality`,
+  `qualityAuto`) migrate automatically. Progress, accounts and purchases are untouched.
+  `?q=low|medium|high|economico|medio|alto|ultra` pins a profile and freezes the controller (benchmarks use it).
+
+### Rollback
+
+* Player: Graphics → *Restore graphics defaults*, or choose **Ultra Original**, or open with `?q=high`.
+* Code: `git revert` the phase-2 commit, or check out tag/branch `ultra-original-v73` (the original, untouched).
+
+### Tests
+
+`npm test` includes `test/adaptive.test.mjs` (Ultra identical to v73 numbers, controller behaviour on
+synthetic frame times) and `test/perfmanager.test.mjs`; `test/perfui.mjs` drives the menu in a browser.

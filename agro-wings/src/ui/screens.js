@@ -367,8 +367,10 @@ export class Screens {
     const keys = keyGroup(undefined), numKeys = keyGroup('num'), classicKeys = keyGroup('classic');
     const el = h(`<div class="panel"><h2>${t('Settings')}</h2>
       <h3>${t('Graphics')}</h3>
-      <div class="field"><label>${t('Quality')}</label>${seg('quality', [['low', t('Low')], ['medium', t('Medium')], ['high', t('High')]])}<span></span></div>
-      <div class="field"><label>${t('Show FPS')}</label>${seg('showFps', [[false, t('Off')], [true, t('On')]])}<span></span></div>
+      <div class="field"><label>${t('Graphics profile')}</label>${seg('profile', [['auto', t('Automatic')], ['economico', t('Economy')], ['medio', t('Medium')], ['alto', t('High')], ['ultra', t('Ultra Original')]])}<span class="val" data-gfx>${g.perf ? g.perf.label() : ''}</span></div>
+      <div class="field"><label>${t('FPS limit')}</label>${seg('fpsLimit', [[0, t('Off')], [30, '30'], [60, '60']])}<span></span></div>
+      <div class="field"><label>${t('Show FPS')}</label>${seg('showFps', [[false, t('Off')], [true, t('On')]])}<button class="btn small" data-a="resetGfx">${t('Restore graphics defaults')}</button></div>
+      <div class="note">${t('Automatic picks a profile for this device and adjusts the render resolution (never the interface) if the frame rate drops, recovering slowly. A profile chosen by hand only adjusts the resolution; Ultra Original is never reduced.')}</div>
       <div class="field"><label>${t('Cockpit shake')}</label>${seg('shake', [[0, t('Off')], [0.5, t('Low')], [1, t('Normal')]])}<span></span></div>
       <h3>${t('Environment')}</h3>
       <div class="field"><label>${t('Time of day')}</label>${seg('timeOfDay', [...TIME_ORDER.map((k) => [k, t(TIMES[k].label)]), ['flow', t('Passing')]])}<span></span></div>
@@ -433,9 +435,10 @@ export class Screens {
         const key = b.parentElement.dataset.key;
         let v = b.dataset.v;
         if (v === 'true' || v === 'false') v = v === 'true';
-        else if (!Number.isNaN(+v) && (key === 'wind' || key === 'shake')) v = +v;
+        else if (!Number.isNaN(+v) && (key === 'wind' || key === 'shake' || key === 'fpsLimit')) v = +v;
         g.setSetting(key, v);
         b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        if (key === 'profile') { const o = el.querySelector('[data-gfx]'); if (o) o.textContent = g.perf.label(); }
         const aids = el.querySelector(`[data-aids="${key === 'assist' ? 'aidPlane' : 'aidHeli'}"]`);
         if (aids && (key === 'assist' || key === 'heliAssist')) aids.classList.toggle('off', v !== 'on');
         return;
@@ -450,6 +453,7 @@ export class Screens {
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a === 'close') this.close();
       if (a === 'resetKeys') { g.input.resetBindings(); this.settings(); }
+      if (a === 'resetGfx') { g.perf.restoreDefaults(); g.setSetting('profile', 'auto'); this.settings(); }
       if (a === 'resetSave') {
         // Two-step confirmation inside the page (no browser dialogs).
         const btn = e.target.closest('[data-a]');

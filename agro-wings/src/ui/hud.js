@@ -242,7 +242,7 @@ export class HUD {
     $.fps.classList.toggle('show', !!g.settings.showFps);
     if (g.settings.showFps) {
       const st = g.frameStats?.(120) ?? { avg: 0, p95: 0 };
-      $.fps.textContent = `${f.v.toFixed(0)} fps · ${st.avg.toFixed(1)} ms avg / ${st.p95.toFixed(1)} p95 · ${g.renderer.info.render.calls} calls · ${(g.renderer.info.render.triangles / 1000).toFixed(0)}k tris · ${g.settings.quality}`;
+      $.fps.textContent = `${f.v.toFixed(0)} fps · ${st.avg.toFixed(1)} ms avg / ${st.p95.toFixed(1)} p95 · ${g.renderer.info.render.calls} calls · ${(g.renderer.info.render.triangles / 1000).toFixed(0)}k tris · ${g.perf.label()}`;
     }
   }
 }

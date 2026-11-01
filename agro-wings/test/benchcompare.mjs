@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 const [a, b] = [process.argv[2], process.argv[3]].map((f) => JSON.parse(fs.readFileSync(f, 'utf8')));
 const tol = +(process.argv[4] ?? 5);
-if (a.device.gpu !== b.device.gpu || a.device.quality !== b.device.quality || a.device.canvas.join() !== b.device.canvas.join()) {
+if (a.device.gpu !== b.device.gpu || a.device.quality !== b.device.quality || (a.device.profile ?? null) !== (b.device.profile ?? null) || a.device.canvas.join() !== b.device.canvas.join()) {
   console.error('Refused: the two results come from different GPU / quality / canvas size.', { a: [a.device.gpu, a.device.quality, a.device.canvas], b: [b.device.gpu, b.device.quality, b.device.canvas] });
   process.exit(2);
 }

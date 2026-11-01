@@ -1,7 +1,9 @@
 // AGRO WINGS — game shell: boot, main loop, modes, job flow, prompts, warnings.
 import * as THREE from 'three';
 import { World } from '../world/world.js';
-import { QUALITY, GAME, SPRAY } from '../config.js';
+import { GAME } from '../config.js';
+import { PerfManager } from '../core/perfManager.js';
+import { PROFILES } from '../core/perfProfiles.js';
 import { AIRCRAFT_ORDER, aircraftType, setRegistration } from '../aircraft/types.js';
 import { Input, KEY_SCHEMES, DEFAULT_KEY_SCHEME, keyLabel } from '../core/input.js';
 import { ParticlePool } from '../core/particles.js';
@@ -54,7 +56,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -62,8 +64,10 @@ export class Game {
     for (const k of ['assist', 'heliAssist']) if (this.settings[k] !== 'on') this.settings[k] = 'off';
     this.settings.aidPlane = { ...allAids(PLANE_AIDS), ...this.settings.aidPlane };
     this.settings.aidHeli = { ...allAids(HELI_AIDS), ...this.settings.aidHeli };
-    const q = new URLSearchParams(location.search).get('q');
-    if (q && QUALITY[q]) { this.settings.quality = q; this.qualityForced = true; }
+    // Graphics profile (Adaptive Performance System): settings, ?q= and old
+    // saves are resolved here; the renderer-dependent part runs in boot().
+    this.perf = new PerfManager(this);
+    this.qualityForced = this.perf.forced;
     // Frame-time history (ms) for the FPS overlay and the auto quality check.
     this.frameMs = new Float32Array(240);
     this.frameN = 0;
@@ -87,9 +91,10 @@ export class Game {
     this.screens = new Screens(this, this.uiRoot);
     const steps = ['Terrain', 'Ground', 'Sky', 'Crops', 'Forest', 'Base'];
     let si = 0;
-    this.quality = QUALITY[this.settings.quality];
+    this.quality = this.perf.quality;
     this.renderer = this.createRenderer();
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * this.quality.pixelRatio);
+    this.perf.init(); // capabilities, starting profile, pixel ratio (Ultra Original: min(dpr, 2) × 1.5 as before)
+    this.quality = this.perf.quality;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.3, 30000);
     this.input = new Input(this.canvas);
@@ -124,14 +129,14 @@ export class Game {
     this.replay = new ReplayManager(this);
     this.overlay = new CoverageOverlay(this);
     this.service = new GroundService(this);
-    this.mist = new ParticlePool(SPRAY.maxParticles[this.settings.quality], { renderOrder: 22 });
+    this.mist = new ParticlePool(PROFILES.ultra.particles, { renderOrder: 22 }); // capacity of the largest profile; the limit follows the profile
     this.dust = new ParticlePool(1500, { renderOrder: 21 });
     this.scene.add(this.mist.points, this.dust.points);
     this.world.dust = this.dust;
     this.world.mist = this.mist;
     // Fire-suppression test scenario (active while the Fire Boss is flown).
     this.fires = new FireField(this.scene, this.world.terrain);
-    this.mist.limit = SPRAY.maxParticles[this.settings.quality];
+    this.mist.limit = this.perf.profile.particles;
     this.audio = new GameAudio();
     this.audio.setVolume(this.settings.volume);
     this.career = new Career();
@@ -170,6 +175,7 @@ export class Game {
 
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
+    this.perf?.refreshRatio(); // the pixel-count ceiling follows the window; Ultra Original: no change
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -183,14 +189,9 @@ export class Game {
   setSetting(k, v, auto = false) {
     this.settings[k] = v;
     if (k === 'quality' && !auto) this.settings.qualityAuto = false;
+    if (k === 'profile' || (k === 'quality' && !auto)) this.perf.setProfile(v); // updates settings.profile / quality
+    if (k === 'fpsLimit') this.perf.setFpsLimit(v);
     try { localStorage.setItem(SETTINGS, JSON.stringify(this.settings)); } catch { /* ignore */ }
-    if (k === 'quality') {
-      this.quality = QUALITY[v];
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * this.quality.pixelRatio);
-      this.world.setQuality(this.quality);
-      this.mist.limit = Math.min(this.mist.max, SPRAY.maxParticles[v]);
-      this.resize();
-    }
     if (k === 'keyScheme') this._applyKeyScheme();
     if (k === 'touchMode') this.touch?.applySettings();
     if (k === 'volume') this.audio.setVolume(v);
@@ -247,6 +248,7 @@ export class Game {
     next.onEvent = (e) => this._acEvent(e);
     next.placeAtPad();
     next.stuck = false;
+    this.perf?.hold(3); // loading a new aircraft is not a performance signal
     this.fires?.setActive(!!next.water);
     this._parked = Object.values(this.fleet).filter((ac) => ac !== next);
     this.world.extraObstacle = (x, y, z) => {
@@ -562,10 +564,12 @@ export class Game {
   // ------------------------------------------------------------------ frame
   frame() {
     const now = performance.now();
-    this.frameMs[this.frameN++ % this.frameMs.length] = now - this.last;
-    const rawDt = Math.min(0.1, (now - this.last) / 1000);
+    if (this.perf.gate(now)) return; // optional FPS cap: skip this callback, keep `last`
+    const dtMs = now - this.last;
+    this.frameMs[this.frameN++ % this.frameMs.length] = dtMs;
+    const rawDt = Math.min(0.1, dtMs / 1000);
     this.last = now;
-    this._autoQuality(now);
+    this.perf.update(now, dtMs);
     if (this.frozen) { if (!this.noRender) this.render(); return; }
     this.tick(rawDt);
     this.render();
@@ -579,29 +583,6 @@ export class Game {
     for (let i = 1; i <= k; i++) a.push(this.frameMs[(this.frameN - i + this.frameMs.length * 4) % this.frameMs.length]);
     a.sort((x, y) => x - y);
     return { avg: a.reduce((s, v) => s + v, 0) / k, p95: a[Math.min(k - 1, Math.floor(k * 0.95))] };
-  }
-
-  // First run only: measure the frame time on the title screen and pick the
-  // preset that keeps the game smooth on this machine (the player can change
-  // it in Settings; a manual choice turns this off for good).
-  _autoQuality(now) {
-    const s = this.settings;
-    if (!s.qualityAuto || s.autoChecked || this.qualityForced) return;
-    this._aqT0 ??= now;
-    const el = now - this._aqT0;
-    if (el < 2500) { this._aqN0 = this.frameN; return; }
-    if (el < 8000) return;
-    const st = this.frameStats(Math.max(30, this.frameN - this._aqN0));
-    const order = ['low', 'medium', 'high'];
-    let i = order.indexOf(s.quality);
-    if (st.avg > 30 && i > 0) i--; // under ~33 fps: step down
-    else if (st.avg < 12 && st.p95 < 18 && i < 2) i++; // comfortably over 80 fps: step up
-    s.autoChecked = true;
-    this.autoQualityResult = { ...st, from: s.quality, to: order[i] };
-    if (order[i] !== s.quality) {
-      this.setSetting('quality', order[i], true);
-      this.toast(t('Graphics set to {0} for this device (change it in Settings).', t({ low: 'Low', medium: 'Medium', high: 'High' }[order[i]])));
-    } else this.setSetting('autoChecked', true);
   }
 
   // Run the game logic without rendering (automated validation / fast-forward).

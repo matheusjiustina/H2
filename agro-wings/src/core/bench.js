@@ -46,7 +46,7 @@ function deviceInfo(g) {
     ua: navigator.userAgent, dpr: devicePixelRatio, cores: navigator.hardwareConcurrency ?? null, deviceMemoryGB: navigator.deviceMemory ?? null,
     screen: [screen.width, screen.height], canvas: [g.canvas.width, g.canvas.height],
     gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'n/a', pixelRatioInUse: g.renderer.getPixelRatio(),
-    quality: g.settings.quality, qualityForced: !!g.qualityForced, qualityAuto: !!g.settings.qualityAuto,
+    quality: g.settings.quality, profile: g.perf?.profileId ?? null, profileMode: g.perf?.mode ?? null, resolutionScale: g.perf?.scale ?? 1, qualityForced: !!g.qualityForced, adaptiveCostUsPerFrame: g.perf?.stats().costUsPerFrame ?? null,
   };
 }
 
@@ -93,10 +93,13 @@ export async function runBench(g, { only = null, dur = 10 } = {}) {
   const result = { schema: 1, when: new Date().toISOString(), build: window.__AGRO_BUILD ?? null, url: location.href, device: deviceInfo(g), caveat: 'Scenarios are scripted placements of the live game (G, I and B are proxies); numbers are only comparable between runs on the same device, quality and conditions.', scenarios: {} };
   if (!g.playing) g.menuAction('free');
   g.screens.close?.();
+  g.perf?.freeze(true); // the adaptive controller must not change anything while measuring
   for (const [k, def] of Object.entries(SCENARIOS)) {
     if (only && !only.includes(k)) continue;
     result.scenarios[k] = await measure(g, def, dur);
   }
+  g.perf?.freeze(false);
+  result.device = deviceInfo(g);
   try { localStorage.setItem('agro-bench-last', JSON.stringify(result)); } catch { /* private mode */ }
   return result;
 }
