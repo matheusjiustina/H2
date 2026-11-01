@@ -1104,7 +1104,12 @@ export function createAT802Model(panel, opts = {}) {
   const { cockpit, stick, pedals, throttle, valve, leds, THR } = ck;
   // Roof lining (inside of the painted roof), matt dark grey.
   cockpit.add(new THREE.Mesh(headliner, new THREE.MeshStandardMaterial({ color: 0x2c2f33, roughness: 0.95, side: THREE.DoubleSide })));
-  root.add(cockpit);
+  // The camera rig and the parking code switch `model.cockpit` (this
+  // wrapper); the distance cull below switches the interior inside it.
+  const cockpitWrap = new THREE.Group();
+  cockpitWrap.name = 'at802-cockpit-wrap';
+  cockpitWrap.add(cockpit);
+  root.add(cockpitWrap);
 
   // ---------------- pilot ----------------
   const pilot = buildPilot(M, stick, throttle, { throttleAt: THR });
@@ -1138,8 +1143,8 @@ export function createAT802Model(panel, opts = {}) {
     // The interior is drawn only from the cockpit or a camera within 12 m
     // (the chase camera at 18 m and distant views skip its ≈ 65 draw calls).
     const g = ac?.game;
-    if (g?.camera && !ac.parked) cockpit.visible = g.cameraMode === 'cockpit' || g.cameraMode === 'free' || g.camera.position.distanceToSquared(root.position) < 12 * 12;
-    if (cockpit.visible) ck.update(dt, fm, ac);
+    if (g?.camera) cockpit.visible = g.cameraMode === 'cockpit' || g.cameraMode === 'free' || g.camera.position.distanceToSquared(root.position) < 12 * 12;
+    if (cockpit.visible && cockpitWrap.visible) ck.update(dt, fm, ac);
     const o = fm.out;
     let target;
     if (fm.engine === 'off' && (o.onGround || fm.rpm < 150)) target = FEATHER;
@@ -1173,7 +1178,7 @@ export function createAT802Model(panel, opts = {}) {
     ailerons, flaps, elevator, rudder,
     gear: gearGroups,
     stick, pedals, throttle, valve, leds, panelMesh: cockpit, inst: { pick: ck.pick, pickables: ck.pickables },
-    pumpFan, nozzles, pilot, cockpit, glassMesh,
+    pumpFan, nozzles, pilot, cockpit: cockpitWrap, glassMesh,
     eye: new THREE.Vector3(...AT802_EYE),
     seat: new THREE.Vector3(...o3(0, 0.05, -0.55)),
     canopy: { sill: SILL, roof: CAN.yt, windshieldZ: -0.92, rearZ: CAN.zR, halfWidth: CAN.ww },

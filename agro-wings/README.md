@@ -3146,3 +3146,56 @@ events, `placeOnWater`, extra fields in `instruments()`); `game.js`
 warnings); `input.js` (two actions); `layout.js` / `terrainData.js` /
 `vegetation.js` (the reservoir, with optional bank and tree parameters that
 default to the old behaviour); `screens.js` / `styles.css` (premium badge).
+
+**Measured** (run in this container; render times are SwiftShader on the
+CPU and do not represent a GPU — draw calls, triangles and tick times do):
+
+| check | result | reference |
+| --- | --- | --- |
+| model span / length | 18.04 m / 10.96 m | 18.04 / ≈ 10.9 |
+| AT-802A parked | three wheels, 10.5°, 3.47 m to the fin top | — |
+| PT6A-65AG full power | 1,293 shp, 1,700 rpm, 3,996 ft·lb, 429 L/h, 19.3 kN static | 1,295 shp |
+| stall at 7,257 kg | 91 kt clean, 76 kt flaps | 92 / 79 kt |
+| climb at 7,257 kg / 4,500 kg | 759 / 1,773 ft/min | ≈ 780 |
+| full power level at 5,500 kg | 163 kt | cruise 166 kt |
+| take-off roll 7,257 / 4,200 kg | 838 m / 227 m (flaps 1/3, 320 m field, the test's technique) | ≈ 610 m (sea level) |
+| Fire Boss level at 5,500 kg | 147 kt (AT-802A 163) | max cruise 150 KIAS |
+| Fire Boss afloat, 4,245 kg | 0.59 m draft, 3.3° nose up, water carries 100 % | — |
+| water take-off 4,300 / 5,216 kg | 285 m / 473 m | — |
+| water take-off from rest, 6,400 kg | not airborne (overload) | limit 5,216 kg |
+| scoop run | 2,966 L in, stops at the 7,257 kg limit; 2,603 L limit with full fuel | 3,104 L tank |
+| partial / full drop | 649 L in 0.5 s, mass down by the same; 3,000 L emptied | — |
+
+Tests: `node --test test/at802.test.mjs` (13 tests, part of `npm test`,
+155 pass); `test/at802e2e.mjs` in the browser, 12 / 12 (premium lock in
+card, `selectAircraft` and `_activate`; AT-802A spraying; Fire Boss afloat,
+scooping with T — 898 L in 4 s —, gear with U, a drop with C on test fire 2
+— 1,264 L on target, intensity 100 → 39 % —, the fleet parked without
+overlap, re-locked, no page errors); `test/at802cockpit.mjs` for both
+configurations (views, GPS soft keys by click from the pilot's view; looking
+down: Fire Boss gear / probes / door switches and the AT-802A spray valve by
+click); `test/fleetswitch.mjs` 180 switches, none failed;
+`test/at802ortho.mjs` orthographic views of both configurations.
+
+Performance, medium quality (`test/perf.mjs`, before = the build before the
+AT-802, Ipanema flown): load 45.1 → 48.7 s, heap 454 → 507 MB (the two
+AT-802 models in the fleet); base view 823 → 906 draw calls with both
+parked at the base (other views unchanged); tick times within run-to-run
+noise. With the AT-802A flown the cockpit interior is drawn only from the
+cockpit or a camera within 12 m: chase view 352 draw calls (Ipanema 391),
+cockpit view 405. The first entry into the cockpit view compiles its
+shaders (a 1–9 s stall under SwiftShader, once).
+
+**Not done / pending.**
+- Take-off roll at MTOW longer than the published figure (838 against
+  ≈ 610 m) at the game's 320 m field elevation with the test's rotation;
+  climb, stall and cruise match.
+- Oil pressure / temperature, fuel pressure, volts and OAT are not
+  simulated (shown `---` N/S).
+- The Fire Boss's mission switches sit on the lower console, below the
+  default view (look down to reach them); the gear lamps, water readout and
+  mission display are in view.
+- The sound is the existing turboprop profile with five blades; no
+  scooping / drop sounds.
+- There is no premium store in this repository: the entitlement source is
+  the integration point for the platform's existing system.
