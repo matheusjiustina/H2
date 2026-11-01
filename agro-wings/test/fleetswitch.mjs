@@ -15,6 +15,10 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto((process.env.AGRO_URL || 'http://localhost:4173/') + '?q=low', { waitUntil: 'load' });
 await page.waitForFunction(() => window.__agro && window.__agro.frames > 2, null, { timeout: 300000 });
+// Premium aircraft (the Fire Boss) are granted through the entitlement
+// hook first, as the platform's premium system would; the lock itself is
+// tested in at802.test.mjs and at802e2e.mjs.
+await page.evaluate(async () => { const ex = await import('/src/game/expansions.js'); ex.setEntitlementSource(() => true); });
 const res = await page.evaluate(() => {
   const g = window.__agro;
   localStorage.clear(); g.career.resetAll(); g.career.tutorialDone = true;

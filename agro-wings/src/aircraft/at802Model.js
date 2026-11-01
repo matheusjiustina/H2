@@ -1135,10 +1135,10 @@ export function createAT802Model(panel, opts = {}) {
   const state = { probes: 0, door: 0 };
   const update = (dt, fm, ac) => {
     t += dt;
-    // The interior is drawn only from the cockpit or a close camera (the
-    // chase and distant views skip its ≈ 65 draw calls).
+    // The interior is drawn only from the cockpit or a camera within 12 m
+    // (the chase camera at 18 m and distant views skip its ≈ 65 draw calls).
     const g = ac?.game;
-    if (g?.camera && !ac.parked) cockpit.visible = g.cameraMode === 'cockpit' || g.cameraMode === 'free' || g.camera.position.distanceToSquared(root.position) < 22 * 22;
+    if (g?.camera && !ac.parked) cockpit.visible = g.cameraMode === 'cockpit' || g.cameraMode === 'free' || g.camera.position.distanceToSquared(root.position) < 12 * 12;
     if (cockpit.visible) ck.update(dt, fm, ac);
     const o = fm.out;
     let target;
