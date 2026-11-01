@@ -97,6 +97,8 @@ export default {
   'Graphics': 'Gráficos',
   'Quality': 'Qualidade',
   'Low': 'Baixa',
+  'GEAR': 'TREM',
+  'SCOOP': 'CAPT.',
   'Tilt sensitivity': 'Sensibilidade da inclinação',
   'Tilt sensor unavailable: using the virtual stick.': 'Sensor de inclinação indisponível: usando o joystick virtual.',
   'Graphics context lost — waiting for the browser to restore it.': 'Contexto gráfico perdido — aguardando o navegador restaurá-lo.',

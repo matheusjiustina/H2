@@ -28,6 +28,7 @@ export class TouchControls {
       <div class="t-btns">
         <button class="tb" data-tap="spray">${t('SPRAY')}</button><button class="tb" data-hold="engine">${t('ENG')}</button><button class="tb" data-hold="brake">${t('BRAKE')}</button>
       </div>
+      <div class="t-fb"><button class="tb tiny" data-tap="gear" aria-label="${t('Gear up / down (amphibian)')}">${t('GEAR')}</button><button class="tb tiny" data-tap="scoop" aria-label="${t('Scoop probes up / down (Fire Boss)')}">${t('SCOOP')}</button></div>
       <div class="t-flaps"><button class="tb pill" data-tap="flapsDown">FLP+</button><button class="tb pill" data-tap="flapsUp">FLP−</button></div>
       <div class="t-trim"><button class="tb pill" data-hold="trimUp">TRIM+</button><button class="tb pill" data-hold="trimDown">TRIM−</button></div>
       <button class="t-strip" aria-label="${t('Show / hide the readouts')}"></button>
@@ -224,6 +225,14 @@ export class TouchControls {
     const lev = ac?.kind === 'heli' ? ac.lever : fm?.throttle;
     if (fm && (v.throttle === null || v.throttle === undefined)) this.el.querySelector('.t-thr span').style.height = `${lev * 100}%`;
     this.el.querySelector('[data-tap=spray]').classList.toggle('on', !!this.game.sprayer?.on);
+    // Fire Boss only, and only in the air: gear and scoop-probe buttons (the U and T keys on a PC).
+    const ws = this.game.aircraft?.water;
+    this.fbEl ??= this.el.querySelector('.t-fb');
+    this.fbEl.classList.toggle('show', !!ws && !!fm && !fm.out.onGround);
+    if (ws && fm) {
+      this.fbEl.querySelector('[data-tap=gear]').classList.toggle('on', !!fm.gearCmd);
+      this.fbEl.querySelector('[data-tap=scoop]').classList.toggle('on', !!ws.probesCmd);
+    }
     this.el.classList.toggle('hidden', !this.game.playing);
     this.el.style.display = this.game.playing ? '' : 'none';
   }

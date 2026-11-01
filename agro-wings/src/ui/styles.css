@@ -375,3 +375,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 @media (orientation: landscape) and (pointer: coarse) and (max-width: 720px) {
   .t-trim { bottom: calc(var(--bot) + 52px); }
 }
+
+/* Fire Boss, in flight: gear + scoop probes, left of the spray / engine / brake column (touch only; hidden otherwise). */
+.t-fb { display: none; position: absolute; right: calc(var(--edger) + 100px); bottom: calc(var(--bot) + 90px); flex-direction: column; gap: 6px; }
+.t-fb.show { display: flex; }
+.t-fb .tb { width: 40px; height: 30px; border-radius: 15px; font-size: 9px; padding: 0; opacity: .8; }
+.t-fb .tb.on { background: rgba(60,180,90,.7); color: #06200d; }
