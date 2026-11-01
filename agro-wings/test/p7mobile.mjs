@@ -26,6 +26,7 @@ const boot = async (page, q = '') => { await page.goto(URL + q, { waitUntil: 'lo
 const rows = [];
 if (only === 'layout' || only === 'all') {
   for (const [name, d] of Object.entries(DEVICES)) {
+    if (process.env.ONLY && !name.includes(process.env.ONLY)) continue;
     const { ctx, page, errors } = await open(name, d);
     await boot(page);
     const r = await page.evaluate(async () => {
@@ -107,7 +108,7 @@ if (only === 'modes' || only === 'all') {
 }
 if (only === 'life' || only === 'all') {
   const { ctx, page, errors } = await open('life', DEVICES['phone-land-844x390 (dpr3)']);
-  await boot(page);
+  await boot(page, '?q=low');
   const r = await page.evaluate(async () => {
     const g = window.__agro, L = g.lifecycle, res = {};
     g.menuAction('free'); g.screens.close(); g.aircraft.placeAirborne(300, -280, Math.PI / 2, 150, 46); for (let i = 0; i < 30; i++) g.tick(1 / 30);

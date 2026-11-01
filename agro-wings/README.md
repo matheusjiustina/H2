@@ -3426,3 +3426,29 @@ Evidence (all run in this repository):
   positions agree within 0.018 m once the stop time is aligned.
 * `test/p6prof.mjs` — CPU profile of the game logic per tick (no rendering); `test/p6audio.mjs` — audio
   graph node counts while switching aircraft.
+
+## Mobile, browsers and lifecycle (performance work, phase 7)
+
+Branch `perf/fase-7` (from `perf/fase-6`). No physics, control mapping or Ultra Original setting changed.
+The three touch layouts (virtual stick / phone tilt / buttons) and their buttons are untouched; additions only:
+
+* `src/core/lifecycle.js` — page hidden / `pagehide` / `freeze`: progress saved, a running flight paused (pause
+  screen), audio suspended; back (`visible` / `pageshow` / `resume`): frame clock reset, controller held, audio
+  resumed (or on the next tap when the browser demands a gesture, incl. iOS `interrupted`). One debounced resize for
+  `resize`, `orientationchange`, `screen.orientation` and `visualViewport`. `webglcontextlost` pauses and stops the
+  loop; `webglcontextrestored` re-bakes the sky lighting (PMREM contents are lost) and resumes. Screen Wake Lock while
+  flying on a touch device (where the browser has it). iOS pinch-zoom gestures blocked. `report()` lists the browser's
+  features by feature detection, never by user agent.
+* Tilt: sensitivity setting (Settings → Flying → Tilt sensitivity, input scaling only), neutral pose re-taken when the
+  phone is rotated, and a fallback to the virtual stick when there is no sensor, the permission is refused or it never
+  answers (with a toast). The iOS permission still needs a tap.
+* CSS: portrait phones lift the control clusters above the readout strip; short landscape phones lift the trim pair;
+  `dvh` units for panels where supported.
+
+Auto quality was already feature-based (phase 2): no WebGL2 / software renderer → Economy; coarse pointer with
+dpr ≥ 3 and few cores → Economy; the live controller adjusts from measured frame times. Temperature and graphics
+memory are **not** read: browsers do not expose them reliably. `?q=high` / manual Ultra stays unrestricted on a phone
+(user's choice); Auto never starts above High.
+
+Tests (`test/p7mobile.mjs <out> layout|modes|life`, `test/p7perm.mjs`) use Chromium with device metrics and touch
+emulation. There is no Safari / WebKit / Firefox / real phone in the build environment: those are listed as untested.

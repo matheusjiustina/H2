@@ -276,6 +276,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .office { display: flex; flex-direction: column; align-items: center; width: min(1040px, calc(100vw - 24px)); }
 .os-bezel { width: 100%; background: linear-gradient(#2b2e31, #1c1e20); border-radius: 14px; padding: 14px 14px 22px; box-shadow: 0 24px 70px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08); }
 .os-stand { width: 120px; height: 26px; background: linear-gradient(#26292b, #17191a); clip-path: polygon(22% 0, 78% 0, 100% 100%, 0 100%); }
+@supports (height: 100dvh) { .panel { max-height: calc(100dvh - 32px); } } /* phones: the visible height, not the one under the browser bars (ignored where dvh is unknown) */
 .os-screen { background: #eef1ec; color: #1d2a1f; border-radius: 4px; height: min(640px, calc(100vh - 110px)); display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
 .os-bar { display: flex; gap: 14px; align-items: center; background: #24452a; color: #e9f2e6; padding: 7px 12px; font-size: 12px; }
 .os-logo { font-weight: 800; letter-spacing: .08em; } .os-logo b { color: #f2c94c; }
@@ -364,3 +365,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .touch-mode .spraybadge, .touch-mode .trimbadge { transform: translateX(-50%) scale(.7); transform-origin: bottom center; bottom: 38px; }
 .touch-mode .trimbadge { bottom: 58px; }
 .touch-mode .k { min-width: 14px; height: 14px; font-size: 9px; margin: 0 2px; }
+
+/* Phase 7: narrow / short phones. The readout strip sits at the very bottom, so the control clusters rise above it when the screen is
+   portrait (the strip fills the width there), and the trim pair clears it on short landscape phones. */
+@media (orientation: portrait) and (pointer: coarse) {
+  .touch { --bot: calc(max(12px, calc(env(safe-area-inset-bottom) + 6px)) + 58px); }
+  .t-strip { left: auto !important; right: max(6px, env(safe-area-inset-right)); margin-left: 0; }
+}
+@media (orientation: landscape) and (pointer: coarse) and (max-width: 720px) {
+  .t-trim { bottom: calc(var(--bot) + 52px); }
+}

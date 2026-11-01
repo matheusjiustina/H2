@@ -41,6 +41,35 @@ export class Lifecycle {
     on(win, 'pointerdown', kick, { passive: true });
     on(win, 'touchend', kick, { passive: true });
     on(win, 'keydown', kick);
+    // iOS Safari ignores user-scalable=no: block its pinch-zoom gesture events (a no-op elsewhere).
+    on(doc, 'gesturestart', (e) => e.preventDefault());
+    on(doc, 'gesturechange', (e) => e.preventDefault());
+    // Keep the screen awake while flying (phones lock after ~30 s without touches, tilt flying included).
+    on(doc, 'visibilitychange', () => { if (doc.visibilityState === 'visible') this.updateWake(); });
+    this._wakeT = setInterval(() => this.updateWake(), 4000);
+  }
+
+  // Screen Wake Lock where the browser offers it (Chrome / Edge / Android, Safari 16.4+); silently absent elsewhere.
+  async updateWake() {
+    const nav = this.win.navigator;
+    if (!nav?.wakeLock || this.hidden) return;
+    const want = !!this.game.playing && this.game.touch?.active;
+    if (want && !this._wake) {
+      try { this._wake = await nav.wakeLock.request('screen'); this._wake.addEventListener?.('release', () => { this._wake = null; }); this.stats.wakeLocks = (this.stats.wakeLocks || 0) + 1; } catch { this._wake = null; }
+    } else if (!want && this._wake) { try { await this._wake.release(); } catch { /* ignore */ } this._wake = null; }
+  }
+
+  // What this browser offers, by feature (never by user-agent string); used by the docs / the test report.
+  report() {
+    const w = this.win, n = w.navigator, gl = this.game.renderer?.getContext?.();
+    return {
+      webgl2: !!gl, depthExt: this.game.depthMode, audio: w.AudioContext ? 'AudioContext' : w.webkitAudioContext ? 'webkitAudioContext' : 'none',
+      pointerEvents: 'PointerEvent' in w, coarsePointer: !!w.matchMedia?.('(pointer: coarse)').matches,
+      screenOrientation: !!w.screen?.orientation, visualViewport: !!w.visualViewport, wakeLock: !!n.wakeLock,
+      deviceOrientation: typeof w.DeviceOrientationEvent !== 'undefined', orientationPermission: typeof w.DeviceOrientationEvent?.requestPermission === 'function',
+      gamepad: !!n.getGamepads, dvhUnits: !!w.CSS?.supports?.('height: 100dvh'), pageLifecycle: 'onfreeze' in w.document || 'onfreeze' in w,
+      deviceMemory: n.deviceMemory ?? null, cores: n.hardwareConcurrency ?? null, dpr: w.devicePixelRatio,
+    };
   }
 
   get suspended() { return this.contextLost; }
