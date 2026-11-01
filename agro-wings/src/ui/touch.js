@@ -228,7 +228,11 @@ export class TouchControls {
     // Fire Boss only, and only in the air: gear and scoop-probe buttons (the U and T keys on a PC).
     const ws = this.game.aircraft?.water;
     this.fbEl ??= this.el.querySelector('.t-fb');
-    this.fbEl.classList.toggle('show', !!ws && !!fm && !fm.out.onGround);
+    // The scoop button stays while the Fire Boss is flying OR afloat (probes are switched on / off on the water);
+    // the gear button only in the air.
+    const air = !!fm && !fm.out.onGround, afloat = !!fm && !!fm.out.onWater;
+    this.fbEl.classList.toggle('show', !!ws && (air || afloat));
+    this.fbEl.querySelector('[data-tap=gear]').style.display = air || !afloat ? '' : 'none';
     if (ws && fm) {
       this.fbEl.querySelector('[data-tap=gear]').classList.toggle('on', !!fm.gearCmd);
       this.fbEl.querySelector('[data-tap=scoop]').classList.toggle('on', !!ws.probesCmd);
