@@ -10,7 +10,7 @@ import { at802Extent } from '../src/aircraft/at802Model.js';
 import { WaterSystem } from '../src/aircraft/fireboss.js';
 import { FireField, FIRE_TEST_SPOTS } from '../src/world/fires.js';
 import { WATER } from '../src/world/layout.js';
-import { isUnlocked, setEntitlementSource, aircraftUnlocked, FIREBOSS_EXPANSION } from '../src/game/expansions.js';
+import { isUnlocked, setEntitlementSource, aircraftUnlocked, FIREBOSS_EXPANSION, setPremiumEnforced } from '../src/game/expansions.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER, productLimit } from '../src/aircraft/types.js';
 
 const KT = 1.943844, FPM = 196.85;
@@ -322,8 +322,10 @@ test('Fire test field: water on a spot lowers its intensity and puts it out; wat
   assert.equal(FIRE_TEST_SPOTS.length, ff.fires.length);
 });
 
-test('Premium lock: the Fire Boss is locked until the entitlement source grants it; nothing else is locked', () => {
+test('Premium lock: open in the testing phase; enforced, the Fire Boss is locked until the entitlement source grants it; nothing else is locked', () => {
   setEntitlementSource(null);
+  assert.equal(aircraftUnlocked(AIRCRAFT_TYPES.at802f), true, 'testing phase: open by default');
+  setPremiumEnforced(true);
   assert.equal(isUnlocked(FIREBOSS_EXPANSION.id), false);
   assert.equal(aircraftUnlocked(AIRCRAFT_TYPES.at802f), false);
   for (const id of AIRCRAFT_ORDER.filter((k) => k !== 'at802f')) assert.equal(aircraftUnlocked(AIRCRAFT_TYPES[id]), true, id);
@@ -333,6 +335,7 @@ test('Premium lock: the Fire Boss is locked until the entitlement source grants 
   setEntitlementSource(() => { throw new Error('offline'); });
   assert.equal(isUnlocked(FIREBOSS_EXPANSION.id), false);
   setEntitlementSource(null);
+  setPremiumEnforced(false);
   assert.equal(AIRCRAFT_TYPES.at802f.premium, 'expansion.at802f-fireboss');
 });
 

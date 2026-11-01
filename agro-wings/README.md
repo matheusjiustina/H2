@@ -3092,9 +3092,12 @@ last one is out. Not a mission system: no spread, no rewards.
 **Premium lock** (`src/game/expansions.js`). The Fire Boss belongs to the
 expansion `expansion.at802f-fireboss`. There is no payment, checkout,
 account or Pix code anywhere in this change; the platform's existing premium
-system installs an entitlement source with `setEntitlementSource(fn)`. Until
-it does, the Fire Boss is locked: its card shows the lock, and
-`selectAircraft` / `_activate` refuse it (not only the UI). In a browser
+system installs an entitlement source with `setEntitlementSource(fn)`.
+**Testing phase: the lock is not enforced** — the Fire Boss is open to
+everyone while it is flown and tested (`setPremiumEnforced(false)`, the
+default). With `setPremiumEnforced(true)` and no entitlement, the Fire Boss
+is locked: its card shows the lock, and `selectAircraft` / `_activate`
+refuse it (not only the UI). In a browser
 game a client-side check can be bypassed; the authoritative check belongs
 to the server side of the premium system.
 

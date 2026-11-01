@@ -22,18 +22,24 @@ const shot = async (n) => { await page.waitForTimeout(80); await page.screenshot
 const tick = (s, keys = []) => page.evaluate(({ s, keys }) => { const g = window.__agro; for (let i = 0; i < Math.round(s * 60); i++) g.tick(1 / 60); return true; }, { s, keys });
 
 // 1, 10, 17: catalogue and premium lock.
-let r = await page.evaluate(() => {
+let r = await page.evaluate(async () => {
   const g = window.__agro;
   const card = document.querySelector('[data-ac="at802f"]'), cardA = document.querySelector('[data-ac="at802"]');
+  // Testing phase: the Fire Boss is open (card not locked); the lock is
+  // checked with enforcement switched on.
+  const openCard = !card?.classList.contains('locked');
+  const ex = await import('/src/game/expansions.js');
+  ex.setPremiumEnforced(true);
   const before = g.aircraftId;
   const sel = g.selectAircraft('at802f');
   g._activate('at802f');
   const after = g.aircraftId;
   if (after !== before) g._activate(before);
-  return { cardLocked: card?.classList.contains('locked'), badge: card?.querySelector('.ac-premium')?.textContent, cardA: !!cardA, sel, before, after, fleet: Object.keys(g.fleet) };
+  return { openCard, badge: card?.querySelector('.ac-premium')?.textContent, cardA: !!cardA, sel, before, after, fleet: Object.keys(g.fleet) };
 });
 ok('catalogue: AT-802A and Fire Boss cards', r.cardA && r.badge, r.badge);
-ok('premium: Fire Boss locked (card, selectAircraft, _activate)', r.cardLocked && r.sel === false && r.after !== 'at802f', JSON.stringify({ sel: r.sel, after: r.after }));
+ok('testing phase: Fire Boss card open', r.openCard);
+ok('premium enforced: Fire Boss refused (selectAircraft, _activate)', r.sel === false && r.after !== 'at802f', JSON.stringify({ sel: r.sel, after: r.after }));
 await page.evaluate(() => { const st = document.createElement('style'); st.id = 'hideui'; st.textContent = '.overlay.title { display: none !important; }'; document.head.appendChild(st); });
 await shot('00_title');
 
@@ -158,6 +164,7 @@ r = await page.evaluate(async () => {
   return { sel, id: g.aircraftId };
 });
 ok('re-locked: Fire Boss refused again', r.sel === false && r.id === 'at802', JSON.stringify(r));
+await page.evaluate(async () => { const ex = await import('/src/game/expansions.js'); ex.setPremiumEnforced(false); });
 ok('no page errors', errors.length === 0, JSON.stringify(errors.slice(0, 5)));
 fs.writeFileSync(`${outDir}/results.json`, JSON.stringify(results, null, 1));
 await browser.close();
