@@ -446,7 +446,7 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
   lampDefs.forEach(([id, col], i) => {
     lamps[id] ||= lampMat(col);
     const x = FB ? lerp(0.4, 0.06, i / (lampDefs.length - 1)) : 0.4;
-    const p = faceAt(x, lerp(CON.top, CON.bot, 0.58));
+    const p = faceAt(x, lerp(CON.top, CON.bot, 0.5));
     const m = new THREE.Mesh(new THREE.CylinderGeometry(0.0048, 0.0048, 0.005, 12).rotateX(Math.PI / 2), lamps[id]);
     m.position.copy(p); m.rotation.set(CON.slope, Math.PI, 0);
     cockpit.add(m);
