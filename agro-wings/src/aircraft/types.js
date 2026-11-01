@@ -420,9 +420,9 @@ const AT802_BASE = {
   wash: [0, -1.4, -3.0],
   // pedalZ: the pedals' rest z in the body frame (the cockpit is 1.42 m aft of the PR-AGW's).
   anim: { elev: 0.36, rud: 0.4, ail: 0.34, flap: 0.52, pedalZ: -1.0, disc: [450, 950], wash: [1150, 1700], vib: [900, 1700] },
-  // Own pilot view: eye 0.33 m under the roof, looking 14° down so the
+  // Own pilot view: eye 0.38 m under the roof, looking 17° down so the
   // panel top, the screens and the nose share the frame.
-  camera: { dist: 18, height: 5.0, orbit: 27, cockpitPitch: -0.24, cockpitFov: 70 },
+  camera: { dist: 18, height: 5.0, orbit: 27, cockpitPitch: -0.3, cockpitFov: 70 },
   audio: { profile: 'turboprop', blades: 5 },
   fuel: { name: 'Jet-A', price: GAME.fuelPrice * 1.35 },
   smoke: [-0.6, 0.12, 2.7],

@@ -52,8 +52,9 @@ await prep();
 await page.evaluate(() => window.__agro.render());
 await shot('pilot');
 // Clicks from the pilot's view, as the mouse does (game.cockpitClick).
-const chk = await page.evaluate(() => {
+const clicks = (lookPitch) => page.evaluate((lookPitch) => {
   const g = window.__agro, ac = g.aircraft, inst = ac.model.inst;
+  if (lookPitch != null) { g.cameraMode = 'cockpit'; g.rig.setMode('cockpit', ac); g.rig.look.pitch = lookPitch; for (let i = 0; i < 30; i++) g.rig.update(1 / 30, ac, { dx: 0, dy: 0, buttons: 0, wheel: 0 }, g.world.terrain); g.camera.updateMatrixWorld(); }
   const V3 = g.camera.position.constructor;
   const r = g.canvas.getBoundingClientRect();
   const before = { page: ac.panel.page, gear: ac.fm.gearCmd, probes: ac.water?.probesCmd, drop: ac.water?.dropping, spray: g.sprayer.on };
@@ -69,8 +70,11 @@ const chk = await page.evaluate(() => {
   ac.panel.draw(ac.instruments());
   const d = ac.panel.last;
   return { n: inst.pickables.length, picked, before, after, data: { ias: Math.round(d.ias), alt: Math.round(d.altFt), ng: +d.ng.toFixed(1), tq: Math.round(d.torque), hopper: Math.round(d.hopper) }, lit: Object.entries(ac.panel.lit).filter(([, v]) => v).map(([k]) => k) };
-});
+}, lookPitch);
+const chk = await clicks(null);
 console.log('clicks', JSON.stringify(chk));
+console.log('clicksDown', JSON.stringify(await clicks(-0.85)));
+
 await page.evaluate(() => { const g = window.__agro, ac = g.aircraft; g.cameraMode = 'cockpit'; g.rig.setMode('cockpit', ac); for (let i = 0; i < 10; i++) g.tick(1 / 60); ac.panel.draw(ac.instruments()); ac.model.update(1 / 60, ac.fm, ac); g.render(); });
 await shot('pilot2');
 // Custom views: camera placed in the body frame of the aircraft.

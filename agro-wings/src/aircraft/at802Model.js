@@ -66,7 +66,7 @@ export const AT802_LIVERIES = {
 // eye point ≈ 0.28 m under the roof, 1 m aft of the windshield base.
 const OFF = new THREE.Vector3(0, 0.58, -1.42);
 const o3 = (x, y, z) => [x + OFF.x, y + OFF.y, z + OFF.z];
-export const AT802_EYE = [0, 1.53, -1.92]; // ≈ 0.33 m under the roof, 0.75 m from the panel
+export const AT802_EYE = [0, 1.48, -1.8]; // seated, leaning a little forward: 0.38 m under the roof, 0.66 m from the panel
 
 // Ground shadow planforms for createContactShadow().
 export const AT802_SHADOW = { W: 19.6, L: 12.4, wing: [9.0, -1.47, 0.6], fus: [0.62, -1.0, 6.4], tail: [3.0, -7.0, -5.6], core: [6.4, 3.8] };
@@ -706,8 +706,11 @@ export function createAT802Model(panel, opts = {}) {
   const frame = (pts, r = 0.028, rIn = r * 0.85) => {
     add('paint', tube(pts, r, Math.max(6, pts.length * 3), 10));
     const mid = new THREE.Vector3(...pts[Math.floor(pts.length / 2)]);
-    const inw = cabC.clone().sub(mid).normalize().multiplyScalar(r * 0.55);
-    add('frameIn', tube(pts.map((p) => [p[0] + inw.x, p[1] + inw.y, p[2] + inw.z]), rIn, Math.max(6, pts.length * 3), 8));
+    const inw = cabC.clone().sub(mid).normalize().multiplyScalar(r * 0.5);
+    // Inside, the frame is painted black: the inner tube covers the outer
+    // one as seen from the seat.
+    void rIn;
+    add('frameIn', tube(pts.map((p) => [p[0] + inw.x, p[1] + inw.y, p[2] + inw.z]), r * 1.02, Math.max(6, pts.length * 3), 8));
   };
   const hs = (f) => Array.from({ length: 7 }, (_, j) => f(SILL + 0.01 + ((CAN.glassTop - SILL - 0.01) * j) / 6));
   const ringEdge = (y) => { const r = ringAt(y); return r.filter((_, i) => i % 2 === 0 || i === r.length - 1); };

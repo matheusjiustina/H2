@@ -311,7 +311,16 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
   screen(F_R, panel.screens.aux.tex, L.aux.u, L.aux.v, L.aux.w, L.aux.h, 0.85, 0.008);
   add('knob', atF(F_R, new THREE.SphereGeometry(0.02, 18, 12), L.vent.u, L.vent.v, -0.006));
   add('chrome', atF(F_R, new THREE.TorusGeometry(0.022, 0.0035, 8, 24), L.vent.u, L.vent.v, 0.001));
-  add('knob', atF(F_R, new THREE.CylinderGeometry(0.009, 0.009, 0.008, 16).rotateX(Math.PI / 2), 0.15, 0.195, 0.002), true);
+  if (!FB) add('knob', atF(F_R, new THREE.CylinderGeometry(0.009, 0.009, 0.008, 16).rotateX(Math.PI / 2), 0.15, 0.195, 0.002), true);
+  // Fire Boss: gear position block in the pilot's view (green down, blue
+  // up / water, the amber transit lamp between), next to the water LED.
+  if (FB) {
+    add('bezel', atF(F_R, new RoundedBoxGeometry(0.042, 0.05, 0.006, 1, 0.004), 0.15, 0.185, 0.001));
+    for (const [id, col, du, dv] of [['gearDn', 0x26ff4a, -0.01, 0.2], ['gearDn', 0x26ff4a, 0.01, 0.2], ['gearUp', 0x3aa2ff, -0.01, 0.17], ['gearUp', 0x3aa2ff, 0.01, 0.17], ['transit', 0xffb000, 0, 0.185]]) {
+      lamps[id] ||= lampMat(col);
+      cockpit.add(new THREE.Mesh(atF(F_R, new THREE.CylinderGeometry(0.0055, 0.0055, 0.006, 12).rotateX(Math.PI / 2), 0.15 + du, dv, 0.005), lamps[id]));
+    }
+  }
 
   // ---------------- GPS (the game's AGROWINGS NAV) in its housing ----------------
   const pickables = [];
