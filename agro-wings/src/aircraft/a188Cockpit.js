@@ -526,17 +526,8 @@ export function buildA188Cockpit(ctx) {
     addB('cream', new THREE.ShapeGeometry(new THREE.Shape(ring)).translate(0, 0, ROOF.zR + 0.035));
     addB('red', at(new THREE.CylinderGeometry(0.045, 0.045, 0.28, 16), -0.3, -0.25, ROOF.zR + 0.09)); // extinguisher
   }
-  // Compass: on its thin stand rising from the deck just behind the glass,
-  // left of centre (the AgTruck's installation; it used to hang from the
-  // roof on a thick padded centre post that filled the middle of the view).
-  {
-    const cx = 0.13, base = [cx, 0.592, -1.0], top = [cx, 0.74, -1.2];
-    addB('compass', rod(base, top, 0.005, 8));
-    addB('compass', at(new THREE.CylinderGeometry(0.02, 0.024, 0.008, 14), base[0], base[1] + 0.004, base[2]));
-    const cy = top[1] + 0.032, cz = top[2] - 0.02;
-    addB('compass', at(new RoundedBoxGeometry(0.07, 0.055, 0.055, 2, 0.012), cx, cy, cz));
-    addB('card', at(cellUV(new THREE.PlaneGeometry(0.038, 0.019), 3), cx, cy - 0.003, cz - 0.0285, 0, Math.PI, 0));
-  }
+  // (No compass on a stand in front of the windshield: it stood in the
+  // middle of the pilot's view.)
 
   // ---------------- guidance lightbar (on the cowl) ----------------
   const leds = [];
