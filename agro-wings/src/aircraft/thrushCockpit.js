@@ -312,7 +312,11 @@ export function buildThrushCockpit({ M, panel, posts, ringSurface, ringAt, roofY
   liquid.position.copy(pAt(S.u, S.v - S.h / 2, -0.05));
   liquid.quaternion.setFromRotationMatrix(new THREE.Matrix4().extractRotation(PMAT));
   cockpit.add(liquid);
-  addC('metal', inPanel(new THREE.TorusGeometry(1, 0.08, 4, 4).scale(S.w * 0.55, S.h * 0.55, 0.02).rotateZ(Math.PI / 4).translate(S.u, S.v, 0.0)));
+  // Window bezel: a straight frame on the cut-out's edges (it was a diamond
+  // drawn askew over the square window).
+  for (const [w, h, du, dv] of [[S.w + 0.012, 0.006, 0, S.h / 2 + 0.003], [S.w + 0.012, 0.006, 0, -S.h / 2 - 0.003], [0.006, S.h, S.w / 2 + 0.003, 0], [0.006, S.h, -S.w / 2 - 0.003, 0]]) {
+    addC('metal', inPanel(new THREE.BoxGeometry(w, h, 0.004).translate(S.u + du, S.v + dv, 0.002)));
+  }
   // Annunciator lamps, the MVP alerts toggle, the wet compass.
   const lamp = (u, v, mat) => cockpit.add(new THREE.Mesh(inPanel(new RoundedBoxGeometry(0.028, 0.014, 0.01, 2, 0.003).translate(u, v, 0.004)), mat));
   lamp(-0.33, 0.362, CM.lampCaution);
