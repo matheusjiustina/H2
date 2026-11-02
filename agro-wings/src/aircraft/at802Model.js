@@ -127,7 +127,12 @@ const AFT_KEYS = [
 // The old keel hung 0.25–0.35 m lower under the wing and the cabin and rose
 // steeply to a shallow tail cone: that was the "belly". Only the keel side
 // of the sections moves (yb, and ys aft); walls, crown and cabin are kept.
-const AG_KEEL = { 3.26: -0.35, 3.0: -0.44, 2.5: -0.46, 1.95: -0.46, 1.5: -0.5, 1.05: -0.61, 0.5: -0.75, 0.0: -0.74, '-0.45': -0.69, '-0.92': -0.59 };
+// Nose (N4025M, yellow cowl underside, body frame): a straight line rising
+// to the spinner — z 1.08 -0.52 · 1.65 -0.44 · 2.23 -0.36 · 2.8 -0.30 ·
+// 3.09 -0.24 (slope ≈ 0.14) — not the old flat, rounded chin 10–15 cm lower.
+const AG_KEEL = { 3.38: -0.25, 3.26: -0.262, 3.0: -0.29, 2.5: -0.345, 1.95: -0.415, 1.5: -0.475, 1.05: -0.535, 0.5: -0.73, 0.0: -0.74, '-0.45': -0.69, '-0.92': -0.59 };
+// Keel height of the agricultural nose at z (for the scoops on it).
+const agNoseKeel = (z) => -0.25 - 0.138 * (3.38 - z);
 const AG_FWD_KEYS = FWD_KEYS.map((k) => (AG_KEEL[k.z] !== undefined ? { ...k, yb: AG_KEEL[k.z] } : k));
 const AG_CAB_KEYS = [[-0.92, -0.59, 0.62], [-1.6, -0.48, 0.62], [CAN.zR, -0.37, 0.6]].map(([z, yb, hw]) => S(z, yb, -0.04, SILL, SILL, hw, CAN.ww, 0.72, 4.5, 2, 0));
 const AG_AFT_KEYS = [
@@ -248,6 +253,8 @@ function hullOf(fwdKeys, aftKeys) {
   return { fusX, aftTop: sampleSt(aftKeys, 14).map((st) => [st.z, st.yt]) };
 }
 const HULL = { fireboss: hullOf(FWD_KEYS, AFT_KEYS), ag: hullOf(AG_FWD_KEYS, AG_AFT_KEYS) };
+// Skin half-width lookup per configuration (cockpit fitting, tests).
+export const at802HullX = (variant) => HULL[variant === 'fireboss' ? 'fireboss' : 'ag'].fusX;
 const canW = (y) => {
   const u = clamp((y - SILL) / (CAN.yt - SILL), 0, 1);
   return Math.max(0, CAN.ww - CAN.lean * (y - SILL)) * Math.max(0, 1 - u ** CAN.pU) ** (1 / CAN.pU);
@@ -701,19 +708,37 @@ export function createAT802Model(panel, opts = {}) {
     add('paint', tx(new THREE.TorusGeometry(0.295, 0.014, 8, 44), 0, 0.07, z0 - 0.004));
     add('dark', tx(new THREE.CylinderGeometry(0.29, 0.29, 0.1, 44, 1, true), 0, 0.07, z0 - 0.05, Math.PI / 2));
     // Chin inlet: a scoop under the cowl front, dark mouth with a screen.
-    const zi = 3.12, yi = -0.42;
-    add('paint', rbox(0.46, 0.2, 0.42, 0.06, 0, yi - 0.02, zi - 0.05));
-    add('gloss', tx(new THREE.PlaneGeometry(0.36, 0.12), 0, yi - 0.02, zi + 0.165));
-    for (let k = -2; k <= 2; k++) add('steel', tx(new THREE.BoxGeometry(0.36, 0.005, 0.005), 0, yi - 0.02 + k * 0.022, zi + 0.17), true);
+    const zi = 3.12;
+    if (FB) {
+      const yi = -0.42;
+      add('paint', rbox(0.46, 0.2, 0.42, 0.06, 0, yi - 0.02, zi - 0.05));
+      add('gloss', tx(new THREE.PlaneGeometry(0.36, 0.12), 0, yi - 0.02, zi + 0.165));
+      for (let k = -2; k <= 2; k++) add('steel', tx(new THREE.BoxGeometry(0.36, 0.005, 0.005), 0, yi - 0.02 + k * 0.022, zi + 0.17), true);
+    } else {
+      // Agricultural: the inlet is a shallow lip under the nose bowl (the
+      // cowl line stays straight in side view, as on the photographs).
+      const yk = agNoseKeel(zi);
+      add('paint', rbox(0.4, 0.085, 0.36, 0.03, 0, yk - 0.005, zi - 0.04));
+      add('gloss', tx(new THREE.PlaneGeometry(0.32, 0.05), 0, yk - 0.012, zi + 0.141));
+      for (let k = -1; k <= 1; k++) add('steel', tx(new THREE.BoxGeometry(0.32, 0.004, 0.004), 0, yk - 0.012 + k * 0.016, zi + 0.145), true);
+    }
     for (const sx of [1, -1]) {
       add('lens', ball([sx * 0.25, -0.13, z0 - 0.08], 0.05, 14));
       add('white', tx(new THREE.CircleGeometry(0.036, 16), sx * 0.25, -0.13, z0 - 0.06));
     }
   }
   // Oil cooler scoop and drains under the cowl.
-  add('paint', rbox(0.32, 0.12, 0.55, 0.04, 0, -0.52, 1.75, -0.06));
-  add('dark', tx(new THREE.PlaneGeometry(0.26, 0.07), 0, -0.525, 2.03, -0.06));
-  for (const sx of [-0.09, 0.09]) add('steel', rod([sx, -0.48, 1.4], [sx, -0.56, 1.35], 0.008, 6), true);
+  if (FB) {
+    add('paint', rbox(0.32, 0.12, 0.55, 0.04, 0, -0.52, 1.75, -0.06));
+    add('dark', tx(new THREE.PlaneGeometry(0.26, 0.07), 0, -0.525, 2.03, -0.06));
+    for (const sx of [-0.09, 0.09]) add('steel', rod([sx, -0.48, 1.4], [sx, -0.56, 1.35], 0.008, 6), true);
+  } else {
+    // (Agricultural: flatter, on the straight cowl line.)
+    const yk = agNoseKeel(1.75);
+    add('paint', rbox(0.3, 0.07, 0.5, 0.025, 0, yk - 0.012, 1.75, -0.14));
+    add('dark', tx(new THREE.PlaneGeometry(0.24, 0.035), 0, agNoseKeel(2.0) - 0.03, 2.0, -0.14));
+    for (const sx of [-0.09, 0.09]) add('steel', rod([sx, agNoseKeel(1.4) + 0.01, 1.4], [sx, agNoseKeel(1.4) - 0.05, 1.36], 0.008, 6), true);
+  }
   // Spinner: polished, long, with backplate.
   const spinner = lathe([[0.0, 0.58], [0.03, 0.555], [0.08, 0.49], [0.13, 0.4], [0.18, 0.29], [0.225, 0.18], [0.258, 0.085], [0.28, 0]].reverse(), 44);
   spinner.rotateX(Math.PI / 2);

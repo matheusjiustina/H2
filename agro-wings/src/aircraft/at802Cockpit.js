@@ -31,13 +31,15 @@ import { NAV_PAGES } from './agroNav.js';
 
 const D2R = Math.PI / 180;
 const TILT = 12 * D2R; // facets lean back
-const WING = 35 * D2R; // panel wings turned toward the pilot
-// Real proportions (photographs from the seat): the panel spans the cabin
-// between the walls, ≈ 1.1 m, its hood and wing tops reaching the
-// windshield base, ≈ 0.7 m from the eye. Everything laid out in facet
-// coordinates (outlines, instruments, screens, keys, screws) is drawn 1.2×
-// through the facet frames (PS); the layout numbers stay in their units.
-const PS = 1.2;
+const WING = 47 * D2R; // panel wings turned toward the pilot (they fit the cabin walls)
+// Real proportions (photographs from the seat): the panel fills the cabin
+// from wall to wall, its hood and wing tops reaching the windshield base,
+// ≈ 0.7 m from the eye. Everything laid out in facet coordinates (outlines,
+// instruments, screens, keys, screws) is drawn 1.15× through the facet
+// frames (PS); the layout numbers stay in their units. The wings' outer
+// edges are cut to the cabin walls (wingEdge): the walls lean in toward the
+// sill, and a panel corner must never run into them.
+const PS = 1.15;
 const Y0 = 0.70; // panel bottom (top of the lower console)
 const ZC = -1.12; // centre facet bottom
 const HC = 0.4; // centre facet height (facet units: 0.48 m)
@@ -61,9 +63,9 @@ const F_R = frame(new THREE.Vector3(-XW * PS, Y0, ZC), new THREE.Vector3(-ca, 0,
 export const AT802_LAYOUT = {
   gps: { u: 0, v: 0.232, w: 0.29, h: 0.232, screen: { w: 0.24, h: 0.165, v: 0.244 }, keysV: 0.142 },
   ems: { u: -0.125, v: 0.2, sw: 0.168, sh: 0.118, bw: 0.198, bh: 0.178, keysV: 0.128 },
-  placard: { u0: -0.315, u1: -0.212, v0: 0.025, v1: 0.215 },
+  placard: { u0: -0.292, u1: -0.212, v0: 0.025, v1: 0.19 },
   lampsL: { u: -0.022, vs: [0.275, 0.245] },
-  boost: { u: -0.262, v: 0.255 },
+  boost: { u: -0.255, v: 0.235 },
   adi: { u: 0.074, v: 0.27, s: 0.086 },
   asi: { u: 0.205, v: 0.252, r: 0.048 },
   led: { u: 0.074, v: 0.18, w: 0.086, h: 0.024 },
@@ -72,6 +74,25 @@ export const AT802_LAYOUT = {
   vent: { u: 0.262, v: 0.045 },
 };
 const L = AT802_LAYOUT;
+
+// Outer edge of a panel wing, in facet units: the largest u (≤ WW) at height
+// v whose point, sheet thickness included, stays WALL_CLR inside the cabin
+// wall (the cockpit walls stand 0.022 m inside the skin). Both wings mirror.
+const WALL_CLR = 0.034;
+const topV = (u) => lerp(TOP_IN, TOP_OUT, u / WW);
+export function at802WingEdge(fusX) {
+  const inside = (u, v) => { const p = F_R.at(u, v); return Math.abs(p.x) <= fusX(p.z, p.y) - WALL_CLR; };
+  const edge = (v) => {
+    if (inside(WW, v)) return WW;
+    let a = 0, b = WW;
+    for (let i = 0; i < 20; i++) { const m = (a + b) / 2; if (inside(m, v)) a = m; else b = m; }
+    return a;
+  };
+  // Where the edge meets the sloping top: the corner of the outline.
+  let uC = WW;
+  for (let v = 0; v <= TOP_IN; v += 0.005) { const u = edge(v); if (v >= topV(u) - CORNER) { uC = u; break; } }
+  return { edge, uC, at: (sgn, u, v) => (sgn < 0 ? F_L : F_R).at(sgn * u, v), inside };
+}
 
 export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
   const FB = variant === 'fireboss';
@@ -112,6 +133,7 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
   const lampMat = (col) => new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3, emissive: col, emissiveIntensity: 0 });
   const parts = {};
   const add = (key, g, fine = false) => { (parts[(fine ? 'fine:' : '') + key] ||= []).push(g); };
+  const WE = at802WingEdge(fusX);
   const atF = (F, g, u, v, w = 0) => g.applyMatrix4(new THREE.Matrix4().makeTranslation(u, v, w)).applyMatrix4(F.m);
 
   // ---------------- panel facets ----------------
@@ -135,11 +157,20 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     return g.applyMatrix4(F.m);
   };
   // Wing outline (sgn = -1 left wing: u from 0 to -WW; +1 right wing).
+  // The outer edge follows the cabin wall (WE.edge) up to the sloping top.
   const wingShape = (sgn) => {
     const s = new THREE.Shape();
     const U = (u) => sgn * u;
-    s.moveTo(U(0), 0); s.lineTo(U(WW), 0); s.lineTo(U(WW), TOP_OUT - CORNER);
-    s.quadraticCurveTo(U(WW), TOP_OUT, U(WW - CORNER * 1.4), TOP_OUT + 0.004);
+    s.moveTo(U(0), 0);
+    let vLast = 0;
+    for (let v = 0; v <= TOP_IN; v += 0.02) {
+      const u = WE.edge(v);
+      if (v > topV(u) - CORNER) break;
+      s.lineTo(U(u), v); vLast = v;
+    }
+    const uc = WE.uC, vc = topV(uc);
+    s.lineTo(U(uc), Math.max(vLast, vc - CORNER));
+    s.quadraticCurveTo(U(uc), vc, U(uc - CORNER * 1.4), topV(uc - CORNER * 1.4) + 0.002);
     s.lineTo(U(0.02), TOP_IN - 0.002); s.quadraticCurveTo(U(0), TOP_IN, U(0), TOP_IN - 0.01);
     s.lineTo(U(0), 0);
     return s;
@@ -174,9 +205,9 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
   // Screws round the facet edges (instanced, small → detail).
   const screwPts = [];
   for (const [F, sgn] of [[F_L, -1], [F_R, 1]]) {
-    for (let i = 0; i <= 6; i++) screwPts.push([F, sgn * lerp(0.02, WW - 0.02, i / 6), 0.012]);
-    for (let i = 1; i < 6; i++) { const u = lerp(0.03, WW - 0.05, i / 6); screwPts.push([F, sgn * u, lerp(TOP_IN, TOP_OUT, u / WW) - 0.014]); }
-    for (const v of [0.08, 0.16, 0.24]) screwPts.push([F, sgn * (WW - 0.011), v]);
+    for (let i = 0; i <= 6; i++) screwPts.push([F, sgn * lerp(0.02, WE.edge(0) - 0.02, i / 6), 0.012]);
+    for (let i = 1; i < 6; i++) { const u = lerp(0.03, WE.uC - 0.05, i / 6); screwPts.push([F, sgn * u, topV(u) - 0.014]); }
+    for (const v of [0.08, 0.16, 0.24]) if (v < topV(WE.edge(v)) - CORNER) screwPts.push([F, sgn * (WE.edge(v) - 0.011), v]);
   }
   for (const u of [-0.17, -0.09, 0, 0.09, 0.17]) screwPts.push([F_C, u, 0.012]);
   for (const v of [0.06, 0.14, 0.3]) { screwPts.push([F_C, 0.177, v]); screwPts.push([F_C, -0.177, v]); }
@@ -196,9 +227,9 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     const top = [];
     for (let i = 0; i <= N; i++) {
       const t = i / N; // 0 = left outer … 1 = right outer
-      if (t < 0.4) { const u = -WW * (1 - t / 0.4); top.push(F_L.at(u, lerp(TOP_IN, TOP_OUT, -u / WW) + 0.002, -0.006)); }
+      if (t < 0.4) { const u = -WE.uC * (1 - t / 0.4); top.push(F_L.at(u, topV(-u) + 0.002, -0.006)); }
       else if (t <= 0.6) { const u = lerp(XW, -XW, (t - 0.4) / 0.2); top.push(F_C.at(u, HC + 0.002, -0.006)); }
-      else { const u = WW * ((t - 0.6) / 0.4); top.push(F_R.at(u, lerp(TOP_IN, TOP_OUT, u / WW) + 0.002, -0.006)); }
+      else { const u = WE.uC * ((t - 0.6) / 0.4); top.push(F_R.at(u, topV(u) + 0.002, -0.006)); }
     }
     const zWS = (x) => -0.92 - Math.max(0, Math.abs(x) - 0.22) * 1.0;
     const pos = [], idx = [];
