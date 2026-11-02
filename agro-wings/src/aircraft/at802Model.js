@@ -858,9 +858,7 @@ export function createAT802Model(panel, opts = {}) {
   // (No wire cutter or exposed hinge blocks: they floated in front of and
   // above the windshield in the pilot.s view.)
   const roofAt = (z) => (FB ? CAN.yt : agRoofTop(z));
-  add('steel', rod([0, roofAt(-1.95) + 0.02, -1.95], [0, 2.78, -6.0], 0.006, 5));
   add('dark', tx(new THREE.SphereGeometry(0.068, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, roofAt(-2.05) - 0.005, -2.05, 0, 0, 0, [1, 0.45, 1]), true);
-  add('steel', rod([0.15, roofAt(-2.0) - 0.03, -2.0], [0.15, roofAt(-2.0) + 0.42, -2.3], 0.005, 5), true);
   for (const zz of [-3.4, -4.4]) add('steel', rod([0, aftTop.find(([z]) => z <= zz)[1], zz], [0, aftTop.find(([z]) => z <= zz)[1] + 0.32, zz - 0.25], 0.005, 5), true);
 
   // ---------------- wing ----------------
