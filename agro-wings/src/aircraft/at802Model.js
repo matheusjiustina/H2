@@ -852,15 +852,11 @@ export function createAT802Model(panel, opts = {}) {
       add('interior', agRoofDrop(skin(inn, true)));
     }
     add('steel', rod([sx * (canW(SILL + 0.18) + 0.012), SILL + 0.18, DOOR_Z + 0.16], [sx * (canW(SILL + 0.18) + 0.012), SILL + 0.18, DOOR_Z + 0.3], 0.01, 6));
-    for (const hz of [-1.2, -1.55]) add('steel', tx(new THREE.CylinderGeometry(0.013, 0.013, 0.05, 8), sx * (canW(CAN.glassTop) - 0.01), CAN.glassTop + 0.02, hz, 0, 0, Math.PI / 2));
   }
   // Wire cutter ahead of the windshield, deflector cable roof → fin, GPS
   // dome and whip antennas.
-  // Wire cutter on the roof's front edge, above the windshield (it used to
-  // run from the hopper lid up the middle of the centre pane, a bar across
-  // the pilot's view that the photographs from the seat do not show).
-  add('dark', rod([0, CAN.yt - 0.02, -1.66], [0, 2.12, -1.38], 0.012, 8));
-  add('steel', tx(new THREE.BoxGeometry(0.012, 0.3, 0.06), 0, 2.02, -1.45, 0.78));
+  // (No wire cutter or exposed hinge blocks: they floated in front of and
+  // above the windshield in the pilot.s view.)
   const roofAt = (z) => (FB ? CAN.yt : agRoofTop(z));
   add('steel', rod([0, roofAt(-1.95) + 0.02, -1.95], [0, 2.78, -6.0], 0.006, 5));
   add('dark', tx(new THREE.SphereGeometry(0.068, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, roofAt(-2.05) - 0.005, -2.05, 0, 0, 0, [1, 0.45, 1]), true);
