@@ -32,23 +32,30 @@ import { NAV_PAGES } from './agroNav.js';
 const D2R = Math.PI / 180;
 const TILT = 12 * D2R; // facets lean back
 const WING = 35 * D2R; // panel wings turned toward the pilot
-const Y0 = 0.74; // panel bottom (top of the lower console)
-const ZC = -1.14; // centre facet bottom (≈ 0.75 m from the eye)
-const HC = 0.4; // centre facet height
-const XW = 0.19; // half-width of the centre facet (the wings' hinges)
-const WW = 0.32; // wing width
+// Real proportions (photographs from the seat): the panel spans the cabin
+// between the walls, ≈ 1.1 m, its hood and wing tops reaching the
+// windshield base, ≈ 0.7 m from the eye. Everything laid out in facet
+// coordinates (outlines, instruments, screens, keys, screws) is drawn 1.2×
+// through the facet frames (PS); the layout numbers stay in their units.
+const PS = 1.2;
+const Y0 = 0.70; // panel bottom (top of the lower console)
+const ZC = -1.12; // centre facet bottom
+const HC = 0.4; // centre facet height (facet units: 0.48 m)
+const XW = 0.19; // half-width of the centre facet (facet units)
+const WW = 0.32; // wing width (facet units)
 const TOP_IN = 0.37, TOP_OUT = 0.3, CORNER = 0.035;
 
-// A facet frame: origin + u/v unit axes (w = u × v toward the pilot).
+// A facet frame: origin + u/v axes (w = u × v toward the pilot), scaled PS.
 function frame(o, U, V) {
   const W = new THREE.Vector3().crossVectors(U, V);
-  const m = new THREE.Matrix4().makeBasis(U, V, W).setPosition(o);
-  return { o, U, V, W, m, at: (u, v, w = 0) => o.clone().addScaledVector(U, u).addScaledVector(V, v).addScaledVector(W, w) };
+  const Us = U.clone().multiplyScalar(PS), Vs = V.clone().multiplyScalar(PS), Ws = W.clone().multiplyScalar(PS);
+  const m = new THREE.Matrix4().makeBasis(Us, Vs, Ws).setPosition(o);
+  return { o, U, V, W, m, at: (u, v, w = 0) => o.clone().addScaledVector(Us, u).addScaledVector(Vs, v).addScaledVector(Ws, w) };
 }
 const ct = Math.cos(TILT), st = Math.sin(TILT), ca = Math.cos(WING), sa = Math.sin(WING);
 const F_C = frame(new THREE.Vector3(0, Y0, ZC), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, ct, st));
-const F_L = frame(new THREE.Vector3(XW, Y0, ZC), new THREE.Vector3(-ca, 0, sa), new THREE.Vector3(st * sa, ct, st * ca));
-const F_R = frame(new THREE.Vector3(-XW, Y0, ZC), new THREE.Vector3(-ca, 0, -sa), new THREE.Vector3(-st * sa, ct, st * ca));
+const F_L = frame(new THREE.Vector3(XW * PS, Y0, ZC), new THREE.Vector3(-ca, 0, sa), new THREE.Vector3(st * sa, ct, st * ca));
+const F_R = frame(new THREE.Vector3(-XW * PS, Y0, ZC), new THREE.Vector3(-ca, 0, -sa), new THREE.Vector3(-st * sa, ct, st * ca));
 
 // Panel layout in facet coordinates (metres).
 export const AT802_LAYOUT = {
@@ -196,8 +203,10 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     const zWS = (x) => -0.92 - Math.max(0, Math.abs(x) - 0.22) * 1.0;
     const pos = [], idx = [];
     for (const p of top) {
-      const ax = clamp(p.x, -canW(SILL) + 0.03, canW(SILL) - 0.03);
-      const front = new THREE.Vector3(ax, SILL + 0.012, zWS(ax) - 0.012);
+      const ax = clamp(p.x, -canW(SILL) + 0.012, canW(SILL) - 0.012);
+      // (Up to just over the windshield's base frame: from the seat the deck
+      // meets the glass, no painted frame showing between them.)
+      const front = new THREE.Vector3(ax, SILL + 0.055, zWS(ax) - 0.038);
       for (let k = 0; k <= 4; k++) { const t = k / 4; pos.push(lerp(p.x, front.x, t), lerp(p.y, front.y, t) + 0.012 * Math.sin(Math.PI * t), lerp(p.z, front.z, t)); }
     }
     for (let i = 0; i < N; i++) for (let k = 0; k < 4; k++) { const a = i * 5 + k, b = a + 1, c = a + 5, d = c + 1; idx.push(a, c, b, b, c, d); }
@@ -207,6 +216,23 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     g.computeVertexNormals();
     const m = new THREE.Mesh(g, C.hood);
     m.material.side = THREE.DoubleSide;
+    cockpit.add(m);
+  }
+  // Back plate behind the panel, wall to wall, from the lower console to
+  // the glareshield: no daylight between the facets or past the wings'
+  // edges (the panel is a closed box in the aircraft, not cut-outs).
+  {
+    const zB = -0.975, yB0 = 0.5, yB1 = SILL + 0.045, N = 10, pos = [], idx = [];
+    for (let j = 0; j <= N; j++) {
+      const y = lerp(yB0, yB1, j / N), hw = Math.min(fusX(zB, y), canW(SILL) + 0.1) - 0.02;
+      pos.push(hw, y, zB, -hw, y, zB);
+    }
+    for (let j = 0; j < N; j++) { const a = j * 2; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, C.hood);
     cockpit.add(m);
   }
   // Hood over the guidance unit: a visor box proud of the centre facet.
@@ -352,10 +378,10 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
   // ---------------- lower console ----------------
   // Top shelf from the panel foot to the switch face; the face (13° back)
   // carries the legends; a back-plate closes it to the hopper wall.
-  const CON = { x: 0.43, top: Y0, bot: 0.555, zFace: -1.31, slope: 13 * D2R };
+  const CON = { x: 0.5, top: Y0, bot: 0.5, zFace: -1.34, slope: 13 * D2R };
   const faceAt = (x, y) => new THREE.Vector3(x, y, CON.zFace - (CON.top - y) * Math.tan(CON.slope));
   {
-    const zBack = (x) => (Math.abs(x) <= XW ? ZC : ZC - (Math.abs(x) - XW) * Math.tan(WING));
+    const zBack = (x) => (Math.abs(x) <= XW * PS ? ZC : ZC - (Math.abs(x) - XW * PS) * Math.tan(WING));
     const pos = [], idx = [];
     const N = 24;
     for (let i = 0; i <= N; i++) {
@@ -542,10 +568,14 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
   cockpit.add(stick);
 
   // ---------------- PT6 power quadrant (left wall) and spray / drop handle ----------------
-  const THR = [0.33, 0.47, 0.08];
-  add('console', new RoundedBoxGeometry(0.11, 0.05, 0.4, 2, 0.015).translate(...o3(0.37, 0.43, -0.02)));
-  add('console', new RoundedBoxGeometry(0.09, 0.18, 0.44, 2, 0.015).translate(...o3(0.41, 0.33, -0.04)));
-  for (const lx of [0.33, 0.37, 0.405]) add('bezel', new THREE.BoxGeometry(0.008, 0.004, 0.25).translate(...o3(lx, 0.457, -0.01)));
+  // (Aft and low on the left console, clear of the panel's left wing as in
+  // the photographs: the knobs stand below the sill beside the seat.)
+  const QY = -0.05, QZ = -0.16;
+  const q3 = (x, y, z) => o3(x, y + QY, z + QZ);
+  const THR = [0.33, 0.47 + QY, 0.08 + QZ];
+  add('console', new RoundedBoxGeometry(0.11, 0.05, 0.4, 2, 0.015).translate(...q3(0.37, 0.43, -0.02)));
+  add('console', new RoundedBoxGeometry(0.09, 0.18, 0.44, 2, 0.015).translate(...q3(0.41, 0.33, -0.04)));
+  for (const lx of [0.33, 0.37, 0.405]) add('bezel', new THREE.BoxGeometry(0.008, 0.004, 0.25).translate(...q3(lx, 0.457, -0.01)));
   const throttle = new THREE.Group();
   throttle.position.set(...o3(...THR));
   {
@@ -558,7 +588,7 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
   cockpit.add(throttle);
   for (const [lx, col, rot] of [[0.37, std(0x2a5fbf), 0.38], [0.405, C.red, 0.42]]) {
     const lv = new THREE.Group();
-    lv.position.set(...o3(lx, 0.45, 0.02));
+    lv.position.set(...q3(lx, 0.45, 0.02));
     lv.rotation.x = rot;
     const s2 = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.15, 8), C.chrome);
     s2.position.y = 0.075;
@@ -603,12 +633,28 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
       g.computeVertexNormals();
       cockpit.add(new THREE.Mesh(g, C.wall));
       const Wp = (z, y) => new THREE.Vector3(sx * (wallX(z, y) - 0.018), y, z);
-      for (const [a, b] of [[[-1.05, 0.88], [-2.3, 0.88]], [[-1.05, 0.45], [-1.6, 1.1]], [[-1.6, 0.45], [-1.6, 1.1]], [[-1.6, 0.45], [-2.15, 1.1]], [[-2.15, 0.45], [-2.15, 1.1]]]) {
+      // (The tube frame starts aft of the panel wings, which reach the wall.)
+      for (const [a, b] of [[[-1.42, 0.88], [-2.3, 0.88]], [[-1.42, 0.45], [-1.75, 1.1]], [[-1.75, 0.45], [-1.75, 1.1]], [[-1.75, 0.45], [-2.15, 1.1]], [[-2.15, 0.45], [-2.15, 1.1]]]) {
         const pts = Array.from({ length: 6 }, (_, i) => Wp(lerp(a[0], b[0], i / 5), lerp(a[1], b[1], i / 5)));
         add('tube', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 10, 0.016, 8));
       }
       // Door handle and latch on the left (door) side.
       if (sx > 0) { add('chrome', new THREE.BoxGeometry(0.02, 0.025, 0.14).translate(wallX(-1.5, 1.0) - 0.03, 1.0, -1.5)); add('red', new THREE.BoxGeometry(0.018, 0.04, 0.03).translate(wallX(-1.75, 1.05) - 0.025, 1.05, -1.75)); }
+    }
+    // Window sill trim along each side (dark, over the painted sill rail the
+    // pilot otherwise sees as a yellow strip under the side windows).
+    for (const sx of [1, -1]) {
+      const pos = [], idx = [], N = 12;
+      for (let i = 0; i <= N; i++) {
+        const z = lerp(-0.98, Z1, i / N);
+        pos.push(sx * (wallX(z, SILL - 0.01) - 0.005), SILL - 0.012, z, sx * (canW(SILL) - 0.035), SILL + 0.036, z);
+      }
+      for (let i = 0; i < N; i++) { const a = i * 2; if (sx > 0) idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); else idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      add('wall', g);
     }
     // Rear bulkhead to the headliner.
     const r = new THREE.Shape();

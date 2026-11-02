@@ -766,11 +766,11 @@ export function createAT802Model(panel, opts = {}) {
   const frame = (pts, r = 0.028, rIn = r * 0.85) => {
     add('paint', roofFit(tube(pts, r, Math.max(6, pts.length * 3), 10)));
     const mid = new THREE.Vector3(...pts[Math.floor(pts.length / 2)]);
-    const inw = cabC.clone().sub(mid).normalize().multiplyScalar(r * 0.5);
+    const inw = cabC.clone().sub(mid).normalize().multiplyScalar(r * 0.2);
     // Inside, the frame is painted black: the inner tube covers the outer
     // one as seen from the seat.
     void rIn;
-    add('frameIn', roofFit(tube(pts.map((p) => [p[0] + inw.x, p[1] + inw.y, p[2] + inw.z]), r * 1.02, Math.max(6, pts.length * 3), 8)));
+    add('frameIn', roofFit(tube(pts.map((p) => [p[0] + inw.x, p[1] + inw.y, p[2] + inw.z]), r * 1.06, Math.max(6, pts.length * 3), 8)));
   };
   const hs = (f) => Array.from({ length: 7 }, (_, j) => f(SILL + 0.01 + ((CAN.glassTop - SILL - 0.01) * j) / 6));
   const ringEdge = (y) => {
@@ -781,23 +781,28 @@ export function createAT802Model(panel, opts = {}) {
     const w = canW(y), keep = r.filter((p) => p[2] > AG_GLASS_REAR + 0.02);
     return [[w, y, AG_GLASS_REAR], ...keep, [-w, y, AG_GLASS_REAR]];
   };
-  frame(ringEdge(SILL + 0.012), 0.027, 0.018);
-  frame(ringEdge(CAN.glassTop), 0.031, 0.024);
-  { const r = ringAt(SILL + 0.022); add('paint', tube(r.slice(RN.side, r.length - RN.side), 0.036, 32, 10)); }
+  // Frame sections from the photographs taken from the seat: thin channels
+  // (≈ 3–4 cm), not tubes 6 cm across that crowd the pilot's view.
+  frame(ringEdge(SILL + 0.012), 0.018);
+  frame(ringEdge(CAN.glassTop), 0.02);
+  // Windshield base frame (yellow outside, dark inside like the posts: from
+  // the seat it runs along the bottom of the side panes).
+  { const r = ringAt(SILL + 0.018); frame(r.slice(RN.side, r.length - RN.side), 0.022); }
   for (const sx of [1, -1]) {
-    frame(hs((y) => [sx * Math.min(wsC(y), canW(y) * 0.6), y, canF(y) + 0.004]), 0.025, 0.02);
+    frame(hs((y) => [sx * Math.min(wsC(y), canW(y) * 0.6), y, canF(y) + 0.004]), 0.014);
     const aPost = (y) => { const p = aPostAt(y); return [sx * p[0], p[1], p[2]]; };
-    frame(hs(aPost), 0.031, 0.024);
+    frame(hs(aPost), 0.02);
     if (FB) {
-      frame(hs((y) => [sx * canW(y), y, DOOR_Z]), 0.027, 0.02);
-      frame(hs((y) => [sx * canW(y), y, CAN.zR + 0.03]), 0.031, 0.024);
-      for (const p of [aPost(SILL + 0.012), aPost(CAN.glassTop), [sx * canW(SILL), SILL + 0.012, DOOR_Z], [sx * canW(CAN.glassTop), CAN.glassTop, DOOR_Z]]) add('paint', ball(p, 0.033));
+      // (Same cabin as the AT-802A: no post in the middle of the side
+      // window — it crossed the pilot's side view and is not on the type.)
+      frame(hs((y) => [sx * canW(y), y, CAN.zR + 0.03]), 0.02);
+      for (const p of [aPost(SILL + 0.012), aPost(CAN.glassTop)]) add('paint', ball(p, 0.022));
     } else {
       // Agricultural: no post in the middle of the side window (that bar is
       // not on the aircraft); the window's rear edge sits forward of the
       // cabin end and the skin behind it is painted (the fairing side).
-      frame(hs((y) => [sx * canW(y), y, AG_GLASS_REAR]), 0.031, 0.024);
-      for (const p of [aPost(SILL + 0.012), aPost(CAN.glassTop)]) add('paint', ball(p, 0.033));
+      frame(hs((y) => [sx * canW(y), y, AG_GLASS_REAR]), 0.02);
+      for (const p of [aPost(SILL + 0.012), aPost(CAN.glassTop)]) add('paint', ball(p, 0.022));
       const nu = 4, nv = 8, out = [], inn = [];
       for (const [arr, dx] of [[out, 0.003], [inn, -0.004]]) {
         for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
@@ -826,8 +831,11 @@ export function createAT802Model(panel, opts = {}) {
   }
   // Wire cutter ahead of the windshield, deflector cable roof → fin, GPS
   // dome and whip antennas.
-  add('dark', rod([0, 1.22, -0.55], [0, 2.1, -1.42], 0.013, 8));
-  add('steel', tx(new THREE.BoxGeometry(0.014, 0.5, 0.07), 0, 2.02, -1.36, 0.78));
+  // Wire cutter on the roof's front edge, above the windshield (it used to
+  // run from the hopper lid up the middle of the centre pane, a bar across
+  // the pilot's view that the photographs from the seat do not show).
+  add('dark', rod([0, CAN.yt - 0.02, -1.66], [0, 2.12, -1.38], 0.012, 8));
+  add('steel', tx(new THREE.BoxGeometry(0.012, 0.3, 0.06), 0, 2.02, -1.45, 0.78));
   const roofAt = (z) => (FB ? CAN.yt : agRoofTop(z));
   add('steel', rod([0, roofAt(-1.95) + 0.02, -1.95], [0, 2.78, -6.0], 0.006, 5));
   add('dark', tx(new THREE.SphereGeometry(0.068, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, roofAt(-2.05) - 0.005, -2.05, 0, 0, 0, [1, 0.45, 1]), true);
