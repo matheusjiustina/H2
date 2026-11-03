@@ -8,9 +8,10 @@ import PT_JOBS from './pt-jobs.js';
 import PT_CREW from './pt-crew.js';
 import PT_FARMS from './pt-farms.js';
 import PT_STRIPS from './pt-strips.js';
+import PT_SHOWROOM from './pt-showroom.js';
 
 const STORE = 'agrowings.lang';
-const PT = { ...PT_UI, ...PT_GAME, ...PT_JOBS, ...PT_CREW, ...PT_FARMS, ...PT_STRIPS };
+const PT = { ...PT_UI, ...PT_GAME, ...PT_JOBS, ...PT_CREW, ...PT_FARMS, ...PT_STRIPS, ...PT_SHOWROOM };
 
 function initial() {
   try {

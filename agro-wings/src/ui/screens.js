@@ -13,7 +13,16 @@ import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap, mapControls, mapPoint } from './maps.js';
 import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
-import { aircraftUnlocked } from '../game/expansions.js';
+import { aircraftUnlocked, isUnlocked, premiumEnforced, EXPANSIONS } from '../game/expansions.js';
+
+// Paint schemes offered on the menu (the settings keys the models read).
+const PAINTS = {
+  b206: { key: 'b206Livery', tags: ['A', 'B', 'C'], names: ['Agricultural Classic', 'Dark Green Agricultural', 'Red Utility'] },
+  m18: { key: 'm18Livery', tags: ['A', 'B'], names: ['Agro Wings yellow', 'Hellenic fire-fighter'] },
+  r44: { key: 'r44Livery', tags: ['A', 'B'], names: ['Original', 'Black Agricultural'] },
+  e203: { key: 'e203Livery', tags: ['01', '02'], names: ['Green, blue and gold', 'White, green and blue'] },
+  a188: { key: 'a188Livery', tags: ['A', 'B'], names: ['Red', 'Orange'] },
+};
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -24,37 +33,52 @@ export class Screens {
     this.game = game;
     this.root = root;
     this.open = null;
-    this.loading = h(`<div class="loading"><div class="brand">AGRO <b>WINGS</b></div><div class="loading-bar"><span style="width:0%"></span></div><div class="loading-label">${t('Loading')}</div></div>`);
+    this.loading = h(`<div class="loading"><div class="brand">AGRO <b>WINGS</b></div><div class="sr-tag">${t('Agricultural aviation · Simulation · Operation')}</div><div class="loading-bar"><span style="width:0%"></span></div><div class="loading-label">${t('Loading')}</div></div>`);
     root.appendChild(this.loading);
-    this.title = h(`<div class="overlay title interactive">
-      <div class="title-inner">
-        <div class="brand">AGRO <b>WINGS</b></div>
-        <div class="title-sub">${t('Agricultural aviation · Fazenda Boa Esperança, Mato Grosso')}</div>
+    // Main menu 2.0 — the showroom (src/ui/showroom.js): the selected
+    // aircraft stands at the pad in the 3D scene; the menu frames it. The
+    // cards keep their data-ac / aria-checked / .ac-role / .ac-premium hooks.
+    const ICON = {
+      fly: '<path d="M8 5v14l11-7z"/>',
+      air: '<path d="M2 16l20-6-20-6 3 6zM5 10h9"/>',
+      jobs: '<rect x="4" y="4" width="16" height="17" rx="2"/><path d="M8 2v4M16 2v4M4 10h16M8 14h4"/>',
+      fleet: '<path d="M2 14l9-1 2-8h2l-1 8 7 1v2l-7 1 1 3h-2l-2-3-9-1z"/>',
+      exp: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+      set: '<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+      keys: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h1M10 10h1M14 10h1M18 10h0M7 14h10"/>',
+      reset: '<path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/>',
+    };
+    const ic = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
+    const mbtn = (a, k, title, sub, cls = '') => `<button class="sr-btn ${cls}" data-a="${a}">${ic(k)}<span><b>${title}</b><small>${sub}</small></span></button>`;
+    this.title = h(`<div class="overlay title sr">
+      <div class="sr-fade"></div><div class="sr-shade"></div>
+      <div class="sr-brand"><div class="brand">AGRO <b>WINGS</b></div><div class="sr-tag">${t('Agricultural aviation · Simulation · Operation')}</div></div>
+      <div class="sr-bar interactive"><button class="sr-icon" data-a="resetView" title="${t('Reset view')}" aria-label="${t('Reset view')}">${ic('reset')}</button><button class="sr-icon" data-a="settings" title="${t('Settings')}" aria-label="${t('Settings')}">${ic('set')}</button></div>
+      <nav class="sr-menu interactive" aria-label="Menu">
+        ${mbtn('free', 'fly', t('Fly'), t('Take off from the pad with this aircraft'), 'primary sr-fly')}
+        ${mbtn('freeAir', 'air', t('Free flight (airborne)'), t('Start in the air over the farm'))}
+        ${mbtn('career', 'jobs', t('Contracts'), t('Service orders from the hangar computer'))}
+        ${mbtn('fleet', 'fleet', t('Fleet'), t('Every aircraft and its data'))}
+        ${mbtn('expansions', 'exp', t('Expansions'), t('Premium content'))}
+        ${mbtn('settings', 'set', t('Settings'), t('Graphics, audio, language and controls'))}
+        ${mbtn('help', 'keys', t('Controls'), t('Keys, gamepad and touch'))}
+      </nav>
+      <div class="sr-info interactive" aria-live="polite"></div>
+      <div class="sr-strip interactive">
+        <button class="sr-nav" data-scroll="-1" aria-label="${t('Previous')}">‹</button>
         <div class="ac-select" role="radiogroup" aria-label="${t('Aircraft')}">${AIRCRAFT_ORDER.map((id) => {
           const ty = AIRCRAFT_TYPES[id];
           const locked = !aircraftUnlocked(ty);
-          return `<button class="ac-card${ty.premium ? ' premium' : ''}${locked ? ' locked' : ''}" role="radio" aria-checked="false" data-ac="${id}"${locked ? ` aria-disabled="true" title="${t('Premium expansion — not unlocked on this account.')}"` : ''}>${ty.premium ? `
+          return `<button class="ac-card${ty.premium ? ' premium' : ''}${locked ? ' locked' : ''}" role="radio" aria-checked="false" data-ac="${id}"${locked ? ` title="${t('Premium expansion — not unlocked on this account.')}"` : ''}>
+            <span class="ac-thumb"><img alt="" draggable="false"><span class="ac-ph">${ty.name}</span></span>${ty.premium ? `
             <span class="ac-premium">${locked ? `<svg viewBox="0 0 12 14" aria-hidden="true"><path d="M3 6V4a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="1.5" y="6" width="9" height="7" rx="1.2" fill="currentColor"/></svg>${t('Premium expansion · locked')}` : t('Premium expansion')}</span>` : ''}
-            <span class="ac-slot">${t('Aircraft {0}', ty.slot)}</span>
-            <span class="ac-label">${ty.label}</span>
-            <span class="ac-reg">${ty.reg} · ${ty.name}</span>${ty.role ? `<span class="ac-role">${ty.role}</span>` : ''}
-            <span class="ac-spec">${ty.engineName}<br>${ty.summary}</span>${id === 'b206' ? `
-            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B', 'C'].map((l, i) => `<span class="ac-opt" data-livery="${i}" title="${[t('Agricultural Classic'), t('Dark Green Agricultural'), t('Red Utility')][i]}">${l}</span>`).join('')}<span class="ac-opt kit" data-kit="1">${t('Spray kit')}</span></span>` : ''}${id === 'm18' ? `
-            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B'].map((l, i) => `<span class="ac-opt" data-lk="m18Livery" data-livery="${i}" title="${[t('Agro Wings yellow'), t('Hellenic fire-fighter')][i]}">${l}</span>`).join('')}</span>` : ''}${id === 'r44' ? `
-            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B'].map((l, i) => `<span class="ac-opt" data-lk="r44Livery" data-livery="${i}" title="${[t('Original'), t('Black Agricultural')][i]}">${l}</span>`).join('')}</span>` : ''}${id === 'e203' ? `
-            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['01', '02'].map((l, i) => `<span class="ac-opt" data-lk="e203Livery" data-livery="${i}" title="${[t('Green, blue and gold'), t('White, green and blue')][i]}">${l}</span>`).join('')}</span>` : ''}${id === 'a188' ? `
-            <span class="ac-opts"><span class="ac-opt-l">${t('Paint')}</span>${['A', 'B'].map((l, i) => `<span class="ac-opt" data-lk="a188Livery" data-livery="${i}" title="${[t('Red'), t('Orange')][i]}">${l}</span>`).join('')}</span>` : ''}
+            <span class="ac-name"><span class="ac-label">${ty.name}</span><span class="ac-role">${ty.kind === 'heli' ? t('Helicopter') : t('Airplane')}</span></span>
           </button>`;
         }).join('')}</div>
-        <div class="btn-row">
-          <button class="btn primary" data-a="career">${t('Contracts')}</button>
-          <button class="btn" data-a="free">${t('Free flight')}</button>
-          <button class="btn" data-a="freeAir">${t('Free flight (airborne)')}</button>
-          <button class="btn" data-a="settings">${t('Settings')}</button>
-          <button class="btn" data-a="help">${t('Controls')}</button>
-        </div>
-        <div class="title-keys"></div>
-      </div></div>`);
+        <button class="sr-nav" data-scroll="1" aria-label="${t('Next')}">›</button>
+      </div>
+      <div class="title-keys"></div>
+      </div>`);
     // Language: two small flags, top right (Portuguese is the default).
     const BR = '<svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#009c3b"/><path d="M10 1.6 18.2 7 10 12.4 1.8 7z" fill="#ffdf00"/><circle cx="10" cy="7" r="3.1" fill="#002776"/><path d="M7.1 6.3q3-1 5.8.9" stroke="#fff" stroke-width=".5" fill="none"/></svg>';
     const US = '<svg viewBox="0 0 19 10" aria-hidden="true"><rect width="19" height="10" fill="#fff"/>' +
@@ -76,16 +100,22 @@ export class Screens {
       // Everything is rebuilt in the new language (the game has not started yet).
       try { location.reload(); } catch { /* sandboxed: applies on the next load */ }
     });
-    this.title.appendChild(pick);
+    pick.classList.add('interactive');
+    this.title.querySelector('.sr-bar').prepend(pick);
     root.appendChild(this.title);
     this.title.addEventListener('click', (e) => {
       const lvEl = e.target.closest('[data-livery]');
-      if (lvEl) game.setAircraftOption(lvEl.dataset.lk ?? 'b206Livery', +lvEl.dataset.livery);
-      if (e.target.closest('[data-kit]')) game.setAircraftOption('b206Kit', game.settings.b206Kit === false);
+      if (lvEl) { const k = lvEl.dataset.lk ?? 'b206Livery'; game.setAircraftOption(k, +lvEl.dataset.livery); this._markAircraft(); return; }
+      if (e.target.closest('[data-kit]')) { game.setAircraftOption('b206Kit', game.settings.b206Kit === false); this._markAircraft(); return; }
+      const sc = e.target.closest('[data-scroll]')?.dataset.scroll;
+      if (sc) { const row = this.title.querySelector('.ac-select'); row.scrollBy({ left: +sc * row.clientWidth * 0.8, behavior: 'smooth' }); return; }
       const ac = e.target.closest('[data-ac]')?.dataset.ac;
-      if (ac) { game.selectAircraft(ac); this._markAircraft(); return; }
+      if (ac) { this.pickAircraft(ac); return; }
       const a = e.target.closest('[data-a]')?.dataset.a;
-      if (a) game.menuAction(a);
+      if (a === 'resetView') game.showroom?.frame();
+      else if (a === 'fleet') this.fleet();
+      else if (a === 'expansions' || a === 'unlock') this.expansions(a === 'unlock' ? game.showroom?.preview : null);
+      else if (a) game.menuAction(a);
     });
     this.modal = h(`<div class="overlay modal interactive"></div>`);
     root.appendChild(this.modal);
@@ -98,16 +128,94 @@ export class Screens {
   }
   hideLoading() { this.loading.remove(); }
 
+  // A card: an unlocked aircraft becomes the flown one (towed to the pad);
+  // a locked premium one is only shown where it is parked (never activated).
+  pickAircraft(id) {
+    const g = this.game, ty = AIRCRAFT_TYPES[id];
+    if (!ty) return;
+    if (aircraftUnlocked(ty)) {
+      const changed = id !== g.aircraftId || g.showroom?.preview;
+      if (g.showroom) g.showroom.preview = null;
+      g.selectAircraft(id);
+      if (changed) { g.showroom?.flash(); g.showroom?.frame(); }
+    } else {
+      g.showroom?.setPreview(id);
+      g.audio?.play('ui');
+    }
+    this._markAircraft();
+  }
+
   _markAircraft() {
+    const g = this.game, shown = g.showroom?.id ?? g.aircraftId;
     for (const el of this.title.querySelectorAll('[data-ac]')) {
-      const on = el.dataset.ac === this.game.aircraftId;
+      const on = el.dataset.ac === shown;
       el.classList.toggle('sel', on);
       el.setAttribute('aria-checked', String(on));
-      if (on && this.game.touch?.active) { const row = el.parentElement; row.scrollLeft = el.offsetLeft - (row.clientWidth - el.offsetWidth) / 2; }
+      if (on) { const row = el.parentElement; const l = el.offsetLeft - (row.clientWidth - el.offsetWidth) / 2; if (Math.abs(row.scrollLeft - l) > el.offsetWidth) row.scrollTo?.({ left: l, behavior: 'smooth' }); }
     }
-    const S = this.game.settings;
-    for (const el of this.title.querySelectorAll('[data-livery]')) el.classList.toggle('on', +el.dataset.livery === (S[el.dataset.lk ?? 'b206Livery'] ?? 0));
-    for (const el of this.title.querySelectorAll('[data-kit]')) el.classList.toggle('on', S.b206Kit !== false);
+    // Info panel of the aircraft on show (data of the type registry only).
+    const ty = AIRCRAFT_TYPES[shown], S = g.settings, locked = !aircraftUnlocked(ty);
+    const P = PAINTS[shown];
+    const paints = P ? `<div class="sr-paint"><span>${t('Paint')}</span>${P.names.map((n, i) => `<button class="ac-opt${(S[P.key] ?? 0) === i ? ' on' : ''}" data-lk="${P.key}" data-livery="${i}" title="${t(n)}">${P.tags[i]}</button>`).join('')}${shown === 'b206' ? `<button class="ac-opt kit${S.b206Kit !== false ? ' on' : ''}" data-kit="1">${t('Spray kit')}</button>` : ''}</div>` : '';
+    const paintName = P ? t(P.names[S[P.key] ?? 0]) : '';
+    this.title.querySelector('.sr-info').innerHTML = `
+      <div class="sr-k">${ty.kind === 'heli' ? t('Helicopter') : t('Airplane')}${ty.premium ? ` · <em>${t('Premium expansion')}</em>` : ''}</div>
+      <div class="sr-name">${ty.name}</div>
+      <div class="sr-reg">${ty.reg}${ty.role ? ` · ${ty.role}` : ''}</div>
+      <dl><dt>${t('Engine')}</dt><dd>${ty.engineName}</dd><dt>${t('Capacities')}</dt><dd>${ty.summary}</dd>${paintName ? `<dt>${t('Paint')}</dt><dd>${paintName}</dd>` : ''}</dl>
+      ${paints}${locked ? `<div class="sr-lock">${t('Premium expansion — the cockpit stays locked until the purchase is confirmed.')}</div>` : ''}`;
+    // The main button: fly it, or (locked) see how the expansion unlocks.
+    const fly = this.title.querySelector('.sr-fly');
+    fly.dataset.a = locked ? 'unlock' : 'free';
+    fly.classList.toggle('locked', locked);
+    fly.querySelector('b').textContent = locked ? t('Unlock expansion') : t('Fly');
+    fly.querySelector('small').textContent = locked ? t('Premium content') : t('Take off from the pad with this aircraft');
+    for (const b of this.title.querySelectorAll('.sr-menu [data-a="freeAir"], .sr-menu [data-a="career"]')) b.disabled = locked;
+  }
+
+  // Thumbnail of one aircraft, when it exists (cards and the fleet list).
+  _thumbOf(id) { return this.game.showroom?.thumbs.get(id) ?? ''; }
+
+  // Fleet: every registered aircraft with its data; a row selects it.
+  fleet() {
+    const g = this.game;
+    const rows = AIRCRAFT_ORDER.map((id) => {
+      const ty = AIRCRAFT_TYPES[id], locked = !aircraftUnlocked(ty);
+      return `<div class="fl-row${id === (g.showroom?.id ?? g.aircraftId) ? ' sel' : ''}">
+        <span class="fl-img">${this._thumbOf(id) ? `<img src="${this._thumbOf(id)}" alt="">` : ''}</span>
+        <div class="fl-txt"><div class="name">${ty.name} <span class="fl-reg">${ty.reg}</span></div>
+        <div class="desc">${ty.kind === 'heli' ? t('Helicopter') : t('Airplane')}${ty.role ? ` · ${ty.role}` : ''}${ty.premium ? ` · ${locked ? t('Premium expansion · locked') : t('Premium expansion')}` : ''}</div>
+        <div class="meta"><span>${ty.engineName}</span><span>${ty.summary}</span></div></div>
+        <button class="btn small" data-pick="${id}">${t('Select')}</button></div>`;
+    }).join('');
+    const el = h(`<div class="panel wide"><h2>${t('Fleet')}</h2><div class="fl-list">${rows}</div>
+      <div class="row2"><span></span><div class="btn-row"><button class="btn small" data-a="close">${t('Close')}</button></div></div></div>`);
+    el.addEventListener('click', (e) => {
+      const id = e.target.closest('[data-pick]')?.dataset.pick;
+      if (id) { this.close(); this.pickAircraft(id); }
+      else if (e.target.closest('[data-a="close"]')) this.close();
+    });
+    this._show('fleet', el);
+  }
+
+  // Premium expansions: what they contain and whether they are unlocked. No
+  // purchase, checkout or unlock happens here — the platform's premium
+  // system grants it (src/game/expansions.js).
+  expansions(focusId = null) {
+    const rows = EXPANSIONS.map((x) => {
+      const ty = AIRCRAFT_TYPES[x.aircraft], open = isUnlocked(x.id);
+      return `<div class="fl-row${focusId === x.aircraft ? ' sel' : ''}">
+        <span class="fl-img">${this._thumbOf(x.aircraft) ? `<img src="${this._thumbOf(x.aircraft)}" alt="">` : ''}</span>
+        <div class="fl-txt"><div class="name">${x.name}</div>
+        <div class="desc">${open ? (premiumEnforced() ? t('Unlocked') : t('Open to everyone during the testing phase')) : t('Locked')}</div>
+        <div class="meta"><span>${ty?.engineName ?? ''}</span><span>${ty?.summary ?? ''}</span></div></div></div>`;
+    }).join('');
+    const el = h(`<div class="panel wide"><h2>${t('Expansions')}</h2>
+      <div class="sub">${t('Premium expansions are unlocked by the platform’s premium system once the purchase is confirmed. Nothing on this screen buys or unlocks content; a locked aircraft can be looked at in the hangar but not flown.')}</div>
+      <div class="fl-list">${rows}</div>
+      <div class="row2"><span></span><div class="btn-row"><button class="btn small" data-a="close">${t('Close')}</button></div></div></div>`);
+    el.addEventListener('click', (e) => { if (e.target.closest('[data-a="close"]')) this.close(); });
+    this._show('expansions', el);
   }
 
   showTitle(v) {

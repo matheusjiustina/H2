@@ -21,6 +21,7 @@ import { ipanemaAudioState } from '../audio/ipanemaEngine.js';
 import { HUD } from '../ui/hud.js';
 import { Screens, money } from '../ui/screens.js';
 import { TouchControls } from '../ui/touch.js';
+import { Showroom } from '../ui/showroom.js';
 import { Career } from './contracts.js';
 import { Tutorial } from './tutorial.js';
 import { ReplayManager } from './replay.js';
@@ -167,9 +168,8 @@ export class Game {
     window.addEventListener('keydown', startAudio);
     this.resize();
     this.screens.setLoading(1, t('Ready'));
-    this.rig.setMode('orbit', this.aircraft);
-    this.rig.orbit.dist = this.aircraft.type.camera.orbit;
-    this.rig.orbit.pitch = 0.16;
+    this.showroom = new Showroom(this);
+    this.showroom.enter();
     this.screens.hideLoading();
     this.screens.showTitle(true);
     this.last = performance.now();
@@ -182,6 +182,7 @@ export class Game {
     const w = window.innerWidth, h = window.innerHeight;
     this.perf?.refreshRatio(); // the pixel-count ceiling follows the window; Ultra Original: no change
     this.renderer.setSize(w, h, false);
+    if (this.showroom?.active) this.showroom.goal.dist = this.showroom._fitDist(this.showroom.id);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     const ph = h * this.renderer.getPixelRatio();
@@ -319,6 +320,8 @@ export class Game {
   setAircraftOption(k, v) {
     this.setSetting(k, v);
     this._applyAircraftOptions();
+    const id = { b206Livery: 'b206', b206Kit: 'b206', m18Livery: 'm18', e203Livery: 'e203', a188Livery: 'a188', r44Livery: 'r44' }[k];
+    if (id) this.showroom?.invalidate(id);
     this.audio?.play('ui');
   }
 
@@ -433,7 +436,7 @@ export class Game {
         this.mode = 'title';
         this.hud.show(false);
         this.screens.showTitle(true);
-        this.rig.setMode('orbit', this.aircraft);
+        this.showroom.enter();
         this.career.save();
         break;
       default: break;
@@ -443,6 +446,7 @@ export class Game {
   _enterPlay(mode) {
     this.mode = mode;
     this.playing = true;
+    this.showroom?.leave();
     this.screens.showTitle(false);
     this.hud.show(true);
     if (this.rig.mode === 'orbit') { this.rig.setMode('chase', this.aircraft); this.cameraMode = 'chase'; }
@@ -671,7 +675,10 @@ export class Game {
     if (!headless || this._presT > 0.5) {
       const pdt = headless ? this._presT : rawDt;
       this._presT = 0;
-      if (!this.playing) this.rig.orbit.yaw += pdt * 0.06;
+      // Menu: the showroom eases the orbit camera onto the aircraft on show
+      // (no automatic spin); the player can drag / wheel it.
+      const menuCam = !this.playing && !this.replay.active && !modal && this.showroom?.active;
+      if (menuCam) this.showroom.update(pdt, mouse);
       if (this.replay.active) this.replay.update(pdt, mouse);
       else {
         const live = this.playing && !this.controlsLocked;
@@ -679,7 +686,7 @@ export class Game {
         const ax = (a, b) => (input.isDown(a) ? 1 : 0) - (input.isDown(b) ? 1 : 0);
         const eye = live && this.rig.mode === 'cockpit' ? ax('eyeUp', 'eyeDown') : 0;
         if (live) mouse.keys = { x: ax('lookRight', 'lookLeft'), y: ax('lookUp', 'lookDown'), zoom: ax('zoomOut', 'zoomIn'), reset: input.wasPressed('lookReset'), eye };
-        this.rig.update(pdt, ac, live ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
+        this.rig.update(pdt, !this.playing && this.showroom?.active ? this.showroom.target : ac, live || menuCam ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
         // The eye height is kept once the keys are let go.
         if (!eye && this.rig.eyeHeight !== this.settings.eyeHeight) {
           const v = (this.rig.eyeHeight = Math.round(this.rig.eyeHeight * 1000) / 1000), cm = Math.round(v * 100);
@@ -949,6 +956,7 @@ export class Game {
   render() {
     const r = this.renderer;
     r.autoClear = false;
+    this.showroom?.beforeRender(); // menu card thumbnails (a corner the frame then draws over)
     r.clear();
     r.render(this.world.sky.skyScene, this.camera);
     r.clearDepth();

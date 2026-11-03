@@ -9,8 +9,9 @@ import PT_JOBS from '../src/i18n/pt-jobs.js';
 import PT_CREW from '../src/i18n/pt-crew.js';
 import PT_FARMS from '../src/i18n/pt-farms.js';
 import PT_STRIPS from '../src/i18n/pt-strips.js';
+import PT_SHOWROOM from '../src/i18n/pt-showroom.js';
 
-const PT = { ...PT_UI, ...PT_GAME, ...PT_JOBS, ...PT_CREW, ...PT_FARMS, ...PT_STRIPS };
+const PT = { ...PT_UI, ...PT_GAME, ...PT_JOBS, ...PT_CREW, ...PT_FARMS, ...PT_STRIPS, ...PT_SHOWROOM };
 
 export function literalKeys(dir = 'src') {
   const keys = new Set();
