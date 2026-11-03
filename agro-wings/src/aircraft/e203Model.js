@@ -730,7 +730,10 @@ export function createE203Model(panel, opts = {}) {
   const wsTopF = (u) => { const b = wsBase(u), t = roofAt(u, false); return clamp(1 - BROW / Math.max(0.1, t[1] - b[1]), 0, 1); };
   const wsGlassTop = (u) => lerp3(wsBase(u), roofAt(u, false), wsTopF(u));
   glassG.push(grid((u, v) => lerp3(wsBase(u), wsGlassTop(u), v), 26, 10));
+  // (One piece with the cabin, no separate frame tubes on it; lined inside
+  // in the cabin's interior colour so the pilot sees the cabin end there.)
   add('livery', liveryUV(tagged(grid((u, v) => lerp3(wsGlassTop(u), roofAt(u, false), v), 26, 2, [0, 0.6, -1.0]))));
+  add('interior', tagged(grid((u, v) => { const p = lerp3(wsGlassTop(u), roofAt(u, false), v); return [p[0] * 0.99, p[1] - 0.004, p[2] - 0.008]; }, 26, 2, [0, 1.4, 1.0])));
   for (const sx of [1, -1]) {
     glassG.push(grid((u, v) => sideAt(sx, u, v, 'A', BPOST), 10, 6));
     add('livery', liveryUV(tagged(grid((u, v) => sideAt(sx, u, v, BPOST, ROOF.zR), 4, 6, [0, 0.6, -1.7]))));
@@ -742,8 +745,6 @@ export function createE203Model(panel, opts = {}) {
   const fr = (pts, r) => add('frame', tube(pts, r, Math.max(6, pts.length * 3), 8));
   const N = 16;
   fr(Array.from({ length: N + 1 }, (_, i) => wsBase(i / N)), 0.012);
-  fr(Array.from({ length: N + 1 }, (_, i) => wsGlassTop(i / N)), 0.013); // glass top
-  fr(Array.from({ length: N + 1 }, (_, i) => roofAt(i / N, false)), 0.015);
   for (const sx of [1, -1]) {
     const f0 = [sx * sillX(WS_ZS), SILL.y, WS_ZS], f1 = [sx * RAIL.x, RAIL.y, ROOF.zF];
     fr([f0, lerp3(f0, f1, 0.5), f1], 0.017); // A-post
