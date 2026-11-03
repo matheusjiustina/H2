@@ -101,20 +101,24 @@ const WS_Z = -0.5, WS_ZS = -0.62; // windshield base: centre / sides
 const R = (z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT) => ({ z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT });
 // (measured on the PS-SAR side photograph, scaled by the 2.43 m height):
 // the canopy from sill to roof ≈ 0.8 m, so the roof stands at 1.20 m; the
-// fairing drops from it to a dorsal a little under the sill line; the rear
-// fuselage keeps its depth (≈ 0.75 m at the rudder post, the underside
-// nearly straight) while it narrows in plan.
+// rear fuselage keeps its depth (≈ 0.75 m at the rudder post, the underside
+// nearly straight) while it narrows in plan. Revised on the in-flight
+// references: the cabin top is round (big corner radius, no flat lid) and
+// behind it the turtle deck falls in one long, smooth line — a rounded hump
+// narrower than the cabin — from the roof to the fin root (≈ 20° instead
+// of the old 45° drop onto a low dorsal).
 const AFT_KEYS = [
-  R(-1.78, 0.48, -0.06, -0.57, 3.8, 4.3, 0.64, 0.447, 1.2, 0.345, 0.08),
-  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.14, 0.33, 0.12),
-  R(-2.15, 0.455, -0.062, -0.56, 3.72, 4.1, 0.625, 0.435, 0.93, 0.3, 0.15),
-  R(-2.35, 0.435, -0.065, -0.55, 3.62, 3.9, 0.61, 0.41, 0.7, 0.28, 0.17),
-  R(-2.6, 0.41, -0.07, -0.54, 3.5, 3.7, 0.58, 0.36, 0.52, 0.275, 0.19),
-  R(-3.0, 0.36, -0.07, -0.515, 3.3, 3.4, 0.52, 0.31, 0.45, 0.25, 0.18),
-  R(-3.5, 0.3, -0.06, -0.48, 3.1, 3.1, 0.47, 0.27, 0.4, 0.21, 0.16),
-  R(-4.0, 0.235, -0.04, -0.45, 2.9, 2.9, 0.43, 0.24, 0.37, 0.165, 0.13),
-  R(-4.5, 0.16, -0.02, -0.42, 2.7, 2.7, 0.39, 0.21, 0.355, 0.11, 0.09),
-  R(-5.02, 0.075, 0.0, -0.4, 2.5, 2.5, 0.36, 0.18, 0.34, 0.05, 0.045),
+  R(-1.78, 0.48, -0.06, -0.57, 3.8, 4.3, 0.64, 0.447, 1.2, 0.33, 0.16),
+  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.175, 0.315, 0.18),
+  R(-2.15, 0.455, -0.062, -0.56, 3.72, 4.1, 0.625, 0.435, 1.1, 0.29, 0.2),
+  R(-2.4, 0.43, -0.066, -0.548, 3.596, 3.86, 0.604, 0.4, 0.97, 0.255, 0.205),
+  R(-2.7, 0.397, -0.07, -0.534, 3.45, 3.625, 0.565, 0.347, 0.82, 0.225, 0.195),
+  R(-3.0, 0.36, -0.07, -0.515, 3.3, 3.4, 0.52, 0.31, 0.7, 0.2, 0.175),
+  R(-3.4, 0.312, -0.062, -0.487, 3.14, 3.16, 0.48, 0.278, 0.58, 0.175, 0.155),
+  R(-3.8, 0.261, -0.048, -0.462, 2.98, 2.98, 0.446, 0.252, 0.49, 0.15, 0.135),
+  R(-4.2, 0.205, -0.032, -0.438, 2.82, 2.82, 0.414, 0.228, 0.42, 0.12, 0.11),
+  R(-4.6, 0.144, -0.016, -0.416, 2.662, 2.662, 0.384, 0.204, 0.375, 0.09, 0.08),
+  R(-5.02, 0.075, 0, -0.4, 2.5, 2.5, 0.36, 0.18, 0.34, 0.05, 0.045),
 ];
 const CABIN = AFT_KEYS[0];
 // Upper contour of a structured section, left half (x ≥ 0), from the rim up
@@ -444,7 +448,10 @@ const mirrorX = (g) => { const m = g.clone(); m.scale(-1, 1, 1); return m.index 
 // the wing's trailing edge while the chord shrinks along a concave leading
 // edge to a narrow rounded top. The section turns with the path, so the
 // first station is the wing's tip section exactly.
-export const WINGLET = { H: 0.46, cant: (12 * Math.PI) / 180, knee: 0.15, topChord: 0.16 };
+// (Bigger, after the in-flight references: ≈ 0.62 m tall, the leading edge
+// a straight line swept ≈ 65° from the wing's leading edge to a 0.34 m top
+// chord, the trailing edge rising straight off the wing's trailing edge.)
+export const WINGLET = { H: 0.62, cant: (13 * Math.PI) / 180, knee: 0.1, topChord: 0.34 };
 function wingletGeometry() {
   const x0 = W.tipX, y0 = e203WingY(W.tipX), th0 = Math.atan(W.dih), th1 = Math.PI / 2 - WINGLET.cant;
   const te = W.le - W.chord;
@@ -460,7 +467,7 @@ function wingletGeometry() {
       px += Math.cos(tm) * ds; py += Math.sin(tm) * ds;
     }
     const f = clamp(s / len, 0, 1);
-    const chord = WINGLET.topChord + (W.chord - WINGLET.topChord) * (1 - f) ** 2.1;
+    const chord = WINGLET.topChord + (W.chord - WINGLET.topChord) * (1 - f);
     sts.push({ s, th, x: px, y: py, chord, le: te + chord, t: lerp(0.15, 0.085, f), m: lerp(0.04, 0.02, f) });
   }
   const n = 34, pos = [], idx = [];
@@ -695,8 +702,15 @@ export function createE203Model(panel, opts = {}) {
   const sillX = (z) => halfX(z, SILL.y);
   // Deck strip from the hopper top back to the curved windshield base.
   add('livery', liveryUV(tagged(grid((u, v) => { const [x, y, z] = wsBase(u); return [x, y, lerp(WS_Z, z, v)]; }, 28, 2, [0, 0.1, -0.6]))));
-  // Roof.
-  add('livery', liveryUV(tagged(grid((u, v) => lerp3(roofAt(u, false), roofAt(u, true), v), 26, 6, [0, 0.6, -1.4]))));
+  // Roof: domed — it rises ≈ 4 cm between its front and rear frames (zero
+  // at the rails), so the top reads round, not as a flat lid.
+  const roofPt = (u, v) => {
+    const p = lerp3(roofAt(u, false), roofAt(u, true), v);
+    const c = Math.max(0, 1 - (p[0] / RAIL.x) ** 2);
+    p[1] += 0.04 * c * Math.sin(Math.PI * v) ** 0.8;
+    return p;
+  };
+  add('livery', liveryUV(tagged(grid(roofPt, 26, 8, [0, 0.6, -1.4]))));
   // Side: flat glass from the A-post to the B-post, painted panel behind it.
   const sideAt = (sx, u, v, z0, z1) => {
     const zf = z0 === 'A' ? lerp(WS_ZS, ROOF.zF, v) : z0;
@@ -707,8 +721,11 @@ export function createE203Model(panel, opts = {}) {
   glassG.push(grid((u, v) => {
     const b = wsBase(u), t = roofAt(u, false);
     const p = lerp3(b, t, v);
-    const bul = 0.012 * Math.sin(Math.PI * v);
-    return [p[0], p[1] + bul * 0.6, p[2] + bul * 0.8];
+    // Blown windshield: its upper part curves forward and over into the
+    // roof (the rounded "forehead" of the 203's cabin).
+    // (Zero at its side edges, which stay on the A-posts and side glass.)
+    const bul = 0.07 * Math.sin(Math.PI * v ** 0.7) * (1 - (2 * u - 1) ** 2);
+    return [p[0], p[1] + bul * 0.55, p[2] + bul * 0.85];
   }, 26, 10));
   for (const sx of [1, -1]) {
     glassG.push(grid((u, v) => sideAt(sx, u, v, 'A', BPOST), 10, 6));
@@ -742,7 +759,7 @@ export function createE203Model(panel, opts = {}) {
   add('ink', rod([0, topY(1.95) + 0.02, 1.95], mastTop, 0.0045, 5));
   add('ink', rod([0, ROOF.yt - 0.01, ROOF.zFc - 0.03], [0, ROOF.yt + 0.085, ROOF.zFc - 0.005], 0.012, 6));
   add('ink', rod(mastTop, [0, 1.135, -4.93], 0.0035, 4), true);
-  add('white', rod([0, 0.41, -3.35], [0, 0.82, -3.55], 0.006, 5), true);
+  add('white', rod([0, 0.6, -3.35], [0, 0.95, -3.55], 0.006, 5), true);
 
   // ---------------- wing ----------------
   const leY = (x) => e203WingY(x);
