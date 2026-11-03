@@ -213,6 +213,7 @@ const CAB_TOP = (() => {
 const RAIL = CAB_TOP.rail; // where the side glass meets the roof edge
 const ROOF = { yt: CABIN.yt, zF: -0.97, zFc: -0.93, zR: CABIN.z }; // roof top, front edge (rails / centre), rear frame
 const BPOST = -1.58;
+const BROW = 0.07; // the roof's rounded front edge drops this far onto the windshield
 // Half width of a fuselage station at height y (upper half).
 const surfX = (st, y) => {
   const s = clamp((y - st.ys) / (st.yt - st.ys), 0, 1) ** (st.pU / 2);
@@ -699,18 +700,21 @@ export function createE203Model(panel, opts = {}) {
   const roofAt = (u, rear) => {
     const [x, y] = CAB_TOP.at(u);
     const c = Math.max(0, 1 - (x / RAIL.x) ** 2);
-    return [x, y, rear ? ROOF.zR : ROOF.zF + (ROOF.zFc - ROOF.zF) * c ** 0.6];
+    // (The windshield's top sits under the roof's rounded front "brow".)
+    return [x, rear ? y : y - BROW * c, rear ? ROOF.zR : ROOF.zF + (ROOF.zFc - ROOF.zF) * c ** 0.6];
   };
   // Sill half width along the cabin (the lower body's 30° line).
   const sillX = (z) => halfX(z, SILL.y);
   // Deck strip from the hopper top back to the curved windshield base.
   add('livery', liveryUV(tagged(grid((u, v) => { const [x, y, z] = wsBase(u); return [x, y, lerp(WS_Z, z, v)]; }, 28, 2, [0, 0.1, -0.6]))));
-  // Roof: domed — it rises ≈ 4 cm between its front and rear frames (zero
-  // at the rails), so the top reads round, not as a flat lid.
+  // Roof (PP-ZPK / PS-AAP photographs): a short rounded brow at its front —
+  // it rolls down over the flat windshield in a quarter round ≈ 15 cm long —
+  // then a gently crowned top back to the rear frame.
   const roofPt = (u, v) => {
     const p = lerp3(roofAt(u, false), roofAt(u, true), v);
     const c = Math.max(0, 1 - (p[0] / RAIL.x) ** 2);
-    p[1] += 0.04 * c * Math.sin(Math.PI * v) ** 0.8;
+    const f = Math.min(1, v / 0.19);
+    p[1] += BROW * c * (1 - v) * Math.sqrt(1 - (1 - f) ** 2) + BROW * c * v + 0.015 * c * Math.sin(Math.PI * v);
     return p;
   };
   add('livery', liveryUV(tagged(grid(roofPt, 26, 8, [0, 0.6, -1.4]))));
@@ -724,11 +728,8 @@ export function createE203Model(panel, opts = {}) {
   glassG.push(grid((u, v) => {
     const b = wsBase(u), t = roofAt(u, false);
     const p = lerp3(b, t, v);
-    // Blown windshield: its upper part curves forward and over into the
-    // roof (the rounded "forehead" of the 203's cabin).
-    // (Zero at its side edges, which stay on the A-posts and side glass.)
-    const bul = 0.07 * Math.sin(Math.PI * v ** 0.7) * (1 - (2 * u - 1) ** 2);
-    return [p[0], p[1] + bul * 0.55, p[2] + bul * 0.85];
+    // Flat windshield (the photographs: flat panes, no blown glass).
+    return p;
   }, 26, 10));
   for (const sx of [1, -1]) {
     glassG.push(grid((u, v) => sideAt(sx, u, v, 'A', BPOST), 10, 6));
@@ -756,11 +757,10 @@ export function createE203Model(panel, opts = {}) {
     add('steel', rod([surfX(stCab, 0.3) + 0.03, 0.3, -1.5], [surfX(stCab, 0.3) + 0.03, 0.3, -1.38], 0.01, 6), true); // door handle
     for (const hy of [0.0, 0.36]) add('steel', tx(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), surfX(stCab, hy) + 0.01, hy, -0.68), true);
   }
-  // The mast over the windshield, the antenna wire from it to the fin top
-  // (no wire forward to the nose), a whip on the turtle deck.
+  // The mast over the windshield (no wires to the nose or the fin), a whip
+  // on the turtle deck.
   const mastTop = [0, ROOF.yt + 0.075, ROOF.zFc - 0.01];
   add('ink', rod([0, ROOF.yt - 0.01, ROOF.zFc - 0.03], [0, ROOF.yt + 0.085, ROOF.zFc - 0.005], 0.012, 6));
-  add('ink', rod(mastTop, [0, 1.135, -4.93], 0.0035, 4), true);
   add('white', rod([0, 0.54, -3.35], [0, 0.89, -3.55], 0.006, 5), true);
 
   // ---------------- wing ----------------
