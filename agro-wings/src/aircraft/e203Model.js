@@ -102,23 +102,26 @@ const R = (z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT) => ({ z, hw, ys, yb, pL, 
 // (measured on the PS-SAR side photograph, scaled by the 2.43 m height):
 // the canopy from sill to roof ≈ 0.8 m, so the roof stands at 1.20 m; the
 // rear fuselage keeps its depth (≈ 0.75 m at the rudder post, the underside
-// nearly straight) while it narrows in plan. Revised on the in-flight
-// references: the cabin top is round (big corner radius, no flat lid) and
-// behind it the turtle deck falls in one long, smooth line — a rounded hump
-// narrower than the cabin — from the roof to the fin root (≈ 20° instead
-// of the old 45° drop onto a low dorsal).
+// nearly straight) while it narrows in plan. Revised on the PP-ZPK side
+// photographs: the cabin top is round (big corner radius, no flat lid);
+// right behind it the roof rolls off in a short convex curve (≈ 1 m,
+// 40° at its steepest) down to the turtle deck, which then runs STRAIGHT,
+// falling only ≈ 7° (0.575 m at z -3.2 to 0.355 m at the rudder post),
+// into the fin.
 const AFT_KEYS = [
   R(-1.78, 0.48, -0.06, -0.57, 3.8, 4.3, 0.64, 0.447, 1.2, 0.33, 0.16),
-  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.175, 0.315, 0.18),
-  R(-2.15, 0.455, -0.062, -0.56, 3.72, 4.1, 0.625, 0.435, 1.1, 0.29, 0.2),
-  R(-2.4, 0.43, -0.066, -0.548, 3.596, 3.86, 0.604, 0.4, 0.97, 0.255, 0.205),
-  R(-2.7, 0.397, -0.07, -0.534, 3.45, 3.625, 0.565, 0.347, 0.82, 0.225, 0.195),
-  R(-3.0, 0.36, -0.07, -0.515, 3.3, 3.4, 0.52, 0.31, 0.7, 0.2, 0.175),
-  R(-3.4, 0.312, -0.062, -0.487, 3.14, 3.16, 0.48, 0.278, 0.58, 0.175, 0.155),
-  R(-3.8, 0.261, -0.048, -0.462, 2.98, 2.98, 0.446, 0.252, 0.49, 0.15, 0.135),
-  R(-4.2, 0.205, -0.032, -0.438, 2.82, 2.82, 0.414, 0.228, 0.42, 0.12, 0.11),
-  R(-4.6, 0.144, -0.016, -0.416, 2.662, 2.662, 0.384, 0.204, 0.375, 0.09, 0.08),
-  R(-5.02, 0.075, 0, -0.4, 2.5, 2.5, 0.36, 0.18, 0.34, 0.05, 0.045),
+  R(-1.95, 0.472, -0.06, -0.567, 3.78, 4.25, 0.635, 0.445, 1.165, 0.315, 0.18),
+  R(-2.15, 0.455, -0.062, -0.56, 3.72, 4.1, 0.625, 0.435, 1.05, 0.29, 0.19),
+  R(-2.35, 0.435, -0.065, -0.55, 3.62, 3.9, 0.61, 0.41, 0.88, 0.27, 0.19),
+  R(-2.55, 0.415, -0.069, -0.542, 3.524, 3.74, 0.586, 0.37, 0.73, 0.26, 0.19),
+  R(-2.75, 0.391, -0.07, -0.531, 3.425, 3.588, 0.557, 0.341, 0.635, 0.25, 0.185),
+  R(-2.95, 0.366, -0.07, -0.518, 3.325, 3.438, 0.527, 0.316, 0.595, 0.24, 0.175),
+  R(-3.2, 0.336, -0.066, -0.501, 3.22, 3.28, 0.5, 0.294, 0.575, 0.23, 0.17),
+  R(-3.6, 0.287, -0.056, -0.474, 3.06, 3.06, 0.462, 0.264, 0.527, 0.205, 0.155),
+  R(-4.0, 0.235, -0.04, -0.45, 2.9, 2.9, 0.43, 0.24, 0.478, 0.17, 0.13),
+  R(-4.4, 0.175, -0.024, -0.426, 2.74, 2.74, 0.398, 0.216, 0.43, 0.125, 0.1),
+  R(-4.8, 0.111, -0.008, -0.408, 2.585, 2.585, 0.373, 0.193, 0.382, 0.08, 0.068),
+  R(-5.02, 0.075, 0, -0.4, 2.5, 2.5, 0.36, 0.18, 0.355, 0.05, 0.045),
 ];
 const CABIN = AFT_KEYS[0];
 // Upper contour of a structured section, left half (x ≥ 0), from the rim up
@@ -753,13 +756,12 @@ export function createE203Model(panel, opts = {}) {
     add('steel', rod([surfX(stCab, 0.3) + 0.03, 0.3, -1.5], [surfX(stCab, 0.3) + 0.03, 0.3, -1.38], 0.01, 6), true); // door handle
     for (const hy of [0.0, 0.36]) add('steel', tx(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), surfX(stCab, hy) + 0.01, hy, -0.68), true);
   }
-  // Wire deflector over the windshield, the mast, the antenna wire to the
-  // fin top, a whip on the turtle deck, beacon on the fin.
+  // The mast over the windshield, the antenna wire from it to the fin top
+  // (no wire forward to the nose), a whip on the turtle deck.
   const mastTop = [0, ROOF.yt + 0.075, ROOF.zFc - 0.01];
-  add('ink', rod([0, topY(1.95) + 0.02, 1.95], mastTop, 0.0045, 5));
   add('ink', rod([0, ROOF.yt - 0.01, ROOF.zFc - 0.03], [0, ROOF.yt + 0.085, ROOF.zFc - 0.005], 0.012, 6));
   add('ink', rod(mastTop, [0, 1.135, -4.93], 0.0035, 4), true);
-  add('white', rod([0, 0.6, -3.35], [0, 0.95, -3.55], 0.006, 5), true);
+  add('white', rod([0, 0.54, -3.35], [0, 0.89, -3.55], 0.006, 5), true);
 
   // ---------------- wing ----------------
   const leY = (x) => e203WingY(x);
@@ -842,8 +844,8 @@ export function createE203Model(panel, opts = {}) {
   // Dorsal fillet: a concave rise from the spine that runs into the fin's
   // leading edge (its last station is inside the fin).
   add('livery', liveryUV(tagged(loft(sampleStations([
-    K(-3.1, 0.015, 0.43, 0.42, 0.445, 2.2, 2.2), K(-3.45, 0.035, 0.4, 0.39, 0.47, 2.2, 2.2),
-    K(-3.72, 0.05, 0.385, 0.372, 0.56, 2.2, 2.2), K(-4.06, 0.055, 0.37, 0.355, 0.72, 2.2, 2.2),
+    K(-3.78, 0.012, 0.5, 0.49, 0.512, 2.2, 2.2), K(-3.9, 0.035, 0.49, 0.475, 0.555, 2.2, 2.2),
+    K(-4.0, 0.05, 0.48, 0.46, 0.64, 2.2, 2.2), K(-4.08, 0.055, 0.47, 0.455, 0.74, 2.2, 2.2),
   ], 20), 12, null))));
   // Rudder: constant chord from the fuselage's underside to the flat top,
   // square at its trailing-edge corner.
