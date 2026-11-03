@@ -213,7 +213,7 @@ const CAB_TOP = (() => {
 const RAIL = CAB_TOP.rail; // where the side glass meets the roof edge
 const ROOF = { yt: CABIN.yt, zF: -0.97, zFc: -0.93, zR: CABIN.z }; // roof top, front edge (rails / centre), rear frame
 const BPOST = -1.58;
-const BROW = 0.07; // the roof's rounded front edge drops this far onto the windshield
+const BROW = 0.07; // painted strip between the windshield glass's top and the roof's front edge
 // Half width of a fuselage station at height y (upper half).
 const surfX = (st, y) => {
   const s = clamp((y - st.ys) / (st.yt - st.ys), 0, 1) ** (st.pU / 2);
@@ -701,20 +701,19 @@ export function createE203Model(panel, opts = {}) {
     const [x, y] = CAB_TOP.at(u);
     const c = Math.max(0, 1 - (x / RAIL.x) ** 2);
     // (The windshield's top sits under the roof's rounded front "brow".)
-    return [x, rear ? y : y - BROW * c, rear ? ROOF.zR : ROOF.zF + (ROOF.zFc - ROOF.zF) * c ** 0.6];
+    return [x, y, rear ? ROOF.zR : ROOF.zF + (ROOF.zFc - ROOF.zF) * c ** 0.6];
   };
   // Sill half width along the cabin (the lower body's 30° line).
   const sillX = (z) => halfX(z, SILL.y);
   // Deck strip from the hopper top back to the curved windshield base.
   add('livery', liveryUV(tagged(grid((u, v) => { const [x, y, z] = wsBase(u); return [x, y, lerp(WS_Z, z, v)]; }, 28, 2, [0, 0.1, -0.6]))));
-  // Roof (PP-ZPK / PS-AAP photographs): a short rounded brow at its front —
-  // it rolls down over the flat windshield in a quarter round ≈ 15 cm long —
-  // then a gently crowned top back to the rear frame.
+  // Roof: a gently crowned top from the front edge to the rear frame.
   const roofPt = (u, v) => {
     const p = lerp3(roofAt(u, false), roofAt(u, true), v);
     const c = Math.max(0, 1 - (p[0] / RAIL.x) ** 2);
     const f = Math.min(1, v / 0.19);
-    p[1] += BROW * c * (1 - v) * Math.sqrt(1 - (1 - f) ** 2) + BROW * c * v + 0.015 * c * Math.sin(Math.PI * v);
+    void f;
+    p[1] += 0.015 * c * Math.sin(Math.PI * v);
     return p;
   };
   add('livery', liveryUV(tagged(grid(roofPt, 26, 8, [0, 0.6, -1.4]))));
@@ -725,12 +724,13 @@ export function createE203Model(panel, opts = {}) {
     return [sx * lerp(sillX(z), RAIL.x, v), lerp(SILL.y, RAIL.y, v), z];
   };
   const glassG = [];
-  glassG.push(grid((u, v) => {
-    const b = wsBase(u), t = roofAt(u, false);
-    const p = lerp3(b, t, v);
-    // Flat windshield (the photographs: flat panes, no blown glass).
-    return p;
-  }, 26, 10));
+  // Flat windshield (the photographs: flat panes). The glass stops BROW
+  // below the roof: a painted strip in the windshield's plane closes the
+  // gap up to the roof's front edge.
+  const wsTopF = (u) => { const b = wsBase(u), t = roofAt(u, false); return clamp(1 - BROW / Math.max(0.1, t[1] - b[1]), 0, 1); };
+  const wsGlassTop = (u) => lerp3(wsBase(u), roofAt(u, false), wsTopF(u));
+  glassG.push(grid((u, v) => lerp3(wsBase(u), wsGlassTop(u), v), 26, 10));
+  add('livery', liveryUV(tagged(grid((u, v) => lerp3(wsGlassTop(u), roofAt(u, false), v), 26, 2, [0, 0.6, -1.0]))));
   for (const sx of [1, -1]) {
     glassG.push(grid((u, v) => sideAt(sx, u, v, 'A', BPOST), 10, 6));
     add('livery', liveryUV(tagged(grid((u, v) => sideAt(sx, u, v, BPOST, ROOF.zR), 4, 6, [0, 0.6, -1.7]))));
@@ -742,6 +742,7 @@ export function createE203Model(panel, opts = {}) {
   const fr = (pts, r) => add('frame', tube(pts, r, Math.max(6, pts.length * 3), 8));
   const N = 16;
   fr(Array.from({ length: N + 1 }, (_, i) => wsBase(i / N)), 0.012);
+  fr(Array.from({ length: N + 1 }, (_, i) => wsGlassTop(i / N)), 0.013); // glass top
   fr(Array.from({ length: N + 1 }, (_, i) => roofAt(i / N, false)), 0.015);
   for (const sx of [1, -1]) {
     const f0 = [sx * sillX(WS_ZS), SILL.y, WS_ZS], f1 = [sx * RAIL.x, RAIL.y, ROOF.zF];
