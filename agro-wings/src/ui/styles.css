@@ -442,4 +442,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
   .ac-thumb { aspect-ratio: 2 / 1; }
   .title-keys { display: none; }
 }
-@media (max-height: 420px) { .sr-btn { height: 38px; } .sr-menu { gap: 4px; } .ac-thumb { aspect-ratio: 5 / 2; } }
+@media (max-height: 520px) {
+  .sr-btn { width: 40px; height: 34px; } .sr-btn svg { width: 20px; height: 20px; } .sr-btn.primary { height: 36px; }
+  .sr-menu { gap: 4px; top: max(46px, calc(env(safe-area-inset-top) + 40px)); }
+  .sr-info { top: max(46px, calc(env(safe-area-inset-top) + 40px)); padding: 6px 9px; } .sr-name { font-size: 13px; }
+  .ac-card { flex: 0 0 150px; max-width: 150px; } .ac-thumb { aspect-ratio: 5 / 2; }
+  .ac-name { padding: 4px 8px 5px; } .ac-label { font-size: 11px; } .ac-role { display: none; }
+}
