@@ -591,7 +591,7 @@ export class Aircraft {
       flow: this.game.sprayer?.flowNow ?? 0, gps: this.game.guidance, pitch: att.pitch, bank: att.bank, gs: o.groundSpeed * KT, pos: fm.pos,
       // Amphibian (Fire Boss): the water systems' own state, nothing new.
       water: this.water, gearDown: fm.gearDown, onWater: o.onWater,
-      fire: this.water && this.game.fires?.active ? this.game.fires.nearest(fm.pos) : null,
+      fire: this.water ? this.game.fireJobs?.nearest(fm.pos) ?? null : null, // only with an accepted fire order
     };
   }
 

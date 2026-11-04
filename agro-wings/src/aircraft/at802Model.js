@@ -439,10 +439,12 @@ function floatTexture() {
   }
   g.save();
   g.font = 'italic bold 30px Arial'; g.fillStyle = RED; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.translate(WD * 0.3, H * 0.27); g.scale(-1, 1); g.fillText('FIRE BOSS', 0, 0); g.restore();
+  // v runs deck → left side → keel → right side → deck: upright on the
+  // left half, turned half round on the right one so both read bow → stern.
+  g.translate(WD * 0.3, H * 0.27); g.fillText('FIRE BOSS', 0, 0); g.restore();
   g.save();
   g.font = 'italic bold 30px Arial'; g.fillStyle = RED; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.translate(WD * 0.3, H * 0.73); g.fillText('FIRE BOSS', 0, 0); g.restore();
+  g.translate(WD * 0.3, H * 0.73); g.scale(-1, -1); g.fillText('FIRE BOSS', 0, 0); g.restore();
   speckle(g, 0, 0, WD, H, 600, 73, 0.06);
   return canvasTexture(c, { aniso: 8 });
 }
@@ -1165,7 +1167,9 @@ export function createAT802Model(panel, opts = {}) {
       const nose = name.startsWith('nose');
       const R = cfg.radius;
       const ax = cfg.p[0], ay = cfg.p[1] + R, az = cfg.p[2];
-      const pivotP = nose ? [ax, -1.92, az - 0.12] : [ax, -1.85, az + 0.32];
+      // Nose pivot inside the bow, low and aft: a quarter turn forward takes the
+      // wheel pair from the ground into its well on top of the bow.
+      const pivotP = nose ? [ax, -2.275, 3.665] : [ax, -1.85, az + 0.32];
       const pivot = new THREE.Group();
       pivot.position.set(...pivotP);
       root.add(pivot);
@@ -1190,9 +1194,9 @@ export function createAT802Model(panel, opts = {}) {
       pivot.add(leg);
       gearGroups[name] = { group: pivot, wheel, spin: spinPart, rest: wheel.position.clone(), sx };
       // Retracted (Wipline amphibian, EC-KRT photographs): the nose legs fold
-      // forward along the bow, the wheels left just ahead of its tip at deck
-      // height; the mains swing up and aft into their wells inside the float.
-      gearAnim.push({ pivot, up: nose ? -1.45 : 1.0 });
+      // into the bow, only the upper half of the wheels showing above its
+      // deck; the mains swing up and aft into their wells inside the float.
+      gearAnim.push({ pivot, up: nose ? -Math.PI / 2 : 1.0 });
     }
   }
 
