@@ -14,6 +14,7 @@ import { drawMap, mapControls, mapPoint } from './maps.js';
 import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
 import { aircraftUnlocked, isUnlocked, premiumEnforced, EXPANSIONS } from '../game/expansions.js';
+import { FIRE_JOBS } from '../game/fireJobs.js';
 
 // Paint schemes offered on the menu (the settings keys the models read).
 const PAINTS = {
@@ -278,13 +279,24 @@ export class Screens {
         </div>
       </div>`;
     };
-    const cards = [1, 2, 3].map((lv) => `<h3 class="lvl">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => c.level === lv).map(card).join('')}</div>`).join('');
+    // Fire Boss only: fire-fighting orders (src/game/fireJobs.js).
+    const fj = g.fireJobs, fireCards = g.aircraft?.water && fj ? `<h3 class="lvl">${t('Fire fighting')} <span>${t('Fire Boss only · scoop at the reservoir, drop on the spots')}</span></h3><div class="cards">${FIRE_JOBS.map((j) => {
+      const on = fj.job?.def.id === j.id;
+      return `<div class="card ${on ? 'sel' : ''}"><span class="tag lv3">${t('Fire Boss')}</span><div class="name">${j.title}</div><div class="desc">${j.brief}</div>
+        <div class="meta"><span>${t('{0} spots', j.spots.length)}</span><span>${money(j.pay)}</span><span>${t('bonus {0}', `+25 % < ${j.bonusMin} min`)}</span></div>
+        <div class="prog">${on ? t('In progress · {0} of {1} out', fj.spots().filter((f) => f.state === 'out').length, j.spots.length) : t('Not started')}</div>
+        <div class="btn-row" style="justify-content:flex-start">${on ? `<button class="btn small" data-fire-cancel="1">${t('Hand in current job')}</button>` : `<button class="btn primary small" data-fire="${j.id}">${t('Accept')}</button>`}</div></div>`;
+    }).join('')}</div>` : '';
+    const cards = fireCards + [1, 2, 3].map((lv) => `<h3 class="lvl">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => c.level === lv).map(card).join('')}</div>`).join('');
     const el = h(`<div class="panel"><h2>${t('Service orders')}</h2>
       <div class="sub">${t('Choose a job, set the load, and the badeco will service the aircraft on the pad.')}</div>
       ${cards}
       <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span>
       <div class="btn-row"><button class="btn small" data-a="office">${t('Office computer · other farms')}</button>${g.job ? `<button class="btn small" data-a="abandon">${t('Hand in current job')}</button>` : ''}<button class="btn small" data-a="close">${t('Close')}</button></div></div></div>`);
     el.addEventListener('click', (e) => {
+      const fire = e.target.closest('[data-fire]')?.dataset.fire;
+      if (fire) { if (g.fireJobs.accept(fire)) this.close(); return; }
+      if (e.target.closest('[data-fire-cancel]')) { g.fireJobs.cancel(); this.board(); return; }
       const sel = e.target.closest('[data-sel]')?.dataset.sel;
       const rs = e.target.closest('[data-restart]')?.dataset.restart;
       const a = e.target.closest('[data-a]')?.dataset.a;

@@ -194,6 +194,7 @@ export default {
   'Hard water landing': 'Pouso duro na água',
   'Gear down on the water': 'Pouso na água com o trem baixado',
   'Gear up / down (amphibian)': 'Trem recolher / baixar (anfíbio)',
+  'Gear up / down (amphibian; flaps up: Shift+B)': 'Trem recolher / baixar (anfíbio; flape para cima: Shift+B)',
   'Scoop probes up / down (Fire Boss)': 'Sondas de captação sobe / desce (Fire Boss)',
   '{0}: premium expansion — locked.': '{0}: expansão premium — bloqueada.',
   'GEAR DOWN — water landing!': 'TREM BAIXADO — pouso na água!',

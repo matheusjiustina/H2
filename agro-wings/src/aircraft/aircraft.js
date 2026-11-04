@@ -231,7 +231,8 @@ export class Aircraft {
     // Flaps
     const notch = FLAP_NOTCHES.reduce((b, n) => (Math.abs(n - fm.flapsCmd) < Math.abs(b - fm.flapsCmd) ? n : b), 0);
     const ni = FLAP_NOTCHES.indexOf(notch);
-    if (input.wasPressed('flapsUp')) fm.flapsCmd = FLAP_NOTCHES[Math.max(0, ni - 1)];
+    // (Amphibian: G is the gear; its flaps go up with Shift+B.)
+    if (input.wasPressed('flapsUp') && !(this.water && input.wasPressed('gear'))) fm.flapsCmd = FLAP_NOTCHES[Math.max(0, ni - 1)];
     if (input.wasPressed('flapsDown')) fm.flapsCmd = FLAP_NOTCHES[Math.min(3, ni + 1)];
     // Trim: with the assist flying, it moves the held flight path (see
     // Assist); with the assist off or on the ground, the elevator trim tab.

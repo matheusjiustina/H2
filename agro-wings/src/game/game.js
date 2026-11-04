@@ -37,6 +37,7 @@ import { FlightModel } from '../flight/flightModel.js';
 import { t } from '../i18n/index.js';
 import { aircraftUnlocked } from './expansions.js';
 import { FireField } from '../world/fires.js';
+import { FireJobs } from './fireJobs.js';
 
 const SETTINGS = 'agrowings.settings.v1';
 const GPS_PAGE_NAMES = { map: 'MAP', dest: 'DESTINATION', mission: 'MISSION', cov: 'COVERAGE' };
@@ -142,6 +143,7 @@ export class Game {
     this.world.mist = this.mist;
     // Fire-suppression test scenario (active while the Fire Boss is flown).
     this.fires = new FireField(this.scene, this.world.terrain);
+    this.fireJobs = new FireJobs(this); // fire-fighting service orders (Fire Boss)
     this.mist.limit = this.perf.profile.particles;
     this.audio = new GameAudio();
     this.audio.setVolume(this.settings.volume);
@@ -652,6 +654,7 @@ export class Game {
       this.mist.update(dt, ac.windVec, (x, z) => ac.env.top(x, z));
       this.dust.update(dt, ac.windVec, (x, z) => ac.env.ground(x, z));
       this.fires?.update(dt, ac.windVec);
+      this.fireJobs?.update();
       this.guidance.update(dt);
       if (this.playing) this.replay.record(dt);
       if (this.playing && this.weatherCycle.update(dt)) this.world.atmo.set(this.weatherCycle.time, this.weatherCycle.weather);
@@ -919,9 +922,10 @@ export class Game {
     else if (ws.probesCmd) out.push({ text: o.onWater ? t('Probes down — {0}–{1} kt, wings level, gear up', Math.round(fm.A.firefight.scoopMin * 1.944), Math.round(fm.A.firefight.scoopMax * 1.944)) : t('Probes down'), cls: 'amber' });
     if (ws.dropping) out.push({ text: t('Dropping — {0} L left', L), cls: 'amber' });
     if (ws.overload) out.push({ text: t('Too heavy for a water take-off ({0} kg > {1} kg)', Math.round(fm.mass), fm.A.mtowWater), cls: 'blink' });
-    const nf = this.fires?.nearest(fm.pos);
+    // The nearest spot only while a fire-fighting order is accepted (the
+    // fires may burn without one; they are not announced then).
+    const nf = this.fireJobs?.nearest(fm.pos);
     if (nf && !o.onGround) out.push({ text: t('Fire {0}: {1} m, {2}° · {3} %', nf.fire.id, Math.round(nf.dist), String(Math.round(nf.bearing)).padStart(3, '0'), Math.round(nf.fire.intensity * 100)), cls: '' });
-    else if (!nf && this.fires?.active) out.push({ text: t('All test fires out'), cls: '' });
     return out;
   }
 

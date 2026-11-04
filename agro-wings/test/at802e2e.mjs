@@ -109,9 +109,9 @@ await shot('05_fireboss_scooping');
 ok('scooping by key (T): water in, mass up', r.probes && r.h1 > r.h0 + 300, JSON.stringify(r));
 // Gear key in flight.
 await page.evaluate(() => { const g = window.__agro, ac = g.aircraft; ac.placeAirborne(-600, -3800, -Math.PI / 2, 120, 50); ac.fm.gearDown = 0; ac.fm.gearCmd = false; g.tick(1 / 60); });
-await page.keyboard.press('KeyU');
+await page.keyboard.press('KeyG');
 r = await page.evaluate(() => { const g = window.__agro; for (let i = 0; i < 60; i++) g.tick(1 / 60); return { cmd: g.aircraft.fm.gearCmd, pos: g.aircraft.fm.gearDown }; });
-ok('gear key (U) in flight: gear comes down', r.cmd === true && r.pos > 0, JSON.stringify(r));
+ok('gear key (G) in flight: gear comes down', r.cmd === true && r.pos > 0, JSON.stringify(r));
 // A drop on fire 2 (key C) from ≈ 35 m.
 r = await page.evaluate(() => {
   const g = window.__agro, ac = g.aircraft, fm = ac.fm, f = g.fires.fires[1];

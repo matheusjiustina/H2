@@ -500,8 +500,10 @@ function floatHullGeo() {
     out.push([hb, chine + 0.04]);
     for (let i = 1; i <= 4; i++) out.push([hb * (1 + 0.02 * Math.sin((i / 4) * Math.PI)), lerp(chine + 0.04, dy - 0.08, i / 4)]);
     for (let i = 0; i <= 6; i++) out.push(deck((i / 6) * (Math.PI / 2)));
-    const left = out.slice(1).reverse().map(([x, y]) => [-x, y]);
-    return out.reverse().map(([x, y]) => [x, y]).concat(left.reverse().slice(1)).reverse();
+    // Closed ring, symmetric: deck centre → left side → keel → right side →
+    // deck centre (counter-clockwise seen from the bow).
+    const left = out.slice().reverse().map(([x, y]) => [-x, y]);
+    return left.concat(out.slice(1));
   };
   const dense = [];
   for (let i = 0; i < sts.length - 1; i++) {
@@ -522,7 +524,7 @@ function floatHullGeo() {
   });
   for (let i = 0; i < rings.length - 1; i++) for (let k = 0; k < n - 1; k++) {
     const a = i * n + k, b = a + 1, c = a + n, d = c + 1;
-    idx.push(a, b, c, b, d, c);
+    idx.push(a, c, b, b, c, d); // faces outward (they pointed in: the hull looked hollow)
   }
   // Caps: bow tip and stern transom.
   const cap = (ri, flip) => {
@@ -531,7 +533,7 @@ function floatHullGeo() {
     pos.push(0, cy, r.z); uv.push(ri ? 1 : 0, 0.5); col.push(0.8, 0.8, 0.8);
     for (let k = 0; k < n - 1; k++) { const a = ri * n + k, b = a + 1; if (flip) idx.push(c0, b, a); else idx.push(c0, a, b); }
   };
-  cap(0, true); cap(rings.length - 1, false);
+  cap(0, false); cap(rings.length - 1, true);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
@@ -1187,8 +1189,10 @@ export function createAT802Model(panel, opts = {}) {
       leg.castShadow = true;
       pivot.add(leg);
       gearGroups[name] = { group: pivot, wheel, spin: spinPart, rest: wheel.position.clone(), sx };
-      // Retracted: nose legs swing up and forward over the bow, mains up and aft.
-      gearAnim.push({ pivot, up: nose ? -2.55 : 1.55 });
+      // Retracted (Wipline amphibian, EC-KRT photographs): the nose legs fold
+      // forward along the bow, the wheels left just ahead of its tip at deck
+      // height; the mains swing up and aft into their wells inside the float.
+      gearAnim.push({ pivot, up: nose ? -1.45 : 1.0 });
     }
   }
 
