@@ -2,7 +2,7 @@
 // power line and creek water. Static parts are merged per material.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BASE, RUNWAY, HQ, GRAIN_POINTS, FENCES, POWERLINE, CREEK, FARM_SITES, WATER } from './layout.js';
+import { BASE, APRON0, HANGAR0, RUNWAY, HQ, GRAIN_POINTS, FENCES, POWERLINE, CREEK, FARM_SITES, WATER } from './layout.js';
 import { canvas, canvasTexture, makeLabel } from '../core/textures.js';
 import { grainSilo, grainDryer, grainStore } from './grain.js';
 import { rng } from '../core/math.js';
@@ -80,6 +80,9 @@ function makeMaterials() {
   M.glass = std({ color: 0x202a30, roughness: 0.08, metalness: 0.2, envMapIntensity: 1.2 });
   M.dirtyWhite = std({ color: 0xdedbd2, roughness: 0.7 });
   M.hoseBlack = std({ color: 0x111111, roughness: 0.7 });
+  // Translucent roof sheets (polycarbonate): pale outside, daylight inside.
+  M.skylight = std({ color: 0xdfe7e2, roughness: 0.3, metalness: 0.05, emissive: 0x9aa6a0, emissiveIntensity: 0.18 });
+  M.skyIn = new THREE.MeshBasicMaterial({ color: 0xe9efe6 });
   // Vehicles and equipment. Most parts reuse the materials above so the
   // merged static meshes (one draw per material) stay few.
   M.paintWhite = new THREE.MeshPhysicalMaterial({ color: 0xe9e9e4, roughness: 0.38, metalness: 0.05, clearcoat: 0.5, clearcoatRoughness: 0.25 });
@@ -184,6 +187,9 @@ export function createStructures(terrain, scene) {
 
   dyn.hangar = buildHangar(B, M, group);
   buildService(B, M, group, H);
+  buildCrewBase(B, M, group);
+  apronLights(B, M);
+  basePortal(B, M, group);
   buildHelipad(B, M, group, H);
   buildHelipad(B, M, group, H, BASE.helipad2);
   buildVehicles(B, M, H);
@@ -275,10 +281,10 @@ function buildHangar(B, M, group) {
   B.add(tg, M.metalWall, h.x, h.h, z0 - 0.05, Math.PI);
   gableRoof(B, M.metalRoof, h.x, h.h, h.z, h.w, h.d, rise, Math.PI / 2 * 0 + 0, 0.8);
   // Sign over the opening.
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.6), new THREE.MeshStandardMaterial({
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(13, 2.3), new THREE.MeshStandardMaterial({
     map: signTexture([{ text: 'AGRO WINGS', font: 'bold 110px Arial' }, { text: 'AVIAÇÃO AGRÍCOLA', font: 'bold 54px Arial' }]), roughness: 0.7,
   }));
-  sign.position.set(h.x, h.h + 1.0, z1 + 0.2);
+  sign.position.set(h.x, h.h + 1.05, z1 + 0.22);
   group.add(sign);
   // Workbench along the back wall + tools.
   const bz = z0 + 0.9;
@@ -360,7 +366,7 @@ function buildHangar(B, M, group) {
   })();
   const poolMat = new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false });
   const lampGeo = [], poolGeo = [];
-  for (const lz of [h.z - 4, h.z + 3]) for (const lx of [-7, 0, 7]) {
+  for (const lz of [h.z - h.d * 0.28, h.z, h.z + h.d * 0.28]) for (const lx of [-h.w * 0.3, 0, h.w * 0.3]) {
     lampGeo.push(new THREE.CylinderGeometry(0.32, 0.42, 0.22, 14).translate(h.x + lx, h.h - 0.35, lz));
     poolGeo.push(new THREE.PlaneGeometry(7, 7).rotateX(-Math.PI / 2).translate(h.x + lx, 0.2, lz));
     B.add(rodGeo([h.x + lx, h.h - 0.25, lz], [h.x + lx, h.h + 0.4, lz], 0.015), M.steel);
@@ -369,6 +375,7 @@ function buildHangar(B, M, group) {
   const pools = new THREE.Mesh(mergeGeometries(poolGeo), poolMat);
   pools.renderOrder = 3;
   group.add(lamps, pools);
+  hangarBuilding(B, M, group, h, rise);
   // Sliding doors: four corrugated leaves on two top tracks; each pair parks
   // outside its side wall. Open by day, closed at dusk unless an aircraft
   // is near; while closed they are a collider.
@@ -397,6 +404,7 @@ function buildHangar(B, M, group) {
   B.collider(x0 - 0.5, x0 + 0.5, z0 - 0.5, z1 + 0.2, h.h + rise, 'hangar wall');
   B.collider(x1 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.2, h.h + rise, 'hangar wall');
   B.collider(x0 + 0.5, x0 + 5.2, z0, z1 - 4, 2.2, 'hangar equipment'); // tool chest, trestles, spare hopper
+  B.collider(x0 + 0.2, x0 + 1.6, z1 - 8.6, z1 - 1.4, 3.3, 'hangar rack');
   B.collider(x1 - 4.0, x1 - 0.5, h.z - 6, z1 - 1.5, 2.6, 'hangar equipment'); // compressor, ladder, drums
   B.collider(x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.6, h.h + rise + 0.2, 'hangar roof', h.h - 0.6);
   const doorCol = B.collider(x0 - 0.5, x1 + 0.5, z1 + 0.1, z1 + 0.6, h.h, 'hangar door');
@@ -427,6 +435,206 @@ function buildHangar(B, M, group) {
       poolMat.opacity = 0.05 + 0.3 * dark;
     },
   };
+}
+
+// The main hangar's building around its shell (sede principal): the front
+// gable, a block plinth, gutters and downpipes, translucent roof sheets, a
+// lean-to office on the west side, flood lights over the door, a concrete
+// apron at the opening and a pallet rack inside.
+function hangarBuilding(B, M, group, h, rise) {
+  const x0 = h.x - h.w / 2, x1 = h.x + h.w / 2, z0 = h.z - h.d / 2, z1 = h.z + h.d / 2;
+  const half = h.w / 2, slope = Math.atan2(rise, half);
+  // Front gable over the opening (the sign hangs on it) and its lining.
+  const tri = new THREE.Shape([new THREE.Vector2(-half, 0), new THREE.Vector2(half, 0), new THREE.Vector2(0, rise)]);
+  const tg = new THREE.ShapeGeometry(tri);
+  B.add(tg, M.metalWall, h.x, h.h, z1 + 0.05);
+  B.add(tg, M.hangarLining, h.x, h.h, z1 - 0.05, Math.PI);
+  // Block plinth (1.2 m, painted) along the back and the sides, outside the sheeting.
+  B.box(h.w + 0.5, 1.2, 0.24, M.wall, h.x, 0.6, z0 - 0.12, 0, 3);
+  for (const sx of [x0 - 0.12, x1 + 0.12]) B.box(0.24, 1.2, h.d + 0.24, M.wall, sx, 0.6, h.z - 0.12, 0, 3);
+  B.box(h.w + 0.56, 0.22, 0.3, M.padConcrete, h.x, 0.11, z0 - 0.12);
+  for (const sx of [x0 - 0.12, x1 + 0.12]) B.box(0.3, 0.22, h.d + 0.3, M.padConcrete, sx, 0.11, h.z - 0.12);
+  // Gutters along both eaves, downpipes at the four corners.
+  for (const s of [-1, 1]) {
+    const gx = h.x + s * (half + 0.95);
+    B.box(0.26, 0.2, h.d + 1.6, M.galv, gx, h.h - 0.22, h.z);
+    for (const gz of [z0 - 0.6, z1 + 0.6]) B.cyl(0.06, 0.06, h.h - 0.2, M.galv, gx, (h.h - 0.2) / 2, gz, 8);
+  }
+  // Translucent sheets: two bands of three on each slope, daylight under them.
+  for (const s of [-1, 1]) for (const u of [half * 0.32, half * 0.68]) {
+    const cy = h.h + rise * (1 - u / half);
+    for (const k of [-1, 0, 1]) {
+      const cz = h.z + k * h.d * 0.3, len = h.d * 0.18;
+      B.add(new THREE.BoxGeometry(1.05 / Math.cos(slope), 0.03, len), M.skylight, h.x + s * u, cy + 0.08, cz, 0, 0, -s * slope);
+      B.add(new THREE.BoxGeometry(1.0 / Math.cos(slope), 0.01, len - 0.1), M.skyIn, h.x + s * u, cy - 0.125, cz, 0, 0, -s * slope);
+    }
+  }
+  // Ridge cap.
+  B.box(0.5, 0.12, h.d + 1.6, M.galv, h.x, h.h + rise + 0.07, h.z);
+  // Flood lights on arms over the opening.
+  for (const lx of [-h.w * 0.36, 0, h.w * 0.36]) {
+    B.add(rodGeo([h.x + lx, h.h + 0.15, z1 + 0.1], [h.x + lx, h.h + 0.15, z1 + 0.95], 0.04), M.steel);
+    B.box(0.55, 0.16, 0.38, M.black, h.x + lx, h.h + 0.08, z1 + 1.05);
+    B.box(0.48, 0.02, 0.3, M.white, h.x + lx, h.h - 0.01, z1 + 1.05);
+  }
+  // Concrete apron at the opening (the floor slab continues 9 m out).
+  B.box(h.w + 6, 0.12, 9, M.concrete, h.x, 0.0, z1 + 5, 0, 4);
+  for (const ex of [-1, 1]) B.box(0.2, 0.125, 9, M.padConcrete, h.x + ex * (h.w / 2 + 3), 0.0, z1 + 5);
+  // Lean-to on the west side: pilots' room and office (block walls,
+  // windows, a door to the apron side, its own sloping roof, AC unit).
+  const ax1 = x0 - 0.25, ax0 = ax1 - 6.5, az0 = z0 + 1.2, az1 = z1 - 6, aw = ax1 - ax0, ad = az1 - az0, ah = 3.3;
+  const acx = (ax0 + ax1) / 2, acz = (az0 + az1) / 2;
+  B.box(aw, 0.25, ad, M.concrete, acx, 0.12, acz);
+  B.box(0.2, ah, ad, M.wall, ax0 + 0.1, ah / 2, acz, 0, 3);
+  B.box(aw, ah, 0.2, M.wall, acx, ah / 2, az1 - 0.1, 0, 3);
+  B.box(aw, ah, 0.2, M.wall, acx, ah / 2, az0 + 0.1, 0, 3);
+  B.box(0.22, 0.9, ad + 0.04, M.green, ax0 + 0.09, 0.45, acz); // painted dado
+  B.box(aw + 0.04, 0.9, 0.22, M.green, acx, 0.45, az1 - 0.09);
+  // Windows (west wall) and the door + window on the apron side.
+  for (const wz of [az0 + ad * 0.25, az0 + ad * 0.6]) {
+    B.box(0.06, 1.15, 1.9, M.glass, ax0 - 0.02, 1.75, wz);
+    B.box(0.1, 0.08, 2.05, M.white, ax0 - 0.03, 2.36, wz); B.box(0.1, 0.08, 2.05, M.white, ax0 - 0.03, 1.15, wz);
+    B.box(0.1, 1.25, 0.06, M.white, ax0 - 0.03, 1.75, wz);
+  }
+  B.box(0.95, 2.1, 0.06, M.paintWhite, acx + 1.6, 1.05, az1 + 0.02);
+  B.box(1.6, 1.1, 0.06, M.glass, acx - 1.3, 1.75, az1 + 0.02);
+  B.box(1.75, 0.08, 0.1, M.white, acx - 1.3, 2.33, az1 + 0.04); B.box(1.75, 0.08, 0.1, M.white, acx - 1.3, 1.17, az1 + 0.04);
+  B.box(1.3, 0.12, 0.9, M.concrete, acx + 1.6, 0.06, az1 + 0.55); // step
+  B.box(0.75, 0.55, 0.32, M.dirtyWhite, ax0 - 0.2, 2.7, az0 + ad * 0.85); // AC unit
+  {
+    const rr = 0.55, len = Math.hypot(aw + 1.0, rr), sl = Math.atan2(rr, aw + 1.0);
+    const g = new THREE.BoxGeometry(len, 0.1, ad + 1.0);
+    scaleBoxUV(g, len, 0.1, ad + 1.0, 4);
+    B.add(g, M.metalRoof, acx - 0.5, ah + rr / 2 + 0.05, acz, 0, 0, sl);
+  }
+  const offSign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.55), new THREE.MeshStandardMaterial({ map: makeLabel('OPERAÇÕES · PILOTOS', { w: 768, h: 176, bg: '#f2f0ea', fg: '#2c4a22', font: 'bold 72px Arial' }), roughness: 0.6 }));
+  offSign.position.set(acx + 1.6, 2.55, az1 + 0.07);
+  group.add(offSign);
+  B.collider(ax0 - 0.5, ax1 + 0.2, az0 - 0.2, az1 + 0.3, ah + 0.7, 'hangar office');
+  // Pallet rack along the west wall inside: orange uprights, beams, boxes.
+  const rx = x0 + 0.85;
+  for (const rz of [z1 - 8.2, z1 - 5, z1 - 1.8]) for (const dx of [-0.42, 0.42]) B.box(0.08, 3.1, 0.08, M.orange, rx + dx, 1.55, rz);
+  for (const ry of [0.15, 1.15, 2.15, 3.05]) for (const dx of [-0.42, 0.42]) B.box(0.06, 0.1, 6.5, M.blueDark, rx + dx, ry, z1 - 5);
+  for (const ry of [0.2, 1.2, 2.2]) B.box(0.86, 0.03, 6.4, M.wood, rx, ry + 0.02, z1 - 5);
+  const r = rng(41);
+  for (const ry of [0.2, 1.2, 2.2]) for (let i = 0; i < 5; i++) {
+    const bw = 0.5 + r() * 0.3, bh = 0.35 + r() * 0.45;
+    B.box(0.7, bh, bw, r() < 0.6 ? M.wood : r() < 0.5 ? M.dirtyWhite : M.blue, rx, ry + 0.05 + bh / 2, z1 - 7.8 + i * 1.3 + r() * 0.2);
+  }
+}
+
+// Apron flood-light poles at the corners of the main base's apron.
+function apronLights(B, M) {
+  const a = BASE.apron;
+  for (const [x, z] of [[a.x0 + 3, a.z0 + 3], [a.x0 + 3, a.z1 - 3], [a.x1 - 3, a.z0 + 3], [-420, a.z0 + 3]]) {
+    B.cyl(0.11, 0.16, 11, M.galv, x, 5.5, z, 8);
+    B.box(0.12, 0.12, 1.6, M.steel, x, 10.8, z);
+    for (const s of [-1, 1]) { B.box(0.5, 0.18, 0.4, M.black, x, 10.65, z + s * 0.7); B.box(0.44, 0.02, 0.34, M.white, x, 10.55, z + s * 0.7); }
+    B.box(0.3, 0.45, 0.2, M.steel, x, 1.4, z + 0.18); // switch box
+    B.collider(x - 0.35, x + 0.35, z - 0.35, z + 0.35, 11, 'light pole');
+  }
+}
+
+// Base de apoio (main base only): the ground crew's block building behind the
+// crew post — changing room, PPE store and the locked pesticide store under
+// one sloping roof with a veranda to the apron; PPE rack, lockers, wash tank
+// and emergency shower under the veranda; the cage of triple-rinsed empty
+// containers beside it; a water tank on the roof.
+function buildCrewBase(B, M, group) {
+  const c = BASE.crewBase, x0 = c.x - c.w / 2, x1 = c.x + c.w / 2, z0 = c.z - c.d / 2, z1 = c.z + c.d / 2, hh = 3.1;
+  const ver = 2.6; // veranda depth (towards the apron, +Z)
+  B.box(c.w + 1.2, 0.16, c.d + ver + 0.4, M.concrete, c.x, 0.08, c.z + ver / 2, 0, 4);
+  // Walls (block, plastered) with a painted green dado.
+  B.box(c.w, hh, 0.2, M.wall, c.x, hh / 2, z0 + 0.1, 0, 3);
+  B.box(c.w, hh, 0.2, M.wall, c.x, hh / 2, z1 - 0.1, 0, 3);
+  B.box(0.2, hh, c.d, M.wall, x0 + 0.1, hh / 2, c.z, 0, 3);
+  B.box(0.2, hh, c.d, M.wall, x1 - 0.1, hh / 2, c.z, 0, 3);
+  for (const wz of [z0 + 0.08, z1 - 0.08]) B.box(c.w + 0.04, 1.0, 0.22, M.green, c.x, 0.58, wz);
+  for (const wx of [x0 + 0.08, x1 - 0.08]) B.box(0.22, 1.0, c.d + 0.04, M.green, wx, 0.58, c.z);
+  // Inner partitions (three rooms).
+  for (const px of [x0 + c.w / 3, x0 + (2 * c.w) / 3]) B.box(0.14, hh, c.d - 0.3, M.wall, px, hh / 2, c.z);
+  // Front: three doors, high windows, room plates.
+  const rooms = [
+    ['VESTIÁRIO', '#f2f0ea', '#1f2a1f'], ['EPI', '#f2f0ea', '#1f2a1f'], ['DEFENSIVOS · ACESSO RESTRITO', '#f0b20f', '#1b1c1d'],
+  ];
+  rooms.forEach(([label, bg, fg], i) => {
+    const rx = x0 + c.w / 6 + (i * c.w) / 3;
+    B.box(0.95, 2.1, 0.06, i === 2 ? M.steel : M.paintWhite, rx - 0.9, 1.05 + 0.16, z1 + 0.02);
+    B.box(1.5, 0.6, 0.06, i === 2 ? M.steel : M.glass, rx + 0.85, 2.35, z1 + 0.02); // high window (a grille on the store)
+    B.box(1.62, 0.07, 0.1, M.white, rx + 0.85, 2.68, z1 + 0.04); B.box(1.62, 0.07, 0.1, M.white, rx + 0.85, 2.02, z1 + 0.04);
+    if (i === 2) for (let k = 0; k < 6; k++) B.box(1.45, 0.03, 0.04, M.black, rx + 0.85, 2.12 + k * 0.08, z1 + 0.06);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(i === 2 ? 2.0 : 1.1, 0.32), new THREE.MeshStandardMaterial({ map: makeLabel(label, { w: i === 2 ? 768 : 384, h: 112, bg, fg, font: `bold ${i === 2 ? 50 : 64}px Arial` }), roughness: 0.6 }));
+    plate.position.set(rx - 0.9 + (i === 2 ? 0.45 : 0), 2.5, z1 + 0.06);
+    group.add(plate);
+  });
+  // Sloping roof over the rooms and the veranda (high at the back), steel posts.
+  {
+    const run = c.d + ver + 0.6, rr = 0.9, len = Math.hypot(run, rr), sl = Math.atan2(rr, run);
+    const g = new THREE.BoxGeometry(c.w + 1.0, 0.1, len);
+    scaleBoxUV(g, c.w + 1.0, 0.1, len, 4);
+    B.add(g, M.metalRoof, c.x, hh + 0.15 + rr / 2, z0 - 0.3 + run / 2, 0, -sl, 0);
+    for (const px of [x0 + 0.2, c.x - c.w / 6, c.x + c.w / 6, x1 - 0.2]) B.box(0.12, hh + 0.1, 0.12, M.steel, px, (hh + 0.1) / 2, z1 + ver - 0.15);
+    B.box(c.w + 0.2, 0.16, 0.12, M.steel, c.x, hh + 0.12, z1 + ver - 0.15);
+  }
+  // Sign on the fascia.
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 0.62), new THREE.MeshStandardMaterial({ map: makeLabel('BASE DE APOIO · USO OBRIGATÓRIO DE EPI', { w: 1280, h: 152, bg: '#2f6b2c', fg: '#ffffff', font: 'bold 64px Arial' }), roughness: 0.6 }));
+  sign.position.set(c.x, hh + 0.42, z1 + ver - 0.05);
+  group.add(sign);
+  // Under the veranda: lockers, PPE rack with coveralls and boots, bench,
+  // wash tank with a tap, emergency shower / eye wash.
+  for (let i = 0; i < 6; i++) {
+    B.box(0.45, 1.8, 0.48, M.steel, x0 + 0.6 + i * 0.47, 0.98, z1 + 0.28);
+    B.box(0.02, 0.18, 0.08, M.dirtyWhite, x0 + 0.6 + i * 0.47, 1.6, z1 + 0.53);
+  }
+  const prx = c.x - 1.2;
+  B.box(2.6, 0.05, 0.05, M.steel, prx, 1.85, z1 + 0.45);
+  for (const dx of [-1.3, 1.3]) B.box(0.06, 1.85, 0.06, M.steel, prx + dx, 0.95, z1 + 0.45);
+  for (let i = 0; i < 4; i++) {
+    const m = i % 2 ? M.green : M.white;
+    B.box(0.5, 1.05, 0.16, m, prx - 0.95 + i * 0.63, 1.25, z1 + 0.45); // coverall
+    B.box(0.16, 0.42, 0.1, m, prx - 0.95 + i * 0.63 - 0.18, 0.68, z1 + 0.45);
+    B.box(0.16, 0.42, 0.1, m, prx - 0.95 + i * 0.63 + 0.18, 0.68, z1 + 0.45);
+    B.box(0.14, 0.34, 0.26, M.white, prx - 1.05 + i * 0.63, 0.33, z1 + 0.95); // PVC boots
+    B.box(0.14, 0.34, 0.26, M.white, prx - 0.87 + i * 0.63, 0.33, z1 + 0.95);
+  }
+  B.box(2.4, 0.06, 0.42, M.wood, c.x + 2.6, 0.48, z1 + 1.6);
+  for (const dx of [-1.0, 1.0]) B.box(0.06, 0.4, 0.38, M.steel, c.x + 2.6 + dx, 0.24, z1 + 1.6);
+  const tx = x1 - 1.4;
+  B.box(1.1, 0.75, 0.65, M.concrete, tx, 0.53, z1 + 0.45); // wash tank
+  B.box(0.04, 0.3, 0.04, M.alu, tx, 1.05, z1 + 0.2);
+  B.add(rodGeo([x1 + 0.2, 0.16, z1 + 1.6], [x1 + 0.2, 2.6, z1 + 1.6], 0.05), M.green); // emergency shower
+  B.add(rodGeo([x1 + 0.2, 2.6, z1 + 1.6], [x1 - 0.3, 2.6, z1 + 1.6], 0.04), M.green);
+  B.add(new THREE.ConeGeometry(0.22, 0.18, 14).rotateX(Math.PI), M.green, x1 - 0.32, 2.48, z1 + 1.6);
+  B.add(new THREE.TorusGeometry(0.22, 0.03, 6, 16), M.green, x1 + 0.2, 1.05, z1 + 1.35, 0, Math.PI / 2);
+  // Water tank (fibreglass, blue) on the roof.
+  B.cyl(0.78, 0.68, 0.95, M.blue, x0 + 1.6, hh + 1.5, z0 + 1.2, 18);
+  B.cyl(0.8, 0.8, 0.1, M.blueDark, x0 + 1.6, hh + 2.0, z0 + 1.2, 18);
+  // Cage for the triple-rinsed empty containers (returned to the dealer).
+  const gx = x1 + 2.6, gz = c.z - 0.6;
+  for (const [dx, dz] of [[-1.1, -1.3], [1.1, -1.3], [-1.1, 1.3], [1.1, 1.3]]) B.box(0.07, 2.0, 0.07, M.galv, gx + dx, 1.0, gz + dz);
+  for (const yy of [0.12, 1.0, 1.95]) {
+    B.box(2.25, 0.05, 0.05, M.galv, gx, yy, gz - 1.3); B.box(2.25, 0.05, 0.05, M.galv, gx, yy, gz + 1.3);
+    B.box(0.05, 0.05, 2.65, M.galv, gx - 1.1, yy, gz); B.box(0.05, 0.05, 2.65, M.galv, gx + 1.1, yy, gz);
+  }
+  for (let k = -5; k <= 5; k++) { B.box(0.015, 1.9, 0.015, M.galv, gx + k * 0.2, 1.0, gz + 1.3); B.box(0.015, 1.9, 0.015, M.galv, gx - 1.1, 1.0, gz + k * 0.24); }
+  B.box(2.3, 0.04, 2.7, M.metalRoof, gx, 2.1, gz);
+  const r = rng(53);
+  for (let i = 0; i < 14; i++) B.box(0.3, 0.38, 0.22, M.white, gx - 0.8 + (i % 5) * 0.4, 0.33 + Math.floor(i / 5) * 0.4, gz - 0.9 + r() * 1.7, r() * 0.6);
+  B.collider(x0 - 0.3, x1 + 0.3, z0 - 0.3, z1 + 0.6, hh + 2.2, 'crew base');
+  B.collider(x0, x1 + 0.6, z1 + ver - 0.35, z1 + ver + 0.05, hh + 0.4, 'crew base veranda');
+  B.collider(gx - 1.25, gx + 1.25, gz - 1.45, gz + 1.45, 2.2, 'container cage');
+}
+
+// Entrance portal on the road from the headquarters, at the apron's north edge.
+function basePortal(B, M, group) {
+  const x = -445, z = BASE.apron.z0 - 9;
+  for (const dx of [-6, 6]) { B.box(0.5, 5.6, 0.5, M.wall, x + dx, 2.8, z); B.box(0.62, 0.3, 0.62, M.padConcrete, x + dx, 0.15, z); }
+  B.box(12.8, 0.3, 0.5, M.woodDark, x, 5.75, z);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(8.4, 1.3), new THREE.MeshStandardMaterial({ map: makeLabel('AGRO WINGS · SEDE', { w: 1024, h: 160, bg: '#f2ead8', fg: '#2c4a22', font: 'bold 96px Arial' }), roughness: 0.6, side: THREE.DoubleSide }));
+  sign.position.set(x, 4.85, z + 0.27);
+  group.add(sign);
+  B.box(8.6, 1.45, 0.12, M.woodDark, x, 4.85, z + 0.18);
+  for (const dx of [-6, 6]) B.collider(x + dx - 0.35, x + dx + 0.35, z - 0.35, z + 0.35, 5.8, 'portal');
 }
 
 function buildService(B, M, group, H) {
@@ -638,7 +846,7 @@ function buildFarmSite(B, M, group, H, site, dyn) {
   // Open machinery shed (galpão): steel columns, gable roof, earth floor; a
   // rustic wooden one on the small farms, a big one on the large farms.
   const kind = site.farm.shed ?? 'steel';
-  const h = BASE.hangar;
+  const h = HANGAR0;
   const [w, d, hh] = kind === 'big' ? [30, 16, 7.5] : kind === 'wood' ? [16, 10, 4.6] : [20, 14, 6];
   const post = kind === 'wood' ? M.woodDark : M.steel;
   for (const cx of [-w / 2, -w / 6, w / 6, w / 2]) for (const cz of [-d / 2, d / 2]) B2.box(kind === 'wood' ? 0.3 : 0.25, hh, kind === 'wood' ? 0.3 : 0.25, post, h.x + cx, hh / 2, h.z + cz);
@@ -658,7 +866,7 @@ function buildFarmSite(B, M, group, H, site, dyn) {
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.3), new THREE.MeshStandardMaterial({
     map: makeLabel(f.name.toUpperCase(), { w: 1024, h: 320, bg: '#f2ead8', fg: '#2c4a22', font: 'bold 92px Arial' }), roughness: 0.6, side: THREE.DoubleSide,
   }));
-  const ax = BASE.apron.x0 + 6, az = BASE.apron.z1 + 4;
+  const ax = APRON0.x0 + 6, az = APRON0.z1 + 4;
   sign.position.set(ax, 2.4, az);
   g2.add(sign);
   B2.box(0.12, 2.0, 0.12, M.wood, ax - 1.9, 1.0, az - 0.05);

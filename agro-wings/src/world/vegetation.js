@@ -6,7 +6,7 @@
 // obstacles cheap and independent from what is drawn.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { FORESTS, CREEK, FIELDS, HQ, BASE, ROADS, RUNWAY, FARM_SITES, WATER, pondRadius, siteById } from './layout.js';
+import { FORESTS, CREEK, FIELDS, HQ, BASE, APRON0, ROADS, RUNWAY, FARM_SITES, WATER, pondRadius, siteById } from './layout.js';
 import { reliefWeights, RING } from './relief.js';
 import { rng, fbm, segDist } from '../core/math.js';
 import {
@@ -89,7 +89,9 @@ export function createVegetation(terrain, quality) {
   const FIELDS0 = FIELDS.filter((f) => f.level === 1 && !f.farm), ROADS0 = ROADS.filter((rd) => !rd.mesh);
   const avoid = (x, z, m = 6) => {
     if (Math.abs(z) < 60 && x > RUNWAY.x0 - 250 && x < RUNWAY.x1 + 250) return true; // strip approach
-    if (x > BASE.apron.x0 - 30 && x < BASE.apron.x1 + 30 && z > BASE.apron.z0 - 50 && z < 30) return true;
+    // (The original apron: the random streams draw against it; the main
+    // base's larger apron is cleared afterwards, see onMainApron.)
+    if (x > APRON0.x0 - 30 && x < APRON0.x1 + 30 && z > APRON0.z0 - 50 && z < 30) return true;
     for (const f of FIELDS0) if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
     for (const rd of ROADS0) for (let i = 0; i < rd.pts.length - 1; i++) {
       if (segDist(x, z, rd.pts[i][0], rd.pts[i][1], rd.pts[i + 1][0], rd.pts[i + 1][1]) < rd.w / 2 + 3) return true;
@@ -234,8 +236,8 @@ export function createVegetation(terrain, quality) {
   }
   // Shade trees by the base: a big one over the crew bench.
   add('shade', BASE.crewPost.x + 8, BASE.crewPost.z - 14, 1.2);
-  add('ipe', BASE.hangar.x + 30, BASE.hangar.z - 6, 1.0);
-  add('shade', BASE.hangar.x - 34, BASE.hangar.z + 10, 1.1);
+  add('ipe', BASE.hangar.x + 36, BASE.hangar.z - 6, 1.0);
+  add('shade', BASE.hangar.x - 30, BASE.hangar.z - 4, 1.1);
   for (let i = 0; i < 160; i++) {
     const x = -3600 + r() * 7200, z = -3600 + r() * 7200;
     if (avoid(x, z, 25)) continue;
@@ -539,13 +541,20 @@ export function createVegetation(terrain, quality) {
     || WATER.streams.some((st) => st.points.some((q, i) => i < st.points.length - 1 && segDist(x, z, q[0], q[1], st.points[i + 1][0], st.points[i + 1][1]) < st.width * 0.5 + 7));
   // Clear what the outer fields, their pass corridors and the outer roads
   // claim (trees placed by the original farm's random streams included).
+  // The main base's apron (wider than the original one, up to the
+  // windbreak) and the hangar behind it: nothing grows there.
+  const A = BASE.apron, HG = BASE.hangar;
+  const onMainApron = (x, z, m) => (x > A.x0 - m && x < A.x1 + m && z > A.z0 - m && z < A.z1 + m)
+    || (Math.abs(x - HG.x) < HG.w / 2 + 12 && Math.abs(z - HG.z) < HG.d / 2 + 4);
+  // ...but the big shade tree over the crew post stays (it is the badeco's shade).
+  const crewTree = (x, z) => Math.hypot(x - BASE.crewPost.x - 8, z - BASE.crewPost.z + 14) < 0.5;
   for (let i = trees.length - 1; i >= 0; i--) {
     const t = trees[i];
-    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || inWater(t.x, t.z)) trees.splice(i, 1);
+    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || inWater(t.x, t.z) || (!crewTree(t.x, t.z) && onMainApron(t.x, t.z, 1.5))) trees.splice(i, 1);
   }
   for (let i = colliders.length - 1; i >= 0; i--) {
     const c = colliders[i];
-    if (!c.box && (cleared(c.x, c.z, true, 6) || inWater(c.x, c.z))) colliders.splice(i, 1);
+    if (!c.box && (cleared(c.x, c.z, true, 6) || inWater(c.x, c.z) || (!crewTree(c.x, c.z) && onMainApron(c.x, c.z, 1.5)))) colliders.splice(i, 1);
   }
 
   // --- build instanced cells ----------------------------------------------

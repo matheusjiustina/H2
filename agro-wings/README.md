@@ -678,6 +678,23 @@ high-bay lamps with light pools on the floor (no real lights). Colliders
 are now the walls, roof and equipment, so an aircraft can taxi in when
 the doors are open. Grass no longer grows through the slab.
 
+**Main base (sede principal).** The apron reaches west to the eucalyptus
+windbreak and north to the hangar's front (`BASE.apron`), so every airplane
+parks on it, the AT-802s too; the roads end at its north and south edges
+and the old fence across it is gone. The secondary farms keep the original
+service-area layout (`APRON0`, `HANGAR0`). The hangar is 34 × 24 m and
+8.5 m to the eaves: front gable with the sign, block plinth, gutters and
+downpipes, translucent roof sheets, flood lights over the door, a 9 m
+concrete apron at the opening, a pallet rack inside and a lean-to pilots'
+room / operations office on the west side. Behind the crew post, the
+*base de apoio* (`BASE.crewBase`): changing room, PPE store and a locked
+pesticide store under one roof with a veranda (lockers, PPE rack with
+coveralls and boots, wash tank, emergency shower), a water tank on the roof
+and the cage for triple-rinsed empty containers. Light poles at the apron's
+corners and a portal on the road from the headquarters. The service truck's
+routes and timings are unchanged (`test/truck.mjs`), and so is the physics
+(`test/golden.test.mjs`: the base's flat platform was not touched).
+
 **Farm activity.** A tractor with a disc harrow works the fallow T-08 lane
 by lane with headland turns, raising dust; its pose is a function of time,
 so updates are throttled with distance (every frame < 500 m, 8 Hz to

@@ -10,10 +10,20 @@ export const FAR_HALF = 24000; // horizon ring
 
 export const RUNWAY = { x0: -400, x1: 400, z: 0, width: 24, shoulder: 10 };
 
+// Service-area layout shared by the secondary farms (their apron and shed
+// sit where the main base's first ones did; FARM_SITES below).
+export const APRON0 = { x0: -445, x1: -315, z0: -104, z1: -38 };
+export const HANGAR0 = { x: -385, z: -128, w: 24, d: 18, h: 7.5 };
+
 export const BASE = {
-  apron: { x0: -445, x1: -315, z0: -104, z1: -38 },
+  // Main base (sede principal): the apron reaches west to the eucalyptus
+  // windbreak (every airplane parks on it, the AT-802s too) and north to the
+  // hangar's front.
+  apron: { x0: -497, x1: -315, z0: -120, z1: -38 },
   taxiway: { x0: -392, x1: -372, z0: -40, z1: -12 },
-  hangar: { x: -385, z: -128, w: 24, d: 18, h: 7.5 },
+  // Main hangar: 34 x 24 m, 8.5 m to the eaves (an AT-802's 18 m span
+  // fits inside with room to walk round it), its front on the apron.
+  hangar: { x: -385, z: -132, w: 34, d: 24, h: 8.5 },
   // Service pad: the aircraft parks here heading east, left side to the tanks.
   pad: { x: -352, z: -64, heading: Math.PI / 2, radius: 7 },
   // White tyres marking the service spot, a row behind the parked tail (pad
@@ -42,8 +52,8 @@ export const BASE = {
   // east of the first, west of the taxiway: used when a helicopter is
   // flown and all six airplanes wait parked.
   parking6: { x: -404, z: -45, heading: Math.PI / 2 },
-  // AT-802A and Fire Boss (18.04 m span): on the grass west of the apron,
-  // clear of the other spots and of the taxi route.
+  // AT-802A and Fire Boss (18.04 m span): on the west apron (grass at the
+  // secondary farms), clear of the other spots and of the taxi route.
   parking7: { x: -472, z: -58, heading: Math.PI / 2 },
   parking8: { x: -472, z: -88, heading: Math.PI / 2 },
   // Helicopter pad (R44): gravel pad with a painted H at the east end of the
@@ -57,6 +67,9 @@ export const BASE = {
   mixTank: { x: -366, z: -74 },
   reservoirs: [{ x: -378, z: -80 }, { x: -378, z: -70 }],
   crewPost: { x: -350, z: -90 }, // shaded bench where the badeco waits
+  // Base de apoio (main base): the crew's building north of the crew post,
+  // its veranda facing the apron (changing room, PPE, pesticide store).
+  crewBase: { x: -344, z: -115, w: 15, d: 6 },
   pickup: { x: -326, z: -76, heading: -0.4 },
   // Bay of the driving service truck (rear-axle position), by the crew post.
   truck: { x: -331, z: -98, heading: -Math.PI / 2 },
@@ -290,8 +303,8 @@ export const POWERLINE = {
 
 // Main farm roads (centre polylines). Field perimeters get carreadores automatically.
 export const ROADS = [
-  { w: 9, pts: [[-1900, -150], [-1200, -150], [-560, -150], [-450, -130], [-445, -70]] }, // sede -> base
-  { w: 8, pts: [[-445, -70], [-445, 220], [-450, 700], [-430, 1700]] },
+  { w: 9, pts: [[-1900, -150], [-1200, -150], [-560, -150], [-445, -150], [-445, -121]] }, // sede -> base (north edge of the apron)
+  { w: 8, pts: [[-445, -37], [-445, 220], [-450, 700], [-430, 1700]] }, // south from the apron
   { w: 8, pts: [[-445, -150], [-445, -1400], [-450, -2600]] },
   { w: 8, pts: [[-560, -150], [-560, -520]] },
   { w: 8, pts: [[-300, 250], [1150, 250]] },
@@ -384,7 +397,6 @@ export const FENCES = [
   { pts: [[-1150, -140], [-560, -140]], gateAt: 0.5 },
   { pts: [[-1150, 230], [-560, 230]], gateAt: 0.3 },
   { pts: [[-1150, -140], [-1150, 230]], gateAt: 0.7 },
-  { pts: [[-455, -110], [-455, -40]], gateAt: 0.5 },
   // Pasture fences in the rolling and hilly land: every post stands on the
   // terrain, so the wires follow the swells.
   ...pasture(2780, 3280, -3300, -2900, 's', 0.35), // T-44
@@ -510,9 +522,9 @@ function makeSite(f) {
   return {
     id: f.id, farm: f, main: false, dx, dz, y0: 0,
     runway: { x0, x1: x0 + f.len, z: dz, width: f.width, shoulder: 6, surface: f.surface, grade: f.grade, bank: f.bank ?? 0 },
-    apron: mvr(BASE.apron, dx, dz),
+    apron: mvr(APRON0, dx, dz),
     taxiway: { ...mvr(BASE.taxiway, dx, dz), z1: dz - f.width / 2 },
-    hangar: mv(BASE.hangar, dx, dz),
+    hangar: mv(HANGAR0, dx, dz),
     pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz), parking3: mv(BASE.parking3, dx, dz), parking4: mv(BASE.parking4, dx, dz), parking5: mv(BASE.parking5, dx, dz), parking6: mv(BASE.parking6, dx, dz), parking7: mv(BASE.parking7, dx, dz), parking8: mv(BASE.parking8, dx, dz),
     helipad: mv(BASE.helipad, dx, dz), helipad2: mv(BASE.helipad2, dx, dz),
     fuelTank: mv(BASE.fuelTank, dx, dz), mixTank: mv(BASE.mixTank, dx, dz),
