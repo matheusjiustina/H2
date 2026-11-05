@@ -3093,11 +3093,12 @@ switches with the six aeroplanes parked; a sixth parking spot was added).
 ## On foot at the bases (PilotFreeRoamSystem)
 
 Land at a base, stop, shut the engine down and a small **DESCER** button
-appears; the pilot gets out beside the aircraft and walks round the base.
+appears; the view moves to the pilot's eyes (first person, no character
+model) beside the aircraft and he walks round the base.
 By the aircraft he came from, **EMBARCAR** (or E) puts him back in.
 
 **Files:** `src/game/freeRoam.js` (system, zones, collisions, camera),
-`src/game/pilotFigure.js` (the figure), hooks in `src/game/game.js`, the
+hooks in `src/game/game.js`, the
 walking joystick in `src/ui/touch.js`, styles in `src/ui/styles.css`,
 strings in `src/i18n/pt-game.js`, test `test/freeroam.mjs`.
 
@@ -3123,17 +3124,16 @@ running in the game's single loop; nothing is loaded or duplicated.
   against the aircraft's hit boxes, the structures, trees, parked aircraft
   and the truck. No clear spot, no exit.
 - **Walking:** W/S/A/D, the arrows, the numpad (8/5/2, 4/6) and the bound
-  stick keys; mouse drag looks round, wheel zooms; on a phone the stick
-  becomes the walking joystick and a drag on the view looks round. 1.55
-  m/s with gentle acceleration, the body turns toward the motion,
-  procedural walk and idle; feet on the terrain (and the main hangar's
-  floor slab).
+  stick keys; mouse drag looks round; on a phone the stick becomes the
+  walking joystick and a drag on the view looks round. 2.0 m/s with a
+  short acceleration; the eye (1.65 m) follows the terrain with light
+  smoothing (and the main hangar's floor slab); no head bob.
 - **Collisions:** the structures' existing box colliders (hangar walls —
   the main hangar's open front lets him in —, sheds, tanks, office…),
   the tree collider, parked aircraft and the service truck
   (`world.extraObstacle`), the flown aircraft's hit boxes. Colliders within
-  40 m are listed every 15 m walked. The camera pulls in (and up) when
-  something is between it and the pilot.
+  40 m are listed every 15 m walked; the pilot's 0.3 m radius keeps the
+  eye off walls and fuselages.
 - **Boarding:** only within 3.2 m of the own aircraft's cockpit door point;
   parked aircraft never offer it. Boarding restores the camera mode the
   player had and the flight controls; the engine is not restarted.
@@ -3144,14 +3144,14 @@ running in the game's single loop; nothing is loaded or duplicated.
   aircraft as before.
 
 **Measured in this container** (software renderer, `node test/freeroam.mjs`,
-30/30 checks):
+31/31 checks):
 
 | | before (HEAD) | after, in the aircraft | after, on foot |
 | --- | --- | --- | --- |
-| draw calls / triangles at the pad | 729 / 1,627,589 | 729 / 1,627,589 | + the figure: 17 meshes, 1,720 triangles |
-| geometries / textures | 896 / 110 | 896 / 110 | + figure built once; 30 exit/board cycles: no growth |
-| game tick, CPU (ms, 120 ticks, no render) | 0.59–0.72 | 0.67–0.79 | 0.29 walking |
-| free-roam cost per frame | — | exit check 0.04 ms, 4×/s | 0.02 ms |
+| draw calls / triangles at the pad | 729 / 1,627,589 | 729 / 1,627,589 | nothing added (no model) |
+| geometries / textures | 896 / 110 | 896 / 110 | 30 exit/board cycles: no growth |
+| game tick, CPU (ms, 120 ticks, no render) | 0.59–0.72 | 0.58–0.79 | 0.28 walking |
+| free-roam cost per frame | — | exit check 0.04–0.06 ms, 4×/s | 0.013 ms |
 
 Frame time with the software GPU (750–5,600 ms per frame here) is noise,
 not a measurement of a real device; FPS on real PCs and phones was not
@@ -3163,16 +3163,17 @@ over the apron, while rolling and with the engine running; walking with
 W, Numpad 8 and the arrows; stopped by the hangar wall and a parked
 aircraft; no board button there; explore limit; mission coverage, fuel
 and hopper kept; take-off after boarding; phone layout (44 px button,
-joystick walks, flight controls hidden); 30 cycles, one figure.
+joystick walks, flight controls hidden); first-person eye at 1.65 m; 30
+cycles.
 
 **Known limits:** the farm sheds are one solid collider (not walked into);
-small props without colliders (drums, tyres) can be walked through; the
-figure is simple; no real-device FPS measurement.
+small props without colliders (drums, tyres) can be walked through; no
+real-device FPS measurement.
 
 **Rollback:** remove the `freeRoam` lines in `game.js` (import, the
 constructor line, `onFoot` in `tick`, the `forceBoard()` calls and the
 camera / prompt / `cameraInside` conditions) and the `walk` / `on-foot` lines
-in `touch.js`; delete `freeRoam.js`, `pilotFigure.js` and the `.foot-btn` /
+in `touch.js`; delete `freeRoam.js` and the `.foot-btn` /
 `.on-foot` CSS. Nothing else depends on it.
 
 ### One helipad; the spare helicopter in the hangar
