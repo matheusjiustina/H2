@@ -39,6 +39,7 @@ import { aircraftUnlocked } from './expansions.js';
 import { FireField } from '../world/fires.js';
 import { WaterFx } from '../world/waterFx.js';
 import { FireJobs } from './fireJobs.js';
+import { PilotFreeRoamSystem } from './freeRoam.js';
 
 const SETTINGS = 'agrowings.settings.v1';
 const GPS_PAGE_NAMES = { map: 'MAP', dest: 'DESTINATION', mission: 'MISSION', cov: 'COVERAGE' };
@@ -156,6 +157,7 @@ export class Game {
     this.hud = new HUD(this, this.uiRoot);
     this.touch = new TouchControls(this, this.uiRoot);
     this.tutorial = new Tutorial(this);
+    this.freeRoam = new PilotFreeRoamSystem(this);
     // A premium aircraft that is not unlocked never starts as the flown one.
     const start = this.fleet[this.settings.aircraft] && aircraftUnlocked(aircraftType(this.settings.aircraft)) ? this.settings.aircraft : AIRCRAFT_ORDER[0];
     this._activate(start);
@@ -230,6 +232,7 @@ export class Game {
 
   // Debug/validation: fly the current job hands-off through the normal inputs.
   startAutopilot(plan = 'contract') {
+    this.freeRoam?.forceBoard();
     this.autopilot = this.aircraft.kind === 'heli' ? new HeliAutopilot(this) : new Autopilot(this);
     this.autopilot.engage(plan);
     return this.autopilot;
@@ -238,6 +241,7 @@ export class Game {
   // Make `id` the flown aircraft (placed on the pad, inputs and spray hooked
   // up); every other aircraft is parked and becomes an obstacle.
   _activate(id) {
+    this.freeRoam?.forceBoard();
     // Premium expansions: refused here, not only hidden in the UI.
     if (!aircraftUnlocked(aircraftType(id))) id = AIRCRAFT_ORDER.find((k) => aircraftUnlocked(aircraftType(k)));
     const next = this.fleet[id];
@@ -414,6 +418,8 @@ export class Game {
   // ------------------------------------------------------------------ flow
   menuAction(a) {
     this.audio.start();
+    // Leaving the walk (menu, a new flight, a reset): back into the aircraft first.
+    if (['title', 'free', 'freeAir', 'career', 'continue', 'resetPad', 'resetRwy'].includes(a)) this.freeRoam?.forceBoard();
     switch (a) {
       case 'career':
         this._enterPlay('career');
@@ -691,6 +697,7 @@ export class Game {
   }
 
   resetAircraft(where) {
+    this.freeRoam?.forceBoard();
     // A crashed (or written-off) aircraft comes back repaired: placed with
     // 100 % damage it would fail again at once.
     if (this.aircraft.state === 'crashed' || this.aircraft.damage >= 100) return this.recover(where);
@@ -708,6 +715,7 @@ export class Game {
   // it had (fuel and hopper, as the badeco left them) and flies on; to the
   // base the hopper is emptied and the badeco loads it again.
   recover(where = 'pad') {
+    this.freeRoam?.forceBoard();
     const ac = this.aircraft;
     const load = this._loadAtCrash ?? { fuel: ac.fm.fuel, hopper: ac.fm.hopper };
     this._loadAtCrash = null;
@@ -844,7 +852,7 @@ export class Game {
         if (input.wasPressed('jobs') && this.mode === 'career') this.screens.board();
         if (input.wasPressed('office') && this.mode === 'career') this.screens.office();
         if (input.wasPressed('help')) this.screens.help();
-        if (input.wasPressed('replay') && this.replay.latest() >= 0) this.replay.play(this.replay.latest());
+        if (input.wasPressed('replay') && this.replay.latest() >= 0) { this.freeRoam?.forceBoard(); this.replay.play(this.replay.latest()); }
       }
     }
     const paused = (this.playing && (modal === 'pause' || modal === 'settings' || modal === 'help' || modal === 'office')) || this.replay.active;
@@ -853,7 +861,8 @@ export class Game {
     const mouse = input.consumeMouse();
     const ac = this.aircraft;
 
-    if (this.playing && !this.controlsLocked) this._playInput(input);
+    const onFoot = !!this.freeRoam?.active;
+    if (this.playing && !this.controlsLocked && !onFoot) this._playInput(input);
     this.service.fast = this.playing && input.down.has('KeyT') ? 5 : 1;
 
     if (dt > 0 && this._crashCam && ac.state === 'crashed' && this.rig.mode === 'orbit' && !(mouse.buttons & 1)) this.rig.orbit.yaw += dt * 0.16;
@@ -861,6 +870,8 @@ export class Game {
       if (this._outro) {
         this._outroGlide(dt);
         if ((this._outro.t += dt) >= this._outro.dur) this._outroToBase();
+      } else if (this.playing && onFoot) {
+        // On foot: the aircraft is not stepped (it stays where it stopped).
       } else if (this.playing) {
         ac.update(dt, input, { mouse, ...this._controlLaw(ac), heliModel: this.settings.heliModel, windScale: this.settings.wind, cameraMode: this.cameraMode });
       } else {
@@ -906,7 +917,9 @@ export class Game {
         const ax = (a, b) => (input.isDown(a) ? 1 : 0) - (input.isDown(b) ? 1 : 0);
         const eye = live && this.rig.mode === 'cockpit' ? ax('eyeUp', 'eyeDown') : 0;
         if (live) mouse.keys = { x: ax('lookRight', 'lookLeft'), y: ax('lookUp', 'lookDown'), zoom: ax('zoomOut', 'zoomIn'), reset: input.wasPressed('lookReset'), eye };
-        this.rig.update(pdt, !this.playing && this.showroom?.active ? this.showroom.target : ac, live || menuCam ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
+        // On foot the free-roam system drives the camera; otherwise it only
+        // checks (4 times a second) whether the exit button can show.
+        if (this.freeRoam.update(paused ? 0 : pdt, mouse, live)) { /* camera set */ } else this.rig.update(pdt, !this.playing && this.showroom?.active ? this.showroom.target : ac, live || menuCam ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
         if (this._camFly) this._camFlyStep(pdt);
         // The eye height is kept once the keys are let go.
         if (!eye && this.rig.eyeHeight !== this.settings.eyeHeight) {
@@ -929,10 +942,10 @@ export class Game {
       this.marks.update(pdt, this.camera);
       // Visual wind for vegetation/rain = the aircraft's mean wind (no turbulence).
       windAt(this.world.visualWind, ac.simTime ?? this.time, null, 10, this.settings.wind);
-      this.world.atmo.cameraInside = this.rig.mode === 'cockpit';
+      this.world.atmo.cameraInside = !this.freeRoam.active && this.rig.mode === 'cockpit';
       this.world.update(this.camera, ac.rPos, pdt, this.time);
       if (!headless) this._audio(rawDt);
-      if (this.playing) this._prompts();
+      if (this.playing) { if (this.freeRoam.active) this.hud.setPrompt(null); else this._prompts(); }
       this.hud.update(pdt);
       this._waypointUpdate();
       this.touch.update();

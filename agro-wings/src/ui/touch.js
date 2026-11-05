@@ -18,6 +18,7 @@ export class TouchControls {
     this.game = game;
     this.active = false;
     this.dpad = { x: 0, y: 0 };
+    this.walk = { x: 0, y: 0 };
     this.mode = 'stick';
     this.el = h(`<div class="touch">
       <div class="t-stick"><div class="t-knob"></div></div>
@@ -47,6 +48,8 @@ export class TouchControls {
       const l = Math.hypot(x, y);
       if (l > 1) { x /= l; y /= l; }
       knob.style.transform = `translate(${x * 40}px, ${y * 40}px)`;
+      this.walk.x = x; this.walk.y = y; // walking joystick when on foot
+      if (this.game.freeRoam?.active) return;
       v.roll = x;
       v.pitch = y; // drag down = stick back = nose up
     };
@@ -55,7 +58,7 @@ export class TouchControls {
     let fade = null;
     stick.addEventListener('pointerdown', (e) => { sid = e.pointerId; stick.setPointerCapture(e.pointerId); setStick(e); clearTimeout(fade); fade = setTimeout(() => stick.classList.add('faded'), 1500); });
     stick.addEventListener('pointermove', (e) => { if (e.pointerId === sid) setStick(e); });
-    const endStick = (e) => { if (e.pointerId !== sid) return; clearTimeout(fade); stick.classList.remove('faded'); sid = null; v.roll = 0; v.pitch = 0; knob.style.transform = ''; };
+    const endStick = (e) => { if (e.pointerId !== sid) return; clearTimeout(fade); stick.classList.remove('faded'); sid = null; this.walk.x = this.walk.y = 0; v.roll = 0; v.pitch = 0; knob.style.transform = ''; };
     stick.addEventListener('pointerup', endStick);
     stick.addEventListener('pointercancel', endStick);
     const thr = this.el.querySelector('.t-thr'), thrBar = thr.querySelector('span');
@@ -237,6 +240,8 @@ export class TouchControls {
       this.fbEl.querySelector('[data-tap=gear]').classList.toggle('on', !!fm.gearCmd);
       this.fbEl.querySelector('[data-tap=scoop]').classList.toggle('on', !!ws.probesCmd);
     }
+    // On foot: only the stick (as the walking joystick) and the top bar stay.
+    this.el.classList.toggle('on-foot', !!this.game.freeRoam?.active);
     this.el.classList.toggle('hidden', !this.game.playing);
     this.el.style.display = this.game.playing ? '' : 'none';
   }

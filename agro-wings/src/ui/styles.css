@@ -507,3 +507,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 
 .card .tag.lv0 { border-color: rgba(90,200,250,.6); color: #6cd0ff; }
 .lvl.school { color: #6cd0ff; }
+
+/* On foot (PilotFreeRoamSystem): a small GET OUT / BOARD button; the flight
+   readouts and touch flight controls step aside. */
+.foot-btn { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 188px); min-width: 108px; min-height: 40px; padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(240,192,32,.7); background: rgba(16,18,14,.72); color: #f3c623; font: 700 12px/1 Inter, system-ui, sans-serif; letter-spacing: .16em; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 6; }
+.foot-btn:hover { background: rgba(40,36,20,.85); }
+.foot-btn[hidden] { display: none !important; }
+.touch-mode .foot-btn { right: auto; left: 50%; transform: translateX(-50%); bottom: auto; top: max(10px, env(safe-area-inset-top)); min-height: 44px; min-width: 120px; }
+.on-foot .readouts, .on-foot .spraybadge, .on-foot .trimbadge, .on-foot .warnings, .on-foot .levels { display: none !important; }
+.touch.on-foot .t-btns, .touch.on-foot .t-thr, .touch.on-foot .t-rud, .touch.on-foot .t-flaps, .touch.on-foot .t-trim, .touch.on-foot .t-dpad, .touch.on-foot .t-tilt, .touch.on-foot .t-fb, .touch.on-foot .t-look, .touch.on-foot .t-strip, .touch.on-foot .cam { display: none !important; }
+.touch.on-foot .t-stick { display: block !important; width: 116px; height: 116px; border-radius: 50%; background: rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.35); }

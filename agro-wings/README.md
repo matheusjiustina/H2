@@ -3090,6 +3090,91 @@ switches with the six aeroplanes parked; a sixth parking spot was added).
 - The GPS is the game's AgroWings unit, not a specific Satloc model.
 - No end-to-end mission run or frame-time measurement for this build.
 
+## On foot at the bases (PilotFreeRoamSystem)
+
+Land at a base, stop, shut the engine down and a small **DESCER** button
+appears; the pilot gets out beside the aircraft and walks round the base.
+By the aircraft he came from, **EMBARCAR** (or E) puts him back in.
+
+**Files:** `src/game/freeRoam.js` (system, zones, collisions, camera),
+`src/game/pilotFigure.js` (the figure), hooks in `src/game/game.js`, the
+walking joystick in `src/ui/touch.js`, styles in `src/ui/styles.css`,
+strings in `src/i18n/pt-game.js`, test `test/freeroam.mjs`.
+
+**Integration.** States `PILOT_IN_AIRCRAFT → PILOT_EXITING → PILOT_ON_FOOT
+→ PILOT_BOARDING`. In the aircraft the system only checks, 4 times a
+second, whether the button may show. On foot: the aircraft is not
+stepped (it stays exactly where it stopped; fuel, load, damage, engine
+and flaps untouched), the flight inputs are not read, the camera rig is
+not run (the system drives the camera), the flight readouts and the touch
+flight controls are hidden. The world, crew, streaming and rendering keep
+running in the game's single loop; nothing is loaded or duplicated.
+
+- **Zones:** one oriented rectangle per base (`buildZones()` from `SITES`):
+  runway with shoulders, apron, hangar, crew area, helipad and parking
+  spots, +40 m. Every farm strip has its own. The pilot may walk 120 m
+  beyond it, not across the map.
+- **Exit button:** the flown aircraft on the ground inside a zone, below
+  0.3 m/s, engine off and rotor stopped, no menu, replay, autopilot or
+  camera move, and a clear spot found. With the engine running a hint says
+  to shut it down.
+- **Exit spot:** beside the cockpit on the left, then the right, further
+  back, then rings 4–10 m round the aircraft; each candidate is checked
+  against the aircraft's hit boxes, the structures, trees, parked aircraft
+  and the truck. No clear spot, no exit.
+- **Walking:** W/S/A/D, the arrows, the numpad (8/5/2, 4/6) and the bound
+  stick keys; mouse drag looks round, wheel zooms; on a phone the stick
+  becomes the walking joystick and a drag on the view looks round. 1.55
+  m/s with gentle acceleration, the body turns toward the motion,
+  procedural walk and idle; feet on the terrain (and the main hangar's
+  floor slab).
+- **Collisions:** the structures' existing box colliders (hangar walls —
+  the main hangar's open front lets him in —, sheds, tanks, office…),
+  the tree collider, parked aircraft and the service truck
+  (`world.extraObstacle`), the flown aircraft's hit boxes. Colliders within
+  40 m are listed every 15 m walked. The camera pulls in (and up) when
+  something is between it and the pilot.
+- **Boarding:** only within 3.2 m of the own aircraft's cockpit door point;
+  parked aircraft never offer it. Boarding restores the camera mode the
+  player had and the flight controls; the engine is not restarted.
+- **Safety:** changing aircraft, the main menu, a new flight, a reset, a
+  crash recovery, the test autopilot and a replay all put the pilot back in
+  first (`forceBoard`). An error in a transition falls back to "in the
+  aircraft". The walk is not saved; after a reload the game starts in the
+  aircraft as before.
+
+**Measured in this container** (software renderer, `node test/freeroam.mjs`,
+30/30 checks):
+
+| | before (HEAD) | after, in the aircraft | after, on foot |
+| --- | --- | --- | --- |
+| draw calls / triangles at the pad | 729 / 1,627,589 | 729 / 1,627,589 | + the figure: 17 meshes, 1,720 triangles |
+| geometries / textures | 896 / 110 | 896 / 110 | + figure built once; 30 exit/board cycles: no growth |
+| game tick, CPU (ms, 120 ticks, no render) | 0.59–0.72 | 0.67–0.79 | 0.29 walking |
+| free-roam cost per frame | — | exit check 0.04 ms, 4×/s | 0.02 ms |
+
+Frame time with the software GPU (750–5,600 ms per frame here) is noise,
+not a measurement of a real device; FPS on real PCs and phones was not
+measured.
+
+Checked: exit at the pad, at three points along the strip, by the R44 on
+the helipad and at Serra do Cedro (sloping strip); hidden in flight, low
+over the apron, while rolling and with the engine running; walking with
+W, Numpad 8 and the arrows; stopped by the hangar wall and a parked
+aircraft; no board button there; explore limit; mission coverage, fuel
+and hopper kept; take-off after boarding; phone layout (44 px button,
+joystick walks, flight controls hidden); 30 cycles, one figure.
+
+**Known limits:** the farm sheds are one solid collider (not walked into);
+small props without colliders (drums, tyres) can be walked through; the
+figure is simple; no real-device FPS measurement.
+
+**Rollback:** remove the `freeRoam` lines in `game.js` (import, the
+constructor line, `onFoot` in `tick`, the `forceBoard()` calls and the
+camera / prompt / `cameraInside` conditions) and the `walk` / `on-foot` lines
+in `touch.js`; delete `freeRoam.js`, `pilotFigure.js` and the `.foot-btn` /
+`.on-foot` CSS. Nothing else depends on it.
+
 ### One helipad; the spare helicopter in the hangar
 
 - **Main base:** one helipad (the gravel pad with the H at the east end of
