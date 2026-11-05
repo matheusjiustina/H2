@@ -27,15 +27,15 @@ export const ACTIONS = {
   rollRight: { get label() { return t('Roll right'); }, keys: ['KeyD', 'ArrowRight'], scope: 'classic' },
   yawLeft: { get label() { return t('Rudder left / steer'); }, keys: ['KeyZ'], scope: 'classic' },
   yawRight: { get label() { return t('Rudder right / steer'); }, keys: ['KeyX'], scope: 'classic' },
-  throttleUp: { get label() { return t('Power up'); }, keys: ['KeyR', 'ShiftLeft'] },
+  throttleUp: { get label() { return t('Power up'); }, keys: ['ShiftLeft', 'KeyR'] },
   throttleDown: { get label() { return t('Power down'); }, keys: ['ControlLeft'] },
   brakes: { get label() { return t('Brakes (hold)'); }, keys: ['Space'] },
-  flapsUp: { get label() { return t('Flaps up'); }, keys: ['KeyG', 'Shift+KeyB'] },
+  flapsUp: { get label() { return t('Flaps up'); }, keys: ['KeyG'] },
   flapsDown: { get label() { return t('Flaps down'); }, keys: ['KeyB'] },
   trimUp: { get label() { return t('Trim nose up'); }, keys: ['BracketRight', 'PageUp'] },
   trimDown: { get label() { return t('Trim nose down'); }, keys: ['BracketLeft', 'PageDown'] },
   spray: { get label() { return t('Spray on / off'); }, keys: ['KeyC', 'Enter'] },
-  gear: { get label() { return t('Gear up / down (amphibian; flaps up: Shift+B)'); }, keys: ['KeyG'] },
+  gear: { get label() { return t('Gear up / down (amphibian)'); }, keys: ['KeyU'] },
   scoop: { get label() { return t('Scoop probes up / down (Fire Boss)'); }, keys: ['KeyT'] },
   engine: { get label() { return t('Engine (hold start / tap stop)'); }, keys: ['KeyF'] },
   camera: { get label() { return t('Cockpit / chase camera'); }, keys: ['KeyV'] },
@@ -317,6 +317,7 @@ export function keyLabel(code) {
   if (!code) return '—';
   const c = chordOf(code);
   if (c) return `${code.slice(0, code.indexOf('+'))} + ${keyLabel(c[1])}`;
+  if (/^(Shift|Control|Alt)(Left|Right)$/.test(code)) return code.replace(/(Left|Right)$/, '').replace('Control', 'Ctrl');
   return code.replace(/^Numpad/, 'Num ').replace(/^Key/, '').replace(/^Digit/, '').replace('Arrow', '').replace('Left', ' L').replace('Right', ' R')
     .replace('Bracket R', ']').replace('Bracket L', '[').replace('Control', 'Ctrl').replace('Backspace', '⌫').replace('Escape', 'Esc')
     .replace('Divide', '÷').replace('Multiply', '×').replace('Add', '+').replace('Subtract', '−').replace('Equal', '=').replace('Minus', '-');
