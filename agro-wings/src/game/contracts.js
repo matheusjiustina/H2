@@ -148,6 +148,8 @@ export class Career {
     this.read = {}; // office inbox: request id -> read
     this.seq = 0; // operation counter (both histories)
     this.tutorialDone = false;
+    this.resume = null; // the job in hand when the game was left: { job, ac, fuel, hopper, t }
+    this.onSave = null; // game hook: returns the current resume point (undefined = keep)
     this.load();
   }
 
@@ -172,7 +174,9 @@ export class Career {
     try {
       const jobs = {};
       for (const [id, j] of Object.entries(this.jobs)) jobs[id] = j.serialize();
-      localStorage.setItem(STORE, JSON.stringify({ money: this.money, completed: this.completed, jobs, history: this.history.slice(-30), history2: this.history2.slice(-30), read: this.read, seq: this.seq, tutorialDone: this.tutorialDone }));
+      const r = this.onSave?.();
+      if (r !== undefined) this.resume = r;
+      localStorage.setItem(STORE, JSON.stringify({ resume: this.resume, money: this.money, completed: this.completed, jobs, history: this.history.slice(-30), history2: this.history2.slice(-30), read: this.read, seq: this.seq, tutorialDone: this.tutorialDone }));
     } catch { /* storage unavailable: progress stays in memory */ }
   }
   load() {
@@ -186,6 +190,7 @@ export class Career {
       this.read = s.read || {};
       this.seq = s.seq ?? this.history.length + this.history2.length;
       this.tutorialDone = !!s.tutorialDone;
+      this.resume = s.resume && contractById(s.resume.job) ? s.resume : null;
       for (const [id, js] of Object.entries(s.jobs || {})) {
         const c = contractById(id);
         if (!c) continue;
@@ -204,6 +209,7 @@ export class Career {
     this.read = {};
     this.seq = 0;
     this.tutorialDone = false;
+    this.resume = null;
     this.save();
   }
 }

@@ -3090,6 +3090,28 @@ switches with the six aeroplanes parked; a sixth parking spot was added).
 - The GPS is the game's AgroWings unit, not a specific Satloc model.
 - No end-to-end mission run or frame-time measurement for this build.
 
+### Spraying a little high, and continuing a job
+
+**A pass flown a little high still counts.** The 'Too high to spray'
+warning still shows above 8 m, and the losses above the ideal window (drift
+and evaporation, `sprayer.lost`) still count against the report's waste,
+pay and stars. The coverage map now takes what lands, at the strip's own
+dose, up to 20 m over the crop, fading out by 30 m. Before, a pass at
+10–20 m spread its reduced dose so thin (single-pass p80 dose 0.69–0.79
+against the 0.7 threshold) that the strip often did not mark. Measured
+in-browser (Ipanema, one pass over T-07, p80 dose): 5 m 0.86, 10 m 0.82,
+14 m 0.92, 20 m 0.87, 25 m 0.53.
+
+**Continue where you left off.** Coverage was already saved per contract
+in `localStorage` (every 15 s, on the menu, on hide). The save now also
+keeps the job in hand with its aircraft, fuel and hopper (`career.resume`).
+The title menu shows *Continuar de onde parou* (contract, % sprayed,
+registration). It restores the same aircraft and load at the strip nearest
+the job's fields that takes the aircraft, with the coverage as it was.
+Handing the job in clears it. Checked in-browser: 1.6 % sprayed, 333 L
+hopper and 111 L fuel, then a page reload and *Continuar*: the same
+figures, at the main base.
+
 ### AgTruck geometry revision (reverse engineering from photos)
 
 The exterior was re-fitted to side photos of PR-AAQ and PR-AAI (scale from

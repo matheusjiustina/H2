@@ -93,6 +93,13 @@ export class Sprayer {
     loss = clamp(loss, 0, 0.8);
     const useful = litres * (1 - loss);
     this.lost += litres * loss;
+    // What reaches the crop for the coverage map. Flying a little high still
+    // marks the strip as sprayed (the 'Too high' warning stays and the losses
+    // above count against the report), so a pass that drifts up over a rise
+    // is not thrown away; only far too high (20–30 m and up) fades out.
+    const Wideal = this.game.aircraft.type.spray.swath;
+    const keep = Math.max(1, W / Wideal) * (1 - smoothstep(20, 30, hMid));
+    const depFactor = useful > 0 ? (litres * keep) / useful : 0;
     // Lateral axis on the ground (left wing direction, flattened).
     _side.copy(_a).sub(_b);
     _side.y = 0;
@@ -130,7 +137,7 @@ export class Sprayer {
       const l = (useful * wts[i]) / wsum;
       let landed = false;
       for (const cov of this.coverages) {
-        if (cov.deposit(cx, cz, l) >= 0) { landed = true; this.onTarget += l; break; }
+        if (cov.deposit(cx, cz, l * depFactor) >= 0) { landed = true; this.onTarget += l; break; }
       }
       if (!landed) this.offTarget += l;
     }

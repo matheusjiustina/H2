@@ -152,6 +152,7 @@ export class Game {
     this.audio = new GameAudio();
     this.audio.setVolume(this.settings.volume);
     this.career = new Career();
+    this.career.onSave = () => this._resumePoint();
     this.hud = new HUD(this, this.uiRoot);
     this.touch = new TouchControls(this, this.uiRoot);
     this.tutorial = new Tutorial(this);
@@ -423,6 +424,7 @@ export class Game {
         { const L = this.aircraft.type.loads.free; this.aircraft.fm.fuel = L.fuel; this.aircraft.fm.hopper = L.hopper; this.aircraft.fm.updateMass(); }
         this.toast(t('Free flight in {0}: tanks loaded. Hold {1} to start the engine.', this.aircraft.type.reg, keyLabel(this.input.keysOf('engine')[0])));
         break;
+      case 'continue': this.continueJob(); break;
       case 'freeAir':
         this._enterPlay('free');
         this.setJob(null);
@@ -569,6 +571,59 @@ export class Game {
     this.resultShown = false;
   }
 
+  // What 'Continue where you left off' restores: the contract in hand (with
+  // its coverage, saved per job), the aircraft and its load. Recorded on
+  // every save while a career job is under way; cleared when it is handed in.
+  _resumePoint() {
+    const j = this.job, ac = this.aircraft;
+    if (this.mode !== 'career' || !j || !ac) return undefined;
+    if (!j.started && j.sprayed < 1) return undefined;
+    const fm = ac.fm;
+    const prev = this.career.resume;
+    // A crash or an empty aircraft keeps the last good load.
+    if (ac.state === 'crashed') return prev?.job === j.c.id ? prev : undefined;
+    return { job: j.c.id, ac: this.aircraftId, fuel: Math.round(fm.fuel * 10) / 10, hopper: Math.round(fm.hopper * 10) / 10, t: Date.now() };
+  }
+
+  resumeInfo() {
+    const r = this.career.resume;
+    if (!r) return null;
+    const job = this.career.jobs[r.job];
+    if (!job) return null;
+    return { ...r, job, pct: Math.round(job.stats().coverage * 100) };
+  }
+
+  // Back to the job: same aircraft and load, at the strip nearest its
+  // fields (one that takes this aircraft), coverage as it was.
+  continueJob() {
+    const info = this.resumeInfo();
+    if (!info) return;
+    if (info.ac && info.ac !== this.aircraftId && this.fleet[info.ac] && aircraftUnlocked(aircraftType(info.ac))) this.selectAircraft(info.ac);
+    this._enterPlay('career');
+    const job = info.job;
+    this.setJob(job);
+    job.started = true;
+    let cx = 0, cz = 0;
+    for (const f of job.fields) { cx += (f.x0 + f.x1) / 2; cz += (f.z0 + f.z1) / 2; }
+    cx /= job.fields.length; cz /= job.fields.length;
+    const ok = SITES.filter((s) => s.main || stripAllows(s.farm, this.aircraftId));
+    let site = MAIN_SITE, best = Infinity;
+    for (const s of ok) { const d = Math.hypot(s.pad.x - cx, s.pad.z - cz); if (d < best) { best = d; site = s; } }
+    this.sprayer.on = false;
+    this.service.resetAll();
+    this.service.setSite(site);
+    const ac = this.aircraft;
+    ac.repair();
+    ac.fm.fuel = Math.min(info.fuel, ac.A.fuelCapacity);
+    ac.fm.hopper = Math.min(info.hopper, ac.A.hopperCapacity ?? info.hopper);
+    ac.fm.updateMass?.();
+    ac.placeAtPad(site);
+    ac.stuck = false;
+    this.rig.initialized = false;
+    this.toast(t('Continuing {0}: {1}% sprayed, {2} L in the hopper, {3} L of fuel — at {4}.', job.c.title, info.pct, Math.round(ac.fm.hopper), Math.round(ac.fm.fuel), site.main ? t('the main base') : site.farm.name));
+    this.career.save();
+  }
+
   selectContract(id) {
     const job = this.career.job(id);
     const farm = job.c.farm ? siteById(job.c.farm) : null;
@@ -623,8 +678,9 @@ export class Game {
     this.aircraft.repair();
     this.screens.results(r, job);
     job.reset();
-    this.career.save();
+    if (this.career.resume?.job === job.c.id) this.career.resume = null;
     this.setJob(null);
+    this.career.save();
   }
 
   resetAircraft(where) {

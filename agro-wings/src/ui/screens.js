@@ -8,7 +8,7 @@ import { fieldsTerrain } from '../world/terrainInfo.js';
 import { BASE, WORLD_HALF, CROPS, fieldAt, nearestSite } from '../world/layout.js';
 import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
-import { AIRCRAFT_TYPES, AIRCRAFT_ORDER, REG_PREFIXES, normalizeReg, regTaken, productLimit } from '../aircraft/types.js';
+import { aircraftType, AIRCRAFT_TYPES, AIRCRAFT_ORDER, REG_PREFIXES, normalizeReg, regTaken, productLimit } from '../aircraft/types.js';
 import { hoverPower, hoverPowerFrac } from '../flight/heliModel.js';
 import { drawMap, mapControls, mapPoint } from './maps.js';
 import { showOffice } from './office.js';
@@ -57,6 +57,7 @@ export class Screens {
       <div class="sr-bar interactive"><button class="sr-icon" data-a="resetView" title="${t('Reset view')}" aria-label="${t('Reset view')}">${ic('reset')}</button><button class="sr-icon" data-a="settings" title="${t('Settings')}" aria-label="${t('Settings')}">${ic('set')}</button></div>
       <nav class="sr-menu interactive" aria-label="Menu">
         ${mbtn('free', 'fly', t('Fly'), t('Take off from the pad with this aircraft'), 'primary sr-fly')}
+        ${mbtn('continue', 'jobs', t('Continue where you left off'), '', 'sr-cont')}
         ${mbtn('freeAir', 'air', t('Free flight (airborne)'), t('Start in the air over the farm'))}
         ${mbtn('career', 'jobs', t('Contracts'), t('Service orders from the hangar computer'))}
         ${mbtn('fleet', 'fleet', t('Fleet'), t('Every aircraft and its data'))}
@@ -223,6 +224,7 @@ export class Screens {
     this.title.classList.toggle('show', v);
     if (v) {
       this._markAircraft();
+      this._markResume();
       const k = (a) => keyLabel(this.game.input.keysOf(a)[0]);
       const heli = this.game.aircraft?.kind === 'heli';
       this.title.querySelector('.title-keys').innerHTML = this.game.touch?.active
@@ -231,6 +233,15 @@ export class Screens {
           ? t('{0}/{1}/{2}/{3} cyclic · {4}/{5} pedals · {6}/{7} collective · {8} spray · hold {9} engine · {10} camera · {11} map · Esc menu', k('pitchDown'), k('pitchUp'), k('rollLeft'), k('rollRight'), k('yawLeft'), k('yawRight'), k('throttleUp'), k('throttleDown'), k('spray'), k('engine'), k('camera'), k('map'))
           : t('{0}/{1} pitch · {2}/{3} roll · {4}/{5} rudder · {6}/{7} power · {8} brakes · {9} spray · hold {10} engine · {11} camera · {12} map · Esc menu', k('pitchDown'), k('pitchUp'), k('rollLeft'), k('rollRight'), k('yawLeft'), k('yawRight'), k('throttleUp'), k('throttleDown'), k('brakes'), k('spray'), k('engine'), k('camera'), k('map'));
     }
+  }
+
+  // 'Continue where you left off': shown while a career job is in hand.
+  _markResume() {
+    const b = this.title.querySelector('.sr-cont');
+    if (!b) return;
+    const r = this.game.resumeInfo?.();
+    b.hidden = !r;
+    if (r) b.querySelector('small').textContent = t('{0} · {1}% sprayed · {2}', r.job.c.title, r.pct, aircraftType(r.ac)?.reg ?? '');
   }
 
   close() {
