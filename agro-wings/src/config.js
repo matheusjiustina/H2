@@ -853,9 +853,10 @@ export const SPRAY = {
 export const GAME = {
   currency: 'Cr$',
   startMoney: 25000,
-  fuelPrice: 6.2, // per litre
+  fuelPrice: 3.4, // per litre (base; Jet-A and avgas cost more, src/aircraft/types.js)
   liquidPrice: 3.5,
-  repairPerDamage: 180,
+  repairPerDamage: 60, // per % of damage, taken from the job's pay at hand-in
+  crashCost: 2500, // recovery and repairs after a crash (any of the three ways back)
   completeCoverage: 0.9,
 };
 

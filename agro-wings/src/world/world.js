@@ -74,6 +74,25 @@ export class World {
     return this.extraObstacle?.(x, y, z) ?? null;
   }
 
+  // Highest thing within rad of (x, z), absolute metres: the ground and the
+  // crop on it (sampled across the disc), trees, buildings and power-line
+  // wires. Used to put a recovered aircraft back in the air clear of all of it.
+  clearTopAt(x, z, rad) {
+    const T = this.terrain;
+    let top = -Infinity;
+    for (const [dx, dz] of [[0, 0], [rad, 0], [-rad, 0], [0, rad], [0, -rad], [rad * 0.7, rad * 0.7], [-rad * 0.7, rad * 0.7], [rad * 0.7, -rad * 0.7], [-rad * 0.7, -rad * 0.7]]) {
+      top = Math.max(top, T.surfaceTop ? T.surfaceTop(x + dx, z + dz) : T.heightAt(x + dx, z + dz));
+    }
+    top = Math.max(top, this.treeTopNear(x, z, rad));
+    for (const c of this.structures.colliders) if (x > c.x0 - rad && x < c.x1 + rad && z > c.z0 - rad && z < c.z1 + rad) top = Math.max(top, c.top);
+    for (const w of this.structures.wires) {
+      const [ax, ay, az] = w.a, [bx, by, bz] = w.b, dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
+      const k = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
+      if (Math.hypot(ax + dx * k - x, az + dz * k - z) < rad) top = Math.max(top, ay, by);
+    }
+    return top;
+  }
+
   // Highest tree top near (x, z), metres (-Infinity where there is none).
   treeTopNear(x, z, rad) {
     return this.treeHit.topNear(x, z, rad, this.terrain.heightAt(x, z));

@@ -5,7 +5,7 @@ import { h } from './hud.js';
 import { TIMES, WEATHER, TIME_ORDER, WEATHER_ORDER } from '../world/atmosphere.js';
 import { CONTRACTS, LEVELS } from '../game/contracts.js';
 import { fieldsTerrain } from '../world/terrainInfo.js';
-import { BASE, WORLD_HALF } from '../world/layout.js';
+import { BASE, WORLD_HALF, CROPS, fieldAt, nearestSite } from '../world/layout.js';
 import { ACTIONS, KEY_SCHEMES, keyLabel } from '../core/input.js';
 import { GAME } from '../config.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER, REG_PREFIXES, normalizeReg, regTaken, productLimit } from '../aircraft/types.js';
@@ -238,6 +238,8 @@ export class Screens {
     const was = this.open;
     this.open = null;
     this.modal.classList.remove('show');
+    // The crash look fades out with the overlay (not dark and blurred first).
+    if (this.modal.classList.contains('crashmode')) setTimeout(() => { if (!this.open) this.modal.classList.remove('crashmode'); }, 400);
     this.modal.innerHTML = '';
     this.game.onScreenClosed?.(was);
   }
@@ -245,6 +247,7 @@ export class Screens {
   _show(name, el) {
     this.open = name;
     this.modal.innerHTML = '';
+    this.modal.classList.remove('crashmode');
     this.modal.appendChild(el);
     this.modal.classList.add('show');
     this.game.audio?.play('ui');
@@ -668,14 +671,68 @@ export class Screens {
     requestAnimationFrame(draw);
   }
 
-  crash(reason, cost) {
-    const g = this.game;
-    const el = h(`<div class="panel" style="width:min(480px,calc(100vw - 32px))"><h2>${reason}</h2>
-      <div class="sub">${t('The aircraft is down. You walked away from it.')}${cost ? ` ${t('Recovery and repairs: <b>{0}</b>.', money(cost))}` : ''} ${t('It comes back repaired, as new: to the runway with the load it had, to the base with the hopper empty for the badeco to load again. Job coverage is kept.')}</div>
-      <div class="row2"><span class="money">${t('Balance {0}', money(g.career.money))}</span>
-        <span style="display:flex;gap:8px;flex-wrap:wrap">${g.aircraft.kind === 'heli' ? '' : `<button class="btn" data-a="runway">${t('Back to the runway')}</button>`}<button class="btn primary" data-a="pad">${t('Back to the base')}</button></span></div></div>`);
-    el.addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b) g.recover(b.dataset.a === 'runway' ? 'runway' : 'pad'); });
+  // Impact: a short flash, the screen jolts, a red edge stays while the
+  // aircraft is down (the report follows ~2 s later).
+  impact() {
+    const root = this.game.uiRoot;
+    if (!root) return;
+    root.querySelector('.crash-fx')?.remove();
+    const fx = h(`<div class="crash-fx"><div class="cf-flash"></div><div class="cf-vig"></div><div class="cf-tag"><span>${t('IMPACT')}</span></div></div>`);
+    root.appendChild(fx);
+    root.classList.remove('jolt'); void root.offsetWidth; root.classList.add('jolt');
+    setTimeout(() => root.classList.remove('jolt'), 700);
+  }
+  _clearImpact() { this.game.uiRoot?.querySelector('.crash-fx')?.remove(); }
+
+  // Occurrence report after a crash: what happened, where, the state of the
+  // aircraft and the bill; three ways back (runway, base, or on from the
+  // crash point — the checkpoint).
+  crash(reason, info) {
+    const g = this.game, ac = g.aircraft, c = info ?? {};
+    const deg = (r) => String(Math.round(((r * 180) / Math.PI + 360) % 360)).padStart(3, '0');
+    const f = c.x != null ? fieldAt(c.x, c.z) : null;
+    const ns = c.x != null ? nearestSite(c.x, c.z) : null;
+    const place = f ? `${f.name} · ${t(CROPS[f.crop]?.label ?? f.crop)}` : ns ? `${ns.site.main ? 'Faz. Boa Esperança' : ns.site.farm.name} · ${(ns.dist / 1000).toFixed(1)} km` : '—';
+    const heli = ac.kind === 'heli';
+    const now = new Date();
+    const occ = `OC-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const cell = (k, v) => `<div class="cc-cell"><label>${k}</label><b>${v}</b></div>`;
+    const el = h(`<div class="crashcard">
+      <div class="cc-hazard"></div>
+      <div class="cc-head"><span class="cc-tag">${t('OCCURRENCE REPORT')}</span><span class="cc-id">${occ} · ${ac.type.reg}</span></div>
+      <div class="cc-title"><span class="cc-ico">!</span><div><h2>${reason}</h2><div class="cc-sub">${t('The aircraft is down. You walked away from it.')}</div></div></div>
+      <div class="cc-grid">
+        ${cell(t('Aircraft'), `${ac.type.name}`)}
+        ${cell(t('Place'), place)}
+        ${cell(t('Impact speed'), c.speed != null ? `${Math.round(c.speed * 1.944)} kt` : '—')}
+        ${cell(t('Heading'), c.heading != null ? `${deg(c.heading)}°` : '—')}
+        ${cell(t('Fuel'), `${Math.round(c.fuel ?? ac.fm.fuel)} L`)}
+        ${cell(heli ? t('Tank') : t('Hopper'), `${Math.round(c.hopper ?? ac.fm.hopper)} L`)}
+      </div>
+      <div class="cc-bill"><span>${t('Recovery and repairs')}</span><b class="cc-count" data-v="${c.cost ?? 0}">${money(0)}</b></div>
+      <div class="cc-bal">${t('Balance {0}', money(g.career.money))} · ${t('Job coverage is kept.')}</div>
+      <div class="cc-actions">
+        ${heli ? '' : `<button class="cc-btn" data-a="runway"><b>${t('Back to the runway')}</b><small>${t('Repaired, with the load it had')}</small></button>`}
+        <button class="cc-btn" data-a="pad"><b>${t('Back to the base')}</b><small>${t('Hopper empty for the badeco to load')}</small></button>
+        <button class="cc-btn cc-go" data-a="here"${c.x == null ? ' disabled' : ''}><b>${t('Continue from the crash point')}</b><small>${c.heading != null ? t('Back in the air heading {0}°, clear of every obstacle, with the load it had', deg(c.heading)) : ''}</small></button>
+      </div>
+    </div>`);
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-a]');
+      if (!b || b.disabled) return;
+      this._clearImpact();
+      g.recover(b.dataset.a);
+    });
     this._show('crash', el);
+    this.modal.classList.add('crashmode');
+    // The bill counts up.
+    const cnt = el.querySelector('.cc-count'), v = +cnt.dataset.v, t0 = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - t0 - 500) / 900);
+      cnt.textContent = money(v * Math.max(0, 1 - (1 - Math.max(0, k)) ** 3));
+      if (k < 1 && el.isConnected) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 }
 

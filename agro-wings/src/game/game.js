@@ -554,26 +554,71 @@ export class Game {
     this.sprayer.on = false;
     this.service.resetAll();
     ac.repair();
+    const cp = where === 'here' ? this._crashInfo : null;
     const toRunway = where === 'runway' && ac.kind !== 'heli';
     ac.fm.fuel = load.fuel;
-    ac.fm.hopper = toRunway ? load.hopper : 0;
+    ac.fm.hopper = toRunway || cp ? load.hopper : 0;
     ac.fm.updateMass?.();
-    if (toRunway) ac.placeOnRunway('west'); else ac.placeAtPad();
+    let agl = 0;
+    if (cp) agl = this._placeAtCheckpoint(ac, cp);
+    else if (toRunway) ac.placeOnRunway('west'); else ac.placeAtPad();
     ac.repair();
     ac.stuck = false;
+    this._crashInfo = null;
+    this.screens._clearImpact?.();
+    if (this._crashCam) {
+      this.cameraMode = this._crashCam.prev === 'orbit' ? 'chase' : this._crashCam.prev;
+      this.rig.setMode(this.cameraMode, ac);
+      this._crashCam = null;
+    }
     this.rig.initialized = false;
     this.career.save();
-    this.toast(where === 'runway' && ac.kind !== 'heli' ? t('{0} repaired — on runway 09, ready to start.', ac.type.reg) : t('{0} repaired — at the base, ready to start.', ac.type.reg));
+    this.toast(cp ? t('{0} repaired — flying again from where it came down: {1} m above the ground, heading {2}°.', ac.type.reg, Math.round(agl), String(Math.round(((cp.heading * 180) / Math.PI + 360) % 360)).padStart(3, '0'))
+      : toRunway ? t('{0} repaired — on runway 09, ready to start.', ac.type.reg) : t('{0} repaired — at the base, ready to start.', ac.type.reg));
+  }
+
+  // Back in the air at the crash point, heading where it was going, level,
+  // at a working speed, clear of everything on the way: the highest ground,
+  // crop, tree, building or wire within the span (+12 m) along 120 m behind
+  // to 900 m ahead, plus 15 m (never under 20 m above the ground). Not
+  // higher than that: the job goes on from there.
+  _placeAtCheckpoint(ac, cp) {
+    const W = this.world, fx = Math.sin(cp.heading), fz = Math.cos(cp.heading);
+    const half = Math.max(4, ...(ac.type.bounds ?? []).map((b) => Math.max(Math.abs(b[0]), Math.abs(b[1]), Math.abs(b[4]), Math.abs(b[5]))));
+    const rad = half + 12;
+    let top = -Infinity;
+    for (let s = -120; s <= 900; s += 20) top = Math.max(top, W.clearTopAt(cp.x + fx * s, cp.z + fz * s, rad));
+    const g = W.terrain.heightAt(cp.x, cp.z);
+    const agl = Math.max(top + 15, g + 20) - g;
+    const vs = ac.type.vspeeds ?? {};
+    // A working speed (≈ 1.35 Vs1), level and trimmed for it.
+    const speed = ac.kind === 'heli' ? 22 : Math.max(36, (vs.vs1 ?? vs.vs0 ?? 55) * 1.35 * 0.5144);
+    if (ac.placeAirborneLevel) ac.placeAirborneLevel(cp.x, cp.z, cp.heading, agl, speed);
+    else ac.placeAirborne(cp.x, cp.z, cp.heading, agl, speed);
+    return agl;
   }
 
   _acEvent(e) {
     if (e.kind === 'crash') {
       this._loadAtCrash = { fuel: this.aircraft.fm.fuel, hopper: this.aircraft.fm.hopper };
       this.sprayer.on = false;
-      const cost = 6000;
+      const ac = this.aircraft, fm = ac.fm, v = fm.vel, hs = Math.hypot(v.x, v.z);
+      const cost = GAME.crashCost;
       this.career.money -= cost;
+      // The checkpoint: where it came down and where it was going (the
+      // flight path, or the nose when it was barely moving).
+      this._crashInfo = {
+        x: fm.pos.x, z: fm.pos.z, heading: hs > 8 ? Math.atan2(v.x, v.z) : fm.heading(),
+        speed: v.length(), fuel: fm.fuel, hopper: fm.hopper, cost, reason: e.reason, time: this.weatherCycle?.time ?? null,
+      };
       this.rig.shake = 1;
-      setTimeout(() => this.screens.crash(crashText(e.reason), cost), 2200);
+      // Cinematic: a slow orbit round the wreck behind the report.
+      if (!this._crashCam) this._crashCam = { prev: this.cameraMode };
+      this.cameraMode = 'orbit';
+      this.rig.setMode('orbit', ac);
+      Object.assign(this.rig.orbit, { dist: Math.max(16, 1.7 * Math.max(...(ac.type.bounds ?? [[8]]).map((b) => Math.abs(b[0])))), pitch: 0.3 });
+      this.screens.impact();
+      setTimeout(() => this.screens.crash(crashText(e.reason), this._crashInfo), 2200);
     }
     if (e.kind === 'engineStart' && this.job) this.job.started = true;
   }
@@ -644,6 +689,7 @@ export class Game {
     if (this.playing && !this.controlsLocked) this._playInput(input);
     this.service.fast = this.playing && input.down.has('KeyT') ? 5 : 1;
 
+    if (dt > 0 && this._crashCam && ac.state === 'crashed' && this.rig.mode === 'orbit' && !(mouse.buttons & 1)) this.rig.orbit.yaw += dt * 0.16;
     if (dt > 0) {
       if (this.playing) {
         ac.update(dt, input, { mouse, ...this._controlLaw(ac), heliModel: this.settings.heliModel, windScale: this.settings.wind, cameraMode: this.cameraMode });
@@ -756,7 +802,7 @@ export class Game {
       else this.hud.toggleGps();
     }
     if (input.wasPressed('reset')) {
-      if (ac.state === 'crashed') { if (this.screens.open !== 'crash') this.screens.crash(crashText(ac.crashReason ?? 'Crashed'), 0); return; }
+      if (ac.state === 'crashed') { if (this.screens.open !== 'crash') this.screens.crash(crashText(ac.crashReason ?? 'Crashed'), this._crashInfo); return; }
       this.resetAircraft('pad');
     }
   }
@@ -806,7 +852,7 @@ export class Game {
     const ac = this.aircraft, fm = ac.fm;
     const k = (a) => this.hud.key(a);
     if (this.screens.open) return this.hud.setPrompt(null);
-    if (ac.state === 'crashed') return this.hud.setPrompt(t('{0} Recover the aircraft (runway / base)', k('reset')), () => this.screens.crash(crashText(ac.crashReason ?? 'Crashed'), 0));
+    if (ac.state === 'crashed') return this.hud.setPrompt(t('{0} Recover the aircraft (runway / base)', k('reset')), () => this.screens.crash(crashText(ac.crashReason ?? 'Crashed'), this._crashInfo));
     if (ac.stuck) return this.hud.setPrompt(t('Aircraft stuck — {0} tow back to the pad', k('reset')), () => this.resetAircraft('pad'));
     if (this._atPadStopped() && !this.service.busy()) {
       if (this.mode === 'career') {

@@ -123,6 +123,35 @@ export class Aircraft {
     this.fm.throttle = 0.7;
     this._afterPlace();
   }
+  // In the air at (x, z), level: the elevator trim that holds the height at
+  // this speed and power is searched on the flight model itself (a few
+  // seconds of simulation per try, no game state touched), then the
+  // aircraft is placed with it. Returns the trim found.
+  placeAirborneLevel(x, z, heading, agl, speed, throttle = 0.68) {
+    const fm = this.fm, n = Math.round(4 / DT), n0 = Math.round(1.5 / DT), fuel = fm.fuel, hopper = fm.hopper;
+    const vyAt = (trim) => {
+      fm.fuel = fuel; fm.hopper = hopper; fm.updateMass?.();
+      this.placeAirborne(x, z, heading, agl, speed);
+      fm.throttle = throttle; fm.trim = trim;
+      let sum = 0, k = 0;
+      for (let i = 0; i < n; i++) { fm.step(DT, this.env); if (i >= n0) { sum += fm.vel.y; k++; } }
+      return sum / k;
+    };
+    let lo = -1, hi = 1, vlo = vyAt(lo), vhi = vyAt(hi);
+    let best = Math.abs(vlo) < Math.abs(vhi) ? lo : hi;
+    if (Math.sign(vlo) !== Math.sign(vhi)) {
+      for (let i = 0; i < 10; i++) {
+        const mid = (lo + hi) / 2, v = vyAt(mid);
+        if (Math.sign(v) === Math.sign(vlo)) { lo = mid; vlo = v; } else { hi = mid; vhi = v; }
+      }
+      best = Math.abs(vlo) < Math.abs(vhi) ? lo : hi;
+    }
+    fm.fuel = fuel; fm.hopper = hopper; fm.updateMass?.();
+    this.placeAirborne(x, z, heading, agl, speed);
+    fm.throttle = throttle; fm.trim = best;
+    return best;
+  }
+
   // Amphibians: afloat at rest, wheels up (gear in the floats).
   placeOnWater(x, z, heading) {
     if (!this.A.floats) return false;
