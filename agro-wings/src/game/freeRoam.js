@@ -4,8 +4,8 @@
 // States: PILOT_IN_AIRCRAFT → PILOT_EXITING → PILOT_ON_FOOT → PILOT_BOARDING
 // → PILOT_IN_AIRCRAFT. While the pilot is in the aircraft the system costs a
 // throttled condition check (4 per second, a few comparisons) and nothing
-// else: no figure is built until the first exit, no collision or camera
-// work runs.
+// else: no collision or camera work runs. On foot the view is first
+// person (the camera at eye height); there is no character model.
 //
 // While on foot the aircraft is not stepped at all (it stays exactly where
 // it stopped, engine off, fuel, load and damage untouched), the flight
@@ -23,7 +23,6 @@
 // the service truck (world.extraObstacle) and the flown aircraft's hit boxes.
 import * as THREE from 'three';
 import { SITES, BASE } from '../world/layout.js';
-import { PilotFigure } from './pilotFigure.js';
 import { t } from '../i18n/index.js';
 import { clamp, damp } from '../core/math.js';
 
@@ -33,12 +32,12 @@ export const FREE_ROAM = {
   zoneMargin: 40, // m around a base's runway / apron / hangar: where the exit button can show
   exploreMargin: 120, // m further out the pilot can walk
   maxExitSpeed: 0.3, // m/s ground speed
-  walkSpeed: 1.55, // m/s
-  accel: 5, // m/s²
+  walkSpeed: 2.0, // m/s (a brisk walk)
+  accel: 7, // m/s²
   radius: 0.3, // pilot's collision circle (m)
   height: 1.8,
   boardRadius: 3.2, // m from the cockpit door point
-  camDist: 4.2, camHeight: 1.55,
+  eye: 1.65, // m above the feet
 };
 
 // One zone per base: an oriented rectangle (centre, half sizes, rotation
@@ -71,12 +70,12 @@ export class PilotFreeRoamSystem {
     this.zones = buildZones();
     this.zone = null; // zone of the current walk
     this.ac = null; // aircraft the pilot got out of
-    this.figure = null; // built on the first exit
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector2();
-    this.yaw = 0; // body heading
-    this.cam = { yaw: 0, pitch: 0.18, dist: FREE_ROAM.camDist };
-    this.camPos = new THREE.Vector3();
+    this.cam = { yaw: 0, pitch: 0 }; // look direction (yaw 0 = +z)
+    this.eyeY = 0;
+    this._qa = new THREE.Quaternion();
+    this._e = new THREE.Euler(0, 0, 0, 'YXZ');
     this.near = []; // colliders around the pilot
     this.nearT = 0;
     this.checkT = 0;
@@ -209,20 +208,12 @@ export class PilotFreeRoamSystem {
       this.ac = ac;
       this.zone = c.zone;
       this.prevCamera = this.game.cameraMode;
-      this.figure ??= new PilotFigure();
-      if (!this.figure.root.parent) this.game.scene.add(this.figure.root);
       this.pos.set(spot.x, spot.y, spot.z);
+      this.eyeY = spot.y + FREE_ROAM.eye;
       this.vel.set(0, 0);
-      // Face away from the aircraft, the camera behind the pilot and high
-      // enough to look over the wing (forward walks away from the aircraft).
-      const awayX = spot.x - ac.fm.pos.x, awayZ = spot.z - ac.fm.pos.z;
-      this.yaw = Math.atan2(awayX, awayZ);
-      this.cam.yaw = this.yaw + Math.PI - 0.35;
-      this.cam.pitch = 0.5;
-      this.cam.dist = FREE_ROAM.camDist;
-      this.figure.root.position.copy(this.pos);
-      this.figure.root.rotation.y = this.yaw;
-      this.figure.root.visible = true;
+      // Looking away from the aircraft, level.
+      this.cam.yaw = Math.atan2(spot.x - ac.fm.pos.x, spot.z - ac.fm.pos.z);
+      this.cam.pitch = -0.05;
       ac.model.pilot.visible = false;
       this.camFrom = this.game.camera.position.clone();
       this.camFromQ = this.game.camera.quaternion.clone();
@@ -250,11 +241,9 @@ export class PilotFreeRoamSystem {
     this.stats.boards++;
     return true;
   }
-  // Back in the aircraft (also the safe fallback after any error): figure
-  // hidden, camera rig and flight controls back as they were.
+  // Back in the aircraft (also the safe fallback after any error): camera rig and flight controls back as they were.
   _restore() {
     const g = this.game;
-    if (this.figure) this.figure.root.visible = false;
     g.uiRoot?.classList.remove('on-foot');
     const mode = this.prevCamera ?? g.cameraMode ?? 'chase';
     if (g.aircraft) {
@@ -334,14 +323,12 @@ export class PilotFreeRoamSystem {
     if (dt <= 0) return;
     const P = FREE_ROAM;
     const [f, s] = this._walkInput(live);
-    const cy = this.cam.yaw + Math.PI; // direction the camera looks
-    const fx = Math.sin(cy), fz = Math.cos(cy);
+    const fx = Math.sin(this.cam.yaw), fz = Math.cos(this.cam.yaw); // where the view looks
     const tx = (fx * f - fz * s) * P.walkSpeed, tz = (fz * f + fx * s) * P.walkSpeed;
     const k = 1 - Math.exp(-P.accel * dt / P.walkSpeed);
     this.vel.x += (tx - this.vel.x) * k;
     this.vel.y += (tz - this.vel.y) * k;
-    const sp = this.vel.length();
-    if (sp > 0.02) {
+    if (this.vel.lengthSq() > 0.0004) {
       if (Math.hypot(this.pos.x - this.nearX, this.pos.z - this.nearZ) > 15) this._refreshNear(this.pos.x, this.pos.z);
       const nx = this.pos.x + this.vel.x * dt, nz = this.pos.z + this.vel.y * dt;
       const inside = (x, z) => inZone(this.zone, x, z, P.exploreMargin);
@@ -353,63 +340,37 @@ export class PilotFreeRoamSystem {
         this.vel.set(0, 0);
         if (!inside(nx, nz) && this.game.time - this._limitToast > 6) { this._limitToast = this.game.time; this.game.toast(t('Edge of the base — walk back towards the hangar.')); }
       }
-      if (sp > 0.15) {
-        const want = Math.atan2(this.vel.x, this.vel.y);
-        let dy = want - this.yaw;
-        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-        this.yaw += dy * (1 - Math.exp(-10 * dt));
-      }
+      this.pos.y = this._floor(this.pos.x, this.pos.z);
     }
-    this.pos.y = damp(this.pos.y, this._floor(this.pos.x, this.pos.z), 14, dt);
-    const fig = this.figure;
-    fig.root.position.copy(this.pos);
-    fig.root.rotation.y = this.yaw;
-    fig.animate(dt, this.vel.length());
   }
 
+  // First-person view: the eye 1.65 m over the feet, turned by the mouse
+  // drag (or a finger on the view). The eye height follows the ground with
+  // a short smoothing so small bumps do not jolt the view.
   _camera(dt, mouse, live) {
-    const g = this.game, cam = g.camera, P = FREE_ROAM;
-    if (live && mouse) {
-      if (mouse.buttons & 1) {
-        this.cam.yaw -= mouse.dx * 2.2;
-        this.cam.pitch = clamp(this.cam.pitch + mouse.dy * 1.6, -0.25, 1.1);
-      }
-      if (mouse.wheel) this.cam.dist = clamp(this.cam.dist * (1 + mouse.wheel * 0.1), 2.2, 9);
+    const g = this.game, cam = g.camera;
+    if (live && mouse && (mouse.buttons & 1)) {
+      this.cam.yaw -= mouse.dx * 2.2;
+      this.cam.pitch = clamp(this.cam.pitch - mouse.dy * 1.8, -1.25, 1.25);
     }
-    // Head, then back along the view until something is in the way.
-    const hx = this.pos.x, hy = this.pos.y + P.camHeight, hz = this.pos.z;
-    const cp = Math.cos(this.cam.pitch);
-    const dx = Math.sin(this.cam.yaw) * cp, dy = Math.sin(this.cam.pitch), dz = Math.cos(this.cam.yaw) * cp;
-    let dist = this.cam.dist;
-    for (let d = 0.4; d <= this.cam.dist; d += 0.25) {
-      const x = hx + dx * d, y = hy + dy * d, z = hz + dz * d;
-      if (this._pointBlocked(x, y, z)) { dist = Math.max(0.9, d - 0.35); break; }
-    }
-    const lift = dist < this.cam.dist ? clamp((this.cam.dist - dist) * 0.25, 0, 1.2) : 0;
-    const tx = hx + dx * dist, tz = hz + dz * dist;
-    let ty = hy + dy * dist + lift;
-    ty = Math.max(ty, g.world.terrain.heightAt(tx, tz) + 0.4);
-    _v.set(tx, ty, tz);
+    this.eyeY = dt > 0 ? damp(this.eyeY, this.pos.y + FREE_ROAM.eye, 12, dt) : this.pos.y + FREE_ROAM.eye;
+    this._e.set(this.cam.pitch, this.cam.yaw + Math.PI, 0, 'YXZ');
+    this._qa.setFromEuler(this._e);
+    _v.set(this.pos.x, this.eyeY, this.pos.z);
     if (this.state === FOOT.EXITING) {
-      // Ease from where the camera was.
+      // Ease from the flight camera to the eye.
       const k = clamp(this.tr / 0.45, 0, 1), e = k * k * (3 - 2 * k);
-      this.camPos.lerpVectors(this.camFrom, _v, e);
-    } else this.camPos.lerp(_v, 1 - Math.exp(-14 * dt));
-    if (dt <= 0 && this.state !== FOOT.EXITING) this.camPos.copy(_v);
-    cam.position.copy(this.camPos);
+      cam.position.lerpVectors(this.camFrom, _v, e);
+      cam.quaternion.slerpQuaternions(this.camFromQ, this._qa, e);
+    } else {
+      cam.position.copy(_v);
+      cam.quaternion.copy(this._qa);
+    }
     cam.up.set(0, 1, 0);
-    cam.lookAt(hx, hy - 0.15, hz);
-    cam.fov = damp(cam.fov, 60, 6, dt || 1);
-    cam.near = 0.1;
-    cam.updateProjectionMatrix();
+    if (Math.abs(cam.fov - 70) > 0.05) { cam.fov = damp(cam.fov, 70, 6, dt || 1); cam.near = 0.08; cam.updateProjectionMatrix(); }
+    else if (cam.near !== 0.08) { cam.near = 0.08; cam.updateProjectionMatrix(); }
     cam.updateMatrixWorld();
   }
 
-  _pointBlocked(x, y, z) {
-    for (const c of this.near) if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y < c.top && !(y < (c.bottom ?? -Infinity))) return true;
-    if (this.ac?.hitTest(x, y, z)) return true;
-    const w = this.game.world;
-    if (w.extraObstacle?.(x, y, z)) return true;
-    return false;
-  }
+
 }

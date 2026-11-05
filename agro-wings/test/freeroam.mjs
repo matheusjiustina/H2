@@ -58,7 +58,7 @@ check('13 flight keys ignored on foot (engine key does nothing)', await page.eva
 const p0 = await fr();
 await key('KeyW', 3);
 const p1 = await fr();
-check('6 W walks (≈1.5 m/s)', Math.hypot(p1.x - p0.x, p1.z - p0.z) > 3, { from: p0, to: p1 });
+check('6 W walks (≈2 m/s)', Math.hypot(p1.x - p0.x, p1.z - p0.z) > 4.8, { from: p0, to: p1 });
 await key('Numpad8', 1.5); const p2 = await fr();
 await key('ArrowUp', 1.5); const p3 = await fr();
 check('6 Numpad 8 and the arrow keys walk too', Math.hypot(p2.x - p1.x, p2.z - p1.z) > 1 && Math.hypot(p3.x - p2.x, p3.z - p2.z) > 1, { p2, p3 });
@@ -72,8 +72,7 @@ check('10 no board button away from the own aircraft', s.btn === null, s);
 const wall = await page.evaluate(() => {
   const g = window.__agro, f = g.freeRoam, h = { x: -385, z: -132, w: 34, d: 24 };
   f.pos.set(h.x, 0.2, h.z + 4); f._refreshNear(f.pos.x, f.pos.z);
-  f.cam.yaw = -Math.PI / 2 + Math.PI; // camera looks toward -x... walk to the west wall
-  f.cam.yaw = Math.PI / 2; // looking direction = yaw + π → -x
+  f.cam.yaw = -Math.PI / 2; // look toward -x: walk to the west wall
   g.input.press('KeyW'); window.__run(12); g.input.release('KeyW');
   return { x: +f.pos.x.toFixed(2), wallX: h.x - h.w / 2 };
 });
@@ -84,7 +83,7 @@ const parked = await page.evaluate(() => {
   const g = window.__agro, f = g.freeRoam;
   const p = g._parked.find((a) => a.kind !== 'heli' && a.model.root.visible !== false);
   f.pos.set(p.fm.pos.x, 0, p.fm.pos.z + 12); f.pos.y = f._floor(f.pos.x, f.pos.z); f._refreshNear(f.pos.x, f.pos.z);
-  f.cam.yaw = 0; // looking direction -z (toward the aircraft)
+  f.cam.yaw = Math.PI; // look toward -z (the aircraft)
   g.input.press('KeyW'); window.__run(12); g.input.release('KeyW');
   const hit = p.hitTest(f.pos.x, f.pos.y + 1, f.pos.z) || p.hitTest(f.pos.x, f.pos.y + 0.4, f.pos.z);
   return { reg: p.type.reg, d: +Math.hypot(f.pos.x - p.fm.pos.x, f.pos.z - p.fm.pos.z).toFixed(2), inside: hit, btn: f._btnKind };
@@ -96,7 +95,7 @@ const crew = await page.evaluate(() => { const g = window.__agro, f = g.freeRoam
 check('9 walking by the crew post and tanks', crew.ok);
 await snap('05-crew');
 // Edge of the base: cannot walk across the map.
-const edge = await page.evaluate(() => { const g = window.__agro, f = g.freeRoam; f.pos.set(400, 0, 0); f.pos.y = f._floor(400, 0); f.cam.yaw = -Math.PI / 2; g.input.press('KeyW'); window.__run(200, 1 / 20); g.input.release('KeyW'); return { x: +f.pos.x.toFixed(1), limit: f.zone.cx + f.zone.hw + 120 }; });
+const edge = await page.evaluate(() => { const g = window.__agro, f = g.freeRoam; f.pos.set(400, 0, 0); f.pos.y = f._floor(400, 0); f.cam.yaw = Math.PI / 2; g.input.press('KeyW'); window.__run(200, 1 / 20); g.input.release('KeyW'); return { x: +f.pos.x.toFixed(1), limit: f.zone.cx + f.zone.hw + 120 }; });
 check('8 explore limit holds (no walk across the map)', edge.x <= edge.limit + 0.5, edge);
 // Back to the aircraft door and board with the button.
 const back = await page.evaluate(() => {
@@ -165,9 +164,9 @@ const mem = await page.evaluate(() => {
   for (let i = 0; i < 30; i++) { if (g.freeRoam.exit()) ok++; window.__run(0.6); const f = g.freeRoam; const sp = f._findExitSpot(g.aircraft); f.pos.set(sp.x, sp.y, sp.z); window.__run(0.2); f.board(); window.__run(0.3); }
   if (window.gc) window.gc();
   const b = info();
-  return { a, b, ok, state: g.freeRoam.state, figures: g.scene.children.filter((c) => c.name === 'pilot-on-foot').length };
+  return { a, b, ok, state: g.freeRoam.state, figures: g.scene.getObjectByName('pilot-on-foot') ? 1 : 0 };
 });
-check('17 30 exit/board cycles', mem.ok === 30 && mem.state === 'PILOT_IN_AIRCRAFT' && mem.figures === 1, mem);
+check('17 30 exit/board cycles', mem.ok === 30 && mem.state === 'PILOT_IN_AIRCRAFT' && mem.figures === 0, mem);
 check('18 no growth in geometries / textures / scene nodes after the first exit', mem.b.geo <= mem.a.geo + 0 && mem.b.tex <= mem.a.tex && mem.b.kids === mem.a.kids, mem);
 
 // --- 14. Mission continuity: a job's coverage and the load survive a walk
@@ -199,7 +198,8 @@ const perfFoot = await page.evaluate(() => {
   const t0 = performance.now(); for (let i = 0; i < 120; i++) g.tick(1 / 60); const ms = (performance.now() - t0) / 120;
   g.input.release('KeyW'); return ms;
 });
-const draw = await page.evaluate(() => { const g = window.__agro; let n = 0, tri = 0; g.freeRoam.figure.root.traverse((o) => { if (o.isMesh) { n++; tri += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; } }); return { meshes: n, triangles: tri }; });
+const draw = await page.evaluate(() => { const g = window.__agro, f = g.freeRoam, c = g.camera; return { eyeAboveFeet: +(c.position.y - f.pos.y).toFixed(2), camAtPilot: +Math.hypot(c.position.x - f.pos.x, c.position.z - f.pos.z).toFixed(3), model: !!g.scene.getObjectByName('pilot-on-foot') }; });
+check('first person: camera at the eye (1.65 m), no character model', Math.abs(draw.eyeAboveFeet - 1.65) < 0.05 && draw.camAtPilot < 0.01 && !draw.model, draw);
 const perfIn2 = await page.evaluate(() => { const g = window.__agro; g.freeRoam.forceBoard(); window.__run(0.3); const t0 = performance.now(); for (let i = 0; i < 120; i++) g.tick(1 / 60); return (performance.now() - t0) / 120; });
 const cost = await page.evaluate(() => {
   const g = window.__agro, f = g.freeRoam;
@@ -209,7 +209,7 @@ const cost = await page.evaluate(() => {
   g.input.release('KeyW'); f.forceBoard();
   return { exitCheckMs: +inMs.toFixed(4), footUpdateMs: +footMs.toFixed(4) };
 });
-console.log('PERF', JSON.stringify({ tickMsInAircraft: +perfIn.toFixed(2), tickMsInAircraftAfter: +perfIn2.toFixed(2), tickMsOnFoot: +perfFoot.toFixed(2), ...cost, figure: draw }));
+console.log('PERF', JSON.stringify({ tickMsInAircraft: +perfIn.toFixed(2), tickMsInAircraftAfter: +perfIn2.toFixed(2), tickMsOnFoot: +perfFoot.toFixed(2), ...cost, view: draw }));
 check('20 on-foot update under 0.5 ms per frame; exit check under 0.5 ms (run 4×/s)', cost.footUpdateMs < 0.5 && cost.exitCheckMs < 0.5, cost);
 check('no page errors', errors.length === 0, errors.slice(0, 5));
 // --- 16. Mobile: touch layout, walking joystick
