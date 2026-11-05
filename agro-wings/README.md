@@ -3090,6 +3090,24 @@ switches with the six aeroplanes parked; a sixth parking spot was added).
 - The GPS is the game's AgroWings unit, not a specific Satloc model.
 - No end-to-end mission run or frame-time measurement for this build.
 
+### One helipad; the spare helicopter in the hangar
+
+- **Main base:** one helipad (the gravel pad with the H at the east end of
+  the apron); the second pad east of it is gone. Both helicopters use it.
+- **Parking:** while an airplane is flown, the R44 waits on the helipad
+  (its default paint is now B, black agricultural; a saved choice is kept)
+  and the Bell 206 is kept in the hangar, on the floor's parking T, nose to
+  the opening (`BASE.heliHangar`, standing on the floor slab). Fly the
+  Bell and the R44 goes into the hangar instead, and the other way round.
+- **Secondary farms:** a single helipad that is a cleared patch of packed
+  red earth, with whitewashed stones round the edge and a tyre on a stake,
+  not a copy of the base's pad (`buildDirtHelipad`).
+
+Checked in this container: `npm test`; views of the base, the hangar
+inside with either helicopter stored (no overlap with the benches, racks
+or ladder) and a farm's earth pad; a Bell 206 contract by the test
+autopilot (two services on the single pad, spraying, no damage).
+
 ### Flight school (Escola de aviação agrícola)
 
 Two tiny talhões between the strip and the south road open the service

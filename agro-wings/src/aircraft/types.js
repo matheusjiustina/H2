@@ -304,8 +304,7 @@ AIRCRAFT_TYPES.b206 = {
     veto: 8,
     standGap: 3.0,
   },
-  servicePad: BASE.helipad2,
-  padKey: 'helipad2',
+  servicePad: BASE.helipad, // one pad for both helicopters
   stub: { eye: [-0.34, 0.43, 1.13], fuelFiller: [0.56, 0.2, -0.85], hopperPort: [0.54, -0.93, -0.55] },
   bounds: [
     [-0.66, 0.66, -0.81, 1.2, -2.2, 2.7], [-0.23, 0.23, 0.15, 0.62, -6.1, -2.2], [-0.05, 0.42, -0.26, 1.55, -6.8, -5.5],

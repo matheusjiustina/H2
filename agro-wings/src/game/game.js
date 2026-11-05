@@ -61,7 +61,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, r44Livery: 0, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -252,7 +252,10 @@ export class Game {
       ac.onSimStep = null; ac.onEvent = null;
       // The AT-802s (18 m span) have their own spots on the grass west of
       // the apron; everyone else keeps the apron spots in order.
-      ac.park(ac.kind === 'heli' ? ac.type.servicePad : BASE[ac.type.parkSpot] ?? spots.shift());
+      // One helipad: the R44 waits on it while an airplane is flown; the
+      // other helicopter (or both, when one of them is flown) is kept in
+      // the hangar.
+      ac.park(ac.kind === 'heli' ? (ac.type.id === 'r44' && next.kind !== 'heli' ? ac.type.servicePad : BASE.heliHangar) : BASE[ac.type.parkSpot] ?? spots.shift());
     }
     for (const ac of Object.values(this.fleet)) if (ac !== next) this.assets?.freeze(idOf(ac));
     this.aircraft = next;

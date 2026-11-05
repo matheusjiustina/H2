@@ -191,7 +191,6 @@ export function createStructures(terrain, scene) {
   apronLights(B, M);
   basePortal(B, M, group);
   buildHelipad(B, M, group, H);
-  buildHelipad(B, M, group, H, BASE.helipad2);
   buildVehicles(B, M, H);
   buildStripMarks(B, M, group, H, RUNWAY);
   dyn.sites = FARM_SITES.map((site) => buildFarmSite(B, M, group, H, site, dyn));
@@ -759,6 +758,56 @@ function buildHelipad(B, M, group, H, hp = BASE.helipad) {
   for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.add(tyre, M.white, hp.x + dx * (S / 2 + 3), y + 0.1, hp.z + dz * (S / 2 + 3), 0, Math.PI / 2);
 }
 
+// Secondary farms: a plain cleared patch of packed red earth instead of the
+// base's gravel pad — swept round by the rotor wash, a ring of whitewashed
+// stones, a few tufts at the edge, a tyre on a stake as the marker.
+let dirtPadMat = null;
+function buildDirtHelipad(B, M, group, H, hp = BASE.helipad) {
+  const R = 9, px = 512;
+  if (!dirtPadMat) {
+    const c = canvas(px, px);
+    const g = c.getContext('2d');
+    const r = rng(47);
+    const grd = g.createRadialGradient(px / 2, px / 2, px * 0.1, px / 2, px / 2, px / 2);
+    grd.addColorStop(0, 'rgba(150,84,52,1)');
+    grd.addColorStop(0.7, 'rgba(140,78,48,0.95)');
+    grd.addColorStop(0.9, 'rgba(128,84,52,0.5)');
+    grd.addColorStop(1, 'rgba(120,90,60,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, px, px);
+    // Grain: clods, pebbles, a swept (lighter) ring from the rotor wash.
+    for (let i = 0; i < 9000; i++) {
+      const a = r() * Math.PI * 2, d = Math.sqrt(r()) * px * 0.46;
+      const v = r();
+      g.fillStyle = v < 0.5 ? `rgba(105,56,34,${0.25 + r() * 0.35})` : v < 0.85 ? `rgba(178,112,74,${0.2 + r() * 0.3})` : `rgba(205,190,170,${0.3 + r() * 0.4})`;
+      const s = 1 + r() * 3;
+      g.fillRect(px / 2 + Math.cos(a) * d, px / 2 + Math.sin(a) * d, s, s * (0.6 + r() * 0.6));
+    }
+    g.strokeStyle = 'rgba(190,130,90,0.22)'; g.lineWidth = px * 0.06;
+    g.beginPath(); g.arc(px / 2, px / 2, px * 0.3, 0, Math.PI * 2); g.stroke();
+    // Skid marks.
+    g.strokeStyle = 'rgba(70,40,26,0.25)'; g.lineWidth = 3;
+    for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(px / 2 + sx * 30, px / 2 - 70); g.lineTo(px / 2 + sx * 30, px / 2 + 70); g.stroke(); }
+    dirtPadMat = new THREE.MeshStandardMaterial({ map: canvasTexture(c, { aniso: 4 }), roughness: 1, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  }
+  const y = H(hp.x, hp.z);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(R + 2.5, 40), dirtPadMat);
+  disc.rotation.x = -Math.PI / 2;
+  disc.rotation.z = hp.heading;
+  disc.position.set(hp.x, y + 0.03, hp.z);
+  disc.receiveShadow = true;
+  group.add(disc);
+  // Whitewashed stones round the edge (gaps on the approach line).
+  const stone = new THREE.DodecahedronGeometry(0.22, 0);
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2 + 0.09;
+    if (Math.abs(Math.cos(a - hp.heading)) > 0.95) continue;
+    B.add(stone, M.white, hp.x + Math.cos(a) * R, y + 0.1, hp.z + Math.sin(a) * R, a, 0.3 * i);
+  }
+  // Marker: an old tyre on a short stake, off the approach.
+  B.add(new THREE.TorusGeometry(0.36, 0.13, 10, 20), M.white, hp.x, y + 0.75, hp.z - R - 1.6, 0, 0);
+  B.box(0.08, 0.8, 0.08, M.wood, hp.x, y + 0.4, hp.z - R - 1.6);
+}
+
 function buildVehicles(B, M, H) {
   // Support pickup (white double cab) with a chemical tank in the bed.
   const pk = BASE.pickup;
@@ -838,8 +887,7 @@ function buildFarmSite(B, M, group, H, site, dyn) {
   g2.name = 'site-' + site.id;
   const flat = () => 0;
   buildService(B2, M, g2, flat);
-  buildHelipad(B2, M, g2, flat);
-  buildHelipad(B2, M, g2, flat, BASE.helipad2);
+  buildDirtHelipad(B2, M, g2, flat);
   const pk = BASE.pickup;
   pickup(B2, M, pk.x, 0, pk.z, pk.heading + 0.3);
   B2.collider(pk.x - 2.6, pk.x + 2.6, pk.z - 2.6, pk.z + 2.6, 2.1, 'pickup');

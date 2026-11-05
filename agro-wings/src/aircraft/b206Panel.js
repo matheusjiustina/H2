@@ -320,7 +320,7 @@ export function createB206Panel() {
   const mk = (w, h, aniso = 4) => { const c = canvas(w, h); return { c, g: c.getContext('2d'), tex: canvasTexture(c, { aniso }), key: '' }; };
   const ann = mk(ANN.W, ANN.H);
   const clock = mk(128, 48);
-  const gps = createAgroNav({ home: { x: BASE.helipad2.x, z: BASE.helipad2.z, name: 'BASE · H2', label: 'HELIPONTO DA BASE (SEM CONTRATO)' } });
+  const gps = createAgroNav({ home: { x: BASE.helipad.x, z: BASE.helipad.z, name: 'BASE · H', label: 'HELIPONTO DA BASE (SEM CONTRATO)' } });
   const tex = (w, h, fn, aniso = 4) => { const c = canvas(w, h); fn(c.getContext('2d'), w, h); return canvasTexture(c, { aniso }); };
   const attTape = tex(256, 1024, (g, w, h) => drawAttTape(g, w, h));
   const attOverlay = tex(256, 256, (g, w) => drawAttOverlay(g, w));

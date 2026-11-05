@@ -113,6 +113,7 @@ export class Helicopter {
     this.env.wind.set(0, 0, 0);
     for (let i = 0; i < 240; i++) fm.step(1 / 120, this.env);
     fm.vel.set(0, 0, 0); fm.omega.set(0, 0, 0);
+    if (spot.lift) fm.pos.y += spot.lift; // standing on the hangar floor slab
     this.prevPos.copy(fm.pos); this.prevQuat.copy(fm.quat);
     this.rPos.copy(fm.pos); this.rQuat.copy(fm.quat);
     this._sync();

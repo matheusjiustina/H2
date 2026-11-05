@@ -59,9 +59,10 @@ export const BASE = {
   // Helicopter pad (R44): gravel pad with a painted H at the east end of the
   // apron, clear of the taxi route, the service pad and the fuel slab.
   helipad: { x: -323, z: -48, heading: Math.PI / 2, radius: 6 },
-  // Second helicopter pad (Bell 206): on the grass east of the apron, 23 m
-  // from the first (both rotor discs and the truck's stands clear).
-  helipad2: { x: -300, z: -48, heading: Math.PI / 2, radius: 6 },
+  // The helicopter not in use waits inside the hangar, on the floor's
+  // parking T, nose to the opening: rotor and tail clear of the benches,
+  // trestles and racks along the walls. `lift`: the floor slab's top.
+  heliHangar: { x: -386, z: -130, heading: 0, lift: 0.17 },
   // Service equipment sits behind/left of the parked aircraft, clear of the prop.
   fuelTank: { x: -358, z: -84 },
   mixTank: { x: -366, z: -74 },
@@ -550,7 +551,7 @@ function makeSite(f) {
     taxiway: { ...mvr(BASE.taxiway, dx, dz), z1: dz - f.width / 2 },
     hangar: mv(HANGAR0, dx, dz),
     pad: mv(BASE.pad, dx, dz), parking: mv(BASE.parking, dx, dz), parking2: mv(BASE.parking2, dx, dz), parking3: mv(BASE.parking3, dx, dz), parking4: mv(BASE.parking4, dx, dz), parking5: mv(BASE.parking5, dx, dz), parking6: mv(BASE.parking6, dx, dz), parking7: mv(BASE.parking7, dx, dz), parking8: mv(BASE.parking8, dx, dz),
-    helipad: mv(BASE.helipad, dx, dz), helipad2: mv(BASE.helipad2, dx, dz),
+    helipad: mv(BASE.helipad, dx, dz),
     fuelTank: mv(BASE.fuelTank, dx, dz), mixTank: mv(BASE.mixTank, dx, dz),
     reservoirs: BASE.reservoirs.map((r) => mv(r, dx, dz)),
     crewPost: mv(BASE.crewPost, dx, dz), pickup: mv(BASE.pickup, dx, dz), truck: mv(BASE.truck, dx, dz),
