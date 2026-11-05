@@ -3090,6 +3090,53 @@ switches with the six aeroplanes parked; a sixth parking spot was added).
 - The GPS is the game's AgroWings unit, not a specific Satloc model.
 - No end-to-end mission run or frame-time measurement for this build.
 
+### AgTruck geometry revision (reverse engineering from photos)
+
+The exterior was re-fitted to side photos of PR-AAQ and PR-AAI (scale from
+the 7.94 m length: 120.7 and 141.7 px/m) and checked against PT-IJO and a
+three-quarter shot. The model silhouette, pitched 7°, was laid over each
+photo and the stations were moved until cowl, roof, rear slope, spine, fin,
+belly and wheels lined up. Measured over the ground, before → after → photo:
+cowl top 1.97 → 2.14 → 2.15 m; axle to cowl top 1.65 → 1.83 → 1.82–1.84 m;
+fin top above the cowl 0.59 → 0.42 → 0.39–0.44 m. Triangle and mesh
+counts are unchanged (exterior 66,234 triangles in 84 meshes, small-part
+LOD 7,500 in 7, cockpit 27,551 in 112, measured in the running game).
+
+What changed (`src/aircraft/a188Model.js`, no global scaling):
+- **Nose / cowl** (`FWD_KEYS`): narrower lower cowl and chin, so the nose
+  reads less bulbous from the front; the flat top and the hopper
+  character are kept.
+- **Cabin**: the roof corners are crisper (`rT` 0.11) and the glass behind
+  the roof now drops at about 45° into a low spine, so the cabin reads
+  shorter and taller instead of one long rounded hump.
+- **Rear fuselage** (`AFT_KEYS`): lower spine and a progressive taper in
+  width and height from the cabin to the tail cone.
+- **Fin / rudder**: leading edge root moved aft to z −4.6 (about 27°
+  sweep), top lowered to 1.02 (`FIN_TOP_Y`), dorsal fillet shortened.
+- **Gear / stance**: main contacts 0.17 m lower (longer legs), tailwheel
+  0.12 m aft, so the nose stands higher; the parked attitude stays 7.2°.
+- **Paint**: the liveries are unchanged; heights on the rear fuselage are
+  remapped (`paintY`) so the bands keep their place on the lower spine.
+  The rear window is a painted triangle following the new slope.
+
+Anchors updated together (`src/config.js`, `src/aircraft/types.js`): gear
+contact points, fin hard point, work point, collision/wire points and the
+fin and gear bounds. The cockpit (`a188Cockpit.js`) is untouched: it takes
+its cab constants from the model, the cabin width, sill, windshield and
+eye point did not move, and no cockpit vertex lies behind z −2.24 where the
+new rear slope starts.
+
+Physics: mass, wing, engine and drag are unchanged. Because the gear
+contacts moved, the golden scenarios `plane.a188.calm` and
+`plane.a188.wind` were regenerated (lift-off 16.05 → 16.08 s and
+15.68 → 15.71 s); the other 26 scenarios are byte-identical.
+
+Checked in this container: `npm test` (all pass; parked height 2.49 m,
+pitch 7.2°), `test/a188ortho.mjs` (side, top, front, rear, cabin, chase,
+pilot views, both paints), `test/a188ground.mjs` (lowest point 0.002 m,
+three wheels down), photo overlay on PR-AAQ, cockpit view before/after.
+Not checked: real phones, Safari.
+
 ## Aircraft 09 / 10 — Air Tractor AT-802A (PR-AWX) and AT-802AF Fire Boss (PR-FBS, premium)
 
 One airframe module (`src/aircraft/at802Model.js`) and two configurations

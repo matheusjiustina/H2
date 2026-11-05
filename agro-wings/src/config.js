@@ -589,11 +589,15 @@ export const FLIGHT_A188 = {
 
   // Spring-steel main legs from the lower fuselage ahead of the wing, a long
   // spring tailwheel under the rudder: the PR-LEO photograph's stance, the
-  // body datum ≈ 7° nose-up on the three wheels.
+  // body datum ≈ 7° nose-up on the three wheels. Geometry revision
+  // (2026-11, PR-AAQ / PR-AAI): the legs and the tail spring 0.17 m longer
+  // (axle 1.83 m under the cowl top, was 1.65 — the nose sat too low); the
+  // stance angle and the springs are unchanged; the tailwheel 0.12 m further
+  // aft, under the rudder's trailing edge as on both photographs.
   gear: [
-    { name: 'mainL', p: a188(1.27, -1.37, 0.76), k: 95000, c: 9500, travel: 0.2, radius: 0.25, steer: false },
-    { name: 'mainR', p: a188(-1.27, -1.37, 0.76), k: 95000, c: 9500, travel: 0.2, radius: 0.25, steer: false },
-    { name: 'tail', p: a188(0, -1.34, -5.78), k: 28000, c: 2400, travel: 0.14, radius: 0.12, steer: true },
+    { name: 'mainL', p: a188(1.27, -1.54, 0.76), k: 95000, c: 9500, travel: 0.2, radius: 0.25, steer: false },
+    { name: 'mainR', p: a188(-1.27, -1.54, 0.76), k: 95000, c: 9500, travel: 0.2, radius: 0.25, steer: false },
+    { name: 'tail', p: a188(0, -1.51, -5.9), k: 28000, c: 2400, travel: 0.14, radius: 0.12, steer: true },
   ],
   tailSteer: 0.42,
 
@@ -606,7 +610,7 @@ export const FLIGHT_A188 = {
     { name: 'spinner', p: a188(0, 0.42, 2.07) },
     { name: 'belly', p: a188(0, -0.8, 0.0) },
     { name: 'tail', p: a188(0, -0.86, -5.5) },
-    { name: 'fin', p: a188(0, 1.04, -5.3) },
+    { name: 'fin', p: a188(0, 1.02, -5.3) },
     { name: 'stabL', p: a188(1.95, -0.62, -5.0) },
     { name: 'stabR', p: a188(-1.95, -0.62, -5.0) },
     { name: 'roof', p: a188(0, 0.93, -1.8) },

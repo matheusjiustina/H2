@@ -81,10 +81,13 @@ export const A188_LIVERIES = [
 // lip — it falls back gradually as on PR-AAQ / N5324B (0.72 m under the cowl
 // top at the lip, 0.96 m at z 1.3, 1.1 m at z 0.9), so the nose face is
 // smaller and the cowl reads slimmer from the side and three-quarter views.
+// Geometry revision (PR-AAQ / PR-AAI side views, 2026-11): the nose loses
+// volume below the thrust line — narrower ahead of the hopper, the chin
+// rising faster to the spinner, rounder lower corners (no inflated box).
 const FWD_KEYS = [
-  K(1.68, 0.27, 0.3, -0.12, 0.6, 2.5, 2.2), K(1.55, 0.35, 0.24, -0.23, 0.615, 3.0, 2.5),
-  K(1.3, 0.415, 0.16, -0.36, 0.625, 3.8, 2.9), K(0.9, 0.452, 0.09, -0.5, 0.63, 4.5, 3.2),
-  K(0.4, 0.468, 0.04, -0.62, 0.625, 5.0, 3.4), K(-0.2, 0.475, 0.0, -0.72, 0.615, 5.0, 3.4),
+  K(1.68, 0.26, 0.3, -0.09, 0.6, 2.5, 2.1), K(1.55, 0.33, 0.24, -0.18, 0.615, 3.0, 2.3),
+  K(1.3, 0.395, 0.16, -0.29, 0.625, 3.8, 2.6), K(0.9, 0.435, 0.09, -0.42, 0.63, 4.5, 2.8),
+  K(0.4, 0.458, 0.04, -0.58, 0.625, 5.0, 3.0), K(-0.2, 0.47, 0.0, -0.69, 0.615, 5.0, 3.2),
   K(-0.93, 0.475, -0.02, -0.78, 0.6, 5.0, 3.4),
 ];
 // Under the cabin the body keeps the hopper's section, cut at the low sill
@@ -176,17 +179,24 @@ function loftR(stations, colorFn) {
 // radius instead of a flat lid), and the fairing behind it falls in one long
 // progressive slope to the cone (was a steep drop then a flat spine), the
 // sections tapering continuously in plan and side view to the rudder post.
+// Geometry revision (PR-AAQ / PR-AAI, 2026-11): behind the roof the cabin
+// ends in a straight ≈ 45° slope (the triangular rear window) down to a LOW
+// dorsal — ≈ 0.5 m under the cowl top 5 m behind the spinner (the fairing
+// was a long hump still at cowl-top height there, which made the cabin read
+// long and low) — and the spine then falls gently to the fin; the sections
+// narrow faster behind the cabin. Roof corners sharper (0.11 m radius).
 const AFT_KEYS = [
-  R(-2.22, 0.465, -0.02, -0.81, 3.4, 5.0, 0.6, SILL_Y, 1.0, 0.3, 0.16),
-  R(-2.42, 0.455, -0.02, -0.815, 3.4, 4.8, 0.58, 0.18, 0.95, 0.29, 0.16),
-  R(-2.68, 0.438, -0.03, -0.82, 3.3, 4.4, 0.53, 0.16, 0.8, 0.27, 0.17),
-  R(-2.95, 0.412, -0.04, -0.83, 3.2, 4.0, 0.44, 0.13, 0.6, 0.25, 0.17),
-  R(-3.25, 0.38, -0.06, -0.84, 3.1, 3.6, 0.32, 0.07, 0.4, 0.22, 0.16),
-  R(-3.6, 0.335, -0.09, -0.85, 3.0, 3.3, 0.18, 0.0, 0.22, 0.19, 0.14),
-  R(-4.0, 0.285, -0.13, -0.855, 2.9, 3.0, 0.07, -0.05, 0.09, 0.15, 0.11),
-  R(-4.5, 0.21, -0.2, -0.86, 2.7, 2.7, -0.05, -0.12, -0.06, 0.1, 0.08),
-  R(-5.0, 0.145, -0.28, -0.86, 2.6, 2.6, -0.17, -0.21, -0.19, 0.065, 0.055),
-  R(-5.35, 0.1, -0.34, -0.86, 2.5, 2.5, -0.26, -0.29, -0.28, 0.045, 0.04),
+  R(-2.22, 0.465, -0.02, -0.81, 3.4, 5.0, 0.6, SILL_Y, 1.0, 0.3, 0.11),
+  R(-2.4, 0.452, -0.03, -0.815, 3.4, 4.8, 0.56, 0.16, 0.79, 0.27, 0.11),
+  R(-2.6, 0.43, -0.05, -0.82, 3.3, 4.4, 0.38, 0.07, 0.55, 0.24, 0.12),
+  R(-2.8, 0.405, -0.08, -0.83, 3.2, 4.0, 0.2, -0.01, 0.31, 0.21, 0.12),
+  R(-2.98, 0.38, -0.1, -0.835, 3.1, 3.7, 0.08, -0.07, 0.13, 0.19, 0.11),
+  R(-3.25, 0.35, -0.12, -0.84, 3.05, 3.5, 0.03, -0.1, 0.06, 0.18, 0.1),
+  R(-3.6, 0.31, -0.15, -0.85, 3.0, 3.2, -0.01, -0.13, 0.0, 0.16, 0.095),
+  R(-4.0, 0.262, -0.18, -0.855, 2.9, 3.0, -0.08, -0.16, -0.07, 0.14, 0.09),
+  R(-4.5, 0.2, -0.23, -0.86, 2.7, 2.7, -0.16, -0.2, -0.16, 0.1, 0.075),
+  R(-5.0, 0.14, -0.3, -0.86, 2.6, 2.6, -0.23, -0.26, -0.23, 0.065, 0.055),
+  R(-5.35, 0.1, -0.35, -0.86, 2.5, 2.5, -0.28, -0.31, -0.29, 0.045, 0.04),
   R(-5.62, 0.065, -0.42, -0.85, 2.4, 2.4, -0.32, -0.35, -0.33, 0.03, 0.028),
 ];
 const CABIN = AFT_KEYS[0];
@@ -243,6 +253,20 @@ function liveryUV(geo) {
   return geo;
 }
 
+// The paint was laid out on the first rear fuselage (the long fairing): its
+// heights behind the cabin are carried over to the new, lower spine in
+// proportion (belly → spine), so bands, lettering and the white top keep
+// their place on the side. UVs still follow the real geometry.
+const OLD_SPINE = [[-2.22, 1.0], [-2.42, 0.95], [-2.68, 0.8], [-2.95, 0.6], [-3.25, 0.4], [-3.6, 0.22], [-4.0, 0.09], [-4.5, -0.06], [-5.0, -0.19], [-5.35, -0.28], [-5.62, -0.33], [-6.2, -0.4]];
+const interpZ = (pts, z) => { if (z >= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (z >= pts[i][0]) { const [z0, a] = pts[i - 1], [z1, b] = pts[i]; return lerp(a, b, (z0 - z) / (z0 - z1)); } return pts[pts.length - 1][1]; };
+const NEW_SPINE = AFT_KEYS.map((k) => [k.z, k.yt]).concat([[-6.2, -0.4]]);
+const paintY = (z, y) => {
+  if (z > -2.22) return y;
+  const yo = interpZ(OLD_SPINE, z), yn = interpZ(NEW_SPINE, z), yb = -0.86;
+  if (y >= yo) return y;
+  return yb + (y - yb) * ((yn - yb) / (yo - yb));
+};
+
 function liveryTextures(reg, L = A188_LIVERIES[0]) {
   const c = canvas(LV.W, LV.H), b = canvas(LV.W, LV.H);
   const g = c.getContext('2d'), gb = b.getContext('2d');
@@ -251,14 +275,14 @@ function liveryTextures(reg, L = A188_LIVERIES[0]) {
   orangePeel(gb, LV.W, LV.H, 81);
   const orange = L.id === 'orange';
   for (const side of [1, -1]) {
-    const P = (z, y) => lvPix(side, z, y);
+    const P = (z, y, raw = false) => lvPix(side, z, raw ? y : paintY(z, y));
     const oy = side > 0 ? 0 : LV.H / 2;
-    const path = (ctx, pts) => {
+    const path = (ctx, pts, raw) => {
       ctx.beginPath();
-      pts.forEach(([z, y], i) => { const [px, py] = P(z, y); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+      pts.forEach(([z, y], i) => { const [px, py] = P(z, y, raw); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
     };
-    const poly = (pts, fill) => { path(g, pts); g.closePath(); g.fillStyle = fill; g.fill(); };
-    const line = (ctx, pts, col, w) => { path(ctx, pts); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(); };
+    const poly = (pts, fill, raw = false) => { path(g, pts, raw); g.closePath(); g.fillStyle = fill; g.fill(); };
+    const line = (ctx, pts, col, w, raw = false) => { path(ctx, pts, raw); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(); };
     // A band between two lines given as (z, y) lists of the same length.
     const band = (upper, lower, fill) => poly(upper.concat(lower.slice().reverse()), fill);
     const off = (pts, dy) => pts.map(([z, y]) => [z, y + dy]);
@@ -317,8 +341,11 @@ function liveryTextures(reg, L = A188_LIVERIES[0]) {
     }
     // Painted quarter window behind the door (the fairing's glass is not
     // cut: it is a dark pane drawn on the skin).
-    poly([[-2.24, 0.45], [-2.24, 0.82], [-2.36, 0.78], [-2.5, 0.52]], 'rgba(28,36,44,0.92)');
-    line(g, [[-2.24, 0.45], [-2.24, 0.82], [-2.36, 0.78], [-2.5, 0.52], [-2.24, 0.45]], 'rgba(20,20,22,0.8)', 3);
+    // Triangular rear window under the sloping fairing (its edge parallel
+    // to the slope, inset 6 cm).
+    const QW = [[-2.25, 0.38], [-2.25, 0.86], [-2.55, 0.46]];
+    poly(QW, 'rgba(28,36,44,0.92)', true);
+    line(g, [...QW, QW[0]], 'rgba(20,20,22,0.8)', 3, true);
     // Belly grime and the exhaust stain along the lower cowl.
     const [, belly] = P(0, -0.5);
     const grd = g.createLinearGradient(0, belly, 0, oy + LV.H / 2);
@@ -447,8 +474,10 @@ const TIP_ST = [[0, 0, 0, 0], [0.13, -0.025, -0.012, -0.04], [0.23, -0.06, -0.04
 // Overall dimensions (for the tests): span, length spinner to rudder, the
 // high points (roof, fin top).
 export const A188_DIM = { spinnerZ: 2.075, rudderZ: -5.87 };
-const FIN_TOP_Y = 1.19; // fin top: ≈ 2.49 m over the ground on three wheels (A188B figure; was 1.12 → 2.42 m)
-const FK = FIN_TOP_Y / 1.12; // the fin and rudder stations below were measured for a 1.12 m top
+// Fin top: 0.44 m over the cowl top (PR-AAQ; 0.34 on PR-AAI) — was 0.59.
+// With the gear 0.17 m longer the top stays ≈ 2.5 m over the ground.
+const FIN_TOP_Y = 1.02;
+const FK = FIN_TOP_Y / 1.12; // the rudder stations below were measured for a 1.12 m top
 export function a188Extent() {
   return { span: 2 * W.half, length: A188_DIM.spinnerZ - A188_DIM.rudderZ, tops: [[0, ROOF.yt, -1.8], [0, FIN_TOP_Y, -5.3]].map(a188ToBody) };
 }
@@ -812,19 +841,22 @@ export function createA188Model(panel, opts = {}) {
   // Fin (PR-LEO): the leading edge swept ≈ 31° from the dorsal, the top
   // rounded over to the rudder; the fixed part's chord down to the hinge.
   const FIN_TOP = FIN_TOP_Y;
-  const finSt = [[-0.12, -4.36, 1.13], [0.107, -4.48, 1.01], [0.373, -4.64, 0.85], [0.64, -4.79, 0.7], [0.875, -4.93, 0.56], [1.003, -5.02, 0.47], [1.067, -5.1, 0.39], [1.104, -5.19, 0.3], [1.12, -5.29, 0.2]]
-    .map(([h, le, c]) => [h > 0 ? h * FK : h, le, c]);
+  // Geometry revision: the leading edge meets the (lower) spine further aft
+  // (6.7 m behind the spinner, PR-AAQ) and is swept less (≈ 27°), the top
+  // chord ≈ 0.6 m with the rudder. Chords to the hinge.
+  const finLE = [[-0.24, -4.5], [-0.12, -4.6], [0.2, -4.76], [0.5, -4.9], [0.75, -5.02], [0.9, -5.1], [0.97, -5.16], [1.01, -5.22], [1.04, -5.3]];
+  const finSt = finLE.map(([h, le]) => [h > 0 ? (h * FIN_TOP_Y) / 1.04 : h, le, le - HINGE_Z]);
   add('livery', liveryUV(tagged(vfin(airfoil(0, 1, 0.12, 0, 0.4, 12), finSt))));
   // Dorsal fillet: a low strake from the spine into the fin's leading edge.
   // It grows out of the spine (no step) and rises into the fin's leading edge.
   {
     const sp = (z) => spineY(z);
     add('livery', liveryUV(tagged(loft(sampleStations([
-      K(-3.55, 0.01, sp(-3.55) - 0.03, sp(-3.55) - 0.05, sp(-3.55) + 0.004, 2.2, 2.2),
-      K(-3.85, 0.025, sp(-3.85) - 0.04, sp(-3.85) - 0.07, sp(-3.85) + 0.03, 2.2, 2.2),
-      K(-4.12, 0.04, sp(-4.12) - 0.05, sp(-4.12) - 0.09, sp(-4.12) + 0.075, 2.2, 2.2),
-      K(-4.34, 0.05, sp(-4.34) - 0.06, sp(-4.34) - 0.1, sp(-4.34) + 0.15, 2.2, 2.2),
-      K(-4.5, 0.052, sp(-4.5) - 0.06, sp(-4.5) - 0.1, 0.16 * FK, 2.2, 2.2),
+      K(-3.8, 0.01, sp(-3.8) - 0.03, sp(-3.8) - 0.05, sp(-3.8) + 0.004, 2.2, 2.2),
+      K(-4.1, 0.025, sp(-4.1) - 0.04, sp(-4.1) - 0.07, sp(-4.1) + 0.03, 2.2, 2.2),
+      K(-4.36, 0.04, sp(-4.36) - 0.05, sp(-4.36) - 0.09, sp(-4.36) + 0.075, 2.2, 2.2),
+      K(-4.56, 0.05, sp(-4.56) - 0.06, sp(-4.56) - 0.1, sp(-4.56) + 0.15, 2.2, 2.2),
+      K(-4.7, 0.052, sp(-4.7) - 0.06, sp(-4.7) - 0.1, 0.1, 2.2, 2.2),
     ], 20), 12, null))));
   }
   // Rudder: from below the cone to the rounded top.
