@@ -580,7 +580,7 @@ export class Game {
   // Back in the air at the crash point, heading where it was going, level,
   // at a working speed, clear of everything on the way: the highest ground,
   // crop, tree, building or wire within the span (+12 m) along 120 m behind
-  // to 900 m ahead, plus 15 m (never under 20 m above the ground). Not
+  // to 900 m ahead, plus 30 m (never under 40 m above the ground). Not
   // higher than that: the job goes on from there.
   _placeAtCheckpoint(ac, cp) {
     const W = this.world, fx = Math.sin(cp.heading), fz = Math.cos(cp.heading);
@@ -589,7 +589,7 @@ export class Game {
     let top = -Infinity;
     for (let s = -120; s <= 900; s += 20) top = Math.max(top, W.clearTopAt(cp.x + fx * s, cp.z + fz * s, rad));
     const g = W.terrain.heightAt(cp.x, cp.z);
-    const agl = Math.max(top + 15, g + 20) - g;
+    const agl = Math.max(top + 30, g + 40) - g; // room for a beginner to settle in
     const vs = ac.type.vspeeds ?? {};
     // A working speed (≈ 1.35 Vs1), level and trimmed for it.
     const speed = ac.kind === 'heli' ? 22 : Math.max(36, (vs.vs1 ?? vs.vs0 ?? 55) * 1.35 * 0.5144);

@@ -685,9 +685,9 @@ hopper, the bill counting up). Three ways back: the runway (load kept), the
 base (hopper empty for the badeco) or **continue from the crash point**: the
 aircraft is back in the air where it came down, heading where it was going,
 level and trimmed for ≈ 1.35 Vs1 (the trim is searched on its own flight
-model, `Aircraft.placeAirborneLevel`), 15 m above the highest ground, crop,
+model, `Aircraft.placeAirborneLevel`), 30 m above the highest ground, crop,
 tree, building or wire within its span + 12 m from 120 m behind to 900 m
-ahead (`World.clearTopAt`), never under 20 m. Costs were lowered: crash
+ahead (`World.clearTopAt`), never under 40 m. Costs were lowered: crash
 recovery Cr$ 2,500 (`GAME.crashCost`, was 6,000), damage repair Cr$ 60 per %
 (was 180), base fuel Cr$ 3.40/L (was 6.20).
 
