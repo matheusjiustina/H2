@@ -3125,7 +3125,9 @@ running in the game's single loop; nothing is loaded or duplicated.
   and the truck. No clear spot, no exit.
 - **Walking:** W/S/A/D, the arrows, the numpad (8/5/2, 4/6) and the bound
   stick keys; mouse drag looks round; on a phone the stick becomes the
-  walking joystick and a drag on the view looks round. 2.0 m/s with a
+  walking joystick and a drag on the view looks round. 2.6 m/s walking,
+  5.5 m/s running with Shift held (joystick pushed to the edge on a
+  phone; Shift is still power in the aircraft), with a
   short acceleration; the eye (1.65 m) follows the terrain with light
   smoothing (and the main hangar's floor slab); no head bob.
 - **Collisions:** the structures' existing box colliders (hangar walls —

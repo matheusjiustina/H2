@@ -32,7 +32,8 @@ export const FREE_ROAM = {
   zoneMargin: 40, // m around a base's runway / apron / hangar: where the exit button can show
   exploreMargin: 120, // m further out the pilot can walk
   maxExitSpeed: 0.3, // m/s ground speed
-  walkSpeed: 2.0, // m/s (a brisk walk)
+  walkSpeed: 2.6, // m/s (a brisk walk)
+  runSpeed: 5.5, // m/s with Shift held (on foot only; in the aircraft Shift stays power)
   accel: 7, // m/s²
   radius: 0.3, // pilot's collision circle (m)
   height: 1.8,
@@ -224,7 +225,7 @@ export class PilotFreeRoamSystem {
       this._refreshNear(spot.x, spot.z);
       this.game.uiRoot?.classList.add('on-foot');
       this._showButton(null);
-      this.game.toast(this.game.touch?.active ? t('On foot: joystick to walk, drag the view to look round. BOARD by your aircraft.') : t('On foot: W A S D, arrows or the numpad to walk, drag the mouse to look. BOARD (or E) by your aircraft.'));
+      this.game.toast(this.game.touch?.active ? t('On foot: joystick to walk, drag the view to look round. BOARD by your aircraft.') : t('On foot: W A S D, arrows or the numpad to walk (Shift runs), drag the mouse to look. BOARD (or E) by your aircraft.'));
       return true;
     } catch (e) {
       console.error(e);
@@ -324,7 +325,10 @@ export class PilotFreeRoamSystem {
     const P = FREE_ROAM;
     const [f, s] = this._walkInput(live);
     const fx = Math.sin(this.cam.yaw), fz = Math.cos(this.cam.yaw); // where the view looks
-    const tx = (fx * f - fz * s) * P.walkSpeed, tz = (fz * f + fx * s) * P.walkSpeed;
+    const d = this.game.input.down;
+    const run = live && (d.has('ShiftLeft') || d.has('ShiftRight') || this.game.touch?.walk && Math.hypot(this.game.touch.walk.x, this.game.touch.walk.y) > 0.95);
+    const v = run ? P.runSpeed : P.walkSpeed;
+    const tx = (fx * f - fz * s) * v, tz = (fz * f + fx * s) * v;
     const k = 1 - Math.exp(-P.accel * dt / P.walkSpeed);
     this.vel.x += (tx - this.vel.x) * k;
     this.vel.y += (tz - this.vel.y) * k;

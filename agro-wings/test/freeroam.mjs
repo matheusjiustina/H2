@@ -58,11 +58,13 @@ check('13 flight keys ignored on foot (engine key does nothing)', await page.eva
 const p0 = await fr();
 await key('KeyW', 3);
 const p1 = await fr();
-check('6 W walks (≈2 m/s)', Math.hypot(p1.x - p0.x, p1.z - p0.z) > 4.8, { from: p0, to: p1 });
+check('6 W walks (≈2.6 m/s)', Math.hypot(p1.x - p0.x, p1.z - p0.z) > 6.5, { from: p0, to: p1 });
 await key('Numpad8', 1.5); const p2 = await fr();
 await key('ArrowUp', 1.5); const p3 = await fr();
 check('6 Numpad 8 and the arrow keys walk too', Math.hypot(p2.x - p1.x, p2.z - p1.z) > 1 && Math.hypot(p3.x - p2.x, p3.z - p2.z) > 1, { p2, p3 });
 await snap('02-walk');
+const runR = await page.evaluate(() => { const g = window.__agro, f = g.freeRoam, x0 = f.pos.x, z0 = f.pos.z, thr = g.aircraft.fm.throttle; g.input.press('ShiftLeft'); g.input.press('KeyW'); window.__run(2); g.input.release('KeyW'); g.input.release('ShiftLeft'); window.__run(0.5); return { d: +Math.hypot(f.pos.x - x0, f.pos.z - z0).toFixed(2), thrSame: g.aircraft.fm.throttle === thr }; });
+check('Shift runs on foot (≈5.5 m/s) and leaves the aircraft throttle alone', runR.d > 9 && runR.thrSame, runR);
 check('13 aircraft did not move while on foot', JSON.stringify((({ x, y, z, q }) => ({ x, y, z, q }))(await acs())) === JSON.stringify((({ x, y, z, q }) => ({ x, y, z, q }))(before)));
 // Board button far away: hidden.
 s = await fr();

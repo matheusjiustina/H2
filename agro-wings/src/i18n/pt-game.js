@@ -106,7 +106,7 @@ export default {
   'Continue where you left off': 'Continuar de onde parou',
   'GET OUT': 'DESCER',
   'On foot: joystick to walk, drag the view to look round. BOARD by your aircraft.': 'A pé: joystick para andar, arraste a tela para olhar. EMBARCAR junto à sua aeronave.',
-  'On foot: W A S D, arrows or the numpad to walk, drag the mouse to look. BOARD (or E) by your aircraft.': 'A pé: W A S D, setas ou teclado numérico para andar, arraste o mouse para olhar. EMBARCAR (ou E) junto à sua aeronave.',
+  'On foot: W A S D, arrows or the numpad to walk (Shift runs), drag the mouse to look. BOARD (or E) by your aircraft.': 'A pé: W A S D, setas ou teclado numérico para andar (Shift corre), arraste o mouse para olhar. EMBARCAR (ou E) junto à sua aeronave.',
   'BOARD': 'EMBARCAR',
   'No clear place to get out here.': 'Não há um lugar livre para descer aqui.',
   'Shut the engine down to get out of the aircraft.': 'Corte o motor para descer da aeronave.',
