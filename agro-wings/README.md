@@ -691,6 +691,15 @@ ahead (`World.clearTopAt`), never under 40 m. Costs were lowered: crash
 recovery Cr$ 2,500 (`GAME.crashCost`, was 6,000), damage repair Cr$ 60 per %
 (was 180), base fuel Cr$ 3.40/L (was 6.20).
 
+**Back to the title screen in flight.** The flight goes on behind the menu
+for 3.5 s as a cinematic shot (chase camera; the aircraft glides on its
+course kinematically, easing up over whatever is ahead — nothing can crash
+and no impact or report shows on the title screen), then the camera flies
+back to the base in 2.8 s, eyes on the selected aircraft parked at the pad,
+into the showroom framing. Any menu choice meanwhile goes straight to the
+base. A crash still in progress when the menu opens is cleared (the
+aircraft is back at the base, repaired, no report).
+
 **Main base (sede principal).** The apron reaches west to the eucalyptus
 windbreak and north to the hangar's front (`BASE.apron`), so every airplane
 parks on it, the AT-802s too; the roads end at its north and south edges

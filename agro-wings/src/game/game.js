@@ -331,6 +331,7 @@ export class Game {
   // each aircraft; the chosen one is towed to the pad.
   selectAircraft(id) {
     if (!this.fleet[id] || id === this.aircraftId) return;
+    if (this._outro || this._camFly) this._endOutro();
     if (!aircraftUnlocked(aircraftType(id))) {
       this.toast(t('{0}: premium expansion — locked.', aircraftType(id).name));
       this.audio?.play('ui');
@@ -432,20 +433,112 @@ export class Game {
       case 'board': this.screens.board(); break;
       case 'resetPad': this.screens.close(); this.resetAircraft('pad'); break;
       case 'resetRwy': this.screens.close(); this.resetAircraft('runway'); break;
-      case 'title':
+      case 'title': {
         this.screens.close();
+        this.screens._clearImpact?.();
         this.playing = false;
         this.mode = 'title';
         this.hud.show(false);
         this.screens.showTitle(true);
-        this.showroom.enter();
         this.career.save();
+        const ac = this.aircraft, o = ac.fm.out;
+        if (ac.state === 'crashed') { this._toBase(); this.showroom.enter(); } // no wreck (nor report) on the title screen
+        else if (!o.onGround || o.groundSpeed > 3) this._startOutro();
+        else this.showroom.enter();
         break;
+      }
       default: break;
     }
   }
 
+  // Back to the title screen in flight: the flight goes on behind the menu
+  // for a few seconds as a cinematic shot — the aircraft glides on its
+  // course, kinematic (no physics, nothing to crash into: it eases up over
+  // whatever is ahead) — then the camera flies back to the base, where the
+  // selected aircraft stands parked for the normal menu.
+  _startOutro() {
+    const ac = this.aircraft, fm = ac.fm;
+    this.sprayer.on = false;
+    this.service.resetAll();
+    const v = new THREE.Vector3(fm.vel.x, 0, fm.vel.z);
+    if (ac.kind !== 'heli' && v.length() < 25) v.setLength(25);
+    if (this.cameraMode === 'cockpit' || this.rig.mode === 'cockpit') { this.cameraMode = 'chase'; this.rig.setMode('chase', ac); }
+    this._outro = { t: 0, dur: 3.5, vel: v, y: fm.pos.y, fly: null };
+  }
+
+  // One frame of the cinematic glide (in place of the aircraft's update).
+  _outroGlide(dt) {
+    const ac = this.aircraft, fm = ac.fm, o = this._outro, W = this.world;
+    fm.pos.x += o.vel.x * dt; fm.pos.z += o.vel.z * dt;
+    const ax = fm.pos.x + o.vel.x * 2, az = fm.pos.z + o.vel.z * 2;
+    const want = Math.max(o.y, W.clearTopAt(fm.pos.x, fm.pos.z, 14) + 14, W.clearTopAt(ax, az, 14) + 14);
+    fm.pos.y += (want - fm.pos.y) * (1 - Math.exp(-2 * dt));
+    o.y = Math.max(o.y, fm.pos.y - 2);
+    // Wings level, nose along the course.
+    if (o.vel.lengthSq() > 1) {
+      const lvl = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.atan2(o.vel.x, o.vel.z), 0, 'YXZ'));
+      fm.quat.slerp(lvl, 1 - Math.exp(-1.2 * dt));
+    }
+    fm.omega?.set?.(0, 0, 0);
+    ac.prevPos.copy(fm.pos); ac.prevQuat.copy(fm.quat);
+    ac.rPos.copy(fm.pos); ac.rQuat.copy(fm.quat);
+    ac._sync();
+    if (!ac.headless) ac._animate?.(dt);
+  }
+
+  // The aircraft back at the base, repaired, engine off, as at start-up.
+  _toBase() {
+    const ac = this.aircraft;
+    this._loadAtCrash = null;
+    this._crashInfo = null;
+    this._crashCam = null;
+    this.sprayer.on = false;
+    this.service.resetAll();
+    ac.repair();
+    ac.placeAtPad();
+    ac.repair();
+    ac.stuck = false;
+    if (this.cameraMode !== 'chase') this.cameraMode = 'chase';
+    this.rig.initialized = false;
+  }
+
+  // End of the glide: the camera's pose now, the aircraft to the base, the
+  // showroom framing, and a flight of the camera between the two.
+  _outroToBase() {
+    const cam = this.camera;
+    const from = { p: cam.position.clone(), q: cam.quaternion.clone() };
+    this._outro = null;
+    this._toBase();
+    this.showroom.enter();
+    this._camFly = { t: 0, dur: 2.8, from };
+  }
+
+  // Applied after the rig has placed the camera for this frame.
+  _camFlyStep(dt) {
+    const f = this._camFly, cam = this.camera;
+    f.t += dt;
+    const k = Math.min(1, f.t / f.dur), e = k * k * (3 - 2 * k);
+    const to = cam.position.clone(), d = f.from.p.distanceTo(to);
+    cam.position.lerpVectors(f.from.p, to, e);
+    cam.position.y += Math.sin(Math.PI * e) * Math.min(140, 25 + d * 0.12);
+    // Eyes on the aircraft at the base on the way: from the flight's view
+    // to looking at it, then into the showroom framing at the end.
+    const rigQ = cam.quaternion.clone();
+    const look = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(cam.position, this.aircraft.rPos, new THREE.Vector3(0, 1, 0)));
+    const sm = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+    cam.quaternion.copy(f.from.q).slerp(look, sm(0, 0.3, k)).slerp(rigQ, sm(0.72, 1, k));
+    cam.updateMatrixWorld();
+    if (k >= 1) this._camFly = null;
+  }
+
+  // Any choice in the menu while the shot runs: straight to the base.
+  _endOutro() {
+    if (this._outro) { this._outro = null; this._toBase(); this.showroom.enter(); }
+    this._camFly = null;
+  }
+
   _enterPlay(mode) {
+    this._endOutro();
     this.mode = mode;
     this.playing = true;
     this.showroom?.leave();
@@ -599,6 +692,12 @@ export class Game {
   }
 
   _acEvent(e) {
+    if (e.kind === 'crash' && !this.playing) {
+      // Not flying (title screen): no bill, no report — back to the base.
+      this._toBase();
+      if (this.showroom && !this.showroom.active) this.showroom.enter();
+      return;
+    }
     if (e.kind === 'crash') {
       this._loadAtCrash = { fuel: this.aircraft.fm.fuel, hopper: this.aircraft.fm.hopper };
       this.sprayer.on = false;
@@ -618,7 +717,7 @@ export class Game {
       this.rig.setMode('orbit', ac);
       Object.assign(this.rig.orbit, { dist: Math.max(16, 1.7 * Math.max(...(ac.type.bounds ?? [[8]]).map((b) => Math.abs(b[0])))), pitch: 0.3 });
       this.screens.impact();
-      setTimeout(() => this.screens.crash(crashText(e.reason), this._crashInfo), 2200);
+      setTimeout(() => { if (this.playing && this.aircraft.state === 'crashed') this.screens.crash(crashText(e.reason), this._crashInfo); }, 2200);
     }
     if (e.kind === 'engineStart' && this.job) this.job.started = true;
   }
@@ -691,7 +790,10 @@ export class Game {
 
     if (dt > 0 && this._crashCam && ac.state === 'crashed' && this.rig.mode === 'orbit' && !(mouse.buttons & 1)) this.rig.orbit.yaw += dt * 0.16;
     if (dt > 0) {
-      if (this.playing) {
+      if (this._outro) {
+        this._outroGlide(dt);
+        if ((this._outro.t += dt) >= this._outro.dur) this._outroToBase();
+      } else if (this.playing) {
         ac.update(dt, input, { mouse, ...this._controlLaw(ac), heliModel: this.settings.heliModel, windScale: this.settings.wind, cameraMode: this.cameraMode });
       } else {
         ac.update(dt, { ...input, isDown: () => false, wasPressed: () => false, virtual: { active: false } }, { mouse: { buttons: 0, dx: 0, dy: 0, wheel: 0 }, assist: 'normal', windScale: this.settings.wind, cameraMode: 'orbit' });
@@ -736,6 +838,7 @@ export class Game {
         const eye = live && this.rig.mode === 'cockpit' ? ax('eyeUp', 'eyeDown') : 0;
         if (live) mouse.keys = { x: ax('lookRight', 'lookLeft'), y: ax('lookUp', 'lookDown'), zoom: ax('zoomOut', 'zoomIn'), reset: input.wasPressed('lookReset'), eye };
         this.rig.update(pdt, !this.playing && this.showroom?.active ? this.showroom.target : ac, live || menuCam ? mouse : { buttons: 0, dx: 0, dy: 0, wheel: 0 }, this.world.terrain);
+        if (this._camFly) this._camFlyStep(pdt);
         // The eye height is kept once the keys are let go.
         if (!eye && this.rig.eyeHeight !== this.settings.eyeHeight) {
           const v = (this.rig.eyeHeight = Math.round(this.rig.eyeHeight * 1000) / 1000), cm = Math.round(v * 100);
