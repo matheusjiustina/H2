@@ -1,6 +1,6 @@
 // HUD: minimal permanent readouts, job card, minimap, contextual warnings,
 // toasts, prompts, crew status and tutorial card.
-import { SPRAY, GAME } from '../config.js';
+import { SPRAY } from '../config.js';
 import { buildBaseMap, drawMap } from './maps.js';
 import { keyLabel } from '../core/input.js';
 import { t } from '../i18n/index.js';
@@ -180,7 +180,7 @@ export class HUD {
       const s = g.jobStats || g.job.stats();
       $.jobT.textContent = g.job.c.title;
       $.jobS1.textContent = t('{0} ha · {1} · sortie {2}', g.job.ha.toFixed(1), g.job.crop, Math.max(1, g.job.sorties));
-      $.jobBar.style.width = `${Math.min(100, (s.coverage / GAME.completeCoverage) * 100)}%`;
+      $.jobBar.style.width = `${Math.min(100, (s.coverage / g.job.target) * 100)}%`;
       const gd = g.guidance;
       const passes = gd.passes.length ? t('pass {0}/{1}', gd.next ? gd.next.k + 1 : '—', gd.passes.length) : '';
       $.jobS2.textContent = `${t('{0}% covered · {1}', Math.round(s.coverage * 100), passes)}${s.overlap > 0.02 ? t(' · overlap {0}%', Math.round(s.overlap * 100)) : ''}${g.job.complete() ? t(' · COMPLETE — return to base') : ''}`;

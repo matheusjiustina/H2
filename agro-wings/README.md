@@ -3090,6 +3090,31 @@ switches with the six aeroplanes parked; a sixth parking spot was added).
 - The GPS is the game's AgroWings unit, not a specific Satloc model.
 - No end-to-end mission run or frame-time measurement for this build.
 
+### Flight school (Escola de aviação agrícola)
+
+Two tiny talhões between the strip and the south road open the service
+orders, in their own section above Level 1:
+- **Escola 1 — E-01** (soybean, 340 × 80 m, 2.7 ha, east–west rows): load,
+  take-off, find the talhão, work height, spray on/off with the lightbar,
+  a few passes, hand in. 7 steps.
+- **Escola 2 — E-02** (cotton, 420 × 80 m, 3.4 ha, beside the strip): the
+  balão, spray off at the edges, closing the gaps (the power line starts
+  110 m past the east end). 5 steps.
+
+The guide box starts with the job every time it is flown, also after
+*Continuar de onde parou*. It names the PC key, or the touch button on
+mobile (SPRAY, segure ENG, FLP+, manche para trás…). The jobs complete at
+85 % (`complete` on the contract: the edges weigh more on a tiny talhão;
+the others stay at 90 %). The fields are appended to `FIELDS`, so the ids
+and trees of the original farm do not move; their run-in corridors (250 m)
+are cleared of trees. The golden physics is unchanged.
+
+Checked in-browser with the test autopilot (`test/e2e.mjs` flow), Ipanema:
+School 1 went through all 7 steps to the report (85.1 %, no damage) and
+School 2 through all 5 (85.1 %). Board and guide box captured at
+1280 × 720 and at phone landscape with touch. Not checked: a real phone,
+or a human beginner flying it.
+
 ### Spraying a little high, and continuing a job
 
 **A pass flown a little high still counts.** The 'Too high to spray'

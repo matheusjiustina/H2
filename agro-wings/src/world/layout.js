@@ -198,6 +198,15 @@ FIELDS.push(
   field('CV-01', 'soy', -4300, -3850, 5060, 5320, 0.9, 'x', { contract: 'cv-soy', farm: 'chapada', level: 1 }),
   field('CV-02', 'pasture', -4880, -4420, 5120, 5380, 1, 'x', { farm: 'chapada', level: 1 }),
 );
+// Flight school: two tiny talhões on the grass between the strip and the
+// south road, so a beginner works in sight of the base. Both have east–west
+// rows: E-01 (340 × 80 m, soybean) and E-02 (420 × 80 m, cotton, beside the
+// strip) for the balão; the power line starts 110 m past E-02's east end.
+// Appended last so the ids of the fields above do not change.
+FIELDS.push(
+  field('E-01', 'soy', -220, 120, 150, 230, 0.9, 'x', { contract: 'school-1', school: true }),
+  field('E-02', 'cotton', -220, 200, 45, 125, 0.9, 'x', { contract: 'school-2', school: true }),
+);
 for (const f of FIELDS) f.level ??= 1;
 
 export const CONTRACT_FIELDS = FIELDS.filter((f) => f.contract);

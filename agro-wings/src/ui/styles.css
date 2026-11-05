@@ -504,3 +504,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 @media (max-width: 520px) { .cc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cc-actions { grid-template-columns: 1fr; } }
 @media (max-height: 520px) { .cc-title { padding-top: 6px; } .cc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 8px; } .cc-cell { padding: 5px 8px; } .cc-actions { margin-top: 10px; } .cc-btn { padding: 8px 10px; } }
 .sr-btn[hidden] { display: none !important; }
+
+.card .tag.lv0 { border-color: rgba(90,200,250,.6); color: #6cd0ff; }
+.lvl.school { color: #6cd0ff; }

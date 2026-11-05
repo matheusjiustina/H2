@@ -6,7 +6,7 @@
 // state: position, heading, ground speed, coverage grid, sprayer flow.
 import { clamp, KT } from '../core/math.js';
 import { reliefPatch } from '../ui/maps.js';
-import { UNITS, GAME } from '../config.js';
+import { UNITS } from '../config.js';
 import { FIELDS, SITES, siteById } from '../world/layout.js';
 
 const TRACK_MAX = 2400; // points (~16 min at 0.4 s)
@@ -331,7 +331,7 @@ export class Guidance {
     g.fillStyle = P.track;
     g.fillRect(x, by, w, 3);
     g.fillStyle = P.main;
-    g.fillRect(x, by, w * clamp(s.coverage / GAME.completeCoverage, 0, 1), 3);
+    g.fillRect(x, by, w * clamp(s.coverage / this.job.target, 0, 1), 3);
   }
 
   _drawNav(g, x, y, w, h, fs, P, nav, opts) {

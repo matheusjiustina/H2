@@ -86,7 +86,7 @@ export function createVegetation(terrain, quality) {
   // numbers against these only, so every tree of the original farm stays
   // exactly where it was. Trees that the outer fields, their pass corridors
   // and the outer roads now claim are removed afterwards (see `cleared`).
-  const FIELDS0 = FIELDS.filter((f) => f.level === 1 && !f.farm), ROADS0 = ROADS.filter((rd) => !rd.mesh);
+  const FIELDS0 = FIELDS.filter((f) => f.level === 1 && !f.farm && !f.school), ROADS0 = ROADS.filter((rd) => !rd.mesh);
   const avoid = (x, z, m = 6) => {
     if (Math.abs(z) < 60 && x > RUNWAY.x0 - 250 && x < RUNWAY.x1 + 250) return true; // strip approach
     // (The original apron: the random streams draw against it; the main
@@ -101,7 +101,8 @@ export function createVegetation(terrain, quality) {
   // Outer (level 2/3) fields with their run-in corridors along the passes,
   // and the outer access roads: kept clear of trees (low scrub may stay
   // outside the fields themselves).
-  const FIELDS2 = FIELDS.filter((f) => f.level > 1 || f.farm), ROADS2 = ROADS.filter((rd) => rd.mesh);
+  // The flight-school talhões by the strip join them (cleared afterwards).
+  const FIELDS2 = FIELDS.filter((f) => f.level > 1 || f.farm || f.school), ROADS2 = ROADS.filter((rd) => rd.mesh);
   // The outer roads' segments in a 200 m grid (each in every cell its
   // corridor touches), so a point only checks the segments near it.
   const RG = 200, roadGrid = new Map();
@@ -135,11 +136,12 @@ export function createVegetation(terrain, quality) {
     for (const f of FIELDS2) {
       if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
       // Talhões cut out of the forest keep the forest up to their edges.
-      if (!tall || !f.contract || siteById(f.farm).farm?.tight) continue;
+      if (!tall || !f.contract || (f.farm && siteById(f.farm).farm?.tight)) continue;
       const along = f.rowAxis === 'x';
       const a = along ? x : z, c = along ? z : x;
       const a0 = along ? f.x0 : f.z0, a1 = along ? f.x1 : f.z1, c0 = along ? f.z0 : f.x0, c1 = along ? f.z1 : f.x1;
-      if (c > c0 - 35 && c < c1 + 35 && a > a0 - 600 && a < a1 + 600) return true;
+      const run = f.school ? 250 : 600;
+      if (c > c0 - 35 && c < c1 + 35 && a > a0 - run && a < a1 + run) return true;
     }
     return nearOuterRoad(x, z);
   };

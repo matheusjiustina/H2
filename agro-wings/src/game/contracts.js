@@ -9,6 +9,37 @@ export { FARM_CONTRACTS };
 export const contractById = (id) => CONTRACTS.find((c) => c.id === id) ?? FARM_CONTRACTS.find((c) => c.id === id);
 
 export const CONTRACTS = [
+  // --- FLIGHT SCHOOL: two tiny talhões beside the strip, guided step by step ---
+  {
+    id: 'school-1',
+    school: 1,
+    complete: 0.85,
+    get title() { return t('School 1 — First swath · Talhão E-01'); },
+    client: 'Escola Agro Wings',
+    get brief() { return t('A tiny soybean talhão just south of the strip: a few straight passes. Learn the loading, the take-off, the work height and the spray switch.'); },
+    get difficulty() { return t('Beginner'); },
+    level: 0,
+    fields: ['E-01'],
+    payPerHa: 200,
+    bonus: 800,
+    recommended: { fuel: 80, liquid: 200 },
+    get tip() { return t('Follow the guide box at the top of the screen.'); },
+  },
+  {
+    id: 'school-2',
+    school: 2,
+    complete: 0.85,
+    get title() { return t('School 2 — The balão · Talhão E-02'); },
+    client: 'Escola Agro Wings',
+    get brief() { return t('A small cotton talhão right beside the strip. Learn the balão turn, switching the spray off at the edges and closing the gaps.'); },
+    get difficulty() { return t('Beginner'); },
+    level: 0,
+    fields: ['E-02'],
+    payPerHa: 220,
+    bonus: 1000,
+    recommended: { fuel: 80, liquid: 260 },
+    get tip() { return t('Power line past the east end: start the balão early on that side.'); },
+  },
   {
     id: 'soy',
     get title() { return t('Soybean — Talhão T-07'); },
@@ -131,6 +162,7 @@ export const CONTRACTS = [
 ];
 
 export const LEVELS = {
+  0: { get label() { return t('Flight school'); }, get short() { return t('School'); }, get blurb() { return t('Two tiny talhões beside the strip, with a step-by-step guide. Start here.'); } },
   1: { get label() { return t('Level 1 · Flat farmland'); }, get short() { return t('L1'); }, get blurb() { return t('Mostly level terrain.'); } },
   2: { get label() { return t('Level 2 · Rolling fields'); }, get short() { return t('L2'); }, get blurb() { return t('Gentle swells: about 20–30 m of relief across a field, slopes up to 5°.'); } },
   3: { get label() { return t('Level 3 · Hilly agricultural fields'); }, get short() { return t('L3'); }, get blurb() { return t('Noticeable hills and valleys: 25–37 m of relief, slopes up to 7°.'); } },
@@ -252,15 +284,18 @@ export class Job {
     };
   }
 
-  complete() { return this.stats().coverage >= GAME.completeCoverage; }
+  // Coverage that completes the job (the tiny school talhões: 85 %, their
+  // edges weigh more).
+  get target() { return this.c.complete ?? GAME.completeCoverage; }
+  complete() { return this.stats().coverage >= this.target; }
 
   // Payment for the work so far. Partial work is paid pro rata.
   evaluate(damage) {
     const s = this.stats();
-    const base = this.c.payPerHa * this.ha * Math.min(1, s.coverage / GAME.completeCoverage);
+    const base = this.c.payPerHa * this.ha * Math.min(1, s.coverage / this.target);
     const quality = 0.65 + 0.35 * s.uniformity;
     const wastePenalty = Math.max(0, s.waste - 0.1) * 0.8;
-    const done = s.coverage >= GAME.completeCoverage;
+    const done = s.coverage >= this.target;
     const bonus = done ? this.c.bonus * Math.max(0, 1 - s.waste * 1.5) * s.uniformity : 0;
     const repair = Math.round(damage * GAME.repairPerDamage);
     const pay = Math.round(base * quality * (1 - Math.min(0.6, wastePenalty)) + bonus);

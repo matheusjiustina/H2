@@ -14,11 +14,27 @@ export class Tutorial {
     this.passesAtStart = 0;
   }
 
-  start() {
+  // kind: 'general' (first contract) or a flight-school contract id.
+  start(kind = 'general') {
     this.active = true;
+    this.kind = kind;
     this.i = 0;
     this.t = 0;
     this.sprayGood = 0;
+    this.heightOk = 0;
+    this.covT = 0;
+    this.cov = 0;
+  }
+  // Key or touch-button label for an action (PC and mobile).
+  k(a) {
+    const g = this.game;
+    if (!g.touch?.active) return g.hud.key(a);
+    const T = {
+      engine: t('hold ENG'), spray: 'SPRAY', brakes: 'BRAKE', flapsDown: 'FLP+', flapsUp: 'FLP−', map: 'MAP', orbit: t('FREE'),
+      throttleUp: t('power slider up'), throttleDown: t('power slider down'), pitchUp: t('stick back'), pitchDown: t('stick forward'),
+      rollLeft: t('stick left'), rollRight: t('stick right'), yawLeft: 'L', yawRight: 'R', interact: t('the button at the bottom'),
+    };
+    return `<span class="k">${T[a] ?? a}</span>`;
   }
   skip() {
     this.active = false;
@@ -27,9 +43,35 @@ export class Tutorial {
     this.game.career.save();
   }
 
-  steps() {
+  // Flight school lessons: few, short steps on the two tiny talhões by the strip.
+  schoolSteps() {
     const g = this.game;
-    const k = (a) => g.hud.key(a);
+    const k = (a) => this.k(a);
+    const ac = g.aircraft, fm = ac.fm, o = fm.out;
+    const pct = Math.round(this.cov * 100);
+    const loaded = { label: t('Load'), text: t('The badeco is filling the aircraft for this lesson. Watch, or hold {0} to speed it up. A small load is enough here.', '<span class="k">T</span>'), done: () => !g.service.busy() && fm.hopper > 30 };
+    const takeoff = { label: t('Take-off'), text: t('Hold {0} to start. Taxi to the strip, line up facing east, full power {1}, and lift off at about 60 kt with {2}.', k('engine'), k('throttleUp'), k('pitchUp')), done: () => !o.onGround && o.agl > 15 };
+    const handIn = { label: t('Hand in'), text: t('Done! Land on the strip, taxi to the pad (blue circle) and stop the engine {0}. The report shows your grade.', k('engine')), done: () => !g.job || g.job.c.id !== this.kind };
+    if (this.kind === 'school-1') return [
+      loaded, takeoff,
+      { label: t('Find E-01'), text: t('E-01 is the small soybean talhão right below, south of the strip (yellow outline on the map {0}). Turn onto the yellow line: the rows run east–west.', k('map')), done: () => this._nearJob(80) },
+      { label: t('Work height'), text: t('Descend to 3–4 m over the crop: the HGT readout turns green. Keep about 90 kt — low and steady, eyes ahead.'), done: () => this.heightOk > 2 },
+      { label: t('Spray'), text: t('Tap {0} at the edge of the talhão and again at the far edge. Keep the lightbar centred: it shows which way to steer.', k('spray')), done: () => this.sprayGood > 3 },
+      { label: t('Three passes'), text: t('Climb gently at the end, turn around and line up on the next yellow line. A few passes cover E-01. Covered: {0}%', pct), done: () => !!g.job && this.cov >= g.job.target },
+      handIn,
+    ];
+    return [
+      loaded, takeoff,
+      { label: t('The balão'), text: t('E-02 is the cotton beside the strip. At the end of a pass: spray OFF {0}, pull {1} to climb 20–30 m, turn 45° away, then bank back and dive onto the next line. Power line past the east end: turn early there.', k('spray'), k('pitchUp')), done: () => g.guidance.passes.filter((p) => p.done > 0.85).length >= 2 },
+      { label: t('Close the gaps'), text: t('Keep going until no stripe is missing — the map {0} shows unsprayed gaps. Spraying outside the edges is waste. Covered: {1}%', k('map'), pct), done: () => !!g.job && this.cov >= g.job.target },
+      handIn,
+    ];
+  }
+
+  steps() {
+    if (this.kind && this.kind !== 'general') return this.schoolSteps();
+    const g = this.game;
+    const k = (a) => this.k(a);
     const ac = g.aircraft, fm = ac.fm, o = fm.out;
     const onRunway = () => Math.abs(fm.pos.z - RUNWAY.z) < RUNWAY.width / 2 && fm.pos.x > RUNWAY.x0 - 5 && fm.pos.x < RUNWAY.x1;
     const hdg = ac.headingDeg();
@@ -92,15 +134,22 @@ export class Tutorial {
       this.active = false;
       g.career.tutorialDone = true;
       g.career.save();
-      g.toast(t('Tutorial complete. Good flying!'));
+      g.toast(this.kind === 'school-1' ? t('Lesson 1 complete! Next: School 2 — the balão.') : this.kind === 'school-2' ? t('Flight school complete! The Level 1 orders are waiting.') : t('Tutorial complete. Good flying!'));
       return;
     }
+    // A school lesson ends if its job is dropped for another.
+    if (this.kind?.startsWith('school') && this.i < st.length - 1 && g.job?.c.id !== this.kind) { g.hud.setTutorial(null); this.active = false; return; }
     const s = st[this.i];
     // Count good spraying time for the first-pass step.
     const ac = g.aircraft;
     const hh = ac.workHeight();
-    if (g.sprayer.on && g.sprayer.flowNow > 0 && hh > SPRAY.idealHeight[0] - 0.5 && hh < SPRAY.idealHeight[1] + 1.5) this.sprayGood += dt;
-    g.hud.setTutorial(t('Tutorial {0} / {1} · {2}', this.i + 1, st.length, s.label), s.text, '');
+    const inWin = !ac.fm.out.onGround && hh > SPRAY.idealHeight[0] - 0.5 && hh < SPRAY.idealHeight[1] + 1.5;
+    if (g.sprayer.on && g.sprayer.flowNow > 0 && inWin) this.sprayGood += dt;
+    this.heightOk = inWin && g.job && this._nearJob(30) ? this.heightOk + dt : 0;
+    this.covT -= dt;
+    if (this.covT <= 0 && g.job) { this.covT = 0.5; this.cov = g.job.stats().coverage; }
+    const head = this.kind === 'school-1' ? t('School 1') : this.kind === 'school-2' ? t('School 2') : t('Tutorial');
+    g.hud.setTutorial(t('{0} · {1} / {2} · {3}', head, this.i + 1, st.length, s.label), s.text, '');
     this.t += dt;
     if (this.t > 0.6 && s.done()) {
       this.i++;

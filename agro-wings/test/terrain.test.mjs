@@ -98,7 +98,7 @@ test('the three zones have the relief their level promises', () => {
 
 test('contract fields carry their terrain level: relief grows from level 1 to 3', () => {
   const byLevel = { 1: [], 2: [], 3: [] };
-  for (const c of CONTRACTS) {
+  for (const c of CONTRACTS.filter((c) => !c.school)) {
     const fields = c.fields.map((n) => FIELDS.find((f) => f.name === n));
     assert.ok(fields.every((f) => f.level === c.level), c.id);
     const T = fieldsTerrain(td, fields);

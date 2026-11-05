@@ -282,7 +282,7 @@ export class Screens {
       const dist = Math.hypot(T.cx - BASE.pad.x, T.cz - BASE.pad.z) / 1000;
       const terr = c.level > 1 ? `<span>${t('relief {0} m', Math.round(T.relief))}</span><span>${t('slope ≤ {0}°', Math.round(T.maxSlope))}</span>` : '';
       return `<div class="card ${g.job?.c.id === c.id ? 'sel' : ''}">
-        <span class="tag lv${c.level}">${LEVELS[c.level].short} · ${c.difficulty}</span>
+        <span class="tag lv${c.level}">${LEVELS[c.level].short} · ${c.difficulty}</span>${c.school && done ? '<span class="tag lv1">✓</span>' : ''}
         <div class="name">${c.title}</div>
         <div class="desc">${c.brief}</div>
         <div class="meta"><span>${ha.toFixed(1)} ha</span><span>${GAME.currency} ${c.payPerHa}/ha</span><span>${t('bonus {0}', money(c.bonus))}</span><span>${dist.toFixed(1)} km</span>${terr}</div>
@@ -301,7 +301,7 @@ export class Screens {
         <div class="prog">${on ? t('In progress · {0} of {1} out', fj.spots().filter((f) => f.state === 'out').length, j.spots.length) : t('Not started')}</div>
         <div class="btn-row" style="justify-content:flex-start">${on ? `<button class="btn small" data-fire-cancel="1">${t('Hand in current job')}</button>` : `<button class="btn primary small" data-fire="${j.id}">${t('Accept')}</button>`}</div></div>`;
     }).join('')}</div>` : '';
-    const cards = fireCards + [1, 2, 3].map((lv) => `<h3 class="lvl">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => c.level === lv).map(card).join('')}</div>`).join('');
+    const cards = fireCards + [0, 1, 2, 3].map((lv) => `<h3 class="lvl${lv === 0 ? ' school' : ''}">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => c.level === lv).map(card).join('')}</div>`).join('');
     const el = h(`<div class="panel"><h2>${t('Service orders')}</h2>
       <div class="sub">${t('Choose a job, set the load, and the badeco will service the aircraft on the pad.')}</div>
       ${cards}

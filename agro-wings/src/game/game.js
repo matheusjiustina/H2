@@ -603,6 +603,7 @@ export class Game {
     const job = info.job;
     this.setJob(job);
     job.started = true;
+    if (job.c.school) this.tutorial.start(job.c.id);
     let cx = 0, cz = 0;
     for (const f of job.fields) { cx += (f.x0 + f.x1) / 2; cz += (f.z0 + f.z1) / 2; }
     cx /= job.fields.length; cz /= job.fields.length;
@@ -634,6 +635,9 @@ export class Game {
     }
     this.setJob(job);
     this.screens.close();
+    // Flight school: the guide starts with the job, every time it is flown.
+    if (job.c.school) this.tutorial.start(job.c.id);
+    else if (this.tutorial.active && this.tutorial.kind !== 'general') { this.tutorial.active = false; this.hud.setTutorial(null); }
     if (farm && this.site !== farm) {
       const p = this.aircraft.fm.pos;
       const km = Math.hypot(farm.pad.x - p.x, farm.pad.z - p.z) / 1000;
@@ -651,7 +655,7 @@ export class Game {
   requestService(fuel, liquid) {
     if (this.service.request(fuel, liquid)) {
       if (this.job) this.job.started = true;
-      if (this.mode === 'career' && !this.career.tutorialDone && !this.tutorial.active) this.tutorial.start();
+      if (this.mode === 'career' && !this.career.tutorialDone && !this.tutorial.active && !this.job?.c.school) this.tutorial.start();
     }
   }
 
