@@ -678,6 +678,39 @@ high-bay lamps with light pools on the floor (no real lights). Colliders
 are now the walls, roof and equipment, so an aircraft can taxi in when
 the doors are open. Grass no longer grows through the slab.
 
+**Water, lakes and fires (environment realism).** Visual only: physics,
+flotation, missions and economy unchanged (`test/golden.test.mjs` identical).
+* *Water* (`src/world/water.js`): six wind-steered wave trains (lengths
+  2–14 m, deep-water speeds) whose heights wander with large-scale noise, plus
+  two fine noise layers; gusty patches drift downwind; roughness from 0.035
+  (calm, mirror-like) to 0.17 (wind); whitecaps only above ≈ 8 m/s; short
+  waves fade with distance (no moiré). Wind from the weather's own visual wind
+  (`ATMO_U.wind`). Ripple rings and wake from a 16-entry uniform ring buffer
+  (`WATER_U.rip`): no render targets, no planar reflection. Pond meshes have
+  dense rings across the shore (soft edge), the bed under shallow water is
+  sediment (terrain shader), the wet bank low-contrast.
+* *Contact* (`src/world/waterFx.js`): first touch of a float → splash and ring
+  sized by speed and sink rate; while wet → spray sheets at the steps
+  (thinning as the hull planes and lifts), bow wave when taxiing, wake rings
+  from the sterns, spray at the scoop probes. Only on real float contact, one
+  pooled sprite set (700, scaled by the quality profile), nothing spawned more
+  than 650 m from the camera.
+* *Lakes* (`WATER.ponds`, shape `lobes` = harmonics of `pondRadius`, mirrored
+  in the terrain shader): Represa do Norte enlarged (r 430 → 500 m, bays and a
+  narrower neck, ≈ 1.2 km long, Fire Boss operations unchanged); Represa da
+  Lavoura (1100, 4100) among the south fields, long and sinuous; Lagoa do
+  Buritizal (−4000, 3850), small, asymmetric, trees in clumps and an open
+  bank. Sites picked by a scan against fields, roads, forests, strips, farm
+  sites, the power line and the fire zone, on low-relief ground; banks rise
+  from the bed without a step. Trees from the existing pond-margin placement.
+* *Fires* (`src/world/fires.js`): each spot is one burning area — a core of
+  large flames, three clumps, low wide flames along the edge (26 billboards,
+  one instanced draw), each with its own fuel; water puts out what it covers
+  (a drop on one side leaves the other burning), the spot's intensity is their
+  size-weighted mean (same mission logic); a burnt / ember patch laid on the
+  terrain (grass cleared); a continuous smoke column bent by the wind, lighter
+  as it rises, density by quality; steam where water hits.
+
 **Crash: occurrence report and the checkpoint.** On impact the screen
 flashes and jolts, the camera orbits the wreck, and ~2 s later an
 occurrence report comes up (aircraft, place, impact speed, heading, fuel,
