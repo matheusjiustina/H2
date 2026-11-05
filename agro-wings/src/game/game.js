@@ -37,6 +37,7 @@ import { FlightModel } from '../flight/flightModel.js';
 import { t } from '../i18n/index.js';
 import { aircraftUnlocked } from './expansions.js';
 import { FireField } from '../world/fires.js';
+import { WaterFx } from '../world/waterFx.js';
 import { FireJobs } from './fireJobs.js';
 
 const SETTINGS = 'agrowings.settings.v1';
@@ -143,6 +144,9 @@ export class Game {
     this.world.mist = this.mist;
     // Fire-suppression test scenario (active while the Fire Boss is flown).
     this.fires = new FireField(this.scene, this.world.terrain);
+    this.waterFx = new WaterFx(this.scene); // splash, spray and wake of the amphibians
+    this.waterFx.setQuality(this.perf.profile.particles);
+    this.fires.setQuality?.(this.perf.profile.particles);
     this.fireJobs = new FireJobs(this); // fire-fighting service orders (Fire Boss)
     this.mist.limit = this.perf.profile.particles;
     this.audio = new GameAudio();
@@ -190,6 +194,7 @@ export class Game {
     const ph = h * this.renderer.getPixelRatio();
     this.mist?.setScale(ph, 62);
     this.fires?.setScale(ph, 62);
+    this.waterFx?.setScale(ph, 62);
     this.dust?.setScale(ph, 62);
   }
 
@@ -802,6 +807,7 @@ export class Game {
       this.mist.update(dt, ac.windVec, (x, z) => ac.env.top(x, z));
       this.dust.update(dt, ac.windVec, (x, z) => ac.env.ground(x, z));
       this.fires?.update(dt, ac.windVec);
+      this.waterFx?.update(dt, ac, this.camera.position);
       this.fireJobs?.update();
       this.guidance.update(dt);
       if (this.playing) this.replay.record(dt);

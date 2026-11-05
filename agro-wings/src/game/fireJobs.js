@@ -23,9 +23,7 @@ export class FireJobs {
   accept(id) {
     const g = this.game, def = FIRE_JOBS.find((j) => j.id === id);
     if (!def || !g.aircraft?.water || !g.fires) return false;
-    for (const f of g.fires.fires) if (def.spots.includes(f.id)) { f.state = 'burning'; f.intensity = 1; f.water = 0; }
-    g.fires.allOutT = 0;
-    g.fires._writeFlames?.();
+    g.fires.relight(def.spots);
     this.job = { def, t0: g.time };
     g.toast(t('Fire order accepted: {0}. Spots marked on the HUD.', def.title));
     return true;

@@ -41,6 +41,7 @@ uniform float uCropTop;
 uniform vec2 uStream[NSTP];
 uniform vec4 uStreamBox;
 uniform vec4 uPond[NPOND];
+uniform vec4 uPondA[NPOND];
 uniform float uCutKind[NCUT];
 
 // Micro-relief written by terrainColor() and turned into a bump normal later.
@@ -342,19 +343,28 @@ vec3 terrainColor(vec2 p, out float rough) {
   // Stream banks and pond shores: wet earth, then lush grass.
   float ds = 1e9;
   if (sdBox(p, uStreamBox) < 30.0) for (int i = 0; i < NSTP - 1; i++) ds = min(ds, segD(p, uStream[i], uStream[i + 1]));
+  float under = 0.0; // pond bed (seen through the shallow water): sediment, not grass
   for (int i = 0; i < NPOND; i++) {
     vec4 q = uPond[i];
     vec2 d = p - q.xy;
-    if (dot(d, d) > q.z * q.z * 3.0) continue;
+    vec4 L = uPondA[i];
+    float rm = q.z * (1.0 + abs(L.x) + abs(L.y) + abs(L.z) + abs(L.w));
+    if (dot(d, d) > max(q.z * q.z * 3.0, rm * rm * 1.6)) continue;
     float a = atan(d.y, d.x);
-    float rr = q.z * (1.0 + 0.16 * sin(2.0 * a + q.w) + 0.09 * sin(3.0 * a + q.w * 1.7));
-    ds = min(ds, abs(length(d) - rr) + 2.0);
+    float rr = q.z * (1.0 + L.x * sin(2.0 * a + q.w) + L.y * sin(3.0 * a + q.w * 1.7) + L.z * sin(5.0 * a + q.w * 2.3 + 1.1) + L.w * sin(7.0 * a + q.w * 3.1 + 2.0));
+    float sdp = length(d) - rr;
+    ds = min(ds, abs(sdp) + 2.0);
+    under = max(under, 1.0 - smoothstep(-3.0, 1.5, sdp));
   }
   if (ds < 30.0) {
-    vec3 mud = mix(vec3(0.12, 0.07, 0.04), vec3(0.28, 0.21, 0.13), smoothstep(0.4, 0.7, nC.r));
+    // Wet bank: dark damp earth, low contrast (the old two-tone speckle read
+    // as a dotted ring from the air), drying outwards.
+    vec3 mud = mix(vec3(0.15, 0.11, 0.065), vec3(0.22, 0.165, 0.10), smoothstep(0.25, 0.85, nC.r * 0.7 + nD.g * 0.3));
+    mud = mix(mud, vec3(0.27, 0.22, 0.14), smoothstep(6.0, 12.0, ds) * 0.5);
     col = mix(col, col * vec3(0.78, 0.95, 0.7), 1.0 - smoothstep(10.0, 28.0, ds));
-    col = mix(col, mud, 1.0 - smoothstep(4.0, 10.0 + nC.g * 4.0, ds));
+    col = mix(col, mud, 1.0 - smoothstep(5.0, 12.0 + nC.g * 5.0, ds));
   }
+  if (under > 0.0) col = mix(col, mix(vec3(0.12, 0.125, 0.07), vec3(0.17, 0.165, 0.09), nC.r), under * 0.9);
   return col;
 }
 
@@ -421,6 +431,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uStream: { value: stp.map((q) => new THREE.Vector2(q[0], q[1])) },
     uStreamBox: { value: new THREE.Vector4(Math.min(...stp.map((q) => q[0])), Math.min(...stp.map((q) => q[1])), Math.max(...stp.map((q) => q[0])), Math.max(...stp.map((q) => q[1]))) },
     uPond: { value: WATER.ponds.map((q) => new THREE.Vector4(q.x, q.z, q.r, q.ph)) },
+    uPondA: { value: WATER.ponds.map((q) => new THREE.Vector4(...(q.lobes ?? [0.16, 0.09, 0, 0]))) },
     uCutKind: CUT_U.kinds,
     uWet: ATMO_U.wet,
   };

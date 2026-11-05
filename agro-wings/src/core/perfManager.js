@@ -75,6 +75,8 @@ export class PerfManager {
     if (!scaleOnly) {
       g.world?.setQuality(P.quality);
       if (g.mist) g.mist.limit = Math.min(g.mist.max, P.particles);
+      g.waterFx?.setQuality?.(P.particles); // splash / spray (src/world/waterFx.js)
+      g.fires?.setQuality?.(P.particles); // flames and smoke density (src/world/fires.js)
     }
     g.resize();
   }

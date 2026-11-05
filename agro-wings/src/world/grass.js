@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { rng, fbm } from '../core/math.js';
 import { grassTuft, TILES } from './foliage.js';
 import { BASE, FARM_SITES } from './layout.js';
+import { FIRE_TEST_SPOTS } from './fires.js';
 import { ATMO_U } from './atmosphere.js';
 
 const CELL = 16;
@@ -79,7 +80,9 @@ export function createGrass(terrain, quality, atlas) {
       if (x > r.x0 - 2 && x < r.x1 + 2 && Math.abs(z - r.z) < r.width / 2 + 1) return true;
       if (Math.abs(x - sh.x) < 12 && Math.abs(z - sh.z) < 9) return true;
     }
-    if (terrain.surfaceAt(x, z) !== 'grass') return true;
+    // Burnt ground of the fire spots (src/world/fires.js): no grass on it.
+    for (const f of FIRE_TEST_SPOTS) if (Math.abs(x - f.x) < f.r * 1.3 && Math.abs(z - f.z) < f.r * 1.3 && Math.hypot(x - f.x, z - f.z) < f.r * 1.25) return true;
+        if (terrain.surfaceAt(x, z) !== 'grass') return true;
     if (terrain.waterLevel(x, z) > -1e8) return true;
     return false;
   };

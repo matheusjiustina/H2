@@ -247,11 +247,26 @@ export const WATER = {
     // and take off (≈ 1 km long). Gentle banks (bank: rise per metre beyond
     // the shore, blend: where the natural ground takes over, in radii), and
     // open shores at both ends of the long axis (few trees on the approaches).
-    { name: 'Represa do Norte', x: 450, z: -3950, r: 430, depth: 4.5, ph: Math.PI / 2, bank: 0.045, blend: 1.7, trees: 0.3, open: -0.1, big: true },
+    // Enlarged (r 430 → 500) with an irregular shoreline: bays, a narrower
+    // neck on the south side, different ends (lobes: see pondRadius).
+    { name: 'Represa do Norte', x: 450, z: -3950, r: 500, depth: 4.5, ph: Math.PI / 2, bank: 0.045, blend: 1.7, trees: 0.3, open: -0.1, big: true, lobes: [0.13, 0.1, 0.06, 0.035] },
+    // Farm dam among the south fields: long and slightly sinuous, one end
+    // narrower, sparse trees (≈ 0.5 km long).
+    { name: 'Represa da Lavoura', ring: true, x: 1100, z: 4100, r: 190, depth: 3.0, ph: 0.35, bank: 0.035, blend: 2.2, trees: 0.35, open: 0.2, lobes: [0.36, 0.12, 0.05, 0.03] },
+    // Small natural lake out in the south-west: asymmetric, with inlets,
+    // trees in clumps on part of the shore and one open bank.
+    { name: 'Lagoa do Buritizal', ring: true, x: -4000, z: 3850, r: 120, depth: 2.6, ph: 2.6, bank: 0.04, blend: 2.4, trees: 1.6, open: 0.7, lobes: [0.1, 0.17, 0.09, 0.05] },
   ],
 };
 // Radius of a pond's shoreline towards angle a.
-export const pondRadius = (p, a) => p.r * (1 + 0.16 * Math.sin(2 * a + p.ph) + 0.09 * Math.sin(3 * a + p.ph * 1.7));
+// lobes [a2, a3, a5, a7]: the harmonics' amplitudes (default 0.16, 0.09, 0, 0,
+// the original shape); rmax: the largest radius (bounding checks).
+export const POND_LOBES = [0.16, 0.09, 0, 0];
+export const pondRadius = (p, a) => {
+  const [a2, a3, a5, a7] = p.lobes ?? POND_LOBES;
+  return p.r * (1 + a2 * Math.sin(2 * a + p.ph) + a3 * Math.sin(3 * a + p.ph * 1.7) + (a5 ? a5 * Math.sin(5 * a + p.ph * 2.3 + 1.1) : 0) + (a7 ? a7 * Math.sin(7 * a + p.ph * 3.1 + 2.0) : 0));
+};
+for (const p of WATER.ponds) p.rmax = p.r * (1 + (p.lobes ?? POND_LOBES).reduce((s, v) => s + Math.abs(v), 0));
 
 // Forest blocks (legal reserve) and tree belts. kind: 'mata' (dense native),
 // 'eucalyptus' (planted windbreak), 'riparian' (along the creek). ring: a

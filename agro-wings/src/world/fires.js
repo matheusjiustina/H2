@@ -14,6 +14,15 @@
 // { x, z, litres, radius }. Visuals: one instanced, camera-facing flame
 // mesh for every spot (one draw call), and two particle pools (smoke, the
 // falling water / splashes) — a bounded number of points, nothing kept.
+//
+// Each spot burns as one area: a core of large flames, clumps of smaller
+// ones round it with gaps, every flame with its own fuel (0…1). Water puts
+// out the flames it lands on (a drop on one side leaves the other side
+// burning); the spot's intensity is their size-weighted mean, so the
+// mission logic (intensity, state, water received) is unchanged. A flat
+// ember / char patch under each spot (one more instanced draw); smoke is a
+// continuous wind-blown column of soft sprites from the burning flames,
+// steam where water hits them.
 import * as THREE from 'three';
 import { ParticlePool } from '../core/particles.js';
 
@@ -26,38 +35,84 @@ export const FIRE_TEST_SPOTS = [
 ];
 const L_PER_M2 = 1.6; // litres per m² of burning area to put a spot out
 const REIGNITE = 120; // s after the last spot is out
-const PER_FIRE = 16; // flame billboards per spot
+const PER_FIRE = 26; // flames per spot (core + clumps + low creeping edge flames)
+const rng = (seed) => () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 
 const FLAME_VS = /* glsl */ `
 attribute vec4 aInst;
 attribute float aPhase;
+attribute float aW;
 uniform float uTime;
 varying vec2 vUv;
 varying float vPhase;
+varying float vK;
 void main() {
   vUv = uv;
   vPhase = aPhase;
-  float s = aInst.w * (0.82 + 0.18 * sin(uTime * 3.1 + aPhase * 7.0));
+  float k = aInst.w;
+  vK = k;
+  // Height breathes and flickers on two rates; width follows less.
+  float br = 0.86 + 0.14 * sin(uTime * 2.3 + aPhase * 7.0) + 0.06 * sin(uTime * 7.9 + aPhase * 13.0);
   vec4 mv = viewMatrix * vec4(aInst.xyz, 1.0);
-  mv.xy += vec2(position.x * s * 0.65, position.y * s);
+  float sway = (position.y) * 0.18 * sin(uTime * 1.7 + aPhase * 5.0);
+  mv.xy += vec2((position.x + sway) * k * 0.62 * aW, position.y * k * br);
   gl_Position = projectionMatrix * mv;
 }`;
 const FLAME_FS = /* glsl */ `
 uniform float uTime;
 varying vec2 vUv;
 varying float vPhase;
+varying float vK;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
 void main() {
+  if (vK < 0.05) discard;
   float y = vUv.y;
-  float n = n2(vec2(vUv.x * 4.0 + vPhase * 9.0, y * 5.0 - uTime * 3.2)) * 0.6 + n2(vec2(vUv.x * 9.0, y * 11.0 - uTime * 5.0)) * 0.4;
-  float w = 0.5 * (1.0 - y * 0.85);
-  float shape = smoothstep(w, w * 0.25, abs(vUv.x - 0.5)) * smoothstep(1.0, 0.25, y) * smoothstep(0.0, 0.08, y);
-  float a = clamp(shape * 1.8 - n * 0.75 * (0.4 + y), 0.0, 1.0);
-  vec3 col = mix(vec3(1.0, 0.72, 0.22), vec3(0.86, 0.2, 0.03), smoothstep(0.05, 0.7, y + n * 0.25));
-  if (a < 0.01) discard;
-  gl_FragColor = vec4(col, a * 0.92);
+  // Rising turbulence: tongues that split and detach near the top.
+  vec2 q = vec2(vUv.x * 3.0 + vPhase * 9.0, y * 3.2 - uTime * 2.6);
+  float n = n2(q) * 0.55 + n2(q * 2.3 + 4.1) * 0.3 + n2(q * 5.1 - 1.7) * 0.15;
+  float x = vUv.x - 0.5 + (n - 0.5) * 0.28 * y;
+  float w = 0.46 * pow(max(0.0, 1.0 - y * 0.95), 0.8) * (0.8 + 0.4 * n);
+  float body = smoothstep(w, w * 0.3, abs(x)) * smoothstep(0.0, 0.1, y);
+  float top = 1.0 - smoothstep(0.35 + n * 0.45, 0.95, y);
+  float a = clamp(body * top * 1.7 - n * 0.35 * y, 0.0, 1.0);
+  if (a < 0.02) discard;
+  // White-yellow root, orange body, deep red tips with a little soot.
+  float t = clamp(y * 1.15 + (n - 0.5) * 0.35, 0.0, 1.0);
+  vec3 col = mix(vec3(1.0, 0.93, 0.62), vec3(1.0, 0.56, 0.12), smoothstep(0.0, 0.35, t));
+  col = mix(col, vec3(0.78, 0.16, 0.03), smoothstep(0.35, 0.8, t));
+  col = mix(col, vec3(0.22, 0.12, 0.08), smoothstep(0.82, 1.0, t) * 0.6);
+  gl_FragColor = vec4(col * 1.15, a * 0.95);
+}`;
+// Ground patch under a spot: glowing embers on the burnt ground while it
+// burns, char afterwards (aInst.w: 1 burning … 0 out; aR: radius).
+const PATCH_VS = /* glsl */ `
+attribute float aI;
+attribute vec2 aUv;
+varying vec2 vUv;
+varying float vI;
+void main() {
+  vUv = aUv;
+  vI = aI;
+  gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
+}`;
+const PATCH_FS = /* glsl */ `
+uniform float uTime;
+varying vec2 vUv;
+varying float vI;
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float n2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+void main() {
+  vec2 c = vUv - 0.5;
+  float r = length(c) * 2.0;
+  float n = n2(vUv * 9.0) * 0.6 + n2(vUv * 23.0) * 0.4;
+  float edge = 1.0 - smoothstep(0.55 + n * 0.3, 1.0, r);
+  if (edge < 0.01) discard;
+  float glow = vI * smoothstep(0.7, 0.98, n2(vUv * 16.0 + uTime * 0.35) * 0.65 + n * 0.35) * (1.0 - r * 0.7);
+  vec3 col = mix(vec3(0.06, 0.05, 0.04), vec3(0.95, 0.36, 0.06), glow * 0.8);
+  gl_FragColor = vec4(col, edge * (0.55 + glow * 0.3));
 }`;
 
 export class FireField {
@@ -67,7 +122,31 @@ export class FireField {
     this.active = false;
     this.time = 0;
     this.allOutT = 0;
+    this.qk = 1; // particle density (quality profile)
     this.fires = FIRE_TEST_SPOTS.map((s, i) => ({ ...s, id: i + 1, intensity: 1, water: 0, state: 'burning', y: terrain.heightAt(s.x, s.z) }));
+    // The flames of every spot (logic and visuals): a core, three clumps
+    // round it, a few strays; fixed seed (same layout every time).
+    const R = rng(4242);
+    this.cells = [];
+    for (const f of this.fires) {
+      f.cells = [];
+      const clumps = [0, 1, 2].map((j) => ({ a: R() * 6.28 + j * 2.1, d: f.r * (0.45 + R() * 0.35) }));
+      for (let j = 0; j < PER_FIRE; j++) {
+        let x, z, s;
+        let w = 1;
+        if (j < 5) { const a = R() * 6.28, d = f.r * 0.24 * Math.sqrt(R()); x = f.x + Math.cos(a) * d; z = f.z + Math.sin(a) * d; s = 6.5 + R() * 4; w = 0.9 + R() * 0.4; }
+        else if (j < 17) { const c = clumps[j % 3], a = c.a + (R() - 0.5) * 0.8, d = c.d + (R() - 0.5) * f.r * 0.35; x = f.x + Math.cos(a) * d; z = f.z + Math.sin(a) * d; s = 3 + R() * 3; w = 1 + R() * 0.6; }
+        else {
+          // Low, wide flames creeping along the edge between the clumps.
+          const c = clumps[j % 3], a = c.a + 1.05 + (R() - 0.5) * 1.2, d = f.r * (0.55 + R() * 0.4);
+          x = f.x + Math.cos(a) * d; z = f.z + Math.sin(a) * d; s = 1.4 + R() * 1.4; w = 1.8 + R() * 1.2;
+        }
+        const c = { f, x, z, y: terrain.heightAt(x, z) - 0.25, s, w, k: 1, ph: R() };
+        f.cells.push(c);
+        this.cells.push(c);
+      }
+      f.wsum = f.cells.reduce((a, c) => a + c.s, 0);
+    }
     this.packets = [];
     this._acc = null;
     this.impacts = [];
@@ -76,28 +155,20 @@ export class FireField {
     if (this.visual) this._buildVisuals(scene, terrain);
   }
 
+  setQuality(particleBudget) { this.qk = Math.min(1, Math.max(0.3, particleBudget / 6000)); if (this.smoke) this.smoke.limit = Math.round(this.smoke.max * this.qk); }
+
   _buildVisuals(scene, terrain) {
     // Flames: one instanced quad mesh.
-    const n = this.fires.length * PER_FIRE;
+    const n = this.cells.length;
     const quad = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
     const geo = new THREE.InstancedBufferGeometry();
     geo.index = quad.index;
     geo.setAttribute('position', quad.attributes.position);
     geo.setAttribute('uv', quad.attributes.uv);
     this.inst = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4).setUsage(THREE.DynamicDrawUsage);
-    const phase = new Float32Array(n);
-    this.base = [];
-    let k = 0;
-    for (const f of this.fires) {
-      for (let j = 0; j < PER_FIRE; j++, k++) {
-        const a = (j / PER_FIRE) * Math.PI * 2 + Math.random(), d = f.r * Math.sqrt(Math.random()) * 0.85;
-        const x = f.x + Math.cos(a) * d, z = f.z + Math.sin(a) * d;
-        this.base.push({ f, x, y: terrain.heightAt(x, z) - 0.2, z, s: 3.5 + Math.random() * 4.5 });
-        phase[k] = Math.random();
-      }
-    }
     geo.setAttribute('aInst', this.inst);
-    geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phase, 1));
+    geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(new Float32Array(this.cells.map((c) => c.ph)), 1));
+    geo.setAttribute('aW', new THREE.InstancedBufferAttribute(new Float32Array(this.cells.map((c) => c.w)), 1));
     geo.instanceCount = n;
     this.uTime = { value: 0 };
     this.flames = new THREE.Mesh(geo, new THREE.ShaderMaterial({
@@ -107,10 +178,36 @@ export class FireField {
     this.flames.frustumCulled = false;
     this.flames.renderOrder = 24;
     this.flames.visible = false;
-    this.smoke = new ParticlePool(900, { renderOrder: 23 });
+    // Ember / char patches: one merged mesh, a small grid per spot laid on
+    // the terrain (no flat plate cut by the slope), intensity per vertex.
+    const G = 10, pos = [], uvs = [], ints = [], idx = [];
+    this.patchRange = [];
+    for (const f of this.fires) {
+      const R = f.r * 1.35, o = pos.length / 3;
+      for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
+        const u = i / G, v = j / G, x = f.x + (u - 0.5) * 2 * R, z = f.z + (v - 0.5) * 2 * R;
+        pos.push(x, terrain.heightAt(x, z) + 0.12, z); uvs.push(u, v); ints.push(1);
+      }
+      for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { const a = o + j * (G + 1) + i, b = a + 1, c = a + G + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+      this.patchRange.push([o, (G + 1) * (G + 1)]);
+    }
+    const pg = new THREE.BufferGeometry();
+    pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    pg.setAttribute('aUv', new THREE.Float32BufferAttribute(uvs, 2));
+    this.patchI = new THREE.Float32BufferAttribute(ints, 1).setUsage(THREE.DynamicDrawUsage);
+    pg.setAttribute('aI', this.patchI);
+    pg.setIndex(idx);
+    this.patches = new THREE.Mesh(pg, new THREE.ShaderMaterial({
+      uniforms: { uTime: this.uTime }, vertexShader: PATCH_VS, fragmentShader: PATCH_FS,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    }));
+    this.patches.renderOrder = 2;
+    this.patches.visible = false;
+    this.smoke = new ParticlePool(1600, { renderOrder: 23 });
     this.water = new ParticlePool(1400, { renderOrder: 22 });
+    this.smoke.limit = Math.round(this.smoke.max * this.qk);
     this.smoke.points.visible = this.water.points.visible = false;
-    scene.add(this.flames, this.smoke.points, this.water.points);
+    scene.add(this.flames, this.patches, this.smoke.points, this.water.points);
     this._writeFlames();
   }
 
@@ -118,24 +215,37 @@ export class FireField {
 
   setActive(on) {
     this.active = !!on;
-    if (this.visual) this.flames.visible = this.smoke.points.visible = this.water.points.visible = this.active;
+    if (this.visual) this.flames.visible = this.patches.visible = this.smoke.points.visible = this.water.points.visible = this.active;
     if (!this.active) { this.packets.length = 0; this._acc = null; }
   }
 
-  reset() {
-    for (const f of this.fires) { f.intensity = 1; f.water = 0; f.state = 'burning'; }
+  reset() { this.relight(this.fires.map((f) => f.id)); }
+
+  // Spots (by id) burning again from full.
+  relight(ids) {
+    for (const f of this.fires) {
+      if (!ids.includes(f.id)) continue;
+      f.intensity = 1; f.water = 0; f.state = 'burning';
+      for (const c of f.cells) c.k = 1;
+    }
     this.allOutT = 0;
     this._writeFlames();
   }
 
+  _spotIntensity(f) { return f.cells.reduce((a, c) => a + c.k * c.s, 0) / f.wsum; }
+
   _writeFlames() {
     if (!this.visual) return;
     const a = this.inst.array;
-    this.base.forEach((b, i) => {
-      const k = b.f.state === 'burning' ? 0.25 + 0.75 * b.f.intensity : 0;
-      a[i * 4] = b.x; a[i * 4 + 1] = b.y; a[i * 4 + 2] = b.z; a[i * 4 + 3] = b.s * k;
+    this.cells.forEach((c, i) => {
+      // A dying flame shrinks (not fades): 0.3 of its size at the last ember.
+      const k = c.f.state === 'burning' && c.k > 0.02 ? c.s * (0.3 + 0.7 * Math.sqrt(c.k)) : 0;
+      a[i * 4] = c.x; a[i * 4 + 1] = c.y; a[i * 4 + 2] = c.z; a[i * 4 + 3] = k;
     });
     this.inst.needsUpdate = true;
+    const p = this.patchI.array;
+    this.fires.forEach((f, i) => { const [o, n] = this.patchRange[i]; p.fill(f.state === 'burning' ? f.intensity : 0, o, o + n); });
+    this.patchI.needsUpdate = true;
   }
 
   // Water from the drop door (merged into ≈ 50 ms packets).
@@ -152,26 +262,42 @@ export class FireField {
     this.packets.push(this._acc);
   }
 
-  // Water reaching the ground: hand it to the spots it covers.
+  // Water reaching the ground: hand it to the flames it covers. Every
+  // flame gets the water per m² over it (full inside the footprint, tapering
+  // at its edge); a flame needs L_PER_M2 to go out. A drop covering the
+  // whole spot takes its intensity down by (litres / footprint area) /
+  // L_PER_M2, as before; one covering a side only puts that side out.
   applyWater(x, z, litres, radius) {
-    const area = Math.PI * radius * radius;
-    let onTarget = 0;
+    const area = Math.PI * radius * radius, rho = litres / area;
+    let onTarget = 0, hit = false;
     for (const f of this.fires) {
       if (f.state !== 'burning') continue;
       const d = Math.hypot(f.x - x, f.z - z);
       if (d > radius + f.r) continue;
-      // Share of the footprint over the burning disc (overlap of two discs,
-      // approximated by the smaller disc inside the larger, edges tapered).
-      const overlap = Math.max(0, Math.min(1, (radius + f.r - d) / (2 * Math.min(radius, f.r))));
-      const covered = Math.min(area, Math.PI * f.r * f.r) * overlap;
-      const L = litres * (covered / area);
+      const cellA = (Math.PI * f.r * f.r) / f.cells.length;
+      let L = 0;
+      for (const c of f.cells) {
+        const w = 1 - Math.max(0, Math.min(1, (Math.hypot(c.x - x, c.z - z) - radius * 0.8) / (radius * 0.35)));
+        if (w <= 0) continue;
+        L += rho * w * cellA;
+        if (c.k > 0) { c.k = Math.max(0, c.k - (rho * w) / L_PER_M2); hit = true; }
+      }
       f.water += L;
       onTarget += L;
-      f.intensity = Math.max(0, f.intensity - L / (L_PER_M2 * Math.PI * f.r * f.r));
-      if (f.intensity <= 0.001) { f.state = 'out'; f.intensity = 0; f.outT = this.time; }
+      f.intensity = this._spotIntensity(f);
+      if (f.intensity <= 0.02) { f.state = 'out'; f.intensity = 0; f.outT = this.time; for (const c of f.cells) c.k = 0; }
+      // Steam where it hit.
+      if (this.visual && L > 0) {
+        const n = Math.min(14, 3 + Math.round(L / 60));
+        for (let j = 0; j < n; j++) {
+          const a = Math.random() * Math.PI * 2, rr = Math.min(radius, f.r) * Math.sqrt(Math.random());
+          this.smoke.spawn(x + Math.cos(a) * rr, f.y + 1, z + Math.sin(a) * rr, 0, 2.5 + Math.random() * 2, 0,
+            { life: 4 + Math.random() * 3, size: 5, grow: 3.5, alpha: 0.34, drag: 0.4, gravity: -0.6, color: [0.86, 0.87, 0.88] });
+        }
+      }
     }
     this.totalOnTarget += onTarget;
-    this.impacts.push({ x, z, litres, radius, onTarget, t: this.time });
+    this.impacts.push({ x, z, litres, radius, onTarget, t: this.time, hit });
     if (this.impacts.length > 64) this.impacts.shift();
     this._writeFlames();
     return onTarget;
@@ -205,23 +331,29 @@ export class FireField {
         if (p === this._acc) this._acc = null;
       }
     }
-    // Smoke and steam.
+    // Smouldering flames slowly gain back (not the ones put out); smoke
+    // from the burning ones, a continuous column bent by the wind; light
+    // smoke from a spot just put out.
+    let dirty = false;
     for (const f of this.fires) {
-      if (!this.visual) { if (f.state === 'burning') f.intensity = Math.min(1, f.intensity + dt * 0.004); continue; }
       if (f.state === 'burning') {
-        // A smouldering spot slowly gains back.
-        f.intensity = Math.min(1, f.intensity + dt * 0.004);
-        if (Math.random() < dt * (3 + 9 * f.intensity)) {
-          const a = Math.random() * Math.PI * 2, d = f.r * Math.random() * 0.7;
-          const g = 0.12 + 0.1 * Math.random();
-          this.smoke.spawn(f.x + Math.cos(a) * d, f.y + 2, f.z + Math.sin(a) * d, wind.x * 0.5, 3.5 + 2.5 * f.intensity, wind.z * 0.5,
-            { life: 9 + Math.random() * 6, size: 5 + f.r * 0.3, grow: 6, alpha: 0.32 + 0.2 * f.intensity, drag: 0.25, gravity: -0.4, color: [g, g * 0.98, g * 0.95] });
+        for (const c of f.cells) if (c.k > 0.02 && c.k < 1) { c.k = Math.min(1, c.k + dt * 0.004); dirty = true; }
+        f.intensity = this._spotIntensity(f);
+        if (!this.visual) continue;
+        let n = dt * (5 + 22 * f.intensity) * this.qk + Math.random() * 0.999;
+        while (n-- >= 1) {
+          const c = f.cells[Math.floor(Math.random() * f.cells.length)];
+          if (c.k < 0.05) continue;
+          const g = 0.1 + 0.16 * Math.random(), up = 3 + 3.5 * f.intensity * c.k;
+          this.smoke.spawn(c.x + (Math.random() - 0.5) * 2, c.y + c.s * 0.7, c.z + (Math.random() - 0.5) * 2, wind.x * 0.25, up, wind.z * 0.25,
+            { life: 10 + Math.random() * 7, size: 3 + c.s * 0.5, grow: 9 + Math.random() * 4, alpha: (0.15 + 0.15 * f.intensity) * (0.7 + 0.6 * c.k), drag: 0.16, gravity: -0.25 - 0.2 * Math.random(), color: [g, g * 0.97, g * 0.93] });
         }
-      } else if (this.time - f.outT < 25 && Math.random() < dt * 4) {
+      } else if (this.visual && this.time - f.outT < 25 && Math.random() < dt * 4 * this.qk * (1 - (this.time - f.outT) / 25)) {
         this.smoke.spawn(f.x + (Math.random() - 0.5) * f.r, f.y + 1, f.z + (Math.random() - 0.5) * f.r, wind.x * 0.4, 2.2, wind.z * 0.4,
-          { life: 6, size: 4, grow: 4, alpha: 0.28, drag: 0.3, gravity: -0.3, color: [0.78, 0.79, 0.8] });
+          { life: 7, size: 3.5, grow: 5, alpha: 0.2, drag: 0.25, gravity: -0.3, color: [0.68, 0.68, 0.68] });
       }
     }
+    if (dirty && this.visual && ((this._wt = (this._wt || 0) + dt) > 0.5)) { this._wt = 0; this._writeFlames(); }
     if (this.fires.every((f) => f.state === 'out')) {
       this.allOutT += dt;
       if (this.allOutT > REIGNITE) this.reset();

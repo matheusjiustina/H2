@@ -99,11 +99,14 @@ function naturalHeight(x, z) {
   // Ponds: a bowl under the water level, a gentle bank around it.
   for (const p of WATER.ponds) {
     const dx = x - p.x, dz = z - p.z;
-    if (Math.abs(dx) > p.r * 2.6 || Math.abs(dz) > p.r * 2.6 || p.level === undefined) continue;
+    const box = p.lobes ? p.rmax * (p.blend ?? 2.2) * 1.02 : p.r * 2.6;
+    if (Math.abs(dx) > box || Math.abs(dz) > box || p.level === undefined) continue;
     const d = Math.hypot(dx, dz) / pondRadius(p, Math.atan2(dz, dx));
     const blend = p.blend ?? 2.2, bankK = p.bank ? p.bank * p.r : 1.2;
     if (d < 1) h = Math.min(h, p.level - 0.15 - p.depth * (1 - d * d));
-    else if (d < blend) h = lerp(Math.min(h, p.level + 0.35 + (d - 1) * bankK), h, smoothstep(1, blend, d));
+    // (Reshaped lakes: the bank rises from the bed without a step at the
+    // shore, so the terrain grid shows no terraces along it.)
+    else if (d < blend) h = lerp(Math.min(h, p.level + (p.lobes ? -0.15 + (d - 1) * bankK * 1.2 : 0.35 + (d - 1) * bankK)), h, smoothstep(1, blend, d));
   }
   return h;
 }
@@ -263,7 +266,8 @@ export class TerrainData {
   waterLevel(x, z) {
     for (const p of WATER.ponds) {
       const dx = x - p.x, dz = z - p.z;
-      if (Math.abs(dx) < p.r * 1.3 && Math.abs(dz) < p.r * 1.3 && Math.hypot(dx, dz) < pondRadius(p, Math.atan2(dz, dx)) * 1.02) return p.level;
+      const box = p.lobes ? p.rmax * 1.03 : p.r * 1.3;
+      if (Math.abs(dx) < box && Math.abs(dz) < box && Math.hypot(dx, dz) < pondRadius(p, Math.atan2(dz, dx)) * 1.02) return p.level;
     }
     for (const st of WATER.streams) {
       const q = polyNearest(st.points, x, z, _pn);
