@@ -33,7 +33,7 @@ export const FREE_ROAM = {
   exploreMargin: 120, // m further out the pilot can walk
   maxExitSpeed: 0.3, // m/s ground speed
   walkSpeed: 2.6, // m/s (a brisk walk)
-  runSpeed: 5.5, // m/s with Shift held (on foot only; in the aircraft Shift stays power)
+  runSpeed: 8.0, // m/s with Shift held (on foot only; in the aircraft Shift stays power)
   accel: 7, // m/s²
   radius: 0.3, // pilot's collision circle (m)
   height: 1.8,
@@ -63,6 +63,7 @@ export function inZone(z, x, zz, extra = 0) {
 }
 
 const _v = new THREE.Vector3(), _p = new THREE.Vector3();
+const HEIGHTS = [0.4, 1.4];
 
 export class PilotFreeRoamSystem {
   constructor(game) {
@@ -157,14 +158,13 @@ export class PilotFreeRoamSystem {
     }
     const w = this.game.world, ac = this.ac ?? this.game.aircraft;
     const th = w.terrain.heightAt(x, z);
-    for (const hh of [0.35, 1.0, 1.65]) {
+    // Two heights (knee, chest) are enough: the structures were tested above.
+    for (const hh of HEIGHTS) {
       const yy = y + hh;
       if (w.treeHit(x, yy, z, th)) return 'tree';
-      for (const [dx, dz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) {
-        if (ac?.hitTest(x + dx, yy, z + dz)) return 'aircraft';
-        const o = w.extraObstacle?.(x + dx, yy, z + dz);
-        if (o) return o;
-      }
+      const o = w.extraObstacle?.(x, yy, z);
+      if (o) return o;
+      if (ac?.hitTest(x, yy, z) || ac?.hitTest(x + r, yy, z) || ac?.hitTest(x - r, yy, z) || ac?.hitTest(x, yy, z + r) || ac?.hitTest(x, yy, z - r)) return 'aircraft';
     }
     return null;
   }
@@ -322,11 +322,12 @@ export class PilotFreeRoamSystem {
 
   _walk(dt, mouse, live) {
     if (dt <= 0) return;
+    dt = Math.min(dt, 0.1); // a hitch must not become a leap
     const P = FREE_ROAM;
     const [f, s] = this._walkInput(live);
     const fx = Math.sin(this.cam.yaw), fz = Math.cos(this.cam.yaw); // where the view looks
     const d = this.game.input.down;
-    const run = live && (d.has('ShiftLeft') || d.has('ShiftRight') || this.game.touch?.walk && Math.hypot(this.game.touch.walk.x, this.game.touch.walk.y) > 0.95);
+    const run = live && (d.has('ShiftLeft') || d.has('ShiftRight') || this.game.touch?.walk && Math.hypot(this.game.touch.walk.x, this.game.touch.walk.y) > 0.9);
     const v = run ? P.runSpeed : P.walkSpeed;
     const tx = (fx * f - fz * s) * v, tz = (fz * f + fx * s) * v;
     const k = 1 - Math.exp(-P.accel * dt / P.walkSpeed);
@@ -334,15 +335,21 @@ export class PilotFreeRoamSystem {
     this.vel.y += (tz - this.vel.y) * k;
     if (this.vel.lengthSq() > 0.0004) {
       if (Math.hypot(this.pos.x - this.nearX, this.pos.z - this.nearZ) > 15) this._refreshNear(this.pos.x, this.pos.z);
-      const nx = this.pos.x + this.vel.x * dt, nz = this.pos.z + this.vel.y * dt;
       const inside = (x, z) => inZone(this.zone, x, z, P.exploreMargin);
       const try1 = (x, z) => inside(x, z) && !this._blocked(x, z, this._floor(x, z));
-      if (try1(nx, nz)) { this.pos.x = nx; this.pos.z = nz; }
-      else if (try1(nx, this.pos.z)) { this.pos.x = nx; this.vel.y = 0; }
-      else if (try1(this.pos.x, nz)) { this.pos.z = nz; this.vel.x = 0; }
-      else {
-        this.vel.set(0, 0);
-        if (!inside(nx, nz) && this.game.time - this._limitToast > 6) { this._limitToast = this.game.time; this.game.toast(t('Edge of the base — walk back towards the hangar.')); }
+      // Steps of at most 4 cm of travel per ms of frame at run speed: a slow frame cannot jump a wall.
+      const n = Math.max(1, Math.ceil((this.vel.length() * dt) / 0.35));
+      const h = dt / n;
+      for (let i = 0; i < n; i++) {
+        const nx = this.pos.x + this.vel.x * h, nz = this.pos.z + this.vel.y * h;
+        if (try1(nx, nz)) { this.pos.x = nx; this.pos.z = nz; }
+        else if (try1(nx, this.pos.z)) { this.pos.x = nx; this.vel.y = 0; }
+        else if (try1(this.pos.x, nz)) { this.pos.z = nz; this.vel.x = 0; }
+        else {
+          this.vel.set(0, 0);
+          if (!inside(nx, nz) && this.game.time - this._limitToast > 6) { this._limitToast = this.game.time; this.game.toast(t('Edge of the base — walk back towards the hangar.')); }
+          break;
+        }
       }
       this.pos.y = this._floor(this.pos.x, this.pos.z);
     }

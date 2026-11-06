@@ -64,7 +64,7 @@ await key('ArrowUp', 1.5); const p3 = await fr();
 check('6 Numpad 8 and the arrow keys walk too', Math.hypot(p2.x - p1.x, p2.z - p1.z) > 1 && Math.hypot(p3.x - p2.x, p3.z - p2.z) > 1, { p2, p3 });
 await snap('02-walk');
 const runR = await page.evaluate(() => { const g = window.__agro, f = g.freeRoam, x0 = f.pos.x, z0 = f.pos.z, thr = g.aircraft.fm.throttle; g.input.press('ShiftLeft'); g.input.press('KeyW'); window.__run(2); g.input.release('KeyW'); g.input.release('ShiftLeft'); window.__run(0.5); return { d: +Math.hypot(f.pos.x - x0, f.pos.z - z0).toFixed(2), thrSame: g.aircraft.fm.throttle === thr }; });
-check('Shift runs on foot (≈5.5 m/s) and leaves the aircraft throttle alone', runR.d > 9 && runR.thrSame, runR);
+check('Shift runs on foot (≈8 m/s) and leaves the aircraft throttle alone', runR.d > 13 && runR.thrSame, runR);
 check('13 aircraft did not move while on foot', JSON.stringify((({ x, y, z, q }) => ({ x, y, z, q }))(await acs())) === JSON.stringify((({ x, y, z, q }) => ({ x, y, z, q }))(before)));
 // Board button far away: hidden.
 s = await fr();
@@ -78,6 +78,8 @@ const wall = await page.evaluate(() => {
   g.input.press('KeyW'); window.__run(12); g.input.release('KeyW');
   return { x: +f.pos.x.toFixed(2), wallX: h.x - h.w / 2 };
 });
+const tun = await page.evaluate(() => { const g = window.__agro, f = g.freeRoam, h = { x: -385, z: -132, w: 34 }; f.pos.set(h.x + 10, 0.2, h.z + 9); f._refreshNear(f.pos.x, f.pos.z); f.cam.yaw = -Math.PI / 2; f.vel.set(0, 0); g.input.press('ShiftLeft'); g.input.press('KeyW'); for (let i = 0; i < 20; i++) g.tick(0.1); g.input.release('KeyW'); g.input.release('ShiftLeft'); return { x: +f.pos.x.toFixed(2), wallX: h.x - h.w / 2 }; });
+check('8 running at 10 fps: moves, then stops at the hangar equipment/wall (no tunnelling)', tun.x < -385 && tun.x > tun.wallX + 0.2, tun);
 check('8 stops at the hangar wall (does not walk through)', wall.x > wall.wallX + 0.2, wall);
 await snap('03-hangar');
 // Parked aircraft: walk into the AgTruck / Thrush spot from the south.
