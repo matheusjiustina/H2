@@ -23,6 +23,7 @@ const PAINTS = {
   r44: { key: 'r44Livery', tags: ['A', 'B'], names: ['Original', 'Black Agricultural'] },
   e203: { key: 'e203Livery', tags: ['01', '02'], names: ['Green, blue and gold', 'White, green and blue'] },
   a188: { key: 'a188Livery', tags: ['A', 'B'], names: ['Red', 'Orange'] },
+  pa36: { key: 'pa36Livery', tags: ['A', 'B'], names: ['Classic red', 'Yellow & blue'] },
 };
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;

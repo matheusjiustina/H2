@@ -3475,6 +3475,155 @@ shaders (a 1–9 s stall under SwiftShader, once).
 - There is no premium store in this repository: the entitlement source is
   the integration point for the platform's existing system.
 
+## Aircraft 11 — Piper PA-36-300 Pawnee Brave (PR-PWB), phase 01: exterior and physics
+
+An eleventh aircraft with its own geometry (`src/aircraft/pa36Model.js`),
+flight figures (`FLIGHT_PA36`, `SPRAY_PA36` in `src/config.js`), a
+PROVISIONAL panel (`src/aircraft/pa36Panel.js`) and registry entry
+(`AIRCRAFT_TYPES.pa36`, after the AgTruck in the hangar list). PR-PWB is a
+fictional Brazilian registration. The detailed Brave 300 cockpit is the next
+phase (Prompt 02); this phase delivers the exterior, the physics, two
+paints, the integration and the cabin anchors.
+
+**References.** Only the images sent with the brief: the Earl Stahl Pawnee
+Brave plan (side and top views; the side view scaled to 68.3 px/m by an
+8.2 m spinner-to-rudder length), VH-SVO (white/red, rear three-quarter),
+N44523 (white/red, side, in flight), two front three-quarter views, and —
+viewed in the conversation, not on disk — HA-MJG and TC-ZH (yellow/blue)
+and N57886. No photograph is used as a texture.
+
+**Figures.** Lycoming IO-540-K1G5, 300 hp at 2,700 rpm, Hartzell two-blade
+constant-speed prop of 2.13 m; span 11.8 m; length 8.2 m; height 2.3 m;
+wing 20.9 m²; empty 1,039 kg; MTOW 1,996 kg (restricted category); fuel
+326 L; standard hopper 852 L (the 1,041 L option is not fitted), 862 kg
+structural limit. Like the AgTruck and the 203, the hopper's volume is not
+payload (`loadByWeight`): with full fuel the MTOW leaves 637 kg of product,
+and the load sheet shows an over-weight load in red instead of hiding it.
+`productLimit()` now also honours a hopper's own `maxHopperKg` (only the
+Brave defines one).
+
+**Geometry** (reference frame = the plan's: on three wheels, ground at
+y = −1.42; the model is pitched 9° nose-down into the body frame by its
+`stance` group, `pa36ToBody()` maps points):
+- fuselage lofted from its own sections (belly superellipse, straight side,
+  rounded top cap): the long flat-topped cowl and hopper, the cowl face
+  with the shaft high in it, two round inlets low and the oil cooler
+  opening, exhaust stacks, black hopper deck and lid;
+- single-seat cabin standing on the top longerons: raked windshield,
+  flat roof with tinted panel, side glass to the B-post, rear quarter
+  glass, door, frames; wire cutter on the windshield and the cable to the
+  fin top, whip and GPS antennas;
+- turtledeck falling steeply behind the cabin, then the straight spine to
+  a low, shallow tail cone (fin root at 58 % of the fin height, VH-SVO);
+- cantilever low wing: constant 1.75 m chord, the straight root glove
+  (0.35 m at the root, gone 1.9 m out), 6° dihedral, chord 10° to the
+  ground on three wheels (1° incidence), upswept tip caps, flaps
+  0.55–3.1 m and ailerons 3.15–5.65 m on hinge brackets, nav lights and
+  strobes, walkway, fuel fillers, pitot;
+- tall fin swept ≈ 47° and the raked rudder cut from the same section
+  (flush at the hinge), strut-braced tailplane with elevators, beacon;
+- oleo main legs under the leading edge with the drag brace and brake
+  line (2.44 m track, 0.64 m tyres), the tail spring and steerable
+  tailwheel under the rudder;
+- booms 0.2 m under the trailing edge on four hangers a side, 17 nozzles a
+  side, the cross pipe and feed under the belly, the wind-driven pump
+  between the legs;
+- two-blade Hartzell (paddle blades, yellow tips) with a pointed spinner.
+Compared with the plan (`test/pa36ortho.mjs` writes the side view at
+144 px/m; the plan overlaid at the same scale on the spinner tip and
+thrust line): length, nose, fin, rudder, tailplane, belly and tailwheel
+coincide within a few centimetres. Deliberate departures: the cabin roof
+is ≈ 0.1 m higher and the ground line 0.11 m higher than on the plan
+(a rubber-model drawing), which keeps the published 2.3 m height with the
+cabin proportions of the photographs.
+
+**Paints** (same meshes; livery and wing canvases and a few colours change;
+title card Paint A / B, saved as `pa36Livery`):
+- **A — Classic red** (VH-SVO, N44523, N57886): white; a red cheatline from
+  the cowl widening behind the cabin, where the registration sits in white
+  (as on N44523), and running down to a red tail bottom; red pinstripes;
+  red fin cap, spinner, wing tips and the red flash over the wing roots;
+  BRAVE 300 badge on the cowl; RESTRICTED placard.
+- **B — Yellow & blue** (HA-MJG, TC-ZH): yellow; a broad blue band with dark
+  pinstripes, a blue sash on the fin, two blue stripes across each outer
+  wing, blue tips and spinner.
+The wing canvas has an upper and a lower half, so stripes and the root
+flash are on the upper surface only.
+
+**Physics** (`FLIGHT_PA36` on the existing piston / constant-speed branch;
+calibrated in `test/pa36.test.mjs`, not copied from another type): CD0
+0.0563 with the dispersal kit, of which `CDsprayKit` 0.021 is the kit's
+share (used only by the cruise check without it); oswald 0.78 (AR 6.7);
+inertia, the hopper just ahead of the CG (`hopperOffsetZ`), fuel in the
+wings (`fuelTankSpanY`), taildragger gear contacts and tail steering, hard
+points (tips, booms, prop, belly, tail, fin, roof). One opt-in addition to
+the shared engine branch: `radial.lapse` (only the Brave sets it) makes a
+normally aspirated engine lose manifold pressure with the ambient pressure
+and power with the density (Gagg–Ferrar). The other aircraft never reach
+it: their 28 golden physics traces are unchanged; the Brave's two were
+added (`plane.pa36.calm` / `.wind`).
+
+**Integration.** Hangar card and paint selector, settings and save,
+office name, the farm strips that take the AgTruck, its own parking spot
+(`parking9`, south-west corner of the apron, also at the secondary farms),
+service points and keep-out boxes for the hoses, collision / wire points,
+bounds, GPS theme, Portuguese strings. Sound: the existing IO-540 profile
+with its own two-blade 2.13 m prop and 600–2,700 rpm (the same engine
+family; no new sound system). Cameras: the existing chase / orbit /
+cockpit rig with the Brave's own distances.
+
+**Cockpit preparation** (`PA36_CABIN`, reference frame): eye (0, 0.66,
+−1.72), seat (0, −0.27, −1.75), panel centre (0, 0.22, −0.985), floor
+y −0.42, stick (0, −0.48, −1.24), pedals (±0.18, −0.44, −0.78), throttle
+(0.33, 0.10, −1.22), door (0.47, 0.6, −1.4), windshield (0, 0.7, −1.12),
+roof (0, 0.9, −1.64); sill 0.46, rail 0.80, windshield base z −0.93, roof
+front −1.33, rear frame −1.95, B-post −1.8. The provisional cockpit (shell,
+seat, stick, pedals, throttle, valve, light bar and a grey six-gauge
+panel redrawn at 15 Hz only in cockpit view) sits on these anchors.
+
+**Measured** (`node --test test/pa36.test.mjs`, in this container):
+
+| check | result |
+| --- | --- |
+| span / length / height (model) | 11.800 m / 8.200 m / 2.32 m |
+| product allowed by the MTOW | 637 kg with full fuel (hopper 852 L) |
+| parked | three wheels down, pitch 8.8°, height 2.28 m, drift 1.4 cm |
+| start | catches after 1.3 s, idle 600 rpm, 11.5 inHg |
+| full throttle, static, σ 0.963 | 2,700 rpm, 287 hp (300 hp at sea level), 27.9 inHg, 101 L/h, 5.72 kN |
+| take-off roll 1,210 / 1,996 kg | 135 m @ 55 kt / 385 m @ 65 kt |
+| climb at 72 kt, 1,350 / 1,996 kg / 1,996 kg at ≈ 8,000 ft | 1,124 / 533 / 149 ft/min |
+| cruise at 75 % power, 1,700 kg | 191 km/h TAS with the kit, 229 km/h without (published 190 / 228) |
+| cruise 75 %, 1,996 kg / at 5,000 ft | 181 / 195 km/h TAS |
+
+Browser checks (`test/pa36e2e.mjs`, Chromium + SwiftShader, all passed):
+hangar card and selection; paints A/B switch and persist; dimensions from
+the geometry on the ground (span 11.84 m with the tip lights, length
+8.19 m, height 2.38 m to the wire cutter); open faces / wrong winding (the
+model drawn double-sided and front-only from 12 directions at 960×540:
+18 stray pixels of ≈ 0.5 M silhouette pixels, ≤ 0.011 % per view, at
+sub-pixel cracks — the open tube ends and domes found by this check were
+closed); cabin (0.94 m between the walls at the shoulders, eye 0.24 m
+under the roof, 0.86 m from the panel); full flaps clear the boom by
+0.20 m, the compressed wheels clear the wing; tyre bottoms within 1 cm of
+the terrain; 10 s parked on the brake, drift 0.06 cm; blade tips on the
+shaft circle at every angle; 34 nozzles and spraying empties the hopper;
+cockpit eye 0.22 m from the nearest surface (near plane 0.05 m); the
+whole fleet parked with the Brave on `parking9`, no overlaps; no growth
+in geometries or textures over 15 aircraft switches and 10 paint changes;
+draw cost 122 meshes / 68 k triangles (AgTruck 203 / 101 k, Ipanema 203
+228 / 114 k); no page errors. Bundle: +42 kB (+12 kB gzip).
+
+**Not done / limits.**
+- The cockpit is provisional (Prompt 02).
+- Temperature is not modelled anywhere in the shared physics: altitude
+  acts through density only; the lapse is the Brave's alone.
+- The 1,041 L hopper option, the Brave 375 and the 285 hp variant are not
+  modelled.
+- Frame time on a real desktop or phone GPU was not measured here; only
+  the static cost above (SwiftShader frame times are not representative).
+- The dimensional comparison is against a model-builder's plan and
+  photographs, not factory drawings: no exact fidelity is claimed.
+
 ## Benchmark (performance work, phase 1)
 
 Reference for all optimisation: the tag **`ultra-original-v73`** (commit

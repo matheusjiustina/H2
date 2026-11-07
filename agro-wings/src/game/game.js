@@ -62,7 +62,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -306,6 +306,7 @@ export class Game {
     this.fleet?.m18?.model.setLivery?.(this.settings.m18Livery ?? 0);
     this.fleet?.e203?.model.setLivery?.(this.settings.e203Livery ?? 0);
     this.fleet?.a188?.model.setLivery?.(this.settings.a188Livery ?? 0);
+    this.fleet?.pa36?.model.setLivery?.(this.settings.pa36Livery ?? 0);
     this.fleet?.r44?.model.setLivery?.(this.settings.r44Livery ?? 0);
     const b = this.fleet?.b206;
     if (!b) return;
@@ -335,7 +336,7 @@ export class Game {
   setAircraftOption(k, v) {
     this.setSetting(k, v);
     this._applyAircraftOptions();
-    const id = { b206Livery: 'b206', b206Kit: 'b206', m18Livery: 'm18', e203Livery: 'e203', a188Livery: 'a188', r44Livery: 'r44' }[k];
+    const id = { b206Livery: 'b206', b206Kit: 'b206', m18Livery: 'm18', e203Livery: 'e203', a188Livery: 'a188', pa36Livery: 'pa36', r44Livery: 'r44' }[k];
     if (id) this.showroom?.invalidate(id);
     this.audio?.play('ui');
   }

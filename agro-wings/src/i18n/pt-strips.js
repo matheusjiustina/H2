@@ -169,6 +169,12 @@ export default {
   '1,060 L hopper · 204 L fuel · 12.70 m span · 1,905 kg MTOW': 'Hopper 1.060 L · 204 L de combustível · envergadura 12,70 m · PMD 1.905 kg',
   'Red': 'Vermelha',
   'Orange': 'Laranja',
+  // Piper PA-36-300 Pawnee Brave
+  'Agricultural Aircraft · cantilever low wing': 'Avião agrícola · asa baixa cantiléver',
+  'Lycoming IO-540-K1G5 · 300 hp · Hartzell 2-blade': 'Lycoming IO-540-K1G5 · 300 hp · Hartzell bipá',
+  '852 L hopper · 326 L fuel · 11.8 m span · 1,996 kg MTOW': 'Hopper 852 L · 326 L de combustível · envergadura 11,8 m · PMD 1.996 kg',
+  'Classic red': 'Vermelho clássico',
+  'Yellow & blue': 'Amarelo e azul',
   'Lycoming IO-540-K1J5 · 320 hp (ethanol) · Hartzell 3-blade': 'Lycoming IO-540-K1J5 · 320 hp (etanol) · Hartzell tripá',
   '1,050 L hopper · 292 L ethanol · 13.30 m span · 1,900 kg MTOW': 'Hopper 1.050 L · 292 L de etanol · envergadura 13,30 m · PMD 1.900 kg',
   'Green, blue and gold': 'Verde, azul e dourado',

@@ -1,4 +1,4 @@
-// Continuous protection of the flight / helicopter / spray physics: the 28 reproducible scenarios of
+// Continuous protection of the flight / helicopter / spray physics: the 30 reproducible scenarios of
 // test/p6golden.mjs must give exactly the checksums recorded in test/golden/physics.json (the same values
 // the v73 tag produces — phase 6 proved it). A deliberate physics change must regenerate the file
 // (node test/p6golden.mjs test/golden/physics.json, then keep only hash/n/final) AND be reviewed.
@@ -18,7 +18,7 @@ test('every flight model in the registry has golden physics scenarios', () => {
   }
 });
 
-test('physics traces are identical to the recorded reference (28 scenarios)', () => {
+test('physics traces are identical to the recorded reference (30 scenarios)', () => {
   const out = new URL('./golden/_now.json', import.meta.url).pathname;
   const r = spawnSync(process.execPath, [new URL('./p6golden.mjs', import.meta.url).pathname, out], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);

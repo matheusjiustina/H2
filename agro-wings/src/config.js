@@ -632,6 +632,116 @@ export const SPRAY_A188 = {
 };
 
 // ---------------------------------------------------------------------------
+// Piper PA-36-300 Pawnee Brave 300 (fictional Brazilian marks). Reference
+// figures (Piper, Brave 300): Avco Lycoming IO-540-K1G5, 300 hp at 2,700 rpm,
+// fuel injected, air cooled; Hartzell two-blade constant-speed prop ≈ 2.13 m;
+// span ≈ 11.8 m, length ≈ 8.2 m, height ≈ 2.3 m, wing 20.9 m²; empty with
+// dispersal equipment ≈ 1,039 kg; 1,996 kg maximum in the restricted
+// category; hopper 852 L standard (1,041 L option), 862 kg of product at
+// most; ≈ 326 L usable fuel (two wing tanks); cruise at 75 % with dispersal
+// equipment ≈ 190 km/h TAS, ≈ 228 km/h without it.
+// Points are measured in the reference frame of the plan / photographs
+// (the Brave on its three wheels, cowl top level) and pitched into the body
+// frame by its stance (pa36Model.js): the body datum stands 9° nose-up on the
+// ground, the wing chord ≈ 10° (1° of incidence).
+const PA36_ST = (9 * Math.PI) / 180;
+const pa36 = (x, y, z) => [x, y * Math.cos(PA36_ST) - z * Math.sin(PA36_ST), y * Math.sin(PA36_ST) + z * Math.cos(PA36_ST)];
+export const FLIGHT_PA36 = {
+  ...FLIGHT,
+  emptyMass: 1039, // with the dispersal equipment
+  mtow: 1996, // restricted category
+  pilotMass: 85,
+  wingArea: 20.9,
+  span: 11.8,
+  chord: 1.77, // 20.9 m² / 11.8 m
+  oswald: 0.78, // rectangular wing, AR 6.7
+  // The Brave is heavier than the Ipanema / AgTruck but shorter in span:
+  // more pitch inertia (long nose, engine far ahead), a little less in roll.
+  inertiaEmpty: [3150, 4300, 2750],
+
+  // Aerodynamics (calibrated in test/pa36.test.mjs, not copied): CL0 from
+  // 1° of incidence on a cambered section, the lift slope of AR 6.7.
+  CL0: 0.33, CLa: 4.85, alphaStall: 0.26, alphaStallNeg: -0.21,
+  CD0: 0.0563, // with booms, nozzles, pump and wire cutters (the drag the clean check removes is CDsprayKit)
+  CDsprayKit: 0.021, // dispersal equipment's share of CD0 (only the cruise check uses it)
+  CDflap: 0.055, CLflap: 0.68,
+  Cm0: 0.04, CmaWB: 0.24, CmaTail: -1.35, Cmq: -15, Cmde: 0.45, Cmflap: -0.05,
+  Clb: -0.095, Clp: -0.5, Clr: 0.1, Clda: 0.088,
+  Cnb: 0.09, Cnr: -0.18, Cndr: 0.085, Cnda: -0.012,
+  CYb: -0.62, CYdr: 0.12,
+
+  engineType: 'piston-cs',
+  maxPower: 223.7e3, // 300 hp
+  propRadius: 1.065, // Hartzell two-blade, 84 in
+  maxRpm: 2700,
+  idleRpm: 600,
+  radial: {
+    gear: 1.0,
+    crank: 1.3,
+    crankRpm: 280,
+    govThrottle: 0.35,
+    mpIdle: 12, mpMax: 29.2, mpAmbient: 29.6,
+    idleFrac: 0.03,
+    govFrac: 0.3,
+    etaStatic: 0.72, // two blades: a little more static thrust per hp than the three-blade AgTruck
+    etaCruise: 0.82,
+    discDrag: 0.09,
+    spool: 0.55, // lighter two-blade prop: the governor catches up a little faster
+    lapse: true, // normally aspirated: manifold pressure and power fall with altitude
+  },
+  fuelFlowFull: 106 / 3600, // L/s of avgas at full power (≈ 28 gal/h, IO-540-K)
+  fuelFlowIdle: 9 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.72,
+
+  fuelCapacity: 326, // usable, two wing tanks
+  hopperCapacity: 852, // standard hopper (1,041 L option not fitted)
+  maxHopperKg: 862, // structural limit of the standard hopper
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.08, // the hopper sits just ahead of the CG, between the firewall and the cabin
+  fuelTankSpanY: 2.1,
+  loadByWeight: true,
+
+  // Oleo main legs under the wing's leading edge (2.44 m track), the
+  // tailwheel under the rudder: contact points at rest in the plan's frame.
+  gear: [
+    { name: 'mainL', p: pa36(1.22, -1.42, 0.45), k: 108000, c: 11000, travel: 0.2, radius: 0.32, steer: false },
+    { name: 'mainR', p: pa36(-1.22, -1.42, 0.45), k: 108000, c: 11000, travel: 0.2, radius: 0.32, steer: false },
+    { name: 'tail', p: pa36(0, -1.42, -5.13), k: 30000, c: 2600, travel: 0.13, radius: 0.12, steer: true },
+  ],
+  tailSteer: 0.4,
+
+  hard: [
+    { name: 'wingtipL', p: pa36(5.9, -0.08, -0.45) },
+    { name: 'wingtipR', p: pa36(-5.9, -0.08, -0.45) },
+    { name: 'boomL', p: pa36(4.9, -0.6, -1.42) },
+    { name: 'boomR', p: pa36(-4.9, -0.6, -1.42) },
+    { name: 'prop', p: pa36(0, -0.76, 2.18) },
+    { name: 'spinner', p: pa36(0, 0.3, 2.45) },
+    { name: 'belly', p: pa36(0, -0.86, -1.6) },
+    { name: 'tail', p: pa36(0, -0.94, -4.95) },
+    { name: 'fin', p: pa36(0, 0.74, -5.1) },
+    { name: 'stabL', p: pa36(1.8, -0.72, -4.65) },
+    { name: 'stabR', p: pa36(-1.8, -0.72, -4.65) },
+    { name: 'roof', p: pa36(0, 0.9, -1.65) },
+  ],
+  hardLandingVs: 2.7,
+  crashVs: 5.2,
+
+  wheelPoint: pa36(0, -1.1, 0.45),
+  aglOffset: 1.47,
+  wingDrop: 0.6,
+  assistSpeedScale: 0.97,
+};
+
+export const SPRAY_PA36 = {
+  // ≈ 9.8 m boom on four hangers a side: a swath scaled from the boom span,
+  // the flow that gives the target dose at the Brave's working speed.
+  swath: 22,
+  flow: 3.6,
+};
+
+// ---------------------------------------------------------------------------
 // Air Tractor AT-802 family (fictional registrations): one airframe, two
 // configurations with their own mass, engine, equipment and physics.
 //

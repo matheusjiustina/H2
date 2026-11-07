@@ -578,10 +578,15 @@ export class FlightModel {
   // starter turns the big prop over slowly, a few cylinders cough, then it
   // catches. Cylinder head and oil temperatures follow power and cooling air
   // (prop wash on the ground, airspeed in flight); oil pressure follows rpm.
+  // A normally aspirated engine (R.lapse) instead loses its manifold pressure
+  // with the ambient pressure and its power with the air density (Gagg–
+  // Ferrar, (σ − 0.12) / 0.88); the others are unchanged.
   _radial(dt) {
     const A = this.A, R = A.radial;
     const u = this.out.airspeed;
-    let mpT = R.mpAmbient, running = false;
+    const sigma = R.lapse ? clamp(this.out.density / 1.225, 0.3, 1.2) : 1;
+    const dP = R.lapse ? sigma ** 1.235 : 1; // pressure ratio of the standard atmosphere
+    let mpT = R.mpAmbient * dP, running = false;
     if (this.engine === 'cranking') {
       this.crankTime += dt;
       this.rpm += (R.crankRpm - this.rpm) * Math.min(1, dt * 1.6);
@@ -595,10 +600,10 @@ export class FlightModel {
       }
     } else if (this.engine === 'running') {
       running = true;
-      mpT = R.mpIdle + (R.mpMax - R.mpIdle) * this.throttle;
+      mpT = (R.mpIdle + (R.mpMax - R.mpIdle) * this.throttle) * dP;
     }
     this.mp += (mpT - this.mp) * Math.min(1, dt * (running ? 2.5 : 1.2));
-    const boost = clamp((this.mp - R.mpIdle) / (R.mpMax - R.mpIdle), 0, 1);
+    const boost = clamp((this.mp / dP - R.mpIdle) / (R.mpMax - R.mpIdle), 0, 1);
     // Rpm: fine stop (rising with throttle), governed, or winding down.
     let rpmT;
     if (running) {
@@ -613,7 +618,7 @@ export class FlightModel {
     // Shaft power: manifold pressure × rpm (below the governed rpm the engine
     // cannot make full power), roughness from damage.
     let frac = 0;
-    if (running) frac = (R.idleFrac + (1 - R.idleFrac) * boost ** 1.15) * clamp(this.rpm / A.maxRpm, 0.3, 1) * (1 - this.roughness * 0.35);
+    if (running) frac = (R.idleFrac + (1 - R.idleFrac) * boost ** 1.15) * clamp(this.rpm / A.maxRpm, 0.3, 1) * (1 - this.roughness * 0.35) * (R.lapse ? (sigma - 0.12) / 0.88 : 1);
     this.shaftPower = frac * A.maxPower;
     const w = Math.max(this.rpm, 300) * Math.PI / 30;
     this.torque = (this.shaftPower / w) * 0.7376;

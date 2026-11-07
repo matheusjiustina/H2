@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_AT802, FLIGHT_FIREBOSS, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_AT802, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_PA36, FLIGHT_AT802, FLIGHT_FIREBOSS, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_PA36, SPRAY_AT802, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createE203Panel } from './e203Panel.js';
@@ -19,6 +19,8 @@ import { createB206Panel } from './b206Panel.js';
 import { createE203Model, E203_SHADOW, e203WingY } from './e203Model.js';
 import { createA188Model, A188_SHADOW, a188WingY, a188ToBody } from './a188Model.js';
 import { createA188Panel } from './a188Panel.js';
+import { createPA36Model, PA36_SHADOW, pa36WingY, pa36ToBody, PA36_CABIN } from './pa36Model.js';
+import { createPA36Panel } from './pa36Panel.js';
 import { createAT802Model, AT802_SHADOW, FIREBOSS_SHADOW, at802WingY, AT802_EYE } from './at802Model.js';
 import { createAT802Panel } from './at802Panel.js';
 import { FIREBOSS_EXPANSION } from '../game/expansions.js';
@@ -414,6 +416,63 @@ AIRCRAFT_TYPES.a188 = {
   createShadow: () => createContactShadow(A188_SHADOW),
 };
 
+// Piper PA-36-300 Pawnee Brave (FLIGHT_PA36 on the piston + constant-speed
+// branch): its own exterior (pa36Model.js) and a PROVISIONAL cockpit and
+// panel (pa36Panel.js) on the final cabin anchors — the Brave 300 cockpit is
+// the next phase. Fictional Brazilian registration. Points are given in the
+// model's reference frame (on three wheels) and pitched into the body frame.
+const pb = (pts) => pts.map(pa36ToBody);
+// Body-frame bounds of a box given in the reference frame.
+const pbox = ([x0, x1, y0, y1, z0, z1]) => {
+  const c = [];
+  for (const y of [y0, y1]) for (const z of [z0, z1]) c.push(pa36ToBody([0, y, z]));
+  const r = (v) => Math.round(v * 100) / 100;
+  return [x0, x1, r(Math.min(...c.map((p) => p[1]))), r(Math.max(...c.map((p) => p[1]))), r(Math.min(...c.map((p) => p[2]))), r(Math.max(...c.map((p) => p[2])))];
+};
+AIRCRAFT_TYPES.pa36 = {
+  id: 'pa36',
+  slot: '11',
+  parkSpot: 'parking9',
+  label: 'Brave',
+  reg: 'PR-PWB',
+  name: 'Piper PA-36-300 Pawnee Brave',
+  get role() { return t('Agricultural Aircraft · cantilever low wing'); },
+  get engineName() { return t('Lycoming IO-540-K1G5 · 300 hp · Hartzell 2-blade'); },
+  get summary() { return t('852 L hopper · 326 L fuel · 11.8 m span · 1,996 kg MTOW'); },
+  flight: FLIGHT_PA36,
+  spray: { swath: SPRAY_PA36.swath, flow: SPRAY_PA36.flow, boom: pa36ToBody([4.9, -0.52, -1.42]) },
+  work: pb([[0, -1.42, 0.45], [4.9, -0.64, -1.45], [-4.9, -0.64, -1.45]]),
+  collide: pb([[0, 0.3, 2.45], [5.9, -0.05, -0.45], [-5.9, -0.05, -0.45], [0, 0.74, -5.1], [0, -0.94, -5.0], [0, -1.42, 0.45], [0, 0.9, -1.65], [1.8, -0.72, -4.65], [-1.8, -0.72, -4.65]]),
+  wire: pb([[0, 0.3, 2.45], [5.9, -0.05, -0.45], [-5.9, -0.05, -0.45], [0, 0.74, -5.1], [0, -1.42, 0.45], [1.75, -0.42, -0.3], [-1.75, -0.42, -0.3], [0, 1.02, -1.3]]),
+  smoke: pa36ToBody([-0.6, -0.21, 1.1]),
+  wash: [0, -1.0, -2],
+  anim: { elev: 0.35, rud: 0.42, ail: 0.33, flap: 0.42, pedalZ: PA36_CABIN.pedals[2], disc: [380, 900], wash: [1500, 2700], vib: [1500, 2700] },
+  vspeeds: { vs0: 50, vs1: 60, vfe: 90, vne: 139 }, // stall at the MTOW from the model's own lift (flaps down / clean)
+  camera: { dist: 12.5, height: 3.6, orbit: 18, cockpitPitch: -0.28, cockpitFov: 62 },
+  // Lycoming IO-540 with a two-blade Hartzell: the IO-540 sound with its own prop.
+  audio: { profile: 'ipanema', blades: 2, cfg: { blades: 2, propDiameter: 2.13, idleRpm: 600, maxRpm: 2700 } },
+  fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
+  loads: { free: { fuel: 180, hopper: 420 }, boot: 110 },
+  loadSheet: { bankKt: 85, roll: [240, 1300, 2.25] },
+  service: {
+    rates: { fuel: 4.5, liquid: 14 },
+    local: { A: [6.8, -2.0], B: [3.9, -1.9], F: [2.1, -1.65], P: [1.15, -1.6] },
+    keepOut: { wing: [5.95, -1.45, 0.85], wingY: (x) => pa36ToBody([x, pa36WingY(Math.abs(x)), -0.25])[1], fus: [0.5, -0.95, 1.0, -5.2, 2.45], stab: [1.85, -0.75, -0.45, -5.3, -4.1] },
+    veto: 8.5,
+  },
+  stub: { eye: pa36ToBody(PA36_CABIN.eye), fuelFiller: pa36ToBody([1.9, -0.28, -0.08]), hopperPort: pa36ToBody([0.52, -0.35, -0.2]) },
+  // Boxes in the reference frame, as their body-frame bounds: forward
+  // fuselage and cabin, the cone, the wing, the fin and rudder, the
+  // tailplane, the main gear, the propeller disc.
+  bounds: [
+    [-0.49, 0.49, -0.87, 0.92, -1.95, 2.45], [-0.45, 0.45, -0.95, 0.3, -4.95, -1.95], [-5.9, 5.9, -0.8, 0.22, -1.38, 0.82],
+    [-0.06, 0.06, -0.2, 0.78, -5.75, -3.9], [-1.8, 1.8, -0.84, -0.6, -5.15, -4.1], [-1.35, 1.35, -1.42, -0.5, 0.1, 0.8], [-1.07, 1.07, -0.77, 1.37, 2.1, 2.22],
+  ].map(pbox),
+  createModel: (panel, opts) => createPA36Model(panel, opts),
+  createPanel: (opts) => createPA36Panel(opts),
+  createShadow: () => createContactShadow(PA36_SHADOW),
+};
+
 // Air Tractor AT-802 family: one airframe module (at802Model.js), two
 // configurations with their own flight config, equipment and systems.
 // Cockpit: provisional interior (the detailed one is a later phase).
@@ -505,7 +564,7 @@ AIRCRAFT_TYPES.at802f = {
   createShadow: () => createContactShadow(FIREBOSS_SHADOW),
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'at802', 'at802f'];
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'at802', 'at802f'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
 
 // Registrations: each type keeps its factory marks as `reg0`; `reg` reads the
@@ -543,5 +602,6 @@ export function setRegistration(id, reg) {
 }
 
 // Product the MTOW leaves at a given fuel load (kg of liquid ≈ L): the
-// hopper's volume is not its payload.
-export const productLimit = (A, fuelL) => Math.max(0, (A.mtow - A.emptyMass - (A.agKitMass ?? 0) - A.pilotMass - fuelL * A.fuelDensity) / A.liquidDensity);
+// hopper's volume is not its payload. A hopper with its own structural
+// limit (maxHopperKg) is capped there too.
+export const productLimit = (A, fuelL) => Math.max(0, Math.min((A.maxHopperKg ?? Infinity) / A.liquidDensity, (A.mtow - A.emptyMass - (A.agKitMass ?? 0) - A.pilotMass - fuelL * A.fuelDensity) / A.liquidDensity));
