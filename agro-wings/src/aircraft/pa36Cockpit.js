@@ -455,9 +455,9 @@ export function buildPA36Cockpit(ctx) {
     level.add(liq);
     level.position.set(SW.u, vC - SW.win.h / 2, -deep + 0.003);
     level.userData.h = SW.win.h;
-    // (A unit sheet: scaled to the level from the start, so before the first
-    // update it does not stand a metre tall through the roof.)
-    level.scale.y = 0.5 * SW.win.h;
+    // (A unit sheet: scaled from the start — empty until the first update —
+    // so it never stands a metre tall through the roof.)
+    level.scale.y = 0.0001;
     low.add(level);
     lowGlass.push(at(new THREE.PlaneGeometry(SW.win.w, SW.win.h), SW.u, vC, -deep + 0.006));
   }

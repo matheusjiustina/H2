@@ -76,6 +76,15 @@ export class AircraftAssets {
       if (foreign.has(t.image) || t.userData.cpuReleased || t.userData.shrunk) continue;
       if (shrinkCanvas(t.image, scale)) { t.needsUpdate = true; t.userData.shrunk = true; }
     }
+    // Full-resolution parked paint ('high'): its CPU copy goes once uploaded.
+    if (scale >= 1) this.releaseAfterUpload(id);
+    // Cockpit and pilot meshes: hidden while parked, built again with the
+    // whole aircraft when it is selected — their geometry is let go now.
+    for (const sub of [ac.model.cockpit, ac.model.pilot]) {
+      if (!sub?.isObject3D || !sub.children.length) continue;
+      sub.traverse((o) => o.geometry?.dispose());
+      sub.clear();
+    }
     this.light.add(id);
     this.stats.lightened++;
     return true;
@@ -94,7 +103,7 @@ export class AircraftAssets {
     const ac = this.game.fleet[id], t0 = performance.now();
     const wasFrozen = this.entries.get(id)?.state === 'frozen';
     if (wasFrozen) this.thaw(id);
-    rebuildModel(ac, this._foreignCanvases(id));
+    rebuildModel(ac, this._foreignCanvases(id), { gpu: !this._afterLoss });
     this._inRebuild = true;
     try { this.game._applyAircraftOptions?.(id); } finally { this._inRebuild = false; }
     this._registerOne(id);
@@ -134,6 +143,10 @@ export class AircraftAssets {
   // gone, some of its CPU copies were released), then frozen / lightened as
   // before.
   async rebuildAll() {
+    this._afterLoss = true;
+    try { await this._rebuildAll(); } finally { this._afterLoss = false; }
+  }
+  async _rebuildAll() {
     for (const id of Object.keys(this.game.fleet ?? {})) {
       const ac = this.game.fleet[id];
       if (ac.headless) continue;
@@ -265,7 +278,7 @@ export class AircraftAssets {
     for (const o of e.saved.hidden) o.visible = true;
     for (const o of e.saved.autos) o.matrixAutoUpdate = true;
     root.remove(e.merged.holder);
-    for (const g of e.merged.geoms) g.dispose();
+    if (!this._afterLoss) for (const g of e.merged.geoms) g.dispose(); // (after a context loss they are gone already)
     e.merged = e.saved = null;
     e.state = 'live';
     this.stats.thaws++;

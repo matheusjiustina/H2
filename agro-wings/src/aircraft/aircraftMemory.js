@@ -68,10 +68,12 @@ export function shrinkCanvas(c, s) {
 // Give the GPU resources of a model back (its canvases are released too).
 // Shared things are never touched: the scene's environment map and render
 // targets; `keep` = canvases another aircraft still uses.
-export function disposeModel(model, scene, keep = new Set()) {
+// (After a context loss the GPU objects are gone already: `gpu` false skips
+// the deletes, which would only raise WebGL errors.)
+export function disposeModel(model, scene, keep = new Set(), gpu = true) {
   const seen = new Set();
   model.root.traverse((o) => {
-    if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
+    if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); if (gpu) o.geometry.dispose(); }
     for (const m of [].concat(o.material ?? [])) {
       if (seen.has(m)) continue;
       seen.add(m);
@@ -79,17 +81,17 @@ export function disposeModel(model, scene, keep = new Set()) {
         const t = m[k];
         if (!t?.isTexture || seen.has(t) || t.isRenderTargetTexture || t === scene.environment) continue;
         seen.add(t);
-        t.dispose();
+        if (gpu) t.dispose();
         if (!keep.has(t.image)) releaseCanvas(t.image);
       }
-      m.dispose();
+      if (gpu) m.dispose();
     }
   });
 }
 
 // A fresh model and panel for an aircraft, from its type (as at start-up),
 // in place of the current ones; pose and visibility carried over.
-export function rebuildModel(ac, keep) {
+export function rebuildModel(ac, keep, { gpu = true } = {}) {
   const g = ac.game, old = ac.model, reg = ac.type.reg;
   ac.panel = ac.type.createPanel({ reg });
   ac.model = ac.type.createModel(ac.panel, { envMap: g.scene.environment, reg });
@@ -99,8 +101,10 @@ export function rebuildModel(ac, keep) {
   g.scene.add(r);
   if (ac.model.pilot && old.pilot) ac.model.pilot.visible = old.pilot.visible;
   if (ac.model.cockpit && old.cockpit) ac.model.cockpit.visible = old.cockpit.visible;
-  disposeModel(old, g.scene, keep);
+  disposeModel(old, g.scene, keep, gpu);
   ac._sync?.();
-  if (!ac.headless) ac._animate?.(0);
+  // (A parked aircraft is posed now; the flown one at its next frame — its
+  // cockpit decides then, from the camera, what to show.)
+  if (!ac.headless && ac.parked) ac._animate?.(0);
   return ac.model;
 }
