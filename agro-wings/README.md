@@ -3513,14 +3513,15 @@ y = −1.42; the model is pitched 9° nose-down into the body frame by its
   flat roof with tinted panel, side glass to the B-post, rear quarter
   glass, door, frames; wire cutter on the windshield and the cable to the
   fin top, whip and GPS antennas;
-- turtledeck falling steeply behind the cabin, then the straight spine to
-  a low, shallow tail cone (fin root at 58 % of the fin height, VH-SVO);
+- (rear fuselage and empennage rebuilt from the photographs — see "final
+  geometry correction" below) turtledeck falling steeply behind the
+  cabin, then the straight spine to the tail cone;
 - cantilever low wing: constant 1.75 m chord, the straight root glove
   (0.35 m at the root, gone 1.9 m out), 6° dihedral, chord 10° to the
   ground on three wheels (1° incidence), upswept tip caps, flaps
   0.55–3.1 m and ailerons 3.15–5.65 m on hinge brackets, nav lights and
   strobes, walkway, fuel fillers, pitot;
-- tall fin swept ≈ 47° and the raked rudder cut from the same section
+- tall swept fin and the raked rudder cut from the same section
   (flush at the hinge), strut-braced tailplane with elevators, beacon;
 - oleo main legs under the leading edge with the drag brace and brake
   line (2.44 m track, 0.64 m tyres), the tail spring and steerable

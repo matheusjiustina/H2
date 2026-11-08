@@ -21,18 +21,18 @@
 // shaft high in a deep cowl face, the round inlets low in it); the single-
 // seat cabin standing on the fuselage's top longerons well behind the hopper,
 // a raked windshield, flat roof, side windows to the door post and a small
-// rear window; behind it the turtledeck falls steeply to a LOW tail cone (the
-// spine at the fin root ≈ 1.2 m over the ground on three wheels); the tall,
-// strongly swept fin (≈ 47° leading edge) and the raked rudder; the
-// tailplane at the bottom of the cone, strut-braced; the cantilever low wing
+// rear window; behind it the cabin's back falls steeply to a narrow, round-
+// topped turtledeck and a deep, slim cone (the spine at the fin root ≈ 1.4 m
+// over the ground on three wheels; photographs PH-AJB / VH-HLW / N44523 /
+// N57728); the tall, swept fin (≈ 52° leading edge, sloping top) and the
+// raked rudder; the tailplane low on the cone, strut-braced; the cantilever low wing
 // — constant chord with a leading-edge glove at the root, no struts, upswept
 // tip caps, 6° dihedral; oleo main legs under the leading edge with a drag
 // brace, the tailwheel under the rudder; the wire cable from the cabin to
 // the fin top, the windshield cutter; a two-blade Hartzell with a pointed
 // spinner.
-// The cockpit inside is PROVISIONAL (Prompt 01): shell, seat, controls and a
-// plain gauge panel (pa36Panel.js) on the final anchors; the detailed Brave
-// 300 cockpit is the next phase.
+// The cockpit inside is built by pa36Cockpit.js (Prompt 02) on the cabin
+// anchors below.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -110,23 +110,28 @@ const FWD_KEYS = [
 // Under the cabin: the same sections, cut at the sill (the canopy stands on
 // the top longerons: the side windows start at the fuselage top line).
 const CAB_KEYS = [FWD_KEYS[FWD_KEYS.length - 1], R_(-1.45, 0.479, 0.05, -0.82, 3.6, 0.46, 0.468, 0.515, 0.415, 0.05), R_(-1.95, 0.476, 0.05, -0.855, 3.6, 0.46, 0.465, 0.515, 0.41, 0.05)];
-// Behind the cabin: the rear frame at roof height, the turtledeck falling
-// (≈ 30–40°) to the spine, then the spine straight (≈ 22°) to a low, shallow
-// cone end at the rudder hinge — the plan's profile (VH-SVO: fin root at
-// 58 % of the fin height, tail cone 22 %).
-const spineY = (z) => 0.24 - 0.4135 * (-2.85 - z); // straight spine behind z −2.85
+// Behind the cabin (the photographs PH-AJB, VH-HLW, N44523 and N57728, not
+// the model plan, which drew a long wedge and a low cone): the roof runs on
+// 0.17 m past the cabin's rear frame over the rear glazing, the cabin's back
+// falls steeply (≈ 45°) to a narrow, round-topped turtledeck 0.27 over the
+// datum at z −2.8, and the spine then descends gently (≈ 13°) to the fin,
+// whose leading edge leaves it at z ≈ −3.9 through a fillet. The cone is
+// deep and narrow: vertical sides, a round top (radius up to 0.9 of the half
+// width), the belly a superellipse; it tapers in plan from 0.95 m behind the
+// cabin to the rudder post.
+const spineY = (z) => 0.27 - 0.225 * (-2.8 - z); // straight spine behind z −2.8
 const coneKey = (z, hw, yb) => {
-  const yt = spineY(z), D = yt - yb, rc = Math.min(0.1, 0.18 * D);
-  return R_(z, hw, yb + 0.45 * D, yb, 3.0, yt - 0.3 * D, hw * 0.95, yt, hw * 0.58, rc);
+  const yt = spineY(z), D = yt - yb, ws = hw * 0.97, ys = yb + 0.42 * D, sh = ys + 0.12 * D;
+  return R_(z, hw, ys, yb, 3.0, sh, ws, yt, ws, Math.min(0.9 * ws, yt - sh));
 };
 const AFT_KEYS = [
-  R_(-1.95, 0.476, 0.05, -0.855, 3.6, 0.46, 0.465, 0.9, 0.29, 0.1),
-  R_(-2.15, 0.472, 0.04, -0.86, 3.6, 0.44, 0.458, 0.8, 0.27, 0.1),
-  R_(-2.38, 0.462, 0.0, -0.865, 3.5, 0.36, 0.445, 0.6, 0.25, 0.1),
-  R_(-2.62, 0.448, -0.08, -0.868, 3.4, 0.22, 0.43, 0.4, 0.235, 0.1),
-  R_(-2.85, 0.428, -0.2, -0.87, 3.3, 0.06, 0.41, 0.24, 0.22, 0.1),
-  coneKey(-3.2, 0.375, -0.88), coneKey(-3.6, 0.315, -0.888), coneKey(-4.0, 0.255, -0.897),
-  coneKey(-4.45, 0.175, -0.912), coneKey(-4.93, 0.06, -0.94),
+  R_(-1.95, 0.476, 0.05, -0.855, 3.6, 0.46, 0.465, 0.9, 0.29, 0.1), // the cabin's rear frame (roof profile)
+  R_(-2.12, 0.473, 0.04, -0.86, 3.6, 0.455, 0.46, 0.885, 0.28, 0.11), // the roof's end over the rear glazing
+  R_(-2.3, 0.466, 0.02, -0.863, 3.5, 0.44, 0.455, 0.69, 0.455, 0.2),
+  R_(-2.47, 0.457, -0.02, -0.866, 3.45, 0.3, 0.445, 0.5, 0.445, 0.18),
+  R_(-2.65, 0.445, -0.1, -0.868, 3.4, 0.0, 0.43, 0.34, 0.43, 0.25),
+  coneKey(-2.85, 0.428, -0.87), coneKey(-3.2, 0.372, -0.88), coneKey(-3.6, 0.305, -0.888), coneKey(-4.0, 0.242, -0.897),
+  coneKey(-4.45, 0.163, -0.912), coneKey(-4.93, 0.055, -0.94),
 ];
 const SILL_Y = 0.46, RAIL_Y = 0.8;
 const ROOF = { yt: 0.9, zF: -1.33, zFc: 0.05, zR: -1.95 }; // front edge −1.33 at the centre, 5 cm further back at the rails
@@ -259,7 +264,7 @@ function liveryUV(geo) {
 const BAND_TOP = [[2.5, 0.31], [1.2, 0.31], [-0.9, 0.29], [-1.9, 0.27], [-2.5, 0.22], [-3.2, 0.06], [-3.8, -0.14], [-4.4, -0.38], [-5.2, -0.7]];
 const BAND_LOW = [[2.5, 0.15], [1.2, 0.14], [-0.9, 0.11], [-1.9, -0.1], [-2.5, -0.17], [-3.2, -0.29], [-3.8, -0.47], [-4.4, -0.7], [-5.2, -1.0]];
 const REG_AT = [-2.56, 0.0, 0.19]; // registration: centre z, y, letter height
-const FIN_LE = [[-3.93, -0.21], [-5.03, 0.74]]; // fin leading edge root → top (reference frame)
+const FIN_LE = [[-4.0, 0.0], [-5.087, 0.84]]; // fin leading edge root → top (reference frame)
 
 function liveryTextures(reg, L = PA36_LIVERIES[0]) {
   const c = canvas(LV.W, LV.H), b = canvas(LV.W, LV.H);
@@ -300,13 +305,11 @@ function liveryTextures(reg, L = PA36_LIVERIES[0]) {
       line(g, [[za - 0.24, ya], [zb - 0.24, yb + 0.3]], NAVY, 0.012 * LV.ky);
       line(g, [[za - 0.58, ya], [zb - 0.58, yb + 0.3]], NAVY, 0.012 * LV.ky);
     } else {
-      poly([[-4.6, 0.6], [-4.6, 1.0], [-5.95, 1.0], [-5.95, 0.6]], L.cap);
-      line(g, [[-4.6, 0.575], [-5.95, 0.575]], RED, 0.014 * LV.ky);
+      // The cap follows the sloping top, 0.14 deep.
+      const [, [zt, yt]] = FIN_LE, capLow = [[-4.6, yt - 0.14], [zt, yt - 0.14], [-5.95, yt - 0.14 - 0.2 * (zt + 5.95)]];
+      poly(capLow.concat([[-5.95, 1.0], [-4.6, 1.0]]), L.cap);
+      line(g, off(capLow, -0.025), RED, 0.014 * LV.ky);
     }
-    // Painted rear window on the turtledeck either side behind the cabin.
-    const RW = [[-1.98, 0.49], [-1.98, 0.82], [-2.2, 0.71], [-2.44, 0.49]];
-    poly(RW, 'rgba(26,34,42,0.93)');
-    line(g, [...RW, RW[0]], 'rgba(20,20,22,0.85)', 3);
     // Exhaust stain along the lower cowl, belly grime.
     {
       const [ax, ay] = P(1.35, -0.12), [bx] = P(-0.3, -0.16);
@@ -324,7 +327,7 @@ function liveryTextures(reg, L = PA36_LIVERIES[0]) {
     const seams = [
       [[2.0, 0.36], [0.87, 0.36]], [[0.87, -0.47], [0.87, 0.5]], [[1.96, -0.17], [1.96, 0.48]],
       [[0.6, -0.1], [0.6, 0.3], [-0.6, 0.3], [-0.6, -0.1], [0.6, -0.1]],
-      [[-1.95, -0.85], [-1.95, 0.46]], [[-2.85, -0.87], [-2.85, 0.24]], [[-3.6, -0.89], [-3.6, -0.06]], [[-4.3, -0.9], [-4.3, -0.35]],
+      [[-1.95, -0.85], [-1.95, 0.46]], [[-2.85, -0.87], [-2.85, 0.22]], [[-3.6, -0.89], [-3.6, 0.06]], [[-4.3, -0.9], [-4.3, -0.12]],
       [[0.87, -0.2], [-1.95, -0.32]], [[-1.95, -0.34], [-4.9, -0.75]],
     ];
     if (side < 0) seams.push([[-1.0, SILL_Y - 0.01], [-1.0, -0.22], [BPOST, -0.22], [BPOST, SILL_Y - 0.01]]); // the door (right)
@@ -499,7 +502,7 @@ const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 
 
 // Overall dimensions (tests): span, spinner tip, rudder trailing edge, the
 // high points (roof, fin top), all in the reference frame.
-export const PA36_DIM = { spinnerZ: 2.45, rudderZ: -5.75, roofY: ROOF.yt, finTopY: 0.74, ground: GROUND };
+export const PA36_DIM = { spinnerZ: 2.45, rudderZ: -5.75, roofY: ROOF.yt, finTopY: 0.84, ground: GROUND };
 export function pa36Extent() {
   return { span: 2 * W.half, length: PA36_DIM.spinnerZ - PA36_DIM.rudderZ, tops: [[0, ROOF.yt, -1.7], [0, PA36_DIM.finTopY, -5.05]].map(pa36ToBody), height: Math.max(ROOF.yt, PA36_DIM.finTopY) - GROUND };
 }
@@ -568,7 +571,7 @@ export function createPA36Model(panel, opts = {}) {
     let a = 1 - Math.max(0, -y - 0.35) * 0.45;
     const yb = Math.max(0, 1 - Math.abs(y - (W.rootY - 0.12)) / 0.22), zb = Math.max(0, 1 - Math.abs(z + 0.4) / 1.2);
     a *= 1 - 0.3 * yb * Math.sqrt(zb);
-    if (z < -4.0 && z > -5.0) a *= 1 - 0.2 * Math.max(0, 1 - Math.abs(y + 0.76) / 0.12);
+    if (z < -4.0 && z > -5.0) a *= 1 - 0.2 * Math.max(0, 1 - Math.abs(y + 0.56) / 0.12);
     if (z > 1.95) a *= 0.8 + 0.2 * clamp((2.09 - z) / 0.14, 0, 1);
     return clamp(a, 0.5, 1);
   };
@@ -684,6 +687,38 @@ export function createPA36Model(panel, opts = {}) {
     fr([[sx * railX, RAIL_Y, ROOF.zR], [sx * sillX(ROOF.zR), SILL_Y, ROOF.zR]], 0.016); // rear frame
   }
   void aPost;
+  // The cabin's back (behind the rear frame, over the bulkhead): quarter
+  // windows either side, from the rear frame to the sloping rear edge that
+  // runs from the roof's end down to the sill line, and the rear window on
+  // the steep back — tinted glass laid on the skin (the bulkhead stands in
+  // front of it, so nothing behind needs to be seen), framed.
+  {
+    const QW = { z0: ROOF.zR - 0.012, zt: -2.1, zb: -2.42, y0: SILL_Y + 0.02, y1: RAIL_Y - 0.012 };
+    const qRear = (y) => lerp(QW.zb, QW.zt, (y - QW.y0) / (QW.y1 - QW.y0));
+    const onSide = (sx, z, y, off) => [sx * (pa36HalfX(z, y) + off), y, z];
+    for (const sx of [1, -1]) {
+      add('tint', grid((u, v) => { const y = lerp(QW.y0, QW.y1, v); return onSide(sx, lerp(QW.z0, qRear(y), u), y, 0.005); }, 4, 4));
+      const edge = Array.from({ length: 7 }, (_, i) => { const y = lerp(QW.y0 - 0.012, QW.y1 + 0.012, i / 6); return onSide(sx, qRear(y) - 0.012, y, 0.012); });
+      fr(edge, 0.013);
+      fr([onSide(sx, QW.z0, QW.y1 + 0.012, 0.012), onSide(sx, QW.zt - 0.012, QW.y1 + 0.012, 0.012)], 0.012);
+    }
+    // Height of the skin's top at (z, |x|): the section's cap.
+    const capY = (z, x) => {
+      const cap = capHalf(stAt(z));
+      for (let i = 1; i < cap.length; i++) if (cap[i][0] <= x) { const [x0, y0] = cap[i - 1], [x1, y1] = cap[i]; return lerp(y0, y1, (x - x0) / (x1 - x0 || 1)); }
+      return cap[cap.length - 1][1];
+    };
+    const RWz = [-2.15, -2.46], RWx = 0.24;
+    add('tint', grid((u, v) => { const z = lerp(RWz[0], RWz[1], v), hx = RWx * (1 - 0.25 * v), x = lerp(-hx, hx, u); return [x, capY(z, Math.abs(x)) + 0.006, z]; }, 6, 6));
+    const rim = [];
+    for (let i = 0; i <= 24; i++) {
+      const t = i / 24, side = t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3, f = (t * 4) % 1;
+      const [u, v] = [[f, 0], [1, f], [1 - f, 1], [0, 1 - f]][side];
+      const z = lerp(RWz[0], RWz[1], v), hx = (RWx + 0.012) * (1 - 0.25 * v), x = lerp(-hx, hx, u);
+      rim.push([x, capY(z, Math.abs(x)) + 0.008, z]);
+    }
+    add('frame', tube(rim, 0.009, 96, 6));
+  }
   // Door (right, as on the cockpit reference): outside handle, hinges on
   // its front frame.
   {
@@ -791,34 +826,47 @@ export function createPA36Model(panel, opts = {}) {
     for (let i = 0; i < p.count; i++) { p.setXYZ(i, p.getY(i), p.getX(i), p.getZ(i)); c.setXYZ(i, 1, 1, 1); }
     return flipWinding(g2);
   };
-  // Fin: leading edge from (−3.93, −0.21) at the spine to (−5.03, 0.74)
-  // (≈ 47°), nearly flat top; the rudder hinge raked from (−4.91, −0.89)
-  // up to (−5.37, 0.70); the rudder's trailing edge from (−5.21, −0.89) to
-  // (−5.75, 0.70), its top 4 cm under the fin's — all from the plan. Fin
-  // and rudder are cut from one section per height (leading edge to the
+  // Fin (PH-AJB / VH-HLW side views): the leading edge from the spine at
+  // (−4.0, 0.0) to the top at (−5.09, 0.84) (≈ 52° from the vertical),
+  // curving forward into a dorsal fillet that leaves the spine at z ≈ −3.85;
+  // the top falls 0.2 per metre aft (0.84 at the leading edge, 0.71 at the
+  // rudder's trailing edge); the rudder hinge raked from (−4.91, −0.89); the
+  // rudder's trailing edge from (−5.21, −0.89) to (−5.75, 0.71). Fin and
+  // rudder are cut from one section per height (leading edge to the
   // rudder's trailing edge), so they meet flush at the hinge.
-  const finLEz = (y) => -3.93 - (y + 0.21) * (1.1 / 0.95);
-  const RTOP = 0.7;
-  const HB = new THREE.Vector3(0, -0.89, -4.91), HT = new THREE.Vector3(0, RTOP, -5.375);
+  const FTOP = PA36_DIM.finTopY, LE_TOP = -4.0 - FTOP * 1.294;
+  const FIL = [[-0.9, -3.45], [-0.05, -3.45], [0.0, -3.65], [0.03, -3.82], [0.07, -3.98], [0.12, -4.13], [0.18, -4.233]];
+  const finLEz = (y) => {
+    if (y >= FIL[FIL.length - 1][0]) return -4.0 - y * 1.294;
+    for (let i = 1; i < FIL.length; i++) if (y <= FIL[i][0]) return lerp(FIL[i - 1][1], FIL[i][1], (y - FIL[i - 1][0]) / (FIL[i][0] - FIL[i - 1][0]));
+    return FIL[0][1];
+  };
+  const RTOP = FTOP - 0.03;
+  const HB = new THREE.Vector3(0, -0.89, -4.91), HT = new THREE.Vector3(0, RTOP, -4.91 - (RTOP + 0.89) * 0.2925);
   const hingeZ = (y) => lerp(HB.z, HT.z, (y - HB.y) / (HT.y - HB.y));
   const teZ = (y) => lerp(-5.21, -5.75, (y + 0.89) / (RTOP + 0.89));
-  const FTOP = PA36_DIM.finTopY;
-  const FIN_T = 0.11;
+  const FIN_T = 0.1;
+  // The sloping top: heights over 0.5 sheared down aft of the top's leading edge.
+  const slopeTop = (geo) => {
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i);
+      if (y > 0.5) p.setY(i, y - 0.2 * Math.max(0, LE_TOP - p.getZ(i)) * ((y - 0.5) / (FTOP - 0.5)));
+    }
+    geo.computeVertexNormals();
+    return geo;
+  };
   // Full section at height y: leading edge, chord and the hinge's chord fraction.
   const finSec = (y, leCut = 0) => {
     const yy = Math.min(y, RTOP), le = finLEz(Math.min(y, FTOP)) + leCut, c = le - teZ(yy);
     return { le, c, xh: (le - hingeZ(yy)) / c };
   };
-  const finYs = [-0.55, -0.21, 0.1, 0.4, 0.62, FTOP - 0.03, FTOP];
+  const finYs = [-0.85, -0.55, -0.05, 0.0, 0.03, 0.07, 0.12, 0.18, 0.35, 0.55, 0.72, FTOP - 0.03, FTOP];
   const finSt = finYs.map((y, i) => {
     const f = finSec(y, i === finYs.length - 1 ? -0.05 : 0);
     return [y, f.le, f.c, airfoil(0, f.xh, FIN_T, 0, 0.4, 12)];
   });
-  add('livery', liveryUV(tagged(vfin(finSt))));
-  // Fillet where the leading edge meets the spine.
-  const finFil = [[0, spineY(-3.7) - 0.02, -3.7], [0, spineY(-3.85) + 0.02, -3.85], [0, -0.13, -4.05], [0, 0.0, -4.2]];
-  add('livery', liveryUV(tagged(tube(finFil, 0.04, 12, 8))));
-  for (const e of [finFil[0], finFil[finFil.length - 1]]) add('livery', liveryUV(tagged(ball(e, 0.04, 8))));
+  add('livery', liveryUV(tagged(slopeTop(vfin(finSt)))));
   // Rudder on its raked hinge: built in place, carried into the hinge frame.
   const rudYs = [-0.89, -0.6, -0.2, 0.2, 0.5, RTOP - 0.03, RTOP];
   const rudSt = rudYs.map((y, i) => {
@@ -827,7 +875,7 @@ export function createPA36Model(panel, opts = {}) {
     const c = i === rudYs.length - 1 ? f.c - 0.06 : f.c;
     return [y, f.le, c, airfoil(Math.min(0.97, f.xh * (f.c / c)), 1, FIN_T * (f.c / c), 0, 0.4, 12)];
   });
-  const rudGeo = liveryUV(tagged(vfin(rudSt)));
+  const rudGeo = liveryUV(tagged(slopeTop(vfin(rudSt))));
   const rudTab = tagged(tx(new THREE.BoxGeometry(0.01, 0.22, 0.06), 0, -0.55, teZ(-0.55) + 0.03));
   const rudPivot = new THREE.Group();
   {
@@ -845,11 +893,12 @@ export function createPA36Model(panel, opts = {}) {
   rudPivot.add(rudder);
   root.add(rudPivot);
   add('white', ball([0, -0.82, teZ(-0.82) + 0.01], 0.018, 8), true); // tail light
-  add('beacon', tx(new THREE.SphereGeometry(0.03, 12, 8), 0, FTOP + 0.004, -5.1, 0, 0, 0, [0.8, 0.6, 1]));
-  // Tailplane at the bottom of the cone (strut-braced), 3.6 m span, its
-  // chord pitched 8° nose-up in this frame (≈ −1° to the datum in flight);
-  // the elevators clear of the rudder; tips in the scheme's colour.
-  const STY = -0.76, SLE = -4.15, SC = 1.0, ELEV = 0.6, STIP = 1.8;
+  add('beacon', tx(new THREE.SphereGeometry(0.03, 12, 8), 0, FTOP + 0.002, LE_TOP - 0.03, 0, 0, 0, [0.8, 0.6, 1]));
+  // Tailplane low on the cone, a third of its depth over the bottom (the
+  // photographs; strut-braced), 3.6 m span, its chord pitched 8° nose-up in
+  // this frame (≈ −1° to the datum in flight); the elevators clear of the
+  // rudder; tips in the scheme's colour.
+  const STY = -0.56, SLE = -4.15, SC = 1.0, ELEV = 0.6, STIP = 1.8;
   const STT = new THREE.Matrix4().makeTranslation(0, STY, SLE).multiply(new THREE.Matrix4().makeRotationX((-8 * Math.PI) / 180)).multiply(new THREE.Matrix4().makeTranslation(0, -STY, -SLE));
   const sst = (x) => ({ x, y: STY + x * 0.012, le: SLE - x * 0.05, chord: SC - x * 0.08 });
   const elevParts = [];

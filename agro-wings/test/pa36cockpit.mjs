@@ -89,6 +89,8 @@ const V = [
   ['ext181', { cam: [-11.5, -0.35, 1.2], at: [0, -0.15, -1.9], vfov: 38, hopper: 0 }],
   ['ext182', { cam: [9, -3.2, 6], at: [0, 0, -1.6], vfov: 40, air: true, engine: 'running' }],
   ['ext183', { cam: [1.2, -0.9, 13], at: [0, 0.0, -0.8], vfov: 46, engine: 'running' }],
+  ['ext186', { cam: [5.2, 7.2, -8.4], at: [0, -0.3, -1.6], vfov: 40, air: true, engine: 'running' }],
+  ['ext187', { cam: [13, 0.1, -1.4], at: [0, -0.15, -1.6], vfov: 36, hopper: 0 }],
   ['roofL', { pitch: 25, yaw: 35, vfov: 50 }],
   ['roofR', { pitch: 25, yaw: -35, vfov: 50 }],
 ].filter((v) => !only || only.includes(v[0]));
