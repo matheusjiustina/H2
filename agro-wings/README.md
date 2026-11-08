@@ -3478,8 +3478,8 @@ shaders (a 1–9 s stall under SwiftShader, once).
 ## Aircraft 11 — Piper PA-36-300 Pawnee Brave (PR-PWB), phase 01: exterior and physics
 
 An eleventh aircraft with its own geometry (`src/aircraft/pa36Model.js`),
-flight figures (`FLIGHT_PA36`, `SPRAY_PA36` in `src/config.js`), a
-PROVISIONAL panel (`src/aircraft/pa36Panel.js`) and registry entry
+flight figures (`FLIGHT_PA36`, `SPRAY_PA36` in `src/config.js`), its
+panel (`src/aircraft/pa36Panel.js`, rewritten in phase 02 below) and registry entry
 (`AIRCRAFT_TYPES.pa36`, after the AgTruck in the hangar list). PR-PWB is a
 fictional Brazilian registration. The detailed Brave 300 cockpit is the next
 phase (Prompt 02); this phase delivers the exterior, the physics, two
@@ -3614,7 +3614,7 @@ draw cost 122 meshes / 68 k triangles (AgTruck 203 / 101 k, Ipanema 203
 228 / 114 k); no page errors. Bundle: +42 kB (+12 kB gzip).
 
 **Not done / limits.**
-- The cockpit is provisional (Prompt 02).
+- (The provisional cockpit was replaced in phase 02, below.)
 - Temperature is not modelled anywhere in the shared physics: altitude
   acts through density only; the lapse is the Brave's alone.
 - The 1,041 L hopper option, the Brave 375 and the 285 hp variant are not
@@ -3623,6 +3623,73 @@ draw cost 122 meshes / 68 k triangles (AgTruck 203 / 101 k, Ipanema 203
   the static cost above (SwiftShader frame times are not representative).
 - The dimensional comparison is against a model-builder's plan and
   photographs, not factory drawings: no exact fidelity is claimed.
+
+## Aircraft 11 — Pawnee Brave, phase 02: cockpit
+
+The provisional cabin is replaced by a cockpit built from the reference
+image (the Brave 300 panel seen from the pilot's seat):
+`src/aircraft/pa36Cockpit.js` (geometry, per-frame needles) and
+`src/aircraft/pa36Panel.js` (dial atlas, placards, panel textures, GPS).
+Everything is built in the model's reference frame on the `PA36_CABIN`
+anchors; no other aircraft, system or global module changed.
+
+**What is there.**
+- *Upper pod*: the raised black box with recessed instruments in a rim —
+  oil temperature, airspeed (MPH outside, knots inside), tachometer with
+  the hobbs, manifold pressure / fuel flow, fuel quantity — the oil-press
+  lamp and the red boost-pump rocker; the wet compass apart on its right
+  (a card turning with the heading, figures right to left).
+- *Padded band* under the windshield with its placards (take-off /
+  landing check list, maximum speed, crosswind, alternate static, operating
+  limitations, no smoking).
+- *Stepped lower panel*: clock (the game's time of day), oil pressure /
+  CHT, ammeter, magneto and master rockers, breakers, toggles, start
+  button, the radio with its LCD and the registration plate.
+- *Centre box*: the hopper sight window (frame, tunnel, glass, the product
+  level following the hopper).
+- *Controls*: the long stick with boot and ribbed grip (moves with pitch
+  and roll), the pedals with hinge tubes, arms and brake cylinders (move
+  with the rudder), the throttle on the left console (moves with the
+  power), the blue propeller lever and the white-knobbed lever on the
+  right wall (static: the constant-speed prop is governed by the flight
+  model; the white lever's function is not legible on the reference).
+- *Cabin*: floor with tread plates and wiring, side walls following the
+  fuselage, the right door with frame, red handle and EMERGENCY placard,
+  padded A-posts over the windshield frame, B-posts, sill pads, headliner
+  round the tinted roof panel, rear bulkhead, seat and harness.
+- *GPS*: the existing AGROWINGS unit (`createAgroNav`) in a compact housing
+  on a bracket beside the pod, its four soft keys picked by click / tap.
+
+**Data**: the needles are damped readings of `Aircraft.instruments()`
+(airspeed, rpm, manifold, fuel flow, oil temperature and pressure, CHT,
+fuel, heading, hopper); the panel texture is redrawn at 15 Hz only in the
+cockpit view (every 0.3 s when the camera is within 9 m outside).
+
+**Cost**: static parts merged per material; small hardware in an LOD level
+hidden beyond 18 m; the whole interior hidden beyond 30 m outside the
+cockpit view. Panel textures ≈ 4.5 Mpx.
+
+**Checks** (in this container, Chromium + SwiftShader):
+`test/pa36ckcheck.mjs` — flown through the game's own inputs (keyboard on
+a desktop page, touch controls and a tap on a phone-sized page), all
+passed: 1 parked, 2 engine start, 3 taxi (eye shake 1.3 mm RMS), 4 take-off,
+5 steady flight (needles within 4° of the data), 6 turns at ±40° bank,
+7 approach and landing, stick at full deflection clear of the panel and
+seat, 8 fixed camera, 9 free look (nearest surface 0.195 m, near plane
+0.05 m), cabin closed (back faces seen from the eye in 14 directions
+≤ 0.05 %), 10 outside ↔ inside, 11 GPS keys, 12 mobile controls; no page
+errors. `test/pa36cockpit.mjs` renders the reference-framed view (pitch
+−28°, vertical FOV 64°), the game's cockpit camera on the ground and in
+flight, close-ups, and outside views framed as the reference photographs.
+
+**Limits.**
+- Fidelity is to one reference image; placard texts are representative,
+  not copied.
+- The electrics are not simulated beyond master / engine state (ammeter,
+  lamps, radio LCD).
+- A few pixels (≤ 0.05 %) of grazing seams between the headliner and the
+  roof remain visible looking straight up.
+- Frame time on a real GPU was not measured here.
 
 ## Benchmark (performance work, phase 1)
 

@@ -455,6 +455,9 @@ export function buildPA36Cockpit(ctx) {
     level.add(liq);
     level.position.set(SW.u, vC - SW.win.h / 2, -deep + 0.003);
     level.userData.h = SW.win.h;
+    // (A unit sheet: scaled to the level from the start, so before the first
+    // update it does not stand a metre tall through the roof.)
+    level.scale.y = 0.5 * SW.win.h;
     low.add(level);
     lowGlass.push(at(new THREE.PlaneGeometry(SW.win.w, SW.win.h), SW.u, vC, -deep + 0.006));
   }
@@ -601,9 +604,12 @@ export function buildPA36Cockpit(ctx) {
   // Headliner under the roof (round the tinted panel) and the rear
   // bulkhead behind the seat.
   {
-    const R = (u, v) => { const p = lerp3(roofEdge(u), roofRear(u), v); return [p[0] * 0.998, p[1] - 0.006, p[2]]; };
+    // (Under the roof's crown, as the skin bulges, so no sliver of sky shows
+    // between the lining and the roof; the bands overlap the tinted panel's
+    // edge.)
+    const R = (u, v) => { const p = lerp3(roofEdge(u), roofRear(u), v); const crown = 0.03 * Math.sin(Math.PI * v) * Math.max(0, 1 - (p[0] / railX) ** 2); return [p[0] * 0.998, p[1] + crown - 0.004, p[2]]; };
     const band = (u0, u1, v0, v1, nu = 6, nv = 2) => addB('headliner', skin((u, v) => R(lerp(u0, u1, u), lerp(v0, v1, v)), nu, nv, [0, 0.4, -1.6]));
-    band(0, 1, 0, 0.08, 12); band(0, 1, 0.53, 1, 12, 3); band(0, 0.2, 0.08, 0.53, 3, 3); band(0.8, 1, 0.08, 0.53, 3, 3);
+    band(0, 1, 0, 0.12, 16, 2); band(0, 1, 0.5, 1, 16, 4); band(0, 0.26, 0.12, 0.5, 3, 4); band(0.74, 1, 0.12, 0.5, 3, 4);
     const rg = rearRing.slice(0, -1).filter(([, y]) => y > K.floor - 0.02).map(([x, y]) => new THREE.Vector2(x * 0.965, Math.max(y, K.floor) * 0.99));
     addB('headliner', new THREE.ShapeGeometry(new THREE.Shape(rg)).translate(0, 0, ROOF.zR + 0.035));
   }

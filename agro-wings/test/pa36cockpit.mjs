@@ -48,7 +48,15 @@ const view = (name, o) => page.evaluate(async (o) => {
   m.pilot.visible = false; m.cockpit.visible = true;
   m.root.updateMatrixWorld(true);
   const st = m.root.children.find((c) => c.isGroup && Math.abs(c.rotation.x - 0.15708) < 1e-3);
-  if (!o.game) {
+  if (o.cam) {
+    // Outside, as on a photograph: the camera and its target in the cabin's
+    // reference frame, the pilot figure in his seat.
+    m.pilot.visible = true;
+    const c = st.localToWorld(new THREE.Vector3(...o.cam)), t = st.localToWorld(new THREE.Vector3(...o.at));
+    g.cameraMode = 'free';
+    g.camera.position.copy(c); g.camera.up.set(0, 1, 0); g.camera.lookAt(t);
+    g.camera.fov = o.vfov ?? 40; g.camera.near = 0.05; g.camera.far = 6000; g.camera.updateProjectionMatrix();
+  } else if (!o.game) {
     const eye = st.localToWorld(new THREE.Vector3(o.ex ?? 0, 0.645 + (o.dy ?? 0), -1.72 + (o.dz ?? 0)));
     const q = st.getWorldQuaternion(new THREE.Quaternion());
     const p = (o.pitch ?? 0) * Math.PI / 180, y = (o.yaw ?? 0) * Math.PI / 180;
@@ -77,6 +85,12 @@ const V = [
   ['right', { pitch: -18, yaw: -70, vfov: 70 }],
   ['left', { pitch: -40, yaw: 55, vfov: 70 }],
   ['gps', { pitch: -15, yaw: 26, vfov: 20 }],
+  ['up', { pitch: 35, vfov: 80 }],
+  ['ext181', { cam: [-11.5, -0.35, 1.2], at: [0, -0.15, -1.9], vfov: 38, hopper: 0 }],
+  ['ext182', { cam: [9, -3.2, 6], at: [0, 0, -1.6], vfov: 40, air: true, engine: 'running' }],
+  ['ext183', { cam: [1.2, -0.9, 13], at: [0, 0.0, -0.8], vfov: 46, engine: 'running' }],
+  ['roofL', { pitch: 25, yaw: 35, vfov: 50 }],
+  ['roofR', { pitch: 25, yaw: -35, vfov: 50 }],
 ].filter((v) => !only || only.includes(v[0]));
 for (const [name, o] of V) { const r = await view(name, o); await shot(name); console.log(name, JSON.stringify(r)); }
 console.log('errors', errors);

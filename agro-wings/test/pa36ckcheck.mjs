@@ -131,11 +131,13 @@ const needlesOk = (r, tol = 4) => Object.values(r.err).every((e) => Math.abs(e) 
   await page.keyboard.down('ShiftLeft');
   await run(page, 3);
   await page.keyboard.up('ShiftLeft');
-  await run(page, 14, 'if (fm.out.airspeed > 27) { g.input.virtual.active = true; const a = fm.constructor.attitude(fm, {}); g.input.virtual.pitch = fm.out.onGround ? 0.45 : Math.max(-0.6, Math.min(0.6, (0.14 - a.pitch) * 3 + fm.omega.x)); g.input.virtual.roll = Math.max(-1, Math.min(1, -a.bank * 2)); }');
+  // (The touch controls hold the centreline with the rudder — the speed's
+  // sideways part — and, from 27 m/s, lift the nose; then a 11° climb.)
+  await run(page, 20, 'const v = g.input.virtual; v.active = true; const a = fm.constructor.attitude(fm, {}); const sp = Math.hypot(fm.vel.x, fm.vel.z); v.yaw = sp > 1 ? Math.max(-1, Math.min(1, -3 * fm.vel.z / sp + 0.5 * fm.omega.y)) : 0; if (fm.out.airspeed > 27) { v.pitch = fm.out.onGround ? 0.45 : Math.max(-0.6, Math.min(0.6, (0.2 - a.pitch) * 4 + fm.omega.x)); v.roll = Math.max(-1, Math.min(1, -a.bank * 2)); }');
   r = await phase('04_takeoff');
   ok('4 take-off: airborne, stick and needles following, camera at the eye', !r.onGround && r.agl > 2 && needlesOk(r, 6) && r.camOff < 0.07, JSON.stringify(r));
   // 5 steady climb / level flight (touch controls holding the nose).
-  await run(page, 16, 'g.input.virtual.active = true; const a = fm.constructor.attitude(fm, {}); const tgt = fm.out.agl < 90 ? 0.12 : 0.02; g.input.virtual.pitch = Math.max(-0.6, Math.min(0.6, (tgt - a.pitch) * 3 + fm.omega.x)); g.input.virtual.roll = Math.max(-1, Math.min(1, -a.bank * 2));');
+  await run(page, 16, 'g.input.virtual.active = true; const a = fm.constructor.attitude(fm, {}); g.input.virtual.yaw = 0; const tgt = fm.out.agl < 90 ? 0.2 : 0.04; g.input.virtual.pitch = Math.max(-0.6, Math.min(0.6, (tgt - a.pitch) * 4 + fm.omega.x)); g.input.virtual.roll = Math.max(-1, Math.min(1, -a.bank * 2));');
   r = await phase('05_cruise');
   ok('5 steady flight: needles on the data (airspeed, rpm, manifold, oil, fuel)', !r.onGround && needlesOk(r), JSON.stringify(r));
   // 6 turns: 40° bank left then right (keys), pitch changes.
@@ -148,8 +150,8 @@ const needlesOk = (r, tol = 4) => Object.values(r.err).every((e) => Math.abs(e) 
   // 7 approach and landing: short final to the strip (west of the
   // threshold, 22 m up), power back, a steady descent, the flare, touch
   // down and roll out on the brakes.
-  await page.evaluate(() => { const g = window.__agro, ac = g.aircraft; ac.placeAirborne(-760, 0, Math.PI / 2, 22, 37); ac.fm.flapsCmd = ac.fm.flaps = 0.5; });
-  await run(page, 26, 'const v = g.input.virtual; v.active = true; const a = fm.constructor.attitude(fm, {}); const agl = fm.out.agl; if (!fm.out.onGround) { v.throttle = agl > 4 ? 0.32 : 0.05; const want = agl > 4 ? -2.2 : -0.6; v.pitch = Math.max(-0.7, Math.min(0.8, (want - fm.vel.y) * 0.3 + (agl < 3 ? 0.3 : 0) + fm.omega.x)); v.roll = Math.max(-1, Math.min(1, -a.bank * 2)); v.brake = false; } else { v.throttle = 0; v.pitch = 0.6; v.roll = 0; v.brake = fm.out.groundSpeed > 3; }');
+  await page.evaluate(() => { const g = window.__agro, ac = g.aircraft; ac.placeAirborne(-760, 0, Math.PI / 2, 20, 33); ac.fm.flapsCmd = ac.fm.flaps = 0.5; });
+  await run(page, 30, 'const v = g.input.virtual; v.active = true; const a = fm.constructor.attitude(fm, {}); const agl = fm.out.agl; const sp = Math.hypot(fm.vel.x, fm.vel.z); v.yaw = sp > 1 ? Math.max(-1, Math.min(1, -3 * fm.vel.z / sp + 0.5 * fm.omega.y)) : 0; if (!fm.out.onGround) { v.throttle = agl > 3 ? 0.2 : 0; v.pitch = agl > 3 ? Math.max(-0.7, Math.min(0.8, (-2.5 - fm.vel.y) * 0.3 + fm.omega.x)) : Math.max(-0.7, Math.min(0.8, (0.15 - a.pitch) * 4 + fm.omega.x)); v.roll = Math.max(-1, Math.min(1, -a.bank * 2)); v.brake = false; } else { v.throttle = 0; v.pitch = 0.6; v.roll = 0; v.brake = fm.out.groundSpeed > 2 && fm.out.groundSpeed < 9 && a.pitch > 0.1; }');
   r = await phase('07_landing');
   ok('7 approach and landing: on the ground, the aircraft whole, camera at the eye', r.onGround && (await page.evaluate(() => window.__agro.aircraft.state)) === 'ok' && r.camOff < 0.07, JSON.stringify(r));
   await page.evaluate(() => { window.__agro.input.virtual.active = false; });
