@@ -120,6 +120,8 @@ export class Lifecycle {
     this.stats.restored++;
     const g = this.game;
     try { g.world?.sky?.bakeEnv?.(); } catch (e) { console.error(e); }
+    // Aircraft: GPU copies gone and some CPU copies released — built again.
+    try { g.assets?.rebuildAll?.(); } catch (e) { console.error(e); }
     try { g.resize(); } catch { /* ignore */ }
     g.last = performance.now();
     this.contextLost = false;

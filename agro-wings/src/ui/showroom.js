@@ -65,6 +65,7 @@ export class Showroom {
   }
   leave() {
     this.active = false;
+    if (this.preview && this.preview !== this.game.aircraftId) this.game.assets?.lighten(this.preview);
     this.preview = null;
     this.game.camera.clearViewOffset();
   }
@@ -90,7 +91,12 @@ export class Showroom {
 
   // Select a locked aircraft to look at (null: back to the flown one).
   setPreview(id) {
-    this.preview = id && id !== this.game.aircraftId ? id : null;
+    const was = this.preview, g = this.game;
+    this.preview = id && id !== g.aircraftId ? id : null;
+    // Looked at up close: the full model (paint at full resolution) while on
+    // show, light again once it is not (it stays parked and frozen).
+    if (was && was !== this.preview && was !== g.aircraftId) g.assets?.lighten(was);
+    if (this.preview && g.assets?.ensureFull(this.preview)) g.assets.freeze(this.preview);
     const t = this.target;
     if (t) { t.model.root.visible = true; if (t.contactShadow) t.contactShadow.visible = true; }
     this.flash();

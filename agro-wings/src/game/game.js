@@ -116,19 +116,32 @@ export class Game {
     this._startWeather(true);
     this.screens.setLoading(0.85, t('Aircraft'));
     await new Promise((r) => setTimeout(r, 0));
-    // Both aircraft live in the world; the one not selected waits parked.
+    // Every aircraft lives in the world; the ones not selected wait parked.
+    // Built one at a time (a pause between them for the loading screen and
+    // the GC), the selected one first: each parked one is made light
+    // (cockpit canvases released, paint at the device's resolution) right
+    // after it is built, so the full set of resources is never in memory
+    // at once (aircraftMemory.js).
     this.fleet = {};
     // The player's registration marks, before the liveries are painted.
     for (const [id, r] of Object.entries(this.settings.regs ?? {})) if (!setRegistration(id, r)) delete this.settings.regs[id];
-    for (const id of AIRCRAFT_ORDER) {
+    this.assets = new AircraftAssets(this);
+    const want = AIRCRAFT_ORDER.includes(this.settings.aircraft) && aircraftUnlocked(aircraftType(this.settings.aircraft)) ? this.settings.aircraft : AIRCRAFT_ORDER[0];
+    const built = {};
+    for (const [n, id] of [want, ...AIRCRAFT_ORDER.filter((k) => k !== want)].entries()) {
       // Each aircraft gets its own controller and physics by kind.
       const ac = aircraftType(id).kind === 'heli' ? new Helicopter(this, { type: id }) : new Aircraft(this, { type: id });
       ac.fm.fuel = ac.type.loads.boot; ac.fm.hopper = 0; ac.fm.updateMass();
+      built[id] = ac;
       this.fleet[id] = ac;
+      this._applyAircraftOptions(id);
+      if (id !== want) this.assets.lighten(id);
+      this.screens.setLoading(0.85 + (0.1 * (n + 1)) / AIRCRAFT_ORDER.length, t('Aircraft'));
+      await new Promise((r) => setTimeout(r, 0));
     }
-    this._applyAircraftOptions();
-    this.assets = new AircraftAssets(this);
+    this.fleet = Object.fromEntries(AIRCRAFT_ORDER.map((id) => [id, built[id]])); // the hangar's order
     this.assets.register();
+    this.assets.releaseAfterUpload(want);
     this.rig = new CameraRig(this.camera);
     this.rig.shakeScale = this.settings.shake;
     this.rig.eyeHeight = Math.max(-EYE_RANGE, Math.min(EYE_RANGE, +this.settings.eyeHeight || 0));
@@ -244,6 +257,9 @@ export class Game {
     this.freeRoam?.forceBoard();
     // Premium expansions: refused here, not only hidden in the UI.
     if (!aircraftUnlocked(aircraftType(id))) id = AIRCRAFT_ORDER.find((k) => aircraftUnlocked(aircraftType(k)));
+    const prev = this.aircraftId;
+    this.assets?.thaw(id);
+    this.assets?.ensureFull(id); // a light (parked) aircraft is built in full again
     const next = this.fleet[id];
     // Parked spots: the helicopter waits on its pad; the airplanes take the
     // west apron spots in order.
@@ -261,6 +277,7 @@ export class Game {
       // the hangar.
       ac.park(ac.kind === 'heli' ? (ac.type.id === 'r44' && next.kind !== 'heli' ? ac.type.servicePad : BASE.heliHangar) : BASE[ac.type.parkSpot] ?? spots.shift());
     }
+    if (prev && prev !== id) this.assets?.lighten(prev); // the one flown until now: parked, light
     for (const ac of Object.values(this.fleet)) if (ac !== next) this.assets?.freeze(idOf(ac));
     this.aircraft = next;
     this.aircraftId = id;
@@ -302,21 +319,22 @@ export class Game {
   // Aircraft options (title-screen card): paint schemes (M-18, EMB-203,
   // R44, Bell 206) and the Bell 206's spray kit. Removing the kit drains the
   // tank and drops its mass and drag.
-  _applyAircraftOptions() {
-    this.fleet?.m18?.model.setLivery?.(this.settings.m18Livery ?? 0);
-    this.fleet?.e203?.model.setLivery?.(this.settings.e203Livery ?? 0);
-    this.fleet?.a188?.model.setLivery?.(this.settings.a188Livery ?? 0);
-    this.fleet?.pa36?.model.setLivery?.(this.settings.pa36Livery ?? 0);
-    this.fleet?.r44?.model.setLivery?.(this.settings.r44Livery ?? 0);
-    const b = this.fleet?.b206;
-    if (!b) return;
-    b.model.setLivery?.(this.settings.b206Livery ?? 0);
-    const on = this.settings.b206Kit !== false;
-    b.model.setKit?.(on);
-    b.fm.kitOn = on;
-    if (!on) { b.fm.hopper = 0; if (this.aircraft === b) this.sprayer.on = false; }
-    b.fm.updateMass();
-    this.assets?.refreshAll();
+  _applyAircraftOptions(only = null) {
+    const L = { m18: 'm18Livery', e203: 'e203Livery', a188: 'a188Livery', pa36: 'pa36Livery', r44: 'r44Livery', b206: 'b206Livery' };
+    for (const id of only ? [only] : Object.keys(this.fleet ?? {})) {
+      const ac = this.fleet[id];
+      if (!ac) continue;
+      if (L[id]) ac.model.setLivery?.(this.settings[L[id]] ?? 0);
+      if (id === 'b206') {
+        const on = this.settings.b206Kit !== false;
+        ac.model.setKit?.(on);
+        ac.fm.kitOn = on;
+        if (!on) { ac.fm.hopper = 0; if (this.aircraft === ac) this.sprayer.on = false; }
+        ac.fm.updateMass();
+      }
+      this.assets?.afterOptions(id); // new paint canvases: lightened (parked) or released once on the GPU (flown)
+    }
+    if (only) this.assets?.refresh(only); else this.assets?.refreshAll();
   }
   // Registration marks of one aircraft (Settings): only the letters change —
   // the livery canvas and the panel placard are redrawn, nothing else.
@@ -330,13 +348,14 @@ export class Game {
     const ac = this.fleet?.[id];
     ac?.model.setReg?.(r);
     ac?.panel.setReg?.(r);
+    this.assets?.afterOptions(id);
     this.assets?.refresh(id);
     return r;
   }
   setAircraftOption(k, v) {
     this.setSetting(k, v);
-    this._applyAircraftOptions();
     const id = { b206Livery: 'b206', b206Kit: 'b206', m18Livery: 'm18', e203Livery: 'e203', a188Livery: 'a188', pa36Livery: 'pa36', r44Livery: 'r44' }[k];
+    this._applyAircraftOptions(id ?? null);
     if (id) this.showroom?.invalidate(id);
     this.audio?.play('ui');
   }
@@ -569,7 +588,7 @@ export class Game {
     // A spray contract with the Bell 206 refits its spray kit.
     if (job && this.aircraft?.type.id === 'b206' && this.settings.b206Kit === false) {
       this.setSetting('b206Kit', true);
-      this._applyAircraftOptions();
+      this._applyAircraftOptions('b206');
       this.toast(t('Spray kit fitted for the contract.'));
     }
     this.job = job;

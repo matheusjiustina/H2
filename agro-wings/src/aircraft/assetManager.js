@@ -17,6 +17,7 @@
 // locked aircraft stay visible exactly as they were. Sources stay in memory.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { memoryTier, PARKED_PAINT, aircraftTextures, releaseCanvas, shrinkCanvas, rebuildModel } from './aircraftMemory.js';
 
 const _inv = new THREE.Matrix4(), _m = new THREE.Matrix4(), _n = new THREE.Matrix3();
 const BASE_ON_BEFORE = THREE.Object3D.prototype.onBeforeRender;
@@ -36,7 +37,112 @@ export class AircraftAssets {
   constructor(game) {
     this.game = game;
     this.entries = new Map(); // id → state
-    this.stats = { merges: 0, thaws: 0, gpuReleases: 0, lastMergeMs: 0 };
+    this.stats = { merges: 0, thaws: 0, gpuReleases: 0, lastMergeMs: 0, rebuilds: 0, lightened: 0, released: 0, lastRebuildMs: 0 };
+    // Memory (aircraftMemory.js): which aircraft are light, the device tier.
+    this.tier = memoryTier(game.perf?.caps ?? {});
+    this.light = new Set();
+  }
+
+  // Canvases used by any aircraft other than `id` (never released for it).
+  _foreignCanvases(id) {
+    const s = new Set();
+    for (const [k, ac] of Object.entries(this.game.fleet ?? {})) {
+      if (k === id || !ac.model?.root) continue;
+      const { cockpit, exterior } = aircraftTextures(ac);
+      for (const t of cockpit) s.add(t.image);
+      for (const t of exterior) s.add(t.image);
+    }
+    return s;
+  }
+
+  // Parked: the cockpit / pilot / panel canvases released (the parked
+  // cockpit is hidden), the exterior paint kept at the tier's resolution.
+  lighten(id) {
+    const ac = this.game.fleet?.[id];
+    if (!ac?.model?.root || ac.headless) return false;
+    const scale = PARKED_PAINT[this.tier] ?? 1;
+    let tx = aircraftTextures(ac);
+    // Paint released after its upload (it was flown) and a smaller one wanted: build it again.
+    if (scale < 1 && [...tx.exterior].some((t) => t.userData.cpuReleased)) { this._rebuild(id); tx = aircraftTextures(ac); }
+    const foreign = this._foreignCanvases(id);
+    for (const t of tx.cockpit) {
+      if (foreign.has(t.image)) continue;
+      t.dispose();
+      releaseCanvas(t.image);
+      t.userData.cpuReleased = true;
+    }
+    if (scale < 1) for (const t of tx.exterior) {
+      t.onUpdate = null; // (no release after upload: the small copy is kept)
+      if (foreign.has(t.image) || t.userData.cpuReleased || t.userData.shrunk) continue;
+      if (shrinkCanvas(t.image, scale)) { t.needsUpdate = true; t.userData.shrunk = true; }
+    }
+    this.light.add(id);
+    this.stats.lightened++;
+    return true;
+  }
+
+  // Flown: a full model again (rebuilt from the type) if it was light.
+  ensureFull(id) {
+    if (!this.light.has(id)) return false;
+    this._rebuild(id);
+    this.light.delete(id);
+    this.releaseAfterUpload(id);
+    return true;
+  }
+
+  _rebuild(id) {
+    const ac = this.game.fleet[id], t0 = performance.now();
+    const wasFrozen = this.entries.get(id)?.state === 'frozen';
+    if (wasFrozen) this.thaw(id);
+    rebuildModel(ac, this._foreignCanvases(id));
+    this._inRebuild = true;
+    try { this.game._applyAircraftOptions?.(id); } finally { this._inRebuild = false; }
+    this._registerOne(id);
+    this.game.showroom?.radius.delete(id);
+    this.stats.rebuilds++;
+    this.stats.lastRebuildMs = +(performance.now() - t0).toFixed(1);
+  }
+
+  // The flown aircraft's exterior paint: the CPU copy of each canvas is let
+  // go once the GPU has it (a context loss rebuilds the aircraft).
+  // (Only where parked paint keeps full resolution — 'high': elsewhere the
+  // flown aircraft keeps its copy so that, parked again, it is shrunk in
+  // place instead of being built again.)
+  releaseAfterUpload(id) {
+    const ac = this.game.fleet?.[id];
+    if (!ac?.model?.root || ac.headless || (PARKED_PAINT[this.tier] ?? 1) < 1) return;
+    const foreign = this._foreignCanvases(id);
+    for (const t of aircraftTextures(ac).exterior) {
+      const c = t.image;
+      if (!c || typeof c.getContext !== 'function' || c.width * c.height < 256 * 256 || foreign.has(c) || t.userData.cpuReleased) continue;
+      t.onUpdate = () => {
+        t.onUpdate = null;
+        releaseCanvas(c);
+        t.userData.cpuReleased = true;
+        this.stats.released++;
+      };
+    }
+  }
+
+  // An option (paint, kit, marks) made new canvases for this aircraft.
+  afterOptions(id) {
+    if (this._inRebuild) return;
+    if (this.light.has(id)) this.lighten(id); else this.releaseAfterUpload(id);
+  }
+
+  // After a context loss: every aircraft built again (its GPU copies are
+  // gone, some of its CPU copies were released), then frozen / lightened as
+  // before.
+  async rebuildAll() {
+    for (const id of Object.keys(this.game.fleet ?? {})) {
+      const ac = this.game.fleet[id];
+      if (ac.headless) continue;
+      const light = this.light.has(id);
+      this._rebuild(id);
+      if (light) this.lighten(id); else this.releaseAfterUpload(id);
+      if (ac !== this.game.aircraft) this.freeze(id);
+      await new Promise((r) => setTimeout(r, 0));
+    }
   }
 
   // Reference counts of every geometry / texture used by the fleet, to know
@@ -78,6 +184,13 @@ export class AircraftAssets {
     for (const [id, ac] of Object.entries(this.game.fleet)) {
       this.entries.set(id, { id, ac, state: 'live', cockpitOnly: this._cockpitOnly(id, ac, owners), merged: null, saved: null });
     }
+  }
+  // One aircraft again (its model was rebuilt).
+  _registerOne(id) {
+    const ac = this.game.fleet[id];
+    const e = this.entries.get(id);
+    const ck = this._cockpitOnly(id, ac, this._owners());
+    if (e) { e.cockpitOnly = ck; e.state = 'live'; e.merged = e.saved = null; } else this.entries.set(id, { id, ac, state: 'live', cockpitOnly: ck, merged: null, saved: null });
   }
 
   // Freeze a parked aircraft (call after park()).
@@ -167,7 +280,7 @@ export class AircraftAssets {
 
   report() {
     const out = {};
-    for (const [id, e] of this.entries) out[id] = { state: e.state, mergedMeshes: e.merged?.holder.children.length ?? 0 };
-    return { ...this.stats, aircraft: out };
+    for (const [id, e] of this.entries) out[id] = { state: e.state, light: this.light.has(id), mergedMeshes: e.merged?.holder.children.length ?? 0 };
+    return { ...this.stats, tier: this.tier, aircraft: out };
   }
 }
