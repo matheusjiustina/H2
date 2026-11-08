@@ -43,6 +43,7 @@ import {
   airfoil, wingPanel, flipWinding, tagged, tx, rod, tube, bar, ball, rbox, lathe, grid,
   speckle, orangePeel, treadTexture, propDiscTexture, WING_SPAN_UV, buildPilot,
 } from './model.js';
+import { buildPA36Cockpit, PA36_CK } from './pa36Cockpit.js';
 
 const A = FLIGHT_PA36;
 export const PA36_STANCE = (9 * Math.PI) / 180;
@@ -326,7 +327,7 @@ function liveryTextures(reg, L = PA36_LIVERIES[0]) {
       [[-1.95, -0.85], [-1.95, 0.46]], [[-2.85, -0.87], [-2.85, 0.24]], [[-3.6, -0.89], [-3.6, -0.06]], [[-4.3, -0.9], [-4.3, -0.35]],
       [[0.87, -0.2], [-1.95, -0.32]], [[-1.95, -0.34], [-4.9, -0.75]],
     ];
-    if (side > 0) seams.push([[-1.0, SILL_Y - 0.01], [-1.0, -0.22], [BPOST, -0.22], [BPOST, SILL_Y - 0.01]]);
+    if (side < 0) seams.push([[-1.0, SILL_Y - 0.01], [-1.0, -0.22], [BPOST, -0.22], [BPOST, SILL_Y - 0.01]]); // the door (right)
     for (const s of seams) {
       line(g, s, L.seam, 2);
       line(gb, s, '#3c3c3c', 2.6);
@@ -502,11 +503,13 @@ export const PA36_DIM = { spinnerZ: 2.45, rudderZ: -5.75, roofY: ROOF.yt, finTop
 export function pa36Extent() {
   return { span: 2 * W.half, length: PA36_DIM.spinnerZ - PA36_DIM.rudderZ, tops: [[0, ROOF.yt, -1.7], [0, PA36_DIM.finTopY, -5.05]].map(pa36ToBody), height: Math.max(ROOF.yt, PA36_DIM.finTopY) - GROUND };
 }
-// Cabin anchors (reference frame) for the cockpit of the next phase.
+// Cabin anchors (reference frame): the pilot's eye and the cockpit's parts
+// (pa36Cockpit.js builds on them; the door is on the right, as on the
+// cockpit reference).
 export const PA36_CABIN = {
-  eye: [0, 0.66, -1.72], seat: [0, -0.27, -1.75], panel: [0, 0.22, -0.985], floorY: -0.42,
-  stick: [0, -0.48, -1.24], pedals: [0, -0.44, -0.78], throttle: [0.33, 0.1, -1.22],
-  door: [0.47, 0.6, -1.4], windshield: [0, 0.7, -1.12], roof: [0, ROOF.yt, -1.64],
+  eye: [0, 0.645, -1.72], seat: [0, -0.27, -1.75], panel: [-0.012, 0.4825, -1.082], lowerPanel: [0, 0.25, -1.115], floorY: -0.42,
+  stick: [0, -0.5, -1.27], pedals: [0, -0.36, -0.8], throttle: [0.395, -0.06, -1.36],
+  door: [-0.47, 0.2, -1.4], windshield: [0, 0.7, -1.12], roof: [0, ROOF.yt, -1.64],
   sill: SILL_Y, rail: RAIL_Y, wsBaseZ: WS.z, roofFrontZ: ROOF.zF, rearFrameZ: ROOF.zR, bPost: BPOST,
 };
 
@@ -548,10 +551,7 @@ export function createPA36Model(panel, opts = {}) {
     white: new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.35, emissive: 0x222222, vertexColors: true }),
     beacon: new THREE.MeshStandardMaterial({ color: 0xd8261b, roughness: 0.3, emissive: 0xff2010, emissiveIntensity: 0, vertexColors: true }),
     strobe: new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.2, emissive: 0xffffff, emissiveIntensity: 0, vertexColors: true }),
-    // Provisional cockpit and the pilot figure.
-    cabin: new THREE.MeshStandardMaterial({ color: 0x55595d, roughness: 0.8, vertexColors: true }),
-    cabinDark: new THREE.MeshStandardMaterial({ color: 0x2a2c2f, roughness: 0.85, vertexColors: true }),
-    seat: new THREE.MeshStandardMaterial({ color: 0x2f3236, roughness: 0.9, vertexColors: true }),
+    // The pilot figure.
     suit: new THREE.MeshStandardMaterial({ color: 0x4a5462, roughness: 0.88 }),
     glove: new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.75 }),
     skin: new THREE.MeshStandardMaterial({ color: 0xb88462, roughness: 0.7 }),
@@ -684,18 +684,21 @@ export function createPA36Model(panel, opts = {}) {
     fr([[sx * railX, RAIL_Y, ROOF.zR], [sx * sillX(ROOF.zR), SILL_Y, ROOF.zR]], 0.016); // rear frame
   }
   void aPost;
-  // Door (left): handle, hinges on the A-post.
+  // Door (right, as on the cockpit reference): outside handle, hinges on
+  // its front frame.
   {
-    const dx = (y, z) => sillX(z) + (railX - sillX(z)) * clamp((y - SILL_Y) / (RAIL_Y - SILL_Y), 0, 1);
-    add('steel', rod([dx(0.4, -1.62) + 0.03, 0.4, -1.66], [dx(0.4, -1.5) + 0.03, 0.4, -1.52], 0.01, 6), true);
-    for (const hy of [0.52, 0.72]) add('steel', tx(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), dx(hy, -1.05) + 0.008, hy, lerp(wsBase(0)[2], roofEdge(0)[2], (hy - SILL_Y) / (RAIL_Y - SILL_Y)) - 0.01), true);
+    const dx = (y, z) => -(pa36HalfX(z, y) + 0.004);
+    add('steel', rod([dx(0.2, -1.66) - 0.026, 0.2, -1.66], [dx(0.2, -1.52) - 0.026, 0.2, -1.52], 0.01, 6), true);
+    for (const hy of [-0.1, 0.3]) add('steel', tx(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), dx(hy, -1.02), hy, -1.02), true);
   }
   // Wire cutter up the windshield's centre (from the deck to above the roof
   // front), the cable from its top to the fin top (TC-ZH / N44523), a whip
   // antenna and the GPS antenna on the roof.
   const cutterTop = [0, ROOF.yt + 0.12, ROOF.zF + 0.03];
-  add('steel', bar([0, topY(-0.7) + 0.02, -0.7], [0, 0.72, -1.15], 0.05, 0.012));
-  add('steel', bar([0, 0.72, -1.15], cutterTop, 0.04, 0.012));
+  // (The cutter is a blade edge-on to the airflow: thin across, deep
+  // fore and aft.)
+  add('steel', bar([0, topY(-0.7) + 0.02, -0.7], [0, 0.72, -1.15], 0.012, 0.05));
+  add('steel', bar([0, 0.72, -1.15], cutterTop, 0.012, 0.04));
   add('ink', rod(cutterTop, [0, PA36_DIM.finTopY + 0.03, -5.08], 0.0035, 4), true);
   add('white', rod([0, ROOF.yt, -1.85], [0, ROOF.yt + 0.34, -2.12], 0.006, 5), true);
   add('dark', rbox(0.14, 0.04, 0.2, 0.02, 0, ROOF.yt + 0.025, -1.72), true);
@@ -1037,87 +1040,16 @@ export function createPA36Model(panel, opts = {}) {
   prop.add(disc);
   root.add(prop);
 
-  // ---------------- cockpit (PROVISIONAL) ----------------
-  // Shell, seat and controls on the cabin anchors (PA36_CABIN); the panel is
-  // pa36Panel.js. The next phase replaces this with the Brave 300 cockpit.
+  // ---------------- cockpit ----------------
+  // The Brave 300 cockpit (pa36Cockpit.js), in this same reference frame,
+  // on the cabin's own sections; the panel's textures are pa36Panel.js.
   const C = PA36_CABIN;
-  const cockpit = new THREE.Group();
-  cockpit.name = 'pa36-cockpit';
-  const CB = {};
-  const cadd = (mat, geo) => (CB[mat] ||= []).push(tagged(geo));
-  const zF = -0.97, zR = ROOF.zR + 0.02;
-  // Floor, side skins below the sill, the rear bulkhead (the turtledeck's
-  // frame) and the hopper's rear wall under the panel (a footwell for the
-  // pedals below it).
-  cadd('cabinDark', rbox(0.8, 0.03, zF - zR + 0.25, 0.01, 0, C.floorY, (zF + zR) / 2 + 0.12));
-  for (const sx of [1, -1]) {
-    cadd('cabin', grid((u, v) => { const z = lerp(zF, zR, u), y = lerp(C.floorY, SILL_Y - 0.01, v); return [sx * (ringX(stAt(z), y) - 0.02), y, z]; }, 8, 6, [0, 0.1, -1.5]));
-  }
-  {
-    const shape = new THREE.Shape(ringR(stRear).slice(0, -1).filter(([, y]) => y > C.floorY - 0.02).map(([x, y]) => new THREE.Vector2(x * 0.97, Math.max(y, C.floorY) * 0.99)));
-    const bh = new THREE.ShapeGeometry(shape);
-    bh.translate(0, 0, zR - 0.005);
-    cadd('cabin', bh);
-    const fw = new THREE.ShapeGeometry(new THREE.Shape(ringR(stWS).slice(0, -1).filter(([, y]) => y > -0.12).map(([x, y]) => new THREE.Vector2(x * 0.96, Math.max(y, -0.12)))));
-    fw.scale(-1, 1, 1); fw.translate(0, 0, zF + 0.02);
-    cadd('cabinDark', fw);
-    cadd('cabinDark', rbox(0.7, 0.02, 0.32, 0.01, 0, -0.14, zF + 0.16)); // footwell top
-  }
-  // Glareshield, panel board, the compass and the guidance light bar on it.
-  cadd('cabinDark', rbox(0.84, 0.04, 0.2, 0.015, 0, 0.475, zF - 0.06));
-  const panelMat = new THREE.MeshStandardMaterial({ map: panel.texture ?? null, color: panel.texture ? 0xffffff : 0x5a5f63, roughness: 0.75 });
-  const panelMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.3), panelMat);
-  panelMesh.position.set(0, C.panel[1], C.panel[2]);
-  panelMesh.rotation.set(0.12, Math.PI, 0); // faces the pilot (−Z), its top leaning away
-  cockpit.add(panelMesh);
-  cadd('cabinDark', rbox(0.84, 0.34, 0.03, 0.01, 0, C.panel[1], C.panel[2] + 0.02));
-  cadd('ink', tx(new THREE.CylinderGeometry(0.035, 0.035, 0.05, 14), 0, 0.52, zF - 0.06));
-  const leds = [];
-  for (let i = 0; i < 15; i++) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.01, 0.01), new THREE.MeshBasicMaterial({ color: 0x1c1c1c }));
-    m.position.set((7 - i) * 0.018, 0.5, zF - 0.14);
-    cockpit.add(m);
-    leds.push(m);
-  }
-  // Seat with harness.
-  const S0 = C.seat;
-  cadd('seat', rbox(0.46, 0.08, 0.46, 0.03, S0[0], S0[1] - 0.04, S0[2] + 0.12));
-  cadd('seat', rbox(0.46, 0.62, 0.08, 0.03, S0[0], S0[1] + 0.3, S0[2] - 0.13, -0.12));
-  for (const sx of [1, -1]) cadd('cabinDark', rod([sx * 0.12, S0[1] + 0.58, S0[2] - 0.12], [sx * 0.09, S0[1] + 0.25, S0[2] + 0.12], 0.012, 6));
-  // Controls: stick (pivot under the floor), pedals, throttle quadrant on
-  // the left wall, the spray valve handle on the right.
-  const stick = new THREE.Group();
-  stick.position.set(...C.stick);
-  stick.add(new THREE.Mesh(rod([0, 0, 0], [0, 0.62, 0.03], 0.012, 12), M.steel));
-  stick.add(new THREE.Mesh(tx(new THREE.CylinderGeometry(0.02, 0.018, 0.12, 12), 0, 0.66, 0.035), M.ink));
-  stick.add(new THREE.Mesh(tx(new THREE.CylinderGeometry(0.0065, 0.0065, 0.008, 10), 0, 0.725, 0.04), M.red));
-  cockpit.add(stick);
-  const pedals = [];
-  for (const sx of [1, -1]) {
-    const p = new THREE.Group();
-    p.position.set(sx * 0.18, C.pedals[1], C.pedals[2]);
-    p.add(new THREE.Mesh(rbox(0.09, 0.16, 0.025, 0.008, 0, 0.0, 0.0, -0.4), M.steel));
-    p.add(new THREE.Mesh(rod([0, -0.08, 0.02], [0, -0.16, 0.12], 0.01, 6), M.steel));
-    cockpit.add(p);
-    pedals.push(p);
-  }
-  const THR = [C.throttle[0], C.throttle[1], C.throttle[2]];
-  cadd('cabinDark', rbox(0.08, 0.07, 0.26, 0.012, THR[0] + 0.03, THR[1] - 0.045, THR[2]));
-  const throttle = new THREE.Group();
-  throttle.position.set(...THR);
-  throttle.add(new THREE.Mesh(rod([0, 0, 0], [0, 0.15, 0], 0.005, 8), M.chrome));
-  throttle.add(new THREE.Mesh(tx(new THREE.SphereGeometry(0.021, 14, 10), 0, 0.165, 0), M.ink));
-  cockpit.add(throttle);
-  const valve = new THREE.Group();
-  valve.position.set(-0.3, -0.28, -1.32);
-  valve.add(new THREE.Mesh(rod([0, 0, 0], [0, 0.22, 0], 0.008, 8), M.steel));
-  valve.add(new THREE.Mesh(tx(new THREE.SphereGeometry(0.025, 12, 8), 0, 0.23, 0), M.red));
-  cockpit.add(valve);
-  for (const [mat, list] of Object.entries(CB)) {
-    const m = new THREE.Mesh(mergeGeometries(list), M[mat]);
-    m.receiveShadow = true;
-    cockpit.add(m);
-  }
+  const ck = buildPA36Cockpit({
+    panel, envMap: opts.envMap ?? null, harnessMat: M.harness,
+    cab: { halfX: pa36HalfX, SILL_Y, RAIL_Y, ROOF, WS, BPOST, wsBase, roofEdge, roofRear, railX, sillX, rearRing: ringR(stRear), topY },
+  });
+  const { cockpit, stick, pedals, throttle, valve, leds } = ck;
+  const THR = C.throttle;
   const eye = new THREE.Vector3(...C.eye);
   root.add(cockpit);
 
@@ -1126,6 +1058,7 @@ export function createPA36Model(panel, opts = {}) {
   // of that frame sits on the cabin's eye anchor.
   const OFF = new THREE.Vector3(C.eye[0], C.eye[1] - 0.98, C.eye[2] + 0.52);
   const thrPF = [THR[0] - OFF.x, THR[1] - OFF.y, THR[2] - OFF.z];
+  void PA36_CK;
   const pilot = buildPilot(M, stick, throttle, { throttleAt: thrPF });
   pilot.position.copy(OFF);
   root.add(pilot);
@@ -1164,8 +1097,9 @@ export function createPA36Model(panel, opts = {}) {
   };
 
   let bladeAngle = 0.18, t = 0;
-  const update = (dt, fm) => {
+  const update = (dt, fm, ac) => {
     t += dt;
+    ck.update(dt, fm, ac);
     const o = fm.out;
     const pf = fm.shaftPower / A.maxPower;
     const target = fm.engine === 'running' ? 0.16 + 0.34 * smoothstep(15, 55, o.airspeed) + 0.08 * pf : 0.16;
@@ -1192,7 +1126,7 @@ export function createPA36Model(panel, opts = {}) {
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, flaps, elevator, rudder,
     gear: gearGroups,
-    stick, pedals, throttle, valve, leds, panelMesh, inst: null,
+    stick, pedals, throttle, valve, leds, panelMesh: ck.panelMesh, inst: { pick: ck.pick, pickables: ck.pickables, needles: ck.needles, card: ck.card, level: ck.level },
     pumpFan, pilot, cockpit, glassMesh,
     eye: REF.eye.clone(),
     nozzles: nozzles.map(V),
