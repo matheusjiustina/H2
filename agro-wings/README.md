@@ -3785,6 +3785,69 @@ The "High" trims are predicted from pixel counts and ranges, **not measured on a
 `npm test` includes `test/adaptive.test.mjs` (Ultra identical to v73 numbers, controller behaviour on
 synthetic frame times) and `test/perfmanager.test.mjs`; `test/perfui.mjs` drives the menu in a browser.
 
+### Revision (2026-11): order of adaptation, flight gating, cockpit legibility
+
+* **Order.** Down: secondary effects first — the particle budgets of the
+  profile (spray mist, splash / spray, flames and smoke) halved; cheap,
+  nothing is rebuilt — then the resolution (steps of 0.05 to the floor),
+  then, in Automatic, one profile. Up: resolution, then the effects back,
+  then a profile. A profile change brings its own budgets back.
+* **No heavy change in the air.** A profile change rebuilds the vegetation /
+  crop caches (`world.setQuality`), so Automatic never climbs a profile while
+  airborne in a flight, and drops at most one profile per 2 minutes of flight;
+  effects and resolution keep adapting at any time. On the ground and in the
+  menu the rules above apply unchanged.
+* **Cockpit legibility.** In the cockpit view the 3D instruments and GPS are
+  drawn by the canvas: there it never goes under one device pixel per CSS
+  pixel (Economy on a 1× screen, or a low dynamic resolution, no longer blurs
+  them), still under the profile's pixel ceiling. Outside the cockpit the
+  profile's own ratio applies again. Ultra Original is unchanged (already ≥ 1).
+  HUD, buttons and text are HTML, never scaled.
+* The physics never depends on the graphics: same fixed 1/120 s step at every
+  profile (`test/agecheck.mjs` flies 10 s on Economy and Ultra: identical
+  positions and speed).
+* Tests: `npm test` (`adaptive.test.mjs`: order, recovery, gating, cockpit
+  floor) and `test/agecheck.mjs` (the same rules in the real game, frame times
+  fed to the game's PerfManager — in the software renderer every real frame is
+  a "stall" the controller ignores).
+
+### Memory at start-up (optimisation stage 1, 2026-11)
+
+`src/aircraft/aircraftMemory.js` + `assetManager.js`. The whole fleet still
+stands at the base, but only the flown aircraft keeps its full resources:
+
+* **Parked = light.** Right after it is built, a parked aircraft's cockpit,
+  pilot and panel canvases (instrument faces, placards, GPS) are released and
+  its cockpit / pilot geometry let go — a parked cockpit is hidden anyway
+  (`park()`). Its exterior paint keeps the device tier's resolution:
+  `low` ¼ (phones without a reported ≥ 6 GB, iOS), `mid` ½ (6 GB+ phones,
+  ≤ 4 GB computers), `high` full (other computers; the CPU copy goes once the
+  GPU has it). `?mem=low|mid|high` forces the tier.
+* **Selected = rebuilt in full** from its type (the same code as at start-up),
+  paint, kit and marks applied; the previous model is disposed. A locked
+  aircraft previewed in the menu is rebuilt in full while on show.
+* **One at a time.** The fleet is built aircraft by aircraft, the selected one
+  first, a pause between them (loading screen, GC): the full set of resources
+  is never in memory together.
+* **WebGL context restored** → every aircraft is rebuilt (one per task),
+  frozen / lightened as before; GPU objects of the lost context are not
+  deleted (no WebGL errors).
+
+Measured (Chromium + SwiftShader, mobile viewport 390×844 @3×, menu after
+load; canvas = CPU copies of every live canvas):
+
+| | before | low | mid | high (desktop 1600×900) |
+|---|---|---|---|---|
+| canvases (Mpx / MB) | 125.8 / 480 | 36.4 / 139 | 48.7 / 186 | 26.1 / 100 |
+| after visiting all 11 aircraft | 125.8 / 480 | 37.6 / 143 | 49.8 / 190 | 26.8 / 102 |
+
+JS heap ≈ 580 MB in both (≈ 300 MB of it geometry arrays: aircraft ≈ 190, world
+≈ 120 — not reduced yet). Switching aircraft: ≈ 0.15–0.25 s before, ≈ 0.4–0.7 s
+now in this software renderer (one model rebuilt). The flown aircraft is
+pixel-identical to before (cockpit and chase views of 6 aircraft, the apron with
+the parked fleet: < 0.3 % pixels differ, animation phase). Probes are in the
+session scratchpad (`memprobe`, `viscmp`, `ctxtest`).
+
 ## World rendering optimisation (performance work, phase 3)
 
 Branch `perf/fase-3` (from `perf/fase-2`). Rule: the Ultra Original image does not
