@@ -2,21 +2,24 @@
 // is passed in), so it is tested headless (test/adaptive.test.mjs).
 //
 // Input: one frame time per rendered frame. Output: at most one action per
-// evaluation — {type:'scale', scale} (dynamic resolution) or
-// {type:'profile', profile, scale} (automatic mode only) — which the caller
-// applies. Rules:
+// evaluation — {type:'fx', fx} (secondary effects: 0 full, 1 reduced),
+// {type:'scale', scale} (dynamic resolution) or {type:'profile', profile,
+// scale} (automatic mode only) — which the caller applies. Rules:
 //   * Judges WINDOWS (3 s; 2 s while calibrating in the first 15 s), never a
 //     single frame: a window is bad if its mean frame time is over
 //     budget × 1.25 or over a quarter of its frames took > 1.5 × budget;
 //     good if the mean is under budget × 0.72 and almost no frame is slow;
 //     anything in between is neutral (hysteresis).
 //   * Down: two bad windows in a row (one while calibrating), and at least
-//     4 s since the last change (2.5 s calibrating). Resolution first, in
+//     4 s since the last change (2.5 s calibrating). Secondary effects first
+//     (particle budgets halved: cheap, nothing rebuilt), then resolution in
 //     steps of 0.05 down to the profile's floor; in automatic mode, at the
-//     floor, one profile down.
+//     floor, one profile down (if `canProfile` allows it now).
 //   * Up (recovery): good windows adding up to 15 s, at least 20 s since the
 //     last change × a back-off factor. Resolution first (steps of 0.05, up
-//     to 1), then, in automatic mode, one profile up.
+//     to 1), then the effects back, then, in automatic mode, one profile up
+//     (if `canProfile` allows it now — the game keeps profile changes, which
+//     rebuild vegetation caches, out of the air).
 //   * Oscillation guard: a down move within 60 s of an up move means the up
 //     move failed → the up back-off doubles (max × 8, back to 1 after 5
 //     quiet minutes) and a failed PROFILE up bars that profile for 5 min.
@@ -44,6 +47,8 @@ export class AdaptiveController {
     this.auto = auto; this.profile = profile; this.scale = scale;
     this.budgetMs = budgetMs; this.maxProfile = maxProfile;
     this.frozen = false;
+    this.fx = 0; // secondary effects: 0 full, 1 reduced
+    this.canProfile = () => true; // (dir, now) → may a profile change happen now?
     this.reset(0, true);
     this.log = []; // last actions, for tests and the diagnostics
   }
@@ -62,6 +67,7 @@ export class AdaptiveController {
     if (auto !== undefined) this.auto = auto;
     if (profile !== undefined) this.profile = profile;
     this.scale = scale;
+    this.fx = 0;
     this.reset(now, true);
   }
   hold(now, ms) { this.holdUntil = Math.max(this.holdUntil, now + ms); this.win = null; this.badStreak = 0; }
@@ -109,8 +115,9 @@ export class AdaptiveController {
       if (this.lastUp.kind === 'profile') this.bar = { profile: this.lastUp.to, until: now + c.barMs };
       this.lastUp = null;
     }
+    if (this.fx < 1) return { type: 'fx', fx: 1 };
     if (this.dynamicRes && this.scale > this._floor() + 1e-6) return { type: 'scale', scale: +Math.max(this._floor(), this.scale - c.step).toFixed(3) };
-    if (this.auto) {
+    if (this.auto && this.canProfile(-1, now)) {
       const i = PROFILE_ORDER.indexOf(this.profile);
       if (i > 0) return this._moveProfile(PROFILE_ORDER[i - 1]);
     }
@@ -120,7 +127,8 @@ export class AdaptiveController {
   _up(now) {
     const c = this.cfg;
     if (this.dynamicRes && this.scale < 1 - 1e-6) return { type: 'scale', scale: +Math.min(1, this.scale + c.step).toFixed(3), up: true };
-    if (this.auto) {
+    if (this.fx > 0) return { type: 'fx', fx: 0, up: true };
+    if (this.auto && this.canProfile(+1, now)) {
       const i = PROFILE_ORDER.indexOf(this.profile), top = PROFILE_ORDER.indexOf(this.maxProfile);
       const next = PROFILE_ORDER[i + 1];
       if (next && i + 1 <= top && !(this.bar && this.bar.profile === next && now < this.bar.until)) return { ...this._moveProfile(next), up: true, kind: 'profile' };
@@ -140,7 +148,9 @@ export class AdaptiveController {
     if (!a) return null;
     this.lastChange = now; this.quietSince = now;
     if (dir > 0) this.lastUp = { t: now, kind: a.type === 'profile' ? 'profile' : 'scale', to: a.profile ?? this.profile };
-    if (a.type === 'scale') this.scale = a.scale; else { this.profile = a.profile; this.scale = a.scale; }
+    if (a.type === 'scale') this.scale = a.scale;
+    else if (a.type === 'fx') this.fx = a.fx;
+    else { this.profile = a.profile; this.scale = a.scale; this.fx = 0; } // a new profile brings its own effect budgets
     this.holdUntil = now + 1500; this.win = null; // the change itself may stall a frame
     this.log.push({ t: now, ...a }); if (this.log.length > 40) this.log.shift();
     return a;

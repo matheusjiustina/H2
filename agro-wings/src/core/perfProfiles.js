@@ -57,8 +57,11 @@ export const allowsDynamicRes = (profileId, auto) => auto || profileId !== 'ultr
 
 // Canvas pixel ratio for a profile at a given dynamic-resolution factor.
 // For ultra at factor 1 this is exactly the original expression.
-export function pixelRatioFor(profile, scale, dpr, cssW, cssH) {
+// `cockpit`: at least one device pixel per CSS pixel (instrument legibility),
+// still under the pixel ceiling.
+export function pixelRatioFor(profile, scale, dpr, cssW, cssH, cockpit = false) {
   let r = Math.min(dpr, 2) * profile.quality.pixelRatio * scale;
+  if (cockpit) r = Math.max(r, Math.min(dpr, 1));
   const cap = profile.maxPixels;
   if (Number.isFinite(cap) && cssW > 0 && cssH > 0) r = Math.min(r, Math.sqrt(cap / (cssW * cssH)));
   return Math.max(0.5, r);

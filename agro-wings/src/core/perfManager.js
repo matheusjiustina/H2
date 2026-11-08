@@ -29,6 +29,16 @@ export class PerfManager {
     this.profileId = this.mode === 'auto' ? (PROFILES[s.autoLast] ? s.autoLast : 'medio') : p; // refined in init()
     this.ctl = new AdaptiveController({ auto: this.mode === 'auto', profile: this.profileId, budgetMs: this._budget() });
     if (this.forced) this.ctl.frozen = true;
+    // A profile change rebuilds vegetation / crop caches: never a climb in the
+    // air, and at most one drop per 2 minutes of flight (effects and
+    // resolution — cheap — still adapt at any time).
+    this.lastProfileT = -1e9;
+    this.ctl.canProfile = (dir, now) => {
+      const g = this.game, ac = g.aircraft;
+      const flying = g.playing && ac && !ac.fm?.out?.onGround;
+      if (!flying) return true;
+      return dir < 0 && now - this.lastProfileT > 120000;
+    };
     this.lastFrame = 0; this.costUs = 0; this.costN = 0; this.ready = false;
     this._syncLegacy();
   }
@@ -74,17 +84,28 @@ export class PerfManager {
     if (initial) return;
     if (!scaleOnly) {
       g.world?.setQuality(P.quality);
-      if (g.mist) g.mist.limit = Math.min(g.mist.max, P.particles);
-      g.waterFx?.setQuality?.(P.particles); // splash / spray (src/world/waterFx.js)
-      g.fires?.setQuality?.(P.particles); // flames and smoke density (src/world/fires.js)
+      this.applyFx();
     }
     g.resize();
+  }
+
+  // Particle budgets of the profile, halved while the controller has the
+  // secondary effects reduced (mist, splash / spray, flames and smoke).
+  applyFx() {
+    const g = this.game, n = Math.round(this.profile.particles * (this.ctl.fx ? 0.5 : 1));
+    if (g.mist) g.mist.limit = Math.min(g.mist.max, n);
+    g.waterFx?.setQuality?.(n); // splash / spray (src/world/waterFx.js)
+    g.fires?.setQuality?.(n); // flames and smoke density (src/world/fires.js)
   }
 
   refreshRatio(force = false) {
     const g = this.game;
     if (!g.renderer) return;
-    const r = pixelRatioFor(this.profile, this.ctl.scale, window.devicePixelRatio, window.innerWidth, window.innerHeight);
+    // In the cockpit the instruments and GPS are 3D: the canvas never goes
+    // below one device pixel per CSS pixel there (within the profile's pixel
+    // ceiling), whatever the profile's ratio or the dynamic resolution.
+    this._ck = g.cameraMode === 'cockpit';
+    const r = pixelRatioFor(this.profile, this.ctl.scale, window.devicePixelRatio, window.innerWidth, window.innerHeight, this._ck);
     if (force || Math.abs(g.renderer.getPixelRatio() - r) > 1e-3) g.renderer.setPixelRatio(r);
   }
 
@@ -132,11 +153,14 @@ export class PerfManager {
 
   update(now, dtMs) {
     const t0 = performance.now();
+    if ((this.game.cameraMode === 'cockpit') !== this._ck) this.refreshRatio(); // cockpit legibility floor on / off
     const a = this.ctl.push(dtMs, now);
-    if (a) {
+    if (a?.type === 'fx') this.applyFx();
+    else if (a) {
       const profChanged = a.type === 'profile';
       if (profChanged) {
         this.profileId = a.profile;
+        this.lastProfileT = now;
         this.game.setSetting('autoLast', a.profile, true);
       }
       this.apply({ scaleOnly: !profChanged });
@@ -145,6 +169,6 @@ export class PerfManager {
     this.costUs += (performance.now() - t0) * 1000; this.costN++;
   }
 
-  label() { const P = this.profile; return `${this.auto ? 'auto · ' : ''}${P.id} ${Math.round(this.ctl.scale * 100)}%`; }
-  stats() { return { mode: this.mode, profile: this.profileId, scale: this.ctl.scale, forced: this.forced, costUsPerFrame: this.costN ? +(this.costUs / this.costN).toFixed(2) : 0, stalls: this.ctl.stalls, backoff: this.ctl.backoff, log: this.ctl.log.slice(-8), caps: this.caps }; }
+  label() { const P = this.profile; return `${this.auto ? 'auto · ' : ''}${P.id} ${Math.round(this.ctl.scale * 100)}%${this.ctl.fx ? ' · fx½' : ''}`; }
+  stats() { return { mode: this.mode, profile: this.profileId, scale: this.ctl.scale, fx: this.ctl.fx, forced: this.forced, pixelRatio: this.game.renderer?.getPixelRatio(), costUsPerFrame: this.costN ? +(this.costUs / this.costN).toFixed(2) : 0, stalls: this.ctl.stalls, backoff: this.ctl.backoff, log: this.ctl.log.slice(-8), caps: this.caps }; }
 }

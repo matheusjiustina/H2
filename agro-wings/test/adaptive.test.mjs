@@ -85,12 +85,13 @@ test('a momentary drop, a load stall and a hidden-tab style gap change nothing',
 test('a persistent drop lowers the resolution gradually, honours the gap and the floor, never changes a manual profile', () => {
   const c = new AdaptiveController({ auto: false, profile: 'medio' });
   const { acts } = run(c, 120000, 33); // 30 fps against a 60 fps budget
-  assert.ok(acts.length >= 3);
-  assert.ok(acts.every((a) => a.type === 'scale'));
-  for (let i = 1; i < acts.length; i++) {
-    assert.ok(acts[i].t - acts[i - 1].t >= 2500, 'minimum time between adjustments');
-    assert.ok(Math.abs(acts[i].scale - acts[i - 1].scale - -0.05) < 1e-6 || acts[i].scale === PROFILES.medio.resMin, 'steps of 0.05');
-  }
+  assert.ok(acts.length >= 4);
+  // Secondary effects first (cheap), then the resolution.
+  assert.deepEqual([acts[0].type, acts[0].fx], ['fx', 1]);
+  const sc = acts.slice(1);
+  assert.ok(sc.every((a) => a.type === 'scale'));
+  for (let i = 1; i < acts.length; i++) assert.ok(acts[i].t - acts[i - 1].t >= 2500, 'minimum time between adjustments');
+  for (let i = 1; i < sc.length; i++) assert.ok(Math.abs(sc[i].scale - sc[i - 1].scale - -0.05) < 1e-6 || sc[i].scale === PROFILES.medio.resMin, 'steps of 0.05');
   assert.equal(c.scale, PROFILES.medio.resMin); // floor reached, not below
   assert.equal(c.profile, 'medio');
 });
@@ -105,8 +106,9 @@ test('automatic mode: resolution first, then one profile down, then keeps going 
   const c = new AdaptiveController({ auto: true, profile: 'ultra' });
   const { acts } = run(c, 240000, 40);
   const firstProfile = acts.findIndex((a) => a.type === 'profile');
-  assert.ok(firstProfile > 0, 'scale moves come before the first profile move');
-  assert.ok(acts.slice(0, firstProfile).every((a) => a.type === 'scale'));
+  assert.ok(firstProfile > 1, 'effects and scale moves come before the first profile move');
+  assert.equal(acts[0].type, 'fx');
+  assert.ok(acts.slice(1, firstProfile).every((a) => a.type === 'scale'));
   assert.equal(acts[firstProfile].profile, 'alto');
   assert.ok(acts[firstProfile].scale >= PROFILES.alto.resMin && acts[firstProfile].scale <= 1);
   assert.equal(c.profile, 'economico'); // 25 fps never holds: ends on the lowest rung
@@ -165,4 +167,38 @@ test('the controller costs well under 5 µs per frame', () => {
   const us = Number(process.hrtime.bigint() - t0) / 1000 / N;
   console.log(`  controller: ${us.toFixed(3)} µs per frame`);
   assert.ok(us < 5);
+});
+
+test('effects come back after the resolution, before any profile climb; a profile change resets them', () => {
+  const c = new AdaptiveController({ auto: true, profile: 'medio' });
+  c.configure({ auto: true, profile: 'medio', scale: 0.9 }, 0);
+  c.fx = 1;
+  const { acts } = run(c, 400000, 9);
+  const iFx = acts.findIndex((a) => a.type === 'fx'), iProf = acts.findIndex((a) => a.type === 'profile');
+  assert.ok(iFx > 0 && acts.slice(0, iFx).every((a) => a.type === 'scale'), 'resolution back to 1 first');
+  assert.equal(acts[iFx].fx, 0);
+  assert.ok(iProf === -1 || iProf > iFx, 'then a profile');
+  if (iProf > 0) assert.equal(c.fx, 0);
+});
+
+test('canProfile gates profile changes (the game keeps them on the ground); effects and resolution still adapt', () => {
+  const c = new AdaptiveController({ auto: true, profile: 'alto' });
+  c.canProfile = () => false;
+  const { acts } = run(c, 300000, 40);
+  assert.ok(acts.length > 2);
+  assert.ok(acts.every((a) => a.type !== 'profile'));
+  assert.equal(c.profile, 'alto');
+  assert.equal(c.scale, PROFILES.alto.resMin);
+  c.canProfile = () => true;
+  const more = run(c, 60000, 40, 300000).acts;
+  assert.ok(more.some((a) => a.type === 'profile' && a.profile === 'medio'));
+});
+
+test('cockpit: never under one device pixel per CSS pixel (instrument legibility), still under the pixel ceiling; Ultra unchanged', () => {
+  const { economico, medio, ultra } = PROFILES;
+  assert.ok(pixelRatioFor(economico, 0.6, 1, 1280, 720) < 1); // outside: the profile's own ratio
+  assert.equal(pixelRatioFor(economico, 0.6, 1, 1280, 720, true), 1);
+  assert.equal(pixelRatioFor(economico, 1, 3, 390, 844, true), pixelRatioFor(economico, 1, 3, 390, 844)); // already ≥ 1 on a dense phone at full scale
+  assert.ok(pixelRatioFor(medio, 1, 1, 3840, 2160, true) < 1); // a 4K screen keeps the ceiling
+  assert.equal(pixelRatioFor(ultra, 1, 2, 1920, 1080, true), pixelRatioFor(ultra, 1, 2, 1920, 1080));
 });
