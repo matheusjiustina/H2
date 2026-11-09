@@ -198,6 +198,10 @@ export class Game {
     this.saveT = 0;
     this.statT = 0;
     this.renderer.setAnimationLoop(() => this.frame());
+    // Phase 04: while the title is up, every material of the scene not drawn
+    // yet (objects first seen later: wires from the cockpit, far props…) is
+    // compiled once, instead of on the frame it first comes into view.
+    setTimeout(() => { if (!this.lifecycle?.suspended) this.renderer.compileAsync?.(this.scene, this.camera).catch(() => {}); }, 1500);
   }
 
   resize() {
@@ -286,6 +290,8 @@ export class Game {
     // the one now flown is always drawn.
     next.model.root.visible = true;
     if (next.contactShadow) next.contactShadow.visible = true;
+    // Its cockpit is prepared right after (shaders, own textures), not on the first cockpit frame.
+    setTimeout(() => { if (this.aircraft === next) this.assets?.prepareCockpit(id); }, 0);
     next.onSimStep = (h) => this.sprayer.step(h);
     next.onEvent = (e) => this._acEvent(e);
     next.placeAtPad();

@@ -3984,6 +3984,62 @@ Measured (software renderer; Ultra `?q=high`): see the phase 4 report in the pul
 Known costs: the baked copies add ≈ 45 MB of JS heap (≈ 560 → 607 MB), and a baked aircraft is
 culled as one mesh. Rollback: `git revert` the phase-4 commit, or remove `this.assets` calls in `game.js`.
 
+
+### Aircraft performance engine (phase 04, 2026-11)
+
+Audit of the eleven registered aircraft (`AIRCRAFT_ORDER`: ipanema, at502, r44, m18, thrush, b206,
+e203, a188, pa36, at802, at802f) on top of phases 1–3. What was already right and kept: one flown
+aircraft built in full, the others parked *light* (cockpit / pilot / panel canvases released, paint
+at the device tier, rebuilt from the type when selected — memory stage 1) and *baked* (one mesh per
+material, phase 4); paint schemes swap material maps on the same geometry (no geometry copies); the
+catalogue uses light thumbnails. Probe: `test/p4baseline.mjs` (A opening, B first flight, C cockpit
+entry, D 12 consecutive switches; heap, peak heap, GPU counts, per-aircraft geometry drawn / hidden /
+baked).
+
+What the audit found: every parked aircraft kept its **hidden original meshes beside the baked copy**
+(47 MB of geometry at opening — the originals are never drawn again: a light aircraft is rebuilt
+from its type when selected), every switch **thawed and re-baked every parked aircraft**, and the
+first cockpit frame paid for **shader compiles and uploads**.
+
+| Change | Where |
+|---|---|
+| **Parked shell** state: a light, baked aircraft lets go of its hidden originals and of meshes already hidden at bake time (kit off, the other scheme's parts); LOD subtrees are left alone (a fine level hidden now shows up close); geometries any other mesh still uses are kept. Option changes on a shell rebuild it from its type | `assetManager.js` (`_shell`, `refresh`) |
+| Re-parking a shell (every switch re-parks the fleet) keeps its baked copy: soft thaw → `park()` → only the root's matrices recomputed | `assetManager.js` (`thaw`, `_refreeze`) |
+| The selected aircraft is prepared right after the selection: its programs compiled (`compileAsync`), its cockpit textures uploaded, one 32 px off-screen frame with the cockpit shown | `assetManager.prepareCockpit`, `game._activate` |
+| While the title is up, the scene's not-yet-drawn materials are compiled once | `game.js` |
+
+States (mapped onto the existing ones, nothing redundant added): *active* = live, full model (cockpit
+prepared after selection); *parked* = light + baked shell; *releasing* = `lighten` + `_shell` when an
+aircraft stops being flown; *preview* = the showroom's `ensureFull` + bake. Physics, colliders,
+paint schemes, premium rules, Fire Boss systems and helicopter rotors are untouched.
+
+**Measured** (SwiftShader, no GPU: memory / counts exact, times are this container's CPU):
+
+| | Before | After |
+|---|---|---|
+| A: JS heap at opening (after GC) | 538 MB | 499–503 MB |
+| A: hidden aircraft geometry (fleet) | 47.4 MB | 8.3 MB (LOD levels kept on purpose) |
+| D: heap after 12 switches / peak during them | 582 / 660 MB | 535–539 / 588–599 MB |
+| D: switch time (12 switches) | all 4.6–19 s (median 5.7 s) | 5 of 12 at 0.3–0.5 s (no rebuild, no re-bake), rest 4–17 s (median 5.3 s) |
+| C: first cockpit frame (2–3 s after selection) | 5.7 s, 4 programs compiled on that frame | 1.2–2.8 s, 0 programs (rest: finishing compiles and buffer uploads) |
+| GPU geometries / textures at opening | 821 / 115 | 821–830 / 115–119 |
+
+The opening **peak** varied 521–570 MB across three runs (568 MB before): no claim on it. The cockpit
+entry right after a switch (scenario C straight after B) is not faster yet on this renderer: the
+background compile takes 15–20 s here and had not finished; on a GPU with parallel compiles it does.
+
+**Checks:** parked fleet close (inside the fine-LOD range) and far, 15 views before / after: the
+aircraft are identical, differences only in wind-swayed trees and their shadows (state of the run);
+context loss / restore (`ctxtest`): the two builds give the same images (≤ 0.007 % of pixels over
+8/255), same 12 rebuilds, no page error; `pa36e2e` all PASS (memory flat over 15 switches and 10
+paint changes, draw cost, spray, paints); unit tests 206/206.
+
+Not done (and why): new aircraft LOD levels (the models already drop their fine group beyond
+90–110 m; more levels would change the approved look); geometry simplification (forbidden);
+instrument redraw throttling (several panels already skip redraws when the shown values are unchanged — `vKey` in the panel modules; not re-audited instrument by instrument in this phase);
+real mobile devices (none available here — measurements are desktop Chromium + SwiftShader).
+Rollback: `git revert` the commit; `_shell` / `prepareCockpit` can be disabled independently.
+
 ## World streaming and memory (performance work, phase 5)
 
 Branch `perf/fase-5` (from `perf/fase-4`). The world stays one continuous coordinate system;
