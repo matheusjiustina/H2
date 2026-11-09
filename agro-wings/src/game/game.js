@@ -64,7 +64,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, agcatLivery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, agcatLivery: 0, at802Livery: 0, fbLivery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
     try { const r = readSafe(SETTINGS); if (r.data && typeof r.data === 'object') Object.assign(this.settings, r.data); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -331,7 +331,7 @@ export class Game {
   // R44, Bell 206) and the Bell 206's spray kit. Removing the kit drains the
   // tank and drops its mass and drag.
   _applyAircraftOptions(only = null) {
-    const L = { m18: 'm18Livery', e203: 'e203Livery', a188: 'a188Livery', pa36: 'pa36Livery', agcat: 'agcatLivery', r44: 'r44Livery', b206: 'b206Livery' };
+    const L = { m18: 'm18Livery', e203: 'e203Livery', a188: 'a188Livery', pa36: 'pa36Livery', agcat: 'agcatLivery', at802: 'at802Livery', at802f: 'fbLivery', r44: 'r44Livery', b206: 'b206Livery' };
     for (const id of only ? [only] : Object.keys(this.fleet ?? {})) {
       const ac = this.fleet[id];
       if (!ac) continue;
@@ -365,7 +365,7 @@ export class Game {
   }
   setAircraftOption(k, v) {
     this.setSetting(k, v);
-    const id = { b206Livery: 'b206', b206Kit: 'b206', m18Livery: 'm18', e203Livery: 'e203', a188Livery: 'a188', pa36Livery: 'pa36', agcatLivery: 'agcat', r44Livery: 'r44' }[k];
+    const id = { b206Livery: 'b206', b206Kit: 'b206', m18Livery: 'm18', e203Livery: 'e203', a188Livery: 'a188', pa36Livery: 'pa36', agcatLivery: 'agcat', at802Livery: 'at802', fbLivery: 'at802f', r44Livery: 'r44' }[k];
     this._applyAircraftOptions(id ?? null);
     if (id) this.showroom?.invalidate(id);
     this.audio?.play('ui');

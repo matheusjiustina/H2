@@ -3899,6 +3899,15 @@ the roof), every other aircraft identical. Draw cost of the aircraft (same
 test): 198 meshes, 79.7 k triangles (was 198, 79.6 k), 7.98 MPx textures
 (unchanged).
 
+## AT-802A / Fire Boss: paint B
+
+Both now offer paint A / B on the menu card (`at802Livery`, `fbLivery`). B
+follows the photographs N817RX, PR-CUN and the Croatian Fire Boss: yellow
+with a dark-blue cheat line edged in navy, blue rudder and wing / tailplane
+tip bands; the Fire Boss floats carry the blue stripe (FIRE BOSS lettering
+kept). Only the canvases and the accent colour change (`setLivery`): no
+geometry, physics or cockpit change.
+
 ## Benchmark (performance work, phase 1)
 
 Reference for all optimisation: the tag **`ultra-original-v73`** (commit

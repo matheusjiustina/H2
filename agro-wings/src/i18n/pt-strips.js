@@ -180,6 +180,8 @@ export default {
   '1,136 L hopper · 175 L fuel · 10.95 m span · 2,041 kg MTOW': 'Hopper 1.136 L · combustível 175 L · envergadura 10,95 m · PMD 2.041 kg',
   'Classic yellow': 'Amarelo clássico',
   'Yellow & blue': 'Amarelo e azul',
+  'Yellow & green': 'Amarelo e verde',
+  'Yellow & red': 'Amarelo e vermelho',
   'Lycoming IO-540-K1J5 · 320 hp (ethanol) · Hartzell 3-blade': 'Lycoming IO-540-K1J5 · 320 hp (etanol) · Hartzell tripá',
   '1,050 L hopper · 292 L ethanol · 13.30 m span · 1,900 kg MTOW': 'Hopper 1.050 L · 292 L de etanol · envergadura 13,30 m · PMD 1.900 kg',
   'Green, blue and gold': 'Verde, azul e dourado',

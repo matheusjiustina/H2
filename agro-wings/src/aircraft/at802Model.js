@@ -57,10 +57,18 @@ const INK = '#141a24';
 // two navy lines (green rudder, green tip bands); paint B the Fire Boss of
 // LX-AFF / 4O-EAB: yellow with a red cheat line edged in black, red rudder,
 // red tip bands, the floats yellow with the red stripe and FIRE BOSS.
+// Paint B of both (photographs N817RX, PR-CUN and the Croatian Fire Boss):
+// yellow with a dark-blue cheat line edged in navy, blue rudder and tip
+// bands; on the Fire Boss the floats carry the blue stripe.
+const BLUE = '#1f3c9a';
 export const AT802_LIVERIES = {
   ag: { id: 'ag', base: YELLOW, band: GREEN, line: NAVY, tail: GREEN, tailLine: NAVY, tip: GREEN, tipLine: NAVY, text: NAVY, model: 'AT-802A', blades: 0x17181a, bladeTip: 0xf4f0e6 },
-  fireboss: { id: 'fireboss', base: YELLOW, band: RED, line: BLACK, tail: RED, tailLine: BLACK, tip: RED, tipLine: BLACK, text: BLACK, model: 'AT-802', blades: 0x8f959b, bladeTip: 0x8f959b },
+  fireboss: { id: 'fireboss', fire: true, base: YELLOW, band: RED, line: BLACK, tail: RED, tailLine: BLACK, tip: RED, tipLine: BLACK, text: BLACK, float: RED, model: 'AT-802', blades: 0x8f959b, bladeTip: 0x8f959b },
+  agBlue: { id: 'agBlue', base: YELLOW, band: BLUE, line: NAVY, tail: BLUE, tailLine: NAVY, tip: BLUE, tipLine: NAVY, text: NAVY, model: 'AT-802A', blades: 0x17181a, bladeTip: 0xf4f0e6 },
+  firebossBlue: { id: 'firebossBlue', fire: true, base: YELLOW, band: BLUE, line: NAVY, tail: BLUE, tailLine: NAVY, tip: BLUE, tipLine: NAVY, text: NAVY, float: BLUE, model: 'AT-802', blades: 0x8f959b, bladeTip: 0x8f959b },
 };
+// Paint schemes offered per variant (index = the menu's A / B).
+export const AT802_PAINTS = { ag: ['ag', 'agBlue'], fireboss: ['fireboss', 'firebossBlue'] };
 
 // Cockpit reference: the shared pilot (PR-AGW frame) moved by this offset;
 // eye point ≈ 0.28 m under the roof, 1 m aft of the windshield base.
@@ -315,7 +323,7 @@ function liveryTextures(reg, L) {
     // to the top (the coloured tail of both schemes), edged with a line.
     const fr = FIN_ST[0], ft = FIN_ST[FIN_ST.length - 1];
     const d0 = [fr[1] - fr[2] * 0.42, 0.6], d1 = [ft[1] - ft[2] * 0.12, 3.0];
-    poly([d0, d1, [-7.3, 3.0], [-7.3, L.id === 'ag' ? 0.3 : 0.45]], L.tail);
+    poly([d0, d1, [-7.3, 3.0], [-7.3, L.fire ? 0.45 : 0.3]], L.tail);
     line(g, [d0, d1], L.tailLine, 0.03 * LV.ky);
     line(g, [[d0[0] + 0.07, d0[1]], [d1[0] + 0.07, d1[1]]], WHITE, 0.012 * LV.ky);
     // Cheat line: the band between two lines, nose to tail, rising aft.
@@ -381,7 +389,7 @@ function liveryTextures(reg, L) {
     };
     text(-3.85, 0.3, reg, 0.25, L.text);
     text(-6.05, 2.25, L.model, 0.12, L.base === YELLOW ? WHITE : INK, 'italic bold');
-    if (L.id === 'ag') { text(0.9, 0.62, 'AGRO WINGS', 0.13, NAVY, 'italic bold'); text(-1.6, 0.86, 'AVIAÇÃO AGRÍCOLA', 0.045, INK, 'bold'); }
+    if (!L.fire) { text(0.9, 0.62, 'AGRO WINGS', 0.13, NAVY, 'italic bold'); text(-1.6, 0.86, 'AVIAÇÃO AGRÍCOLA', 0.045, INK, 'bold'); }
     else { text(0.9, 0.62, 'COMBATE A INCÊNDIO', 0.085, RED, 'italic bold', null); text(-1.6, 0.86, 'AGRO WINGS', 0.05, INK, 'bold'); }
     text(1.6, -0.36, 'NO STEP', 0.035, 'rgba(30,30,30,0.7)', 'bold');
     text(0.6, 0.05, 'JET A-1', 0.035, 'rgba(30,30,30,0.75)', 'bold');
@@ -426,7 +434,7 @@ function wingTextures(L) {
 
 // Float skin (Fire Boss): yellow with the red stripe and FIRE BOSS on the
 // outboard side near the bow; u along the float (bow = 0), v round it.
-function floatTexture() {
+function floatTexture(stripe = RED) {
   const WD = 1024, H = 256;
   const c = canvas(WD, H), g = c.getContext('2d');
   g.fillStyle = YELLOW; g.fillRect(0, 0, WD, H);
@@ -434,8 +442,8 @@ function floatTexture() {
   for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(80,60,30,${0.03 + r() * 0.05})`; g.fillRect(r() * WD, r() * H, 3 + r() * 30, 1 + r() * 3); }
   // Stripe on both sides (v ≈ 0.3 and 0.7: the hull sides).
   for (const v of [0.31, 0.69]) {
-    g.fillStyle = RED; g.fillRect(WD * 0.18, H * v - 7, WD * 0.8, 14);
-    g.fillStyle = BLACK; g.fillRect(WD * 0.18, H * v - 10, WD * 0.8, 2.5); g.fillRect(WD * 0.18, H * v + 8, WD * 0.8, 2.5);
+    g.fillStyle = stripe; g.fillRect(WD * 0.18, H * v - 7, WD * 0.8, 14);
+    g.fillStyle = stripe === RED ? BLACK : NAVY; g.fillRect(WD * 0.18, H * v - 10, WD * 0.8, 2.5); g.fillRect(WD * 0.18, H * v + 8, WD * 0.8, 2.5);
   }
   g.save();
   g.font = 'italic bold 30px Arial'; g.fillStyle = RED; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -565,10 +573,11 @@ export function createAT802Model(panel, opts = {}) {
   const variant = opts.variant === 'fireboss' ? 'fireboss' : 'ag';
   const FB = variant === 'fireboss';
   const A = FB ? FLIGHT_FIREBOSS : FLIGHT_AT802;
-  const L = AT802_LIVERIES[variant];
+  let paint = 0, L = AT802_LIVERIES[variant];
   const root = new THREE.Group();
   root.name = FB ? 'at802-fireboss' : 'at802a';
-  const liv = liveryTextures(opts.reg ?? (FB ? 'PR-FBS' : 'PR-AWX'), L);
+  let REG = opts.reg ?? (FB ? 'PR-FBS' : 'PR-AWX');
+  const liv = liveryTextures(REG, L);
   const wtx = wingTextures(L);
   const coat = { roughness: 0.46, metalness: 0.0, specularIntensity: 0.3, clearcoat: 0.16, clearcoatRoughness: 0.3, envMap: opts.envMap ?? null, envMapIntensity: 0.3 };
   const ALBEDO = 0.84;
@@ -610,7 +619,7 @@ export function createAT802Model(panel, opts = {}) {
     visor: new THREE.MeshPhysicalMaterial({ color: 0x15181c, roughness: 0.05, metalness: 0.3, clearcoat: 1 }),
     helmStripe: new THREE.MeshPhysicalMaterial({ color: 0x1b1b1b, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2 }),
   };
-  if (FB) M.float = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(ALBEDO), map: floatTexture(), vertexColors: true, ...coat });
+  if (FB) M.float = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(ALBEDO), map: floatTexture(L.float), vertexColors: true, ...coat });
 
   const B = {};
   const add = (mat, g, fine = false) => { const k = (fine ? 'fine:' : '') + mat; (B[k] ||= []).push(tagged(g)); };
@@ -1302,10 +1311,24 @@ export function createAT802Model(panel, opts = {}) {
   return {
     variant,
     setReg(r) {
+      REG = r;
       const n = liveryTextures(r, L);
       M.livery.map.dispose(); M.livery.bumpMap.dispose();
       M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
     },
+    // Paint scheme A / B: only the paint (canvases and the accent colour)
+    // changes — no geometry.
+    setLivery(i) {
+      const list = AT802_PAINTS[variant], k = ((i % list.length) + list.length) % list.length;
+      if (k === paint) return;
+      paint = k; L = AT802_LIVERIES[list[k]];
+      const swap = (mat, n) => { mat.map.dispose(); mat.bumpMap.dispose(); mat.map = n.map; mat.bumpMap = n.bump; mat.needsUpdate = true; };
+      swap(M.livery, liveryTextures(REG, L));
+      swap(M.wing, wingTextures(L));
+      M.accent.color.set(L.tip).multiplyScalar(ALBEDO);
+      if (M.float) { M.float.map.dispose(); M.float.map = floatTexture(L.float); M.float.needsUpdate = true; }
+    },
+    get livery() { return paint; },
     // Scoop probes (0 up … 1 down) and drop doors (0 shut … 1 open).
     setWaterGear(probesDown, doorOpen) { state.probes = probesDown; state.door = doorOpen; },
     root, M,
