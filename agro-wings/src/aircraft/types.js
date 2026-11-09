@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_PA36, FLIGHT_AT802, FLIGHT_FIREBOSS, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_PA36, SPRAY_AT802, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_PA36, FLIGHT_AT802, FLIGHT_FIREBOSS, FLIGHT_AGCAT, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_PA36, SPRAY_AT802, SPRAY_AGCAT, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createE203Panel } from './e203Panel.js';
@@ -23,6 +23,8 @@ import { createPA36Model, PA36_SHADOW, pa36WingY, pa36ToBody, PA36_CABIN } from 
 import { createPA36Panel } from './pa36Panel.js';
 import { createAT802Model, AT802_SHADOW, FIREBOSS_SHADOW, at802WingY, AT802_EYE } from './at802Model.js';
 import { createAT802Panel } from './at802Panel.js';
+import { createAgCatModel, AGCAT_SHADOW, AGCAT_CABIN, agcatLowerY } from './agcatModel.js';
+import { createAgCatPanel } from './agcatPanel.js';
 import { FIREBOSS_EXPANSION } from '../game/expansions.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
@@ -564,7 +566,59 @@ AIRCRAFT_TYPES.at802f = {
   createShadow: () => createContactShadow(FIREBOSS_SHADOW),
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'at802', 'at802f'];
+// Grumman G-164A Super Ag-Cat 450 — the radial Ag-Cat (P&W R-985, 450 hp,
+// two-blade Hamilton Standard): FLIGHT_AGCAT on the radial / constant-speed
+// branch, its own biplane exterior (agcatModel.js); the cockpit is only its
+// structure with a provisional flat panel until the real one (Prompt 02).
+// Fictional Brazilian registration.
+AIRCRAFT_TYPES.agcat = {
+  id: 'agcat',
+  slot: '12',
+  parkSpot: 'parking10',
+  label: 'Ag-Cat',
+  reg: 'PR-GAC',
+  name: 'Grumman G-164A Super Ag-Cat 450',
+  get role() { return t('Radial Agricultural Biplane'); },
+  get engineName() { return t('Pratt & Whitney R-985 radial · 450 hp · Hamilton Standard 2-blade'); },
+  get summary() { return t('1,136 L hopper · 175 L fuel · 10.95 m span · 2,041 kg MTOW'); },
+  flight: FLIGHT_AGCAT,
+  spray: { swath: SPRAY_AGCAT.swath, flow: SPRAY_AGCAT.flow, boom: [4.7, -0.56, -1.45] },
+  work: [[0, -1.7, 0.7], [4.7, -0.68, -1.47], [-4.7, -0.68, -1.47]],
+  collide: [[0, 0.12, 2.04], [5.47, 1.42, -0.1], [-5.47, 1.42, -0.1], [5.25, -0.12, -0.6], [-5.25, -0.12, -0.6], [0, 1.6, -4.85], [0, 0.15, -5.3], [0, -1.7, 0.7], [0, 1.23, -1.0], [1.85, 0.3, -4.75], [-1.85, 0.3, -4.75]],
+  wire: [[0, 0.12, 2.04], [5.47, 1.42, -0.1], [-5.47, 1.42, -0.1], [0, 1.6, -4.85], [0, -1.7, 0.7], [2.7, -0.26, -0.6], [-2.7, -0.26, -0.6], [0, 1.5, 0.0], [0, 1.23, -1.0]],
+  smoke: [-0.57, -0.48, 0.7], // exhaust stack outlet (right side, low)
+  wash: [0, -1.0, -2],
+  anim: { elev: 0.38, rud: 0.42, ail: 0.35, flap: 0, pedalZ: AGCAT_CABIN.pedals[2], propGear: 1, disc: [380, 900], wash: [1300, 2100], vib: [800, 2100] },
+  // No flaps: vs0 = vs1 (58 kt at the MTOW, published 67 mph).
+  vspeeds: { vs0: 58, vs1: 58, vfe: 58, vne: 128 },
+  camera: { dist: 12.5, height: 3.8, orbit: 17, cockpitPitch: -0.22, cockpitFov: 70 },
+  // Nine-cylinder R-985, direct drive, two blades: its own radial sound.
+  audio: { profile: 'r985', blades: 2, propGear: 1 },
+  fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
+  loads: { free: { fuel: 150, hopper: 450 }, boot: 100 },
+  loadSheet: { bankKt: 75, roll: [119, 1450, 1.91] }, // fit to the measured rolls (test/agcat.test.mjs)
+  service: {
+    rates: { fuel: 4.5, liquid: 16 },
+    // Badeco stands outboard of the main wheel, ahead of the lower wing.
+    local: { A: [6.4, -2.0], B: [3.8, -1.9], F: [1.9, 0.6], P: [1.75, 0.5] },
+    keepOut: { wing: [5.25, -1.32, 0.14], wingY: agcatLowerY, fus: [0.52, -0.5, 1.23, -5.0, 1.7], stab: [1.85, 0.26, 0.34, -5.14, -4.25] },
+    veto: 8,
+  },
+  overhead: 1.0, // the upper wing: walked under
+  stub: { eye: AGCAT_CABIN.eye, fuelFiller: [0, 1.52, 0.25], hopperPort: [0.59, -0.16, 0.3] },
+  // Fuselage and canopy, upper wing, lower wing, fin and rudder, tailplane,
+  // main wheels, propeller disc.
+  bounds: [
+    [-0.52, 0.52, -0.5, 1.23, -5.0, 1.7], [-5.47, 5.47, 1.3, 1.53, -0.82, 0.65], [-5.25, 5.25, -0.47, -0.05, -1.32, 0.14],
+    [-0.05, 0.05, 0.4, 1.6, -5.4, -4.3], [-1.85, 1.85, 0.26, 0.34, -5.14, -4.25], [0.98, 1.32, -1.7, -0.96, 0.5, 0.9], [-1.32, -0.98, -1.7, -0.96, 0.5, 0.9],
+    [-1.3, 1.3, -1.18, 1.42, 1.8, 2.04],
+  ],
+  createModel: (panel, opts) => createAgCatModel(panel, opts),
+  createPanel: (opts) => createAgCatPanel(opts),
+  createShadow: () => createContactShadow(AGCAT_SHADOW),
+};
+
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'agcat', 'at802', 'at802f'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
 
 // Registrations: each type keeps its factory marks as `reg0`; `reg` reads the

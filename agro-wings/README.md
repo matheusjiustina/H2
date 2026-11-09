@@ -3692,6 +3692,98 @@ flight, close-ups, and outside views framed as the reference photographs.
   roof remain visible looking straight up.
 - Frame time on a real GPU was not measured here.
 
+## Aircraft 12 — Grumman G-164A Super Ag-Cat 450, radial (PR-GAC), phase 01: exterior and physics
+
+The radial Ag-Cat — Pratt & Whitney R-985 Wasp Jr, nine cylinders, 450 hp,
+direct drive, two-blade Hamilton Standard constant-speed prop — with its
+own geometry (`src/aircraft/agcatModel.js`), figures (`FLIGHT_AGCAT`,
+`SPRAY_AGCAT` in `src/config.js`), registry entry (`AIRCRAFT_TYPES.agcat`,
+after the Brave in the hangar list, parking spot `parking10`) and a
+provisional flat panel (`src/aircraft/agcatPanel.js`). Not a Turbo Ag-Cat,
+not a G-164B. PR-GAC is a fictional Brazilian registration. The cockpit
+here is only its structure on the final anchors (`AGCAT_CABIN`: eye, seat,
+floor, walls, panel space, stick, pedals, quadrant, GPS point); the real
+Ag-Cat cockpit is phase 02.
+
+**References.** Only the images sent with the brief (N7509V, TI-AYR, the
+PZ- radial, N8362K, N974H, N84PG, the Hellenic 1569, N8882H, a head-on
+view; the Garrett turbine N-48429 only as what not to copy). Proportions
+were measured against the R-985's 1.17 m diameter (fuselage depth under
+the sill ≈ 0.98 m, gap ≈ 1.9 m, wheel ≈ 0.72 m). No photograph is used as a
+texture.
+
+**Figures.** Span 10.95 m (upper), length 7.42 m, height ≈ 3.30 m, wing
+30.47 m² (both wings), empty equipped 1,220 kg, MTOW 2,041 kg, hopper
+1,136 L with a 907 kg structural limit, fuel 175 L, 450 hp at 2,300 rpm,
+no flaps, stall 67 mph (58 kt) at 4,500 lb, climb ≈ 1,080 ft/min. Volume is
+not payload: with full fuel the MTOW leaves 610 kg of product. Estimated
+(not published or not found): lower span 10.5 m, chords 1.42 m, gap 1.92 m,
+stagger 0.5 m, prop 2.59 m, CD0 0.062 and the biplane induced drag through
+Munk's span factor (k² ≈ 1.31, folded into `oswald`), inertias, fuel flow.
+
+**Geometry** (body frame, origin at the CG): exposed R-985 — nine finned
+cylinders (one cylinder built once and placed nine times, merged), black
+crankcase and nose case, push-rods, intake pipes, ignition harness,
+governor, magnetos on the accessory case, collector ring and the stack on
+the right — in a narrow ring cowl; slab-sided fuselage with the tan
+hopper lid ahead of a framed single-seat canopy (raked windshield, door
+post, rear pane, opaque roof) standing behind the upper wing's trailing
+edge; two wings built separately (upper flat with 1.5° incidence, lower
+at the fuselage bottom with 3° dihedral, 0.5 m aft), rounded trailing tip
+corners, fabric rib tapes in the bump map, ailerons on all four panels
+(the lower pair linked to the upper one); N interplane struts at 3.3 m,
+cabane N-struts from the hopper sides, doubled flying wires and landing
+wires; square-topped fin and rudder down to the fuselage's lower line,
+the tailplane on the fuselage with struts under it and wires to the fin;
+splayed spring main legs with drag braces (2.3 m track, 8.50-10 tyres),
+the tailwheel on its long leaf spring; booms under the lower wing's
+trailing edge on five hangers a side, 16 nozzles a side, the windmill
+pump under the belly; bare Hamilton Standard hub with counterweights.
+On three wheels it stands 12.0° nose-up, 3.04 m to the upper wing,
+3.25 m with a blade standing up.
+
+**Paints** (`agcatLivery`): A — classic yellow, dark metallic radial and
+ring, black prop with yellow tips; B — yellow and blue: a straight blue
+band with a navy pinstripe from the cowl to the rudder (straight in the
+side projection, whatever the taper), blue ring, blue fin bands, blue wing
+and tailplane tips, navy canopy frames.
+
+**Physics.** The radial / constant-speed branch of the flight model
+(`engineType: 'radial'`, direct drive `gear: 1`, normally aspirated
+`lapse`), `noFlaps` (the flap keys and the autopilot's flap calls do
+nothing on this type), contact points from the gear above. Measured in
+`test/agcat.test.mjs`: start 2 coughs, catch at 2.4 s, idle 520 rpm; full
+throttle 2,300 rpm, 431 hp at the field's density (σ 0.963, 431 expected),
+7.6 kN static thrust; stall 58.4 kt IAS at 2,041 kg in slow flight; climb
+at 64 kt 1,027 ft/min at 2,041 kg (field density, σ ≈ 0.92), 1,698 at
+1,450 kg, 556 at ≈ 8,000 ft; full-power level 108 kt; 241 hp → 85 kt
+(working speed); take-off roll 108 m light, 229 m at the MTOW. The golden
+physics traces of the other ten aircraft are unchanged (30 of 30
+identical); the Ag-Cat adds two.
+
+**Sound.** Its own `r985` profile on the radial layers: a crisper,
+higher bark than the Dromader's ASz-62, a faster idle lope, two-blade
+blade-pass with no reduction gear, a higher inertia-starter whine; the
+coughs and the catch of the radial start.
+
+**Integration.** Hangar card and selection, both paints, free flight,
+contracts (allowed on the same restricted strips as the Brave; nothing
+requires it), office, GPS theme, load sheet (ground roll fitted to the
+measured rolls), service points (badeco outboard of the main wheel; the
+upper wing is walked under), i18n.
+
+**Validation** (`test/agcate2e.mjs`, all pass): card and selection, paints
+A/B persist, dimensions from the vertices (10.954 / 7.44 / 3.04 m), wheels
+on the ground within 1 cm, parked 10 s drift 0.13 cm, open faces 0.035 %,
+clearances (compressed wheel 0.32 m under the lower wing, prop 0.53 m
+tail up, nozzles 0.48 m over the ground on three wheels), linked ailerons,
+no flaps, prop pivot, spraying, cockpit camera clear, fleet parked without
+overlaps, no geometry/texture growth over 15 switches and 10 paint
+changes, no page error. In the game, through the touch input
+(`input.virtual`): start, take-off (192 m, 64 kt), climb to 120 m, cruise
+96 kt at 2,300 rpm / 25.9 inHg, camera switches, spraying, landing
+(touchdown 51 kt, 1.9 m/s, stopped, no damage).
+
 ## Benchmark (performance work, phase 1)
 
 Reference for all optimisation: the tag **`ultra-original-v73`** (commit

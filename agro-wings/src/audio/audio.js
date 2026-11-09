@@ -295,7 +295,10 @@ export class GameAudio {
     const heli = s.profile === 'heli' || c20;
     // Radial (ASz-62IR): nine cylinders, 4.5 firings per crank revolution,
     // deeper exhaust, geared four-blade prop.
-    const radial = s.profile === 'radial';
+    // R-985 (Ag-Cat): the same nine-cylinder layers with its own tone —
+    // smaller cylinders (a crisper, higher bark), direct drive, two blades.
+    const r985 = s.profile === 'r985';
+    const radial = s.profile === 'radial' || r985;
     const fire = Math.max(1, (rpm / 60) * (radial ? 4.5 : 3));
     const on = turbo ? smoothstep(3, 30, s.ng ?? 0) : smoothstep(150, 500, rpm) * (run ? 1 : 0.15);
     const load = clamp(turbo ? s.power ?? 0 : s.throttle, 0, 1);
@@ -306,17 +309,17 @@ export class GameAudio {
     const piston = turbo || ipa ? 0 : 1;
     this.eng.frequency.setTargetAtTime(fire, t, 0.04);
     this.engSub.frequency.setTargetAtTime(fire / 2, t, 0.04);
-    this.engLP.frequency.setTargetAtTime(radial ? 150 + 800 * load + rpm * 0.28 : 220 + 1200 * load + rpm * 0.35, t, 0.08);
+    this.engLP.frequency.setTargetAtTime(r985 ? 210 + 950 * load + rpm * 0.34 : radial ? 150 + 800 * load + rpm * 0.28 : 220 + 1200 * load + rpm * 0.35, t, 0.08);
     const dist = s.listenerDist ?? 0;
     const att = s.inside ? 1 : 1 / (1 + dist / 40);
     // The R44's engine sits behind the cabin under the rotor: a little quieter
     // than the airplanes' (the rotor dominates outside).
     const engK = heli ? 0.75 : 1;
     const crankChug = radial && s.engine === 'cranking' ? 0.07 : 0;
-    this.engGain.gain.setTargetAtTime((piston * on * (radial ? 0.2 + 0.26 * load : 0.16 + 0.22 * load) * engK * (s.rough ? 0.8 + Math.random() * 0.4 : 1) + crankChug) * att, t, k);
+    this.engGain.gain.setTargetAtTime((piston * on * (r985 ? 0.18 + 0.24 * load : radial ? 0.2 + 0.26 * load : 0.16 + 0.22 * load) * engK * (s.rough ? 0.8 + Math.random() * 0.4 : 1) + crankChug) * att, t, k);
     if (radial) {
-      this.lope.frequency.setTargetAtTime(Math.max(1, rpm / 120), t, 0.1);
-      this.lopeDepth.gain.setTargetAtTime(on * (1 - smoothstep(600, 1500, rpm)) * 0.07 * att, t, 0.1);
+      this.lope.frequency.setTargetAtTime(Math.max(1, rpm / (r985 ? 105 : 120)), t, 0.1);
+      this.lopeDepth.gain.setTargetAtTime(on * (1 - smoothstep(r985 ? 550 : 600, r985 ? 1300 : 1500, rpm)) * (r985 ? 0.06 : 0.07) * att, t, 0.1);
       // Idle pops and the crackle of a closed throttle at high rpm.
       const chop = (this._lastThr ?? s.throttle) - s.throttle > 0.02 && rpm > 1400;
       if (s.engine === 'running' && ((rpm < 900 && Math.random() < dt * 0.7) || (chop && Math.random() < 0.5))) this.play('pop', { volume: att * (chop ? 0.9 : 0.6) });
@@ -324,7 +327,7 @@ export class GameAudio {
     this._lastThr = s.throttle;
     this.clatMod.frequency.setTargetAtTime(fire, t, 0.04);
     this.clatBP.frequency.setTargetAtTime(600 + rpm * 0.4, t, 0.1);
-    this.clatGain.gain.setTargetAtTime(piston * on * (0.05 + 0.06 * load) * att, t, k);
+    this.clatGain.gain.setTargetAtTime(piston * on * (r985 ? 0.065 + 0.06 * load : 0.05 + 0.06 * load) * att, t, k);
     // PT6: the whine follows the gas generator, the roar follows power.
     const ng = s.ng ?? 0;
     this.tWhine.frequency.setTargetAtTime(c20 ? 2400 + ng * 64 : h80 ? 1850 + ng * 66 : 1500 + ng * 58, t, 0.08);
@@ -368,7 +371,7 @@ export class GameAudio {
     }
     // The radial's inertia starter: a flywheel whine that rises as it spins up.
     this.starterGain.gain.setTargetAtTime(s.engine === 'cranking' && !turbo && !ipa ? (radial ? 0.06 : 0.08) : 0, t, 0.05);
-    this.starter.frequency.setTargetAtTime(s.engine === 'cranking' ? (radial ? 380 + rpm * 2.6 : 160 + rpm * 0.6) : 120, t, radial ? 0.6 : 0.2);
+    this.starter.frequency.setTargetAtTime(s.engine === 'cranking' ? (r985 ? 460 + rpm * 3.0 : radial ? 380 + rpm * 2.6 : 160 + rpm * 0.6) : 120, t, radial ? 0.6 : 0.2);
     this.acTone.frequency.setTargetAtTime(s.inside ? 1500 : 7000, t, 0.1);
     this.acBus.gain.setTargetAtTime(s.inside ? 1.5 : 1.1, t, 0.2);
     // Wind

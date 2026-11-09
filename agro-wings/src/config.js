@@ -742,6 +742,129 @@ export const SPRAY_PA36 = {
 };
 
 // ---------------------------------------------------------------------------
+// Grumman G-164A Super Ag-Cat 450 (fictional Brazilian marks PR-GAC): the
+// radial Ag-Cat — Pratt & Whitney R-985 Wasp Jr, nine cylinders, 450 hp at
+// 2,300 rpm, direct drive, two-blade constant-speed propeller. Not a Turbo
+// Ag-Cat, not a G-164B. Figures used (type data as given for the game,
+// checked against Wikipedia / airliners.net / Plane & Pilot / NASM):
+// span 10.95 m (upper wing); length 7.42 m; height ≈ 3.30 m; wing area
+// 30.47 m² (both wings); maximum take-off 2,041 kg (4,500 lb); empty
+// equipped for spraying 1,220 kg (2,690 lb); hopper 1,136 L (300 US gal,
+// fibreglass) with a structural limit of 907 kg (2,000 lb); fuel 175 L
+// (46.3 US gal, upper centre-section tank); stall ≈ 58 kt (67 mph) at
+// 4,500 lb; working speed 70–86 kt; initial climb ≈ 1,080 ft/min (sources
+// disagree: 1,080–1,800, the higher figures belong to the 600 hp B); no
+// flaps. Volume is not payload: with the pilot and full fuel the MTOW
+// leaves ≈ 610 kg for the product.
+// Estimated for the game (not published, or not found): the lower span
+// (10.5 m, photographs), both chords (1.42 m), the gap (1.92 m) and stagger
+// (0.5 m), the Hamilton Standard prop's diameter (2.59 m), CLmax ≈ 1.25
+// from the 58 kt stall, the biplane's induced drag through Munk's span
+// factor (k² ≈ 1.31 for gap/span 0.18 and a 0.96 span ratio, folded into
+// `oswald` against the upper span), CD0 for two wings, interplane and
+// cabane struts, wires, the open radial, booms and nozzles, the
+// inertias (radial far forward, two wings), fuel flow from an R-985's
+// ≈ 0.6 lb/hp/h at take-off power, manifold pressure (36 inHg take-off).
+// Body frame: +Z nose, +Y up, +X left; origin = CG (≈ 25 % of the mean of
+// both wings' chords). The gear points put it ≈ 12° nose-up on three
+// wheels.
+export const FLIGHT_AGCAT = {
+  ...FLIGHT,
+  emptyMass: 1220,
+  mtow: 2041,
+  pilotMass: 85,
+  wingArea: 30.47,
+  span: 10.95,
+  chord: 1.42,
+  oswald: 1.04, // e 0.8 × Munk's biplane span factor 1.31 (see above)
+  // Heavy radial far forward (pitch and yaw), two wings and their struts
+  // and wires (roll), short fuselage.
+  inertiaEmpty: [2900, 4400, 3300],
+
+  CL0: 0.25, CLa: 4.3, alphaStall: 0.235, alphaStallNeg: -0.2,
+  CD0: 0.062, // calibrated in test/agcat.test.mjs: climb, level and working speeds
+  // No flaps on the G-164A: the flap keys do nothing (noFlaps).
+  noFlaps: true, CDflap: 0, CLflap: 0, Cmflap: 0,
+  Cm0: 0.04, CmaWB: 0.22, CmaTail: -1.3, Cmq: -14, Cmde: 0.46,
+  Clb: -0.075, Clp: -0.58, Clr: 0.1, Clda: 0.095, // ailerons on all four wing panels
+  Cnb: 0.085, Cnr: -0.17, Cndr: 0.085, Cnda: -0.014,
+  CYb: -0.7, CYdr: 0.12,
+
+  engineType: 'radial',
+  maxPower: 335.6e3, // 450 hp take-off, sea level
+  propRadius: 1.295, // Hamilton Standard two-blade, 8 ft 6 in
+  maxRpm: 2300, // direct drive: prop rpm = crank rpm
+  idleRpm: 520,
+  radial: {
+    gear: 1.0,
+    crank: 2.4, // s of inertia starter before it catches
+    crankRpm: 190,
+    govThrottle: 0.36,
+    mpIdle: 12, mpMax: 36, mpAmbient: 29.6,
+    idleFrac: 0.03,
+    govFrac: 0.3,
+    etaStatic: 0.7, // two blades on a 450 hp radial
+    etaCruise: 0.82,
+    discDrag: 0.1,
+    spool: 0.7,
+    lapse: true, // the R-985's mild blower holds no rated altitude worth modelling here
+  },
+  fuelFlowFull: 170 / 3600, // L/s of avgas at take-off power (≈ 45 gal/h, rich)
+  fuelFlowIdle: 14 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.72,
+
+  fuelCapacity: 175, // 46.3 US gal, upper-wing centre-section tank
+  hopperCapacity: 1136, // 300 US gal
+  maxHopperKg: 907, // 2,000 lb structural limit
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.15, // the hopper sits between the engine and the cabin, at the CG
+  fuelTankSpanY: 0.6,
+  loadByWeight: true,
+
+  // Spring-steel main legs ahead of the lower wing (2.3 m track, 8.50-10
+  // tyres), the tailwheel on its long leaf spring under the fin.
+  gear: [
+    { name: 'mainL', p: [1.15, -1.7, 0.7], k: 115000, c: 11500, travel: 0.2, radius: 0.37, steer: false },
+    { name: 'mainR', p: [-1.15, -1.7, 0.7], k: 115000, c: 11500, travel: 0.2, radius: 0.37, steer: false },
+    { name: 'tail', p: [0, -0.61, -4.62], k: 32000, c: 2800, travel: 0.12, radius: 0.13, steer: true },
+  ],
+  tailSteer: 0.4,
+
+  hard: [
+    { name: 'wingtipL', p: [5.47, 1.45, -0.1] },
+    { name: 'wingtipR', p: [-5.47, 1.45, -0.1] },
+    { name: 'lowtipL', p: [5.25, -0.12, -0.6] },
+    { name: 'lowtipR', p: [-5.25, -0.12, -0.6] },
+    { name: 'boomL', p: [4.7, -0.6, -1.45] },
+    { name: 'boomR', p: [-4.7, -0.6, -1.45] },
+    { name: 'prop', p: [0, -1.18, 1.86] },
+    { name: 'spinner', p: [0, 0.12, 2.04] },
+    { name: 'belly', p: [0, -0.5, -0.4] },
+    { name: 'tail', p: [0, -0.05, -4.9] },
+    { name: 'fin', p: [0, 1.55, -4.9] },
+    { name: 'stabL', p: [1.85, 0.32, -4.75] },
+    { name: 'stabR', p: [-1.85, 0.32, -4.75] },
+    { name: 'roof', p: [0, 1.23, -1.0] },
+  ],
+  hardLandingVs: 2.8,
+  crashVs: 5.3,
+
+  wheelPoint: [0, -1.7, 0.7],
+  aglOffset: 1.7,
+  wingDrop: 0.5,
+  assistSpeedScale: 1.05, // stall speed ratio to the PR-AGW at max weight
+};
+
+export const SPRAY_AGCAT = {
+  // ≈ 9.4 m boom under the lower wing's trailing edge: a swath scaled from
+  // the boom span like the others', the flow that gives the target dose at
+  // the Ag-Cat's ≈ 78 kt working speed.
+  swath: 21,
+  flow: 3.3,
+};
+
+// ---------------------------------------------------------------------------
 // Air Tractor AT-802 family (fictional registrations): one airframe, two
 // configurations with their own mass, engine, equipment and physics.
 //

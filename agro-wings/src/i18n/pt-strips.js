@@ -174,6 +174,11 @@ export default {
   'Lycoming IO-540-K1G5 · 300 hp · Hartzell 2-blade': 'Lycoming IO-540-K1G5 · 300 hp · Hartzell bipá',
   '852 L hopper · 326 L fuel · 11.8 m span · 1,996 kg MTOW': 'Hopper 852 L · 326 L de combustível · envergadura 11,8 m · PMD 1.996 kg',
   'Classic red': 'Vermelho clássico',
+  // Grumman G-164A Super Ag-Cat 450 (radial).
+  'Radial Agricultural Biplane': 'Biplano agrícola radial',
+  'Pratt & Whitney R-985 radial · 450 hp · Hamilton Standard 2-blade': 'Radial Pratt & Whitney R-985 · 450 hp · Hamilton Standard bipá',
+  '1,136 L hopper · 175 L fuel · 10.95 m span · 2,041 kg MTOW': 'Hopper 1.136 L · combustível 175 L · envergadura 10,95 m · PMD 2.041 kg',
+  'Classic yellow': 'Amarelo clássico',
   'Yellow & blue': 'Amarelo e azul',
   'Lycoming IO-540-K1J5 · 320 hp (ethanol) · Hartzell 3-blade': 'Lycoming IO-540-K1J5 · 320 hp (etanol) · Hartzell tripá',
   '1,050 L hopper · 292 L ethanol · 13.30 m span · 1,900 kg MTOW': 'Hopper 1.050 L · 292 L de etanol · envergadura 13,30 m · PMD 1.900 kg',

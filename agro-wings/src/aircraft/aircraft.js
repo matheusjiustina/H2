@@ -262,6 +262,7 @@ export class Aircraft {
     const ni = FLAP_NOTCHES.indexOf(notch);
     if (input.wasPressed('flapsUp')) fm.flapsCmd = FLAP_NOTCHES[Math.max(0, ni - 1)];
     if (input.wasPressed('flapsDown')) fm.flapsCmd = FLAP_NOTCHES[Math.min(3, ni + 1)];
+    if (this.A.noFlaps) fm.flapsCmd = 0; // no flaps on this type (G-164A)
     // Trim: with the assist flying, it moves the held flight path (see
     // Assist); with the assist off or on the ground, the elevator trim tab.
     const trim = (input.isDown('trimUp') ? 1 : 0) - (input.isDown('trimDown') ? 1 : 0);
@@ -323,6 +324,7 @@ export class Aircraft {
     if (opts.aid) planeAid(fm, this.cmd, opts.aid);
     fm.brake = approach(fm.brake, t.brake, 4, h);
     fm.parkBrake = fm.engine === 'off' && o.groundSpeed < 0.4 && o.onGround;
+    if (this.A.noFlaps) fm.flapsCmd = 0; // (the autopilot's flap calls too)
     fm.flaps = approach(fm.flaps, fm.flapsCmd, 0.22, h);
     windAt(this.windVec, this.simTime, fm.pos, o.agl, opts.windScale ?? 1);
     this.env.wind.copy(this.windVec);
@@ -405,8 +407,8 @@ export class Aircraft {
       const d = this.game.camera ? this.game.camera.position.distanceTo(this.rPos) : 0;
       const vol = this.game.cameraMode === 'cockpit' ? 0.8 : 1 / (1 + Math.max(0, d - 10) / 40);
       // (The flat six on the same branch has its own start sound.)
-      if (this.type.audio.profile === 'radial') this.game.audio?.play(e.kind === 'cough' ? 'cough' : 'catchRadial', { volume: vol });
-      this._exhaustPuff(this.type.audio.profile === 'radial' ? (e.kind === 'cough' ? 6 : 18) : e.kind === 'cough' ? 0 : 5);
+      if (this.type.audio.profile === 'radial' || this.type.audio.profile === 'r985') this.game.audio?.play(e.kind === 'cough' ? 'cough' : 'catchRadial', { volume: vol });
+      this._exhaustPuff(this.type.audio.profile === 'radial' || this.type.audio.profile === 'r985' ? (e.kind === 'cough' ? 6 : 18) : e.kind === 'cough' ? 0 : 5);
     }
     this.onEvent?.(e);
   }

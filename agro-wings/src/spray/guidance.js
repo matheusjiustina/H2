@@ -427,6 +427,7 @@ const THEMES = {
   a188: { bg: '#0b0904', strip: 'rgba(14,10,4,0.85)', main: '#ffc35a', text: '#ffe6b8', dim: '#7a6a4c', edge: '#ffe2a8', next: '#7fe0ff', good: '#9dff86', warn: '#ff7056', spray: '#7fe0ff', trackOn: 'rgba(127,224,255,0.9)', terrain: '#e8c890', fuel: '#ffb347', load: '#7fe0ff', track: 'rgba(255,220,160,0.14)' },
   // Pawnee Brave: AGROWINGS NAV (provisional cockpit), white-green on black.
   pa36: { bg: '#060a07', strip: 'rgba(6,10,7,0.85)', main: '#9cf7b4', text: '#e8f6ec', dim: '#5f7666', edge: '#d8f4e0', next: '#ffd640', good: '#86ff9a', warn: '#ff7a5a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#cadcb8', fuel: '#ffc85a', load: '#7fd8ff', track: 'rgba(220,245,230,0.14)' },
+  agcat: { bg: '#060a07', strip: 'rgba(6,10,7,0.85)', main: '#9cf7b4', text: '#e8f6ec', dim: '#5f7666', edge: '#d8f4e0', next: '#ffd640', good: '#86ff9a', warn: '#ff7a5a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#cadcb8', fuel: '#ffc85a', load: '#7fd8ff', track: 'rgba(220,245,230,0.14)' },
   r44: { bg: '#050a10', strip: 'rgba(4,8,14,0.85)', main: '#8fe3ff', text: '#dff3ff', dim: '#56707e', edge: '#cfeeff', next: '#ffe14a', good: '#86ffb0', warn: '#ff7a6a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#b9d6e6', fuel: '#ffd36a', load: '#8fe3ff', track: 'rgba(200,235,255,0.14)' },
 };
 

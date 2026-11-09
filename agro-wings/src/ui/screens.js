@@ -24,6 +24,7 @@ const PAINTS = {
   e203: { key: 'e203Livery', tags: ['01', '02'], names: ['Green, blue and gold', 'White, green and blue'] },
   a188: { key: 'a188Livery', tags: ['A', 'B'], names: ['Red', 'Orange'] },
   pa36: { key: 'pa36Livery', tags: ['A', 'B'], names: ['Classic red', 'Yellow & blue'] },
+  agcat: { key: 'agcatLivery', tags: ['A', 'B'], names: ['Classic yellow', 'Yellow & blue'] },
 };
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
