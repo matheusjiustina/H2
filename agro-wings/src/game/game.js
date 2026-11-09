@@ -1,5 +1,7 @@
 // AGRO WINGS — game shell: boot, main loop, modes, job flow, prompts, warnings.
 import * as THREE from 'three';
+import { readSafe, writeSafe } from '../core/safeStore.js';
+import { Diagnostics } from '../core/diagnostics.js';
 import { World } from '../world/world.js';
 import { GAME } from '../config.js';
 import { AircraftAssets } from '../aircraft/assetManager.js';
@@ -63,7 +65,7 @@ export class Game {
     this.job = null;
     this.cameraMode = 'chase';
     this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
-    try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS) || '{}')); } catch { /* defaults */ }
+    try { const r = readSafe(SETTINGS); if (r.data && typeof r.data === 'object') Object.assign(this.settings, r.data); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
     if (this.settings.assistV !== 2) Object.assign(this.settings, { assist: 'off', heliAssist: 'off', assistV: 2 });
@@ -72,11 +74,13 @@ export class Game {
     this.settings.aidHeli = { ...allAids(HELI_AIDS), ...this.settings.aidHeli };
     // Graphics profile (Adaptive Performance System): settings, ?q= and old
     // saves are resolved here; the renderer-dependent part runs in boot().
+    this.diag = new Diagnostics(this); // errors ring, fail-safe screen, ?diag panel (phase 05)
     this.perf = new PerfManager(this);
     this.qualityForced = this.perf.forced;
     // Frame-time history (ms) for the FPS overlay and the auto quality check.
     this.frameMs = new Float32Array(240);
     this.frameN = 0;
+    this._frameErr = 0;
   }
 
   createRenderer() {
@@ -194,6 +198,7 @@ export class Game {
     this.showroom.enter();
     this.screens.hideLoading();
     this.screens.showTitle(true);
+    this.diag.ready();
     this.last = performance.now();
     this.saveT = 0;
     this.statT = 0;
@@ -224,7 +229,7 @@ export class Game {
     if (k === 'quality' && !auto) this.settings.qualityAuto = false;
     if (k === 'profile' || (k === 'quality' && !auto)) this.perf.setProfile(v); // updates settings.profile / quality
     if (k === 'fpsLimit') this.perf.setFpsLimit(v);
-    try { localStorage.setItem(SETTINGS, JSON.stringify(this.settings)); } catch { /* ignore */ }
+    writeSafe(SETTINGS, this.settings, 1); // (storage unavailable: settings stay in memory)
     if (k === 'keyScheme') this._applyKeyScheme();
     if (k === 'touchMode') this.touch?.applySettings();
     if (k === 'volume') this.audio.setVolume(v);
@@ -825,7 +830,18 @@ export class Game {
   }
 
   // ------------------------------------------------------------------ frame
+  // Phase 05: an exception in a frame is recorded and the next frame tries
+  // again; only a frame loop that keeps failing (30 in a row, ~0.5 s) stops
+  // on the fail-safe screen instead of throwing forever behind a frozen image.
   frame() {
+    try { this._frame(); this._frameErr = 0; } catch (e) {
+      console.error(e);
+      this.diag?.record('frame', e?.message ?? String(e));
+      if (++this._frameErr >= 30) this.diag?.failSafe(e?.message ?? String(e));
+    }
+  }
+
+  _frame() {
     const now = performance.now();
     if (this.lifecycle?.suspended) { this.last = now; return; } // WebGL context lost: nothing to draw, nothing to integrate
     if (this.perf.gate(now)) return; // optional FPS cap: skip this callback, keep `last`

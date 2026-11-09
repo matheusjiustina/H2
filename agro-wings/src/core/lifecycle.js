@@ -15,6 +15,8 @@
 //   audio state 'interrupted' / 'suspended' while visible: resumed on the next gesture
 import { t } from '../i18n/index.js';
 
+const RESTORE_WAIT = 20000; // ms before a lost WebGL context is given up on (phase 05)
+
 export class Lifecycle {
   constructor(game, doc = document, win = window) {
     this.game = game; this.doc = doc; this.win = win;
@@ -24,7 +26,10 @@ export class Lifecycle {
     this._raf = 0;
     const on = (el, ev, fn, o) => el.addEventListener(ev, fn, o);
     on(doc, 'visibilitychange', () => (doc.visibilityState === 'hidden' ? this.onHide() : this.onShow()));
-    on(win, 'pagehide', () => this.onHide());
+    // A real unload (reload, Restart, closing the tab — not the back/forward
+    // cache): the GPU context and its buffers are given back at once, so the
+    // next page does not start while this one still holds them (phase 05).
+    on(win, 'pagehide', (e) => { this.onHide(); if (!e.persisted) this.release(); });
     on(win, 'pageshow', () => this.onShow());
     on(doc, 'freeze', () => this.onHide());
     on(doc, 'resume', () => this.onShow());
@@ -103,21 +108,37 @@ export class Lifecycle {
     this.scheduleResize();
   }
 
+  release() {
+    if (this.released) return;
+    this.released = true;
+    const g = this.game;
+    clearInterval(this._wakeT); clearTimeout(this._lostT);
+    try { g.renderer?.setAnimationLoop(null); } catch { /* ignore */ }
+    try { g.audio?.ctx?.close?.(); } catch { /* ignore */ }
+    try { g.renderer?.dispose(); g.renderer?.forceContextLoss(); } catch { /* ignore */ }
+  }
+
   scheduleResize() {
     if (this._raf) return;
     this._raf = this.win.requestAnimationFrame(() => { this._raf = 0; this.stats.resizes++; this.game.resize(); });
   }
 
   onContextLost() {
-    if (this.contextLost) return;
+    if (this.contextLost || this.released) return;
     this.contextLost = true; this.stats.lost++;
     const g = this.game;
     if (g.playing && !g.screens?.open && !g.replay?.active) g.screens.pause();
     g.toast?.(t('Graphics context lost — waiting for the browser to restore it.'));
+    // Phase 05: a context the browser never gives back would leave a frozen
+    // image forever — after RESTORE_WAIT the player gets the fail-safe screen
+    // (Restart on their click; it goes away by itself if the context returns).
+    clearTimeout(this._lostT);
+    this._lostT = setTimeout(() => { if (this.contextLost) { this.stats.restoreTimeouts = (this.stats.restoreTimeouts || 0) + 1; g.diag?.failSafe(t('The browser did not restore the graphics context.')); } }, RESTORE_WAIT);
   }
 
   onContextRestored() {
     this.stats.restored++;
+    clearTimeout(this._lostT);
     const g = this.game;
     try { g.world?.sky?.bakeEnv?.(); } catch (e) { console.error(e); }
     // Aircraft: GPU copies gone and some CPU copies released — built again.
@@ -125,6 +146,7 @@ export class Lifecycle {
     try { g.resize(); } catch { /* ignore */ }
     g.last = performance.now();
     this.contextLost = false;
+    g.diag?.clearFailSafe();
     g.toast?.(t('Graphics restored.'));
   }
 }

@@ -139,7 +139,7 @@ await page.evaluate(() => window.__agro.screens.close());
 
 // --- the choice is saved; rebinding one scheme leaves the other alone -------------------
 await scheme('classic');
-const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('agrowings.settings.v1')).keyScheme);
+const saved = await page.evaluate(() => ((o) => (o && o.f === 'aw1' ? JSON.parse(o.data) : o))(JSON.parse(localStorage.getItem('agrowings.settings.v1'))).keyScheme);
 check('the chosen scheme is saved', saved === 'classic', saved);
 await scheme('numpad');
 const reb = await page.evaluate(() => {

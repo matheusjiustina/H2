@@ -2,6 +2,7 @@
 import { CONTRACT_FIELDS, CROPS } from '../world/layout.js';
 import { FieldCoverage } from '../spray/coverage.js';
 import { GAME, SPRAY } from '../config.js';
+import { readSafe, writeSafe } from '../core/safeStore.js';
 import { t } from '../i18n/index.js';
 import { FARM_CONTRACTS } from './farmContracts.js';
 
@@ -208,12 +209,15 @@ export class Career {
       for (const [id, j] of Object.entries(this.jobs)) jobs[id] = j.serialize();
       const r = this.onSave?.();
       if (r !== undefined) this.resume = r;
-      localStorage.setItem(STORE, JSON.stringify({ resume: this.resume, money: this.money, completed: this.completed, jobs, history: this.history.slice(-30), history2: this.history2.slice(-30), read: this.read, seq: this.seq, tutorialDone: this.tutorialDone }));
+      // (phase 05: hashed envelope + previous good copy, see core/safeStore.js)
+      writeSafe(STORE, { resume: this.resume, money: this.money, completed: this.completed, jobs, history: this.history.slice(-30), history2: this.history2.slice(-30), read: this.read, seq: this.seq, tutorialDone: this.tutorialDone }, 1);
     } catch { /* storage unavailable: progress stays in memory */ }
   }
   load() {
     try {
-      const s = JSON.parse(localStorage.getItem(STORE) || 'null');
+      const r = readSafe(STORE);
+      this.loadSource = r.source; // 'backup' when the main entry was damaged
+      const s = r.data;
       if (!s) return;
       this.money = s.money ?? this.money;
       this.completed = s.completed || {};

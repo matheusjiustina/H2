@@ -15,7 +15,7 @@ const ok = (n, v, i = '') => { if (!v) fails++; console.log(v ? 'PASS' : 'FAIL',
 const boot = async (q = '') => { await page.goto(url + q, { waitUntil: 'load' }); await page.waitForFunction(() => window.__agro && window.__agro.frames > 1, null, { timeout: 600000 }); };
 
 await boot();
-let r = await page.evaluate(() => { const p = window.__agro.perf; return { mode: p.mode, prof: p.profileId, s: JSON.parse(localStorage.getItem('agrowings.settings.v1') || '{}').profile, gpu: p.caps?.gpu, sw: p.caps?.software, ratio: window.__agro.renderer.getPixelRatio() }; });
+let r = await page.evaluate(() => { const p = window.__agro.perf; return { mode: p.mode, prof: p.profileId, s: ((o) => (o && o.f === 'aw1' ? JSON.parse(o.data) : o))(JSON.parse(localStorage.getItem('agrowings.settings.v1') || '{}')).profile, gpu: p.caps?.gpu, sw: p.caps?.software, ratio: window.__agro.renderer.getPixelRatio() }; });
 ok('first run: automatic mode, conservative start (software GPU → economico)', r.mode === 'auto' && r.prof === 'economico' && r.sw === true, JSON.stringify(r));
 
 await page.evaluate(() => { window.__agro.frozen = true; window.__agro.screens.settings(); });
@@ -33,7 +33,7 @@ ok('Econômico → the old low preset', r.shadow === 1024 && r.ratio === 0.75 &&
 await sel('profile', 'auto'); r = await st();
 ok('Automático selected, label shown in Settings', r.profile === 'auto' && /auto/.test(r.ui), JSON.stringify(r));
 await sel('fpsLimit', 30); r = await st();
-ok('FPS limit 30 saved', r.fps === 30 && (await page.evaluate(() => JSON.parse(localStorage.getItem('agrowings.settings.v1')).fpsLimit)) === 30);
+ok('FPS limit 30 saved', r.fps === 30 && (await page.evaluate(() => ((o) => (o && o.f === 'aw1' ? JSON.parse(o.data) : o))(JSON.parse(localStorage.getItem('agrowings.settings.v1'))).fpsLimit)) === 30);
 await sel('profile', 'alto'); await sel('showFps', 'true');
 
 // Persistence across a reload.

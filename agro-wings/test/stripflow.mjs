@@ -126,7 +126,7 @@ for (const id of IDS) {
 }
 const saved = await page.evaluate(() => {
   const g = window.__agro; g.career.save();
-  const s = JSON.parse(localStorage.getItem('agrowings.save.v1'));
+  const s = ((o) => (o && o.f === 'aw1' ? JSON.parse(o.data) : o))(JSON.parse(localStorage.getItem('agrowings.save.v1')));
   return { money: s.money, completed: Object.keys(s.completed), hist2: s.history2.map((e) => e.farm) };
 });
 check('save keeps the money, the completed requests and the farm history', IDS.every((id) => saved.hist2.includes(id)) && saved.completed.length >= IDS.length && saved.money > money0, JSON.stringify(saved));

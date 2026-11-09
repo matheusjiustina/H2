@@ -73,7 +73,9 @@ export function createSky(renderer, scene, quality) {
 
   const sun = new THREE.DirectionalLight(new THREE.Color(1.0, 0.95, 0.86), 3.3);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(quality.shadow, quality.shadow);
+  // (never above what this GPU accepts — phase 05; unchanged wherever the size fits)
+  const shadowSize = (n) => Math.min(n, renderer.capabilities?.maxTextureSize || n);
+  sun.shadow.mapSize.set(shadowSize(quality.shadow), shadowSize(quality.shadow));
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.6;
   const cam = sun.shadow.camera;
@@ -100,8 +102,8 @@ export function createSky(renderer, scene, quality) {
     },
     setQuality(q) {
       state.range = q.shadowRange;
-      if (sun.shadow.mapSize.x !== q.shadow) {
-        sun.shadow.mapSize.set(q.shadow, q.shadow);
+      if (sun.shadow.mapSize.x !== shadowSize(q.shadow)) {
+        sun.shadow.mapSize.set(shadowSize(q.shadow), shadowSize(q.shadow));
         sun.shadow.map?.dispose();
         sun.shadow.map = null;
       }
