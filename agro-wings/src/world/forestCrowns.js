@@ -9,6 +9,7 @@
 // Toward the radius the crowns shrink into the canopy (shader), so nothing
 // pops. Above ~700 m the system switches itself off.
 import * as THREE from 'three';
+import { lruGet, lruTrim } from './lru.js';
 import { FORESTS } from './layout.js';
 import { fbm, rng } from '../core/math.js';
 import { PlantBuilder, TILES, foliageMaterial } from './foliage.js';
@@ -16,7 +17,9 @@ import { PlantBuilder, TILES, foliageMaterial } from './foliage.js';
 const CELL = 80;
 const SPACING = 10;
 const EDGE = 14; // the edge band belongs to the instanced edge trees
-const CAP = 12000; // instances per variant
+const CAP = 12000; // instances per variant, at most
+const CAP0 = 1024; // ... allocated at first (grows on demand)
+const CACHE_MAX = 600; // generated 80 m cells kept (LRU); Ultra's reach covers ~150
 
 const C = (r, g, b) => new THREE.Color(r, g, b);
 
@@ -60,8 +63,11 @@ export function createForestCrowns(scene, terrain, atlas, quality) {
   const WT = WEIGHT.reduce((a, b) => a + b, 0);
   const group = new THREE.Group();
   group.name = 'forestCrowns';
+  // Phase 3: each variant's instance buffer starts small and grows (powers
+  // of two, up to CAP) to what the forests in reach need — 4 × CAP matrices
+  // were ~3 MB (and as much on the GPU) whether or not a forest was near.
   const meshes = VARIANTS.map((g) => {
-    const im = new THREE.InstancedMesh(g, mat, CAP);
+    const im = new THREE.InstancedMesh(g, mat, CAP0);
     im.count = 0;
     im.frustumCulled = false;
     im.castShadow = false;
@@ -98,21 +104,52 @@ export function createForestCrowns(scene, terrain, atlas, quality) {
     return lists.map((l) => new Float32Array(l));
   }
 
+  // Room for `need` instances (the first `keep` are kept).
+  function reserve(im, keep, need) {
+    const cap = im.instanceMatrix.count;
+    if (need <= cap) return true;
+    if (need > CAP) return false;
+    let c = cap;
+    while (c < need) c *= 2;
+    c = Math.min(c, CAP);
+    const a = new THREE.InstancedBufferAttribute(new Float32Array(c * 16), 16).setUsage(THREE.DynamicDrawUsage);
+    a.array.set(im.instanceMatrix.array.subarray(0, keep * 16));
+    im.dispose(); // the old GPU buffer goes; three.js uploads the new one
+    im.instanceMatrix = a;
+    stats.grows++;
+    return true;
+  }
+
   let lastX = 1e9, lastZ = 1e9, radius = fadeR.value;
+  // World optimisation (phase 3): the instance buffers are refilled (and
+  // re-uploaded, up to 4 × 12000 matrices) only when the SET of 80 m cells in
+  // reach changes — a refill with the same cells wrote the same instances.
+  // Generated cells are kept in a bounded LRU cache (it used to grow without
+  // limit over a long flight across the forests).
+  let lastSig = '';
+  const stats = { refills: 0, skipped: 0, built: 0, grows: 0 };
   function refill(cam) {
     const counts = VARIANTS.map(() => 0);
     const R = radius + CELL * 0.75;
     const ci0 = Math.floor((cam.x - R) / CELL), ci1 = Math.floor((cam.x + R) / CELL);
     const cj0 = Math.floor((cam.z - R) / CELL), cj1 = Math.floor((cam.z + R) / CELL);
+    const keys = [];
     for (let cj = cj0; cj <= cj1; cj++) for (let ci = ci0; ci <= ci1; ci++) {
       const cx = (ci + 0.5) * CELL, cz = (cj + 0.5) * CELL;
       if (Math.hypot(cx - cam.x, cz - cam.z) > R) continue;
+      keys.push(ci, cj);
+    }
+    const sig = keys.join(',');
+    if (sig === lastSig) { stats.skipped++; return; }
+    lastSig = sig; stats.refills++;
+    for (let i = 0; i < keys.length; i += 2) {
+      const ci = keys[i], cj = keys[i + 1];
       const key = ci + ',' + cj;
-      let cell = cache.get(key);
-      if (!cell) { cell = buildCell(ci, cj); cache.set(key, cell); }
+      let cell = lruGet(cache, key);
+      if (!cell) { cache.set(key, (cell = buildCell(ci, cj))); stats.built++; }
       cell.forEach((arr, v) => {
         const n = arr.length / 16;
-        if (!n || counts[v] + n > CAP) return;
+        if (!n || !reserve(meshes[v], counts[v], counts[v] + n)) return;
         meshes[v].instanceMatrix.array.set(arr, counts[v] * 16);
         counts[v] += n;
       });
@@ -123,11 +160,12 @@ export function createForestCrowns(scene, terrain, atlas, quality) {
       im.instanceMatrix.addUpdateRange(0, counts[v] * 16);
       im.instanceMatrix.needsUpdate = true;
     });
+    lruTrim(cache, CACHE_MAX);
   }
 
   return {
     group,
-    setQuality(qq) { radius = fadeR.value = qq.crownRadius ?? 380; lastX = 1e9; },
+    setQuality(qq) { radius = fadeR.value = qq.crownRadius ?? 380; lastX = 1e9; lastSig = ''; },
     update(camera, groundY) {
       const cam = camera.position;
       // From high up the canopy surface alone reads as forest.
@@ -138,5 +176,6 @@ export function createForestCrowns(scene, terrain, atlas, quality) {
       refill(cam);
     },
     count: () => meshes.reduce((a, m) => a + m.count, 0),
+    stats: () => ({ ...stats, cached: cache.size }),
   };
 }

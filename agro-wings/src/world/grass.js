@@ -8,8 +8,10 @@ import { grassTuft, TILES } from './foliage.js';
 import { BASE, FARM_SITES } from './layout.js';
 import { FIRE_TEST_SPOTS } from './fires.js';
 import { ATMO_U } from './atmosphere.js';
+import { lruGet, lruTrim } from './lru.js';
 
 const CELL = 16;
+const PREFETCH_MS = 1.2; // per frame, generating the cells ahead (phase 3)
 
 function grassMaterial(atlas, U) {
   const m = new THREE.MeshStandardMaterial({
@@ -109,7 +111,9 @@ export function createGrass(terrain, quality, atlas) {
       mats[dry].set(m4.elements, k * 16);
       cols[dry][k * 3] = tint; cols[dry][k * 3 + 1] = tint; cols[dry][k * 3 + 2] = tint * 0.95;
     }
-    return [0, 1].map((k) => ({ m: mats[k].subarray(0, cnt[k] * 16), c: cols[k].subarray(0, cnt[k] * 3), n: cnt[k] }));
+    // Exact-size copies (phase 3): a subarray kept the whole scratch buffer of
+    // 70 tufts alive per cell, even for the many cells with no grass at all.
+    return [0, 1].map((k) => ({ m: mats[k].slice(0, cnt[k] * 16), c: cols[k].slice(0, cnt[k] * 3), n: cnt[k] }));
   }
 
   let lastKey = null;
@@ -124,8 +128,8 @@ export function createGrass(terrain, quality, atlas) {
       const dx = Math.max(0, Math.abs((cx + 0.5) * CELL - cam.x) - CELL / 2), dz = Math.max(0, Math.abs((cz + 0.5) * CELL - cam.z) - CELL / 2);
       if (dx * dx + dz * dz > R * R) continue;
       const key = cx + ',' + cz;
-      let c = cache.get(key);
-      if (!c) { c = buildCell(cx, cz); cache.set(key, c); }
+      let c = lruGet(cache, key);
+      if (!c) cache.set(key, (c = buildCell(cx, cz)));
       for (let k = 0; k < 2; k++) {
         const e = c[k];
         if (!e.n || counts[k] + e.n > cap) continue;
@@ -142,9 +146,29 @@ export function createGrass(terrain, quality, atlas) {
       im.instanceMatrix.needsUpdate = true;
       im.instanceColor.needsUpdate = true;
     }
-    if (cache.size > 3000) {
-      for (const key of cache.keys()) { cache.delete(key); if (cache.size < 2000) break; }
+    lruTrim(cache, 900, 600); // least recently used first (Ultra's reach is ~100 cells)
+  }
+
+  // Phase 3: the cells the camera is about to gather are generated ahead of
+  // time, a little per frame (PREFETCH_MS), in a ring up to 2.5 cells beyond
+  // the gathered one — entering a new cell used to build a whole new row of
+  // cells in that one frame (up to ~13 ms measured).
+  let prefDone = false;
+  function prefetch(cam, ms) {
+    const t0 = performance.now();
+    const R = U.radius.value + CELL * 2.5;
+    const ccx = Math.floor(cam.x / CELL), ccz = Math.floor(cam.z / CELL);
+    const nC = Math.ceil(R / CELL);
+    for (let j = -nC; j <= nC; j++) for (let i = -nC; i <= nC; i++) {
+      const cx = ccx + i, cz = ccz + j;
+      const dx = Math.max(0, Math.abs((cx + 0.5) * CELL - cam.x) - CELL / 2), dz = Math.max(0, Math.abs((cz + 0.5) * CELL - cam.z) - CELL / 2);
+      if (dx * dx + dz * dz > R * R) continue;
+      const key = cx + ',' + cz;
+      if (cache.has(key)) continue;
+      if (performance.now() - t0 > ms) return false;
+      cache.set(key, buildCell(cx, cz));
     }
+    return true;
   }
 
   return {
@@ -160,7 +184,8 @@ export function createGrass(terrain, quality, atlas) {
       // Re-gather when the camera enters another cell (cells are gathered
       // half a cell beyond the radius, so the fade edge never runs out).
       const key = Math.floor(cam.x / CELL) + ',' + Math.floor(cam.z / CELL);
-      if (key !== lastKey) { lastKey = key; rebuild(cam); }
+      if (key !== lastKey) { lastKey = key; rebuild(cam); prefDone = false; }
+      else if (!prefDone) prefDone = prefetch(cam, PREFETCH_MS);
     },
   };
 }

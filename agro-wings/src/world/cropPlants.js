@@ -28,12 +28,16 @@ import { ATMO_U } from './atmosphere.js';
 import { CUT_U, CUT_GLSL, CROP_U } from './cutState.js';
 import { canvas, canvasTexture } from '../core/textures.js';
 import { rng } from '../core/math.js';
+import { lruGet, lruTrim } from './lru.js';
 
 const KINDS = ['soy', 'corn', 'cotton'];
 // Model height (m) at full growth; along-row spacing of the plant clumps.
 const MODEL = { soy: { H: 0.85, ds: 0.36 }, corn: { H: 2.45, ds: 0.3 }, cotton: { H: 1.2, ds: 0.34 } };
 const CELL = 4;
-const CAP = 52000;
+const CAP = 52000; // instances per crop variant, at most
+const CAP0 = 2048; // ... allocated at first (grows on demand)
+const CACHE_MAX = 2400; // generated 4 m cells kept (LRU); the Ultra working set is ~350 (+ ~250 prefetched)
+const PREFETCH_MS = 1.2; // per frame, generating the cells ahead
 
 // ---------------------------------------------------------------- atlas
 // 4 x 2 tiles of 512 px: 0/1 soy trifoliate, 2/3 corn blade, 4/5 cotton
@@ -517,13 +521,16 @@ export function createCropPlants(scene, terrain, quality) {
   const geoms = { soy: [soyPlant(11), soyPlant(12), soyPlant(13, 1)], corn: [cornPlant(21), cornPlant(22), cornPlant(23, 1)], cotton: [cottonPlant(31), cottonPlant(32), cottonPlant(33, 1)] };
   const group = new THREE.Group();
   group.name = 'cropPlants';
-  // One instanced draw per crop variant.
+  // One instanced draw per crop variant. World optimisation (phase 3): the
+  // instance buffers start small and grow (powers of two, up to CAP) to what
+  // the plants around the camera actually need — 9 buffers pairs of CAP were
+  // ~15 MB (and as much on the GPU) whether or not a crop was in reach.
   const slots = [];
+  const newAttr = (n) => new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4).setUsage(THREE.DynamicDrawUsage);
   for (const k of KINDS) {
     geoms[k].forEach((base, vi) => {
       const g = new THREE.InstancedBufferGeometry().copy(base);
-      const a1 = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 4), 4).setUsage(THREE.DynamicDrawUsage);
-      const a2 = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 4), 4).setUsage(THREE.DynamicDrawUsage);
+      const a1 = newAttr(CAP0), a2 = newAttr(CAP0);
       g.setAttribute('aInst', a1); g.setAttribute('aInst2', a2);
       g.instanceCount = 0;
       const m = new THREE.Mesh(g, mat);
@@ -531,8 +538,24 @@ export function createCropPlants(scene, terrain, quality) {
       m.frustumCulled = false;
       m.receiveShadow = true;
       group.add(m);
-      slots.push({ kind: k, vi, mesh: m, a1, a2, n: 0 });
+      slots.push({ kind: k, vi, mesh: m, a1, a2, n: 0, cap: CAP0 });
     });
+  }
+  // Room for `need` instances in a slot (keeps what is already written).
+  function reserve(s, need) {
+    if (need <= s.cap) return true;
+    if (need > CAP) return false;
+    let cap = s.cap;
+    while (cap < need) cap *= 2;
+    cap = Math.min(cap, CAP);
+    const a1 = newAttr(cap), a2 = newAttr(cap);
+    a1.array.set(s.a1.array.subarray(0, s.n * 4)); a2.array.set(s.a2.array.subarray(0, s.n * 4));
+    // Old GPU buffers go with the geometry's; three.js uploads the new ones.
+    s.mesh.geometry.dispose();
+    s.mesh.geometry.setAttribute('aInst', a1); s.mesh.geometry.setAttribute('aInst2', a2);
+    s.a1 = a1; s.a2 = a2; s.cap = cap;
+    stats.grows++;
+    return true;
   }
   scene.add(group);
   const slotOf = (k, vi) => slots.find((s) => s.kind === k && s.vi === vi);
@@ -585,6 +608,7 @@ export function createCropPlants(scene, terrain, quality) {
   }
 
   const cache = new Map();
+  const stats = { built: 0, grows: 0, prefetched: 0 };
   let radius = quality.cropPlantRadius ?? 28;
   let lastX = 1e9, lastZ = 1e9, lastAlt = 1e9;
   // Refills every few metres of travel (not every frame on a low pass): the
@@ -601,12 +625,12 @@ export function createCropPlants(scene, terrain, quality) {
       const d = Math.hypot((ci + 0.5) * CELL - cam.x, (cj + 0.5) * CELL - cam.z, alt);
       if (d > R) continue;
       const key = ci + ',' + cj;
-      let cell = cache.get(key);
-      if (!cell) { cell = buildCell(ci, cj); cache.set(key, cell); }
+      let cell = lruGet(cache, key);
+      if (!cell) { cache.set(key, (cell = buildCell(ci, cj))); stats.built++; }
       for (const rec of cell) {
         if (rec.lod ? d < Rlod : d > Rfull) continue;
         const s = rec.slot, n = rec.a.length / 4;
-        if (s.n + n > CAP) continue;
+        if (!reserve(s, s.n + n)) continue;
         s.a1.array.set(rec.a, s.n * 4); s.a2.array.set(rec.b, s.n * 4);
         s.n += n;
       }
@@ -615,10 +639,28 @@ export function createCropPlants(scene, terrain, quality) {
       s.mesh.geometry.instanceCount = s.n;
       for (const at of [s.a1, s.a2]) { at.clearUpdateRanges(); at.addUpdateRange(0, s.n * 4); at.needsUpdate = true; }
     }
-    if (cache.size > 9000) {
-      let drop = cache.size - 6000;
-      for (const key of cache.keys()) { if (drop-- <= 0) break; cache.delete(key); }
+    lruTrim(cache, CACHE_MAX); // least recently used first (the cells in use were just touched)
+  }
+
+  // Phase 3: cells about to be gathered are generated ahead, a little per
+  // frame (PREFETCH_MS), in a ring 1.5 refill steps beyond the gathered one —
+  // a refill used to build its whole new ring of 4 m cells in one frame (up
+  // to ~10 ms measured on a low pass).
+  let prefDone = false;
+  function prefetch(cam, R0, alt, ms) {
+    const t0 = performance.now();
+    const mv = moveStep(R0), half = CELL * 0.71;
+    const R = R0 + mv * 2.5 + half;
+    const ci0 = Math.floor((cam.x - R) / CELL), ci1 = Math.floor((cam.x + R) / CELL);
+    const cj0 = Math.floor((cam.z - R) / CELL), cj1 = Math.floor((cam.z + R) / CELL);
+    for (let cj = cj0; cj <= cj1; cj++) for (let ci = ci0; ci <= ci1; ci++) {
+      if (Math.hypot((ci + 0.5) * CELL - cam.x, (cj + 0.5) * CELL - cam.z, alt) > R) continue;
+      const key = ci + ',' + cj;
+      if (cache.has(key)) continue;
+      if (performance.now() - t0 > ms) return false;
+      cache.set(key, buildCell(ci, cj)); stats.built++; stats.prefetched++;
     }
+    return true;
   }
 
   const api = {
@@ -638,11 +680,16 @@ export function createCropPlants(scene, terrain, quality) {
       group.visible = alt < R0 + 1;
       if (!group.visible) { lastAlt = 1e9; return; }
       const mv = moveStep(R0);
-      if (Math.hypot(cam.x - lastX, cam.z - lastZ) < mv && Math.abs(alt - lastAlt) < mv * 0.5) return;
+      if (Math.hypot(cam.x - lastX, cam.z - lastZ) < mv && Math.abs(alt - lastAlt) < mv * 0.5) {
+        if (!prefDone) prefDone = prefetch(cam, R0, alt, PREFETCH_MS);
+        return;
+      }
       lastX = cam.x; lastZ = cam.z; lastAlt = alt;
       refill(cam, R0, alt);
+      prefDone = false;
     },
     count: () => slots.reduce((a, s) => a + s.n, 0),
+    stats: () => ({ ...stats, cached: cache.size, capacity: slots.reduce((a, s) => a + s.cap, 0), instances: slots.reduce((a, s) => a + s.n, 0) }),
     atlas,
   };
   api.setQuality(quality);

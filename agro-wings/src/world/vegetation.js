@@ -17,6 +17,20 @@ import {
 const C = (r, g, b) => new THREE.Color(r, g, b);
 
 const CELL = 500;
+const HYST = 30; // m, LOD switch hysteresis of a cell (phase 3)
+
+// Level of a forest cell at distance d (1 near copy, 2 far copy, 0 none).
+// Hysteresis (phase 3), one-sided: never less detail than the plain
+// distances give (as before: < near → near copy, < far → far copy); a cell
+// that already has a level only keeps it `hyst` metres longer, so a camera
+// hovering at a boundary does not flip a whole 500 m cell every frame.
+// `prev` undefined / 0 (just built, hidden, or after a jump): plain distances.
+export function cellLevel(d, near, far, prev, hyst = HYST) {
+  const lvl = d < near ? 1 : d < far ? 2 : 0;
+  if (prev === 1 && d < near + hyst) return 1;
+  if (prev && !lvl && d < far + hyst) return 2;
+  return lvl;
+}
 
 // Variants per kind: [hi, lo] geometry pairs, all card-built (foliage.js).
 function buildVariants() {
@@ -588,15 +602,23 @@ export function createVegetation(terrain, quality) {
       // Small plants (shrubs, termite mounds, snags) are a few pixels beyond
       // the near radius: no far-LOD copy, one draw call less per cell.
       const small = kind === 'bush' || kind === 'mound' || kind === 'snag';
+      // The near and far copies hold the same trees: they share one
+      // instance-matrix buffer (phase 3 — half the instance memory and
+      // uploads; the matrices are computed once).
+      let shared = null;
       for (const [grp, geo] of small ? [[hi, gh]] : [[hi, gh], [lo, gl]]) {
         const im = new THREE.InstancedMesh(geo, mat, ts.length);
-        ts.forEach((t, i) => {
-          pos.set(t.x, terrain.heightAt(t.x, t.z) - 0.3, t.z);
-          q.setFromAxisAngle(UP, t.rot);
-          sc.setScalar(t.s);
-          im.setMatrixAt(i, m4.compose(pos, q, sc));
-        });
-        im.instanceMatrix.needsUpdate = true;
+        if (shared) im.instanceMatrix = shared;
+        else {
+          ts.forEach((t, i) => {
+            pos.set(t.x, terrain.heightAt(t.x, t.z) - 0.3, t.z);
+            q.setFromAxisAngle(UP, t.rot);
+            sc.setScalar(t.s);
+            im.setMatrixAt(i, m4.compose(pos, q, sc));
+          });
+          im.instanceMatrix.needsUpdate = true;
+          shared = im.instanceMatrix;
+        }
         im.computeBoundingSphere();
         im.castShadow = grp === hi && kind !== 'bush' && kind !== 'mound';
         im.receiveShadow = grp === hi;
@@ -613,7 +635,7 @@ export function createVegetation(terrain, quality) {
       group.remove(g);
       g.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); // instance buffers only; geometry is shared
     }
-    c.hi = c.lo = null; c.built = false;
+    c.hi = c.lo = null; c.built = false; c.lvl = undefined;
   }
   for (const [key, list] of cells) {
     const [cx, cz] = key.split(',').map(Number);
@@ -635,12 +657,13 @@ export function createVegetation(terrain, quality) {
   let near = quality.treeNear;
   const far = 1800;
   const vis = { built: 0, released: 0 };
+  const lastCam = new THREE.Vector3(1e9, 0, 1e9);
   return {
     group,
     atlas,
     colliders,
     count: trees.length,
-    setQuality(qq) { near = qq.treeNear; },
+    setQuality(qq) { near = qq.treeNear; for (const c of cellObjs) c.lvl = undefined; },
     // Streaming interface (src/world/worldStreaming.js).
     cells: cellObjs,
     cellRadius: () => far + CELL,
@@ -651,11 +674,16 @@ export function createVegetation(terrain, quality) {
     stats: () => ({ cells: cellObjs.length, built: cellObjs.filter((c) => c.built).length, releasedTotal: vis.released }),
     update(camera) {
       const p = camera.position;
+      // A jump (teleport, site change): every cell decides afresh.
+      const jump = Math.hypot(p.x - lastCam.x, p.z - lastCam.z) > 400;
+      lastCam.copy(p);
       for (const c of cellObjs) {
         if (!c.built) continue;
         const d = Math.hypot(c.center.x - p.x, c.center.z - p.z) - CELL * 0.6;
-        c.hi.visible = d < near;
-        c.lo.visible = !c.hi.visible && d < far;
+        const lvl = cellLevel(d, near, far, jump ? 0 : c.lvl);
+        c.lvl = lvl;
+        c.hi.visible = lvl === 1;
+        c.lo.visible = lvl === 2;
       }
     },
   };

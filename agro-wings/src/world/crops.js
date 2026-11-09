@@ -18,6 +18,7 @@ import { CUT_U, CUT_GLSL, CROP_U } from './cutState.js';
 const CANOPY = 0.78; // canopy surface relative to crop height
 const FIN_LO = 0.42, FIN_HI = 1.04;
 const PATCH = 48;
+const BUILD_MS = 4; // ms of fin-patch building per frame beyond the first (phase 3)
 const CROP_KINDS = ['soy', 'corn', 'cotton'];
 
 function finMaterial(tex, radiusU) {
@@ -219,13 +220,22 @@ export function createCrops(terrain, quality) {
           tmp.push([d, px, pz]);
         }
         tmp.sort((a, b) => a[0] - b[0]);
-        let budget = 6;
-        for (const [, px, pz] of tmp) {
+        // Build budget (phase 3): patches whose fins are clearly visible
+        // (nearest point inside 0.8 r) are built as before, up to 6 a frame;
+        // the faint outer ones only while the frame has spent < BUILD_MS on
+        // patches — six at once cost up to ~15 ms. Nearest first, the rest
+        // the next frames (they come into reach at the radius, where the fins
+        // have dissolved).
+        let built = 0;
+        const t0 = performance.now();
+        for (const [d, px, pz] of tmp) {
           const key = patchKey(px, pz);
           need.add(key);
           if (!cache.has(key)) {
-            if (budget-- <= 0) { need.delete(key); pending = true; continue; }
+            const must = d - PATCH * 0.71 < r * 0.8;
+            if (built >= 6 || (!must && built > 0 && performance.now() - t0 > BUILD_MS)) { need.delete(key); pending = true; continue; }
             cache.set(key, buildPatch(px, pz));
+            built++;
           }
         }
       }

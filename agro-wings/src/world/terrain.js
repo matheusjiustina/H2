@@ -557,7 +557,28 @@ export function createTerrain(td, noiseTex) {
       const members = [];
       for (let j = bj; j < Math.min(chunks, bj + size); j++) for (let i = bi; i < Math.min(chunks, bi + size); i++) members.push(lods[j * chunks + i]);
       if (members.length < 2) continue;
-      const mesh = new THREE.Mesh(mergeGeometries(members.map((l) => l.levels[levelIdx].object.geometry)), mat);
+      const parts = members.map((l) => l.levels[levelIdx].object.geometry);
+      const merged = mergeGeometries(parts);
+      // Phase 3: the members' own geometries of this level become views of
+      // the merged one (same index, positions and normals; their own index
+      // range and bounds) — the vertices were held twice, on the CPU and the
+      // GPU. What each chunk draws is unchanged.
+      let start = 0;
+      members.forEach((l, k) => {
+        const o = l.levels[levelIdx].object, g = parts[k];
+        const n = g.index.count;
+        const v = new THREE.BufferGeometry();
+        v.setIndex(merged.index);
+        v.setAttribute('position', merged.attributes.position);
+        v.setAttribute('normal', merged.attributes.normal);
+        v.setDrawRange(start, n);
+        v.boundingSphere = g.boundingSphere.clone();
+        v.boundingBox = g.boundingBox.clone();
+        o.geometry = v;
+        g.dispose();
+        start += n;
+      });
+      const mesh = new THREE.Mesh(merged, mat);
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       mesh.visible = false;
