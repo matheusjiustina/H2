@@ -4122,6 +4122,57 @@ memory are **not** read: browsers do not expose them reliably. `?q=high` / manua
 Tests (`test/p7mobile.mjs <out> layout|modes|life`, `test/p7perm.mjs`) use Chromium with device metrics and touch
 emulation. There is no Safari / WebKit / Firefox / real phone in the build environment: those are listed as untested.
 
+### Browser stability and release reliability (phase 05, 2026-11)
+
+Audit first: lifecycle handling (phase 7), adaptive quality and capability detection (phase 2), the
+FPS cap (`settings.fpsLimit`: off / 30 / 60), one audio context, the fixed physics step with the frame
+time clamped to 0.1 s and the tilt-sensor fallbacks were already in place and are kept. Gaps found:
+
+* no handler for uncaught errors or rejected promises; an exception inside the frame loop repeated
+  every frame behind a frozen image, with nothing shown to the player;
+* a WebGL context the browser never gives back left the game waiting forever;
+* career and settings were plain JSON: a damaged entry was silently replaced by defaults and then
+  overwritten on the next save;
+* on a reload the old page's JS heap and GPU context lingered until the browser collected them
+  (one measured peak of 971 MB right after a reload in this container, typically ~570 MB);
+* a manually forced Ultra on a GPU whose texture limit is under 4096 would ask for a larger shadow map
+  than it accepts.
+
+| Change | Where |
+|---|---|
+| Saves in a hashed envelope with the previous good copy kept as `<key>.bak`; a damaged entry is read from the backup; old plain-JSON saves still load. No purchase or permission is decided from it | `src/core/safeStore.js`, `contracts.js`, `game.js` |
+| Uncaught errors and unhandled rejections kept in a 30-entry ring (never sent anywhere) | `src/core/diagnostics.js` |
+| Frame guard: a failing frame is recorded and the next one runs; 30 failures in a row stop on a fail-safe screen with **Restart** — the page reloads only on that click, never by itself | `game.frame`, `diagnostics.failSafe` |
+| Lost WebGL context not restored within 20 s → the same fail-safe screen; it goes away if the context comes back | `lifecycle.js` |
+| A real unload (reload / Restart / tab closed, not the back-forward cache) stops the loop, closes audio and releases the WebGL context at once | `lifecycle.release` |
+| Shadow map size clamped to the GPU's `maxTextureSize` (unchanged wherever it fits) | `sky.js` |
+| Diagnostics panel, only with `?diag` on the URL (Ctrl+Shift+D): FPS, frame time, avg / p95 / p99, profile, internal resolution, draw calls, triangles, textures, geometries, JS heap, WebGL state, load time, last errors — "unavailable" when the browser does not expose a value; no sampling while closed | `diagnostics.js` |
+
+**Tests** (Chromium + SwiftShader in this container; unit tests in Node):
+
+* `test/stability.test.mjs` — saves: round trip, damaged / truncated entry → backup, legacy entries,
+  storage refusing reads / writes (5/5); full unit suite 211/211.
+* `test/p5stability.mjs` — 11/11: boot without page error (ready in ~34 s here, heap 505 MB, peak
+  531–562 MB); one game loop; damaged career save → backup, settings kept; 6 hide/show cycles in flight
+  (auto-paused, one loop, aircraft moved 0 m); one failing frame survived; diagnostics panel with real
+  values; cockpit ×10, 5 aircraft switches, 4 quality changes with no error (heap 505 → 516 MB);
+  canvas and camera aspect follow 16:9, 16:10, 21:9, phone landscape / portrait and 4:3; WebGL
+  context never restored → fail-safe after 20 s, no reload, cleared when restored; a frame loop that
+  keeps failing → fail-safe, no reload.
+* Peaks per operation (`probes`): title 509, flight 505, cockpit 505, aircraft switch 538–547, paint
+  change 557, quality change 522–526, back to menu 521 MB.
+* Regression: `pa36e2e` all PASS; context loss / restore (`ctxtest`) 12 rebuilds, no error;
+  `p5long` (every farm, cruise / low passes / reversals / high, ~16 000 updates): no hole, no error,
+  heap 535–629 MB, 546 MB at the end.
+
+**Not tested here** (no such hardware or browser in this container): real Android / iPhone / iPad
+devices, Safari / WebKit, Firefox, Samsung Internet, Edge, Brave, integrated / dedicated GPUs (all
+runs use a software renderer, so frame rates here say nothing about a real device). The reports of
+the game closing on phones could not be reproduced here; the most likely causes measured are memory
+(heap ~500 MB plus GPU memory on a phone that shares RAM) and the transient overlap on reloads. A
+computer switching itself off is not something a web page can cause by itself: check the system's
+event logs, temperatures and power supply separately, without repeating the session that triggered it.
+
 ## Final validation and release (performance work, phase 8)
 
 See `docs/RELEASE_REPORT.md` (before/after, device matrix, known issues), `docs/EXPANSION_CHECKLIST.md`
