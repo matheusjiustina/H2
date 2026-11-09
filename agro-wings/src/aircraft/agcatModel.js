@@ -13,27 +13,28 @@
 // N84PG, the Hellenic 1569, N8882H and a head-on view; scaled to the type's
 // 10.95 m span, 7.42 m length, ≈ 3.30 m height):
 //   spinner/hub nose z 2.04 · prop plane 1.86 · cylinder plane 1.55 (R-985
-//   ≈ 1.17 m across, the crank axis 0.12 over the CG) · ring cowl 1.40–1.68 ·
-//   accessory cowl to the firewall 1.0 · hopper 1.0 … −0.3 under the upper
-//   wing, its lid on top · windshield foot −0.35 · canopy roof −0.62 … −1.55,
-//   rear pane to the deck at −1.80 · upper wing LE 0.62, chord 1.42, chord
+//   ≈ 1.17 m across, the crank axis 0.12 over the CG; no ring cowl: the
+//   cylinders stand in the air ahead of the baffle) · accessory cowl to the
+//   firewall 1.0 · hopper 1.0 … −0.85 under and behind the upper wing, its
+//   lid on top · windshield foot −0.85 (behind the upper wing's trailing
+//   edge) · roof crest 1.235 at −1.6 · window rear −2.22, the fairing curving
+//   down into the turtledeck and on to the fin · upper wing LE 0.62, chord 1.42, chord
 //   line 1.42 over the CG (flat, 1.5° incidence) · lower wing LE 0.12 (0.5 m
 //   stagger), at the fuselage bottom (−0.50), 3° dihedral, 10.5 m span ·
 //   N interplane struts at 3.3 m · cabane N-struts from the hopper sides ·
 //   fin LE root −4.30, rudder TE −5.38 · tailplane 0.30 high, 3.7 m span,
 //   strut-braced underneath, wired above · main wheels z 0.70, 2.3 m track,
 //   8.50-10 tyres · tailwheel on a long leaf spring at −4.62.
-// What makes it an Ag-Cat: the short nose with the exposed radial in a
-// narrow ring cowl; the slab-sided fuselage with the hopper ahead of a tall,
+// What makes it an Ag-Cat: the short nose with the exposed radial; the
+// slab-sided fuselage with the hopper ahead of a tall,
 // framed single-seat canopy standing behind the upper wing's trailing edge;
 // two nearly equal wings, the lower one at the fuselage bottom and staggered
 // aft; the N interplane and cabane struts with doubled flying/landing wires;
 // the tall, square-topped fin and rudder; the braced tailplane; the big
 // main wheels on splayed legs; the tailwheel on a long spring; the booms
 // under the lower wing's trailing edge, the windmill pump under the belly.
-// The cockpit inside is only its structure for now (seat, floor, walls,
-// stick, pedals, quadrant, a provisional flat panel on the final anchors):
-// the real Ag-Cat cockpit is Prompt 02.
+// The cockpit (agcatCockpit.js) is built in its own frame and placed CK_DZ
+// aft with the cabin.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -42,7 +43,7 @@ import { buildAgCatCockpit, AGCAT_CK } from './agcatCockpit.js';
 import { rng, clamp, lerp } from '../core/math.js';
 import { FLIGHT_AGCAT } from '../config.js';
 import {
-  sampleStations, loft, K, airfoil, wingPanel, tagged, tx, rod, tube, ball, lathe, patch,
+  sampleStations, ring, loft, K, airfoil, wingPanel, tagged, tx, rod, tube, ball, lathe, patch,
   speckle, orangePeel, treadTexture, propDiscTexture, WING_SPAN_UV, buildPilot,
 } from './model.js';
 
@@ -76,17 +77,22 @@ const loSpar = (x, k) => loAt(x, SPAR[k]).add(new THREE.Vector3(0, 0.055, 0));
 
 export const AGCAT_SHADOW = { W: 12.5, L: 9.5, wing: [5.47, -1.3, 0.62], fus: [0.55, -1.6, 3.6], tail: [1.85, -5.1, -4.25], core: [4.0, 2.6] };
 
-// Cabin / canopy (sill, roof, windshield foot and top, rear pane foot).
-const CAB = { sill: 0.51, roof: 1.2, hwS: 0.5, hwR: 0.37, wsF: -0.35, wsT: -0.62, rT: -1.55, rF: -1.8, post: -1.1 };
-// Canopy surface point: v 0 = sill, 1 = roof edge (tumblehome).
-const cside = (sx, z, v) => [sx * lerp(CAB.hwS, CAB.hwR, v), lerp(CAB.sill, CAB.roof, v), z];
-const wsZ = (v) => lerp(CAB.wsF, CAB.wsT, v);
-const rearZ = (v) => lerp(CAB.rF, CAB.rT, v);
-// Pilot and cockpit anchors (body frame) — Prompt 02 builds on these.
+// Cabin (body frame): the sill (top longerons), the windshield's foot and
+// the roof's front bow, the roof's rear end, the window's rear edge, the
+// rear bulkhead behind the seat, the door post. The cabin stands behind the
+// upper wing's trailing edge (photographs TI-AYR, N84PG, N-48429: the
+// windshield's foot ≈ 1.55 m behind the main wheels), its roof a rounded
+// crest, and behind it the fairing falls in a curve into the turtledeck
+// that runs on to the fin.
+const CAB = { sill: 0.51, roof: 1.235, hwS: 0.5, wsF: -0.85, wsT: -1.22, rT: -1.95, win: -2.22, rF: -2.3, post: -1.62 };
+// The cockpit (agcatCockpit.js) is laid out in its own frame; it sits in
+// the cabin moved CK_DZ along the body's z.
+export const CK_DZ = -0.5;
+// Pilot and cockpit anchors (body frame).
 export const AGCAT_CABIN = {
-  eye: [0, 0.9, -0.98], seat: [0, 0.02, -1.12], floorY: -0.38, panel: [0, 0.515, -0.48], stick: [0, -0.3, -0.58],
-  pedals: [0, -0.21, -0.06], throttle: [0.43, 0.04, -0.64], windshield: [0, 0.85, -0.5], roof: [0, CAB.roof, -1.1],
-  door: [0.5, 0.75, -0.75], gps: [-0.272, 0.533, -0.476], sill: CAB.sill, wsFoot: CAB.wsF, wsTop: CAB.wsT, roofRear: CAB.rT, rearFoot: CAB.rF, post: CAB.post,
+  eye: [0, 0.9, -1.48], seat: [0, 0.02, -1.62], floorY: -0.38, panel: [0, 0.515, -0.99], stick: [0, -0.3, -1.08],
+  pedals: [0, -0.21, -0.56], throttle: [0.43, 0.04, -1.14], windshield: [0, 0.85, -1.0], roof: [0, CAB.roof, -1.6],
+  door: [0.5, 0.75, -1.4], gps: [-0.272, 0.533, -0.976], sill: CAB.sill, wsFoot: CAB.wsF, wsTop: CAB.wsT, roofRear: CAB.rT, rearFoot: CAB.rF, post: CAB.post,
 };
 
 // Overall dimensions (tests): span, nose to rudder, the high points.
@@ -95,7 +101,7 @@ export function agcatExtent() {
     span: 2 * WU.half, lowerSpan: 2 * WL.half, length: NOSE_Z - RUDDER_Z,
     // Points that may be the highest on three wheels: upper wing (LE, top),
     // a blade standing up, the fin top, the canopy roof.
-    tops: [[0, WU.y + 0.1, WU.le - 0.4], [WU.half, WU.y + 0.08, WU.le - 0.4], [0, HUB_Y + A.propRadius, PROP_Z], [0, 1.6, -4.8], [0, CAB.roof + 0.02, -1.0]],
+    tops: [[0, WU.y + 0.1, WU.le - 0.4], [WU.half, WU.y + 0.08, WU.le - 0.4], [0, HUB_Y + A.propRadius, PROP_Z], [0, 1.6, -4.8], [0, CAB.roof + 0.005, -1.6]],
   };
 }
 
@@ -287,27 +293,63 @@ function cylinderParts(R0, R1) {
 }
 
 // Fuselage stations K(z, half-width, shoulder y, bottom y, top y, pU, pL):
-// round behind the radial, slab-sided and flat-bottomed from the firewall.
+// the accessory cowl just behind the cylinders no wider than the radial's
+// crankcase section (the cylinders stand out of it, no ring cowl), then
+// slab-sided and flat-bottomed from the firewall to the windshield's foot.
 const FWD_KEYS = [
-  K(1.43, 0.49, HUB_Y, HUB_Y - 0.47, HUB_Y + 0.45, 2.1, 2.1),
-  K(1.25, 0.505, 0.08, -0.42, 0.53, 2.5, 2.6),
+  K(1.43, 0.47, HUB_Y, HUB_Y - 0.46, HUB_Y + 0.44, 2.6, 2.6),
+  K(1.25, 0.5, 0.08, -0.43, 0.53, 2.8, 2.9),
   K(1.0, 0.515, 0.04, -0.47, 0.51, 3.2, 4.2),
   K(0.5, 0.515, 0.02, -0.48, 0.51, 3.8, 5.5),
-  K(-0.0, 0.515, 0.0, -0.48, 0.51, 4.0, 6),
-  K(-0.35, 0.515, 0.0, -0.48, 0.51, 4.0, 6),
+  K(-0.0, 0.515, 0.0, -0.48, 0.51, 5.0, 6),
+  K(CAB.wsF, 0.515, 0.0, -0.48, 0.51, 9.0, 6), // squaring into the cabin's straight sides
 ];
-const CAB_KEYS = [K(-0.35, 0.515, 0.0, -0.48, 0.51, 4.0, 6), K(-1.1, 0.51, 0.0, -0.47, 0.51, 4.0, 6), K(-1.8, 0.49, 0.0, -0.45, 0.51, 4.0, 6)];
-const AFT_KEYS = [
-  K(-1.8, 0.49, 0.0, -0.45, 0.51, 3.6, 6),
-  K(-2.5, 0.41, 0.06, -0.35, 0.5, 3.2, 5),
-  K(-3.4, 0.29, 0.14, -0.2, 0.47, 2.8, 4),
-  K(-4.3, 0.165, 0.2, -0.02, 0.43, 2.6, 3),
-  K(-5.0, 0.055, 0.24, 0.1, 0.4, 2.4, 2.4),
+// Aft of the windshield's foot: the box fuselage under the top longerons
+// [z, half-width, longeron y, side→belly y, bottom y, belly exponent] —
+// deep to the tail (the bottom line nearly straight, as on the photographs),
+// and over it the cabin, fairing and turtledeck in one shell whose crest
+// follows CREST (roof → fairing → dorsal → fin root).
+const BOX = [
+  [CAB.wsF, 0.515, 0.51, 0.0, -0.48, 6],
+  [-1.6, 0.515, 0.51, 0.0, -0.476, 6],
+  [CAB.rF, 0.505, 0.51, 0.0, -0.466, 6],
+  [-3.0, 0.445, 0.47, 0.02, -0.43, 5],
+  [-3.7, 0.35, 0.41, 0.05, -0.345, 4],
+  [-4.4, 0.24, 0.345, 0.09, -0.23, 3.5],
+  [-4.78, 0.15, 0.305, 0.11, -0.16, 3],
+  [-5.02, 0.045, 0.28, 0.12, -0.12, 2.6],
 ];
-// Top line of the fuselage (fin root, deck).
-const topY = (z) => (z > -1.8 ? 0.51 : lerp(0.51, 0.4, (-1.8 - z) / 3.2));
-const botY = (z) => (z > -1.8 ? -0.48 : lerp(-0.45, 0.1, (-1.8 - z) / 3.2));
-const halfW = (z) => (z > -1.8 ? 0.525 : lerp(0.5, 0.055, (-1.8 - z) / 3.2));
+const CREST = [[CAB.wsF, 0.51], [-1.04, 0.875], [-1.2, 1.17], [-1.32, 1.225], [-1.6, 1.235], [-1.88, 1.226], [-2.08, 1.17], [-2.32, 1.03],
+  [-2.62, 0.84], [-3.0, 0.69], [-3.7, 0.565], [-4.4, 0.48], [-4.78, 0.44], [-5.02, 0.415]];
+// Monotone cubic through the knots (no overshoot between them).
+function pchip(K) {
+  const n = K.length, xs = K.map((k) => -k[0]), ys = K.map((k) => k[1]);
+  const d = [], m = new Array(n).fill(0);
+  for (let i = 0; i < n - 1; i++) d.push((ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]));
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (2 * d[i - 1] * d[i]) / (d[i - 1] + d[i]);
+  return (z) => {
+    const x = -z;
+    let i = 0; while (i < n - 2 && x > xs[i + 1]) i++;
+    const h = xs[i + 1] - xs[i], t = clamp((x - xs[i]) / h, 0, 1), t2 = t * t, t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h * m[i] + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h * m[i + 1];
+  };
+}
+const crestY = pchip(CREST);
+const boxAt = (z) => {
+  let i = 0; while (i < BOX.length - 2 && z < BOX[i + 1][0]) i++;
+  const a = BOX[i], b = BOX[i + 1], t = clamp((a[0] - z) / (a[0] - b[0]), 0, 1), s = t * t * (3 - 2 * t) * 0.35 + t * 0.65;
+  return { w: lerp(a[1], b[1], s), yl: lerp(a[2], b[2], s), ys: lerp(a[3], b[3], s), yb: lerp(a[4], b[4], s), p: lerp(a[5], b[5], s) };
+};
+// Top / bottom line of the fuselage (hopper lid, fittings, tailplane struts).
+const topY = (z) => (z > CAB.wsF ? 0.51 : crestY(z));
+const botY = (z) => (z > CAB.wsF ? -0.48 : boxAt(z).yb);
+// Shell point: arch over the longerons, t 0 = left longeron, 0.5 = crest, 1 = right.
+const shellP = (z, t) => {
+  const b = boxAt(z), top = Math.max(b.yl + 0.002, crestY(z)), p = z > CAB.rF ? 2.5 : 2.25;
+  const a = Math.PI * t, c = Math.cos(a), sn = Math.sin(a);
+  return [b.w * Math.sign(c) * Math.abs(c) ** (2 / p), b.yl + (top - b.yl) * Math.abs(sn) ** (2 / p), z];
+};
 
 // ==========================================================================
 export function createAgCatModel(panel, opts = {}) {
@@ -327,7 +369,6 @@ export function createAgCatModel(panel, opts = {}) {
     tip: new THREE.MeshPhysicalMaterial({ color: col(L0.tip), vertexColors: true, ...coat }),
     stab: new THREE.MeshPhysicalMaterial({ color: col(L0.stab), vertexColors: true, ...coat }),
     gear: new THREE.MeshPhysicalMaterial({ color: col(L0.gear), vertexColors: true, ...coat }),
-    ring: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(L0.ring), vertexColors: true, ...coat, metalness: 0.35, roughness: 0.42 }),
     lid: new THREE.MeshStandardMaterial({ color: 0x8f7650, roughness: 0.75, metalness: 0.02, vertexColors: true, side: THREE.DoubleSide }), // thin shell
     dark: new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: 0.62, metalness: 0.1, vertexColors: true }),
     ink: new THREE.MeshStandardMaterial({ color: 0x151617, roughness: 0.55, metalness: 0.15, vertexColors: true }),
@@ -374,21 +415,52 @@ export function createAgCatModel(panel, opts = {}) {
     a *= 1 - 0.3 * lw;
     return clamp(a, 0.5, 1);
   };
-  const fwdSt = sampleStations(FWD_KEYS, 18), cabSt = sampleStations(CAB_KEYS, 8), aftSt = sampleStations(AFT_KEYS, 12);
+  const fwdSt = sampleStations(FWD_KEYS, 18);
   add('livery', liveryUV(tagged(loft(fwdSt, 56, fusAO))));
-  // Cabin: open on top between the sills (the canopy closes it).
-  add('livery', liveryUV(tagged(loft(cabSt, 52, fusAO, [Math.PI * 0.94, Math.PI * 2.06], CAB.sill))));
-  add('livery', liveryUV(tagged(loft(aftSt, 56, fusAO))));
-  // Tail post cap.
-  add('livery', liveryUV(tagged(tx(new THREE.CircleGeometry(0.06, 12), 0, 0.25, -5.0, 0, Math.PI, 0, [0.9, 1.4, 1]))));
+  // Box fuselage aft of the windshield's foot: straight sides from the
+  // longerons down to the belly's superellipse (open on top: the shell
+  // closes it).
+  const zsAft = [];
+  for (let z = CAB.wsF; z > -5.02 + 1e-6; z -= 0.09) zsAft.push(z);
+  zsAft.push(-5.02);
+  const rings = (fn, n) => {
+    const pos = [], col = [], idx = [];
+    for (const z of zsAft) for (let k = 0; k <= n; k++) { const [x, y] = fn(z, k / n); pos.push(x, y, z); const gg = fusAO(x, y, z); col.push(gg, gg, gg); }
+    for (let si = 0; si < zsAft.length - 1; si++) for (let k = 0; k < n; k++) { const a = si * (n + 1) + k, b = a + 1, c = a + n + 1, d = c + 1; idx.push(a, b, c, b, d, c); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  };
+  const boxRing = (z, u) => {
+    // u 0..1: left longeron → down the left side → belly → up the right side.
+    const b = boxAt(z), side = 0.18;
+    if (u <= side) return [b.w, lerp(b.yl, b.ys, u / side)];
+    if (u >= 1 - side) return [-b.w, lerp(b.ys, b.yl, (u - (1 - side)) / side)];
+    const a = Math.PI + Math.PI * ((u - side) / (1 - 2 * side)), c = Math.cos(a), sn = Math.sin(a);
+    return [-b.w * Math.sign(c) * Math.abs(c) ** (2 / b.p), b.ys - (b.ys - b.yb) * Math.abs(sn) ** (2 / b.p)];
+  };
+  add('livery', liveryUV(tagged(rings(boxRing, 40))));
+  // Collar at the windshield's foot: closes the thin step between the forward
+  // fuselage's rounded shoulders and the cabin's straight sides.
+  {
+    const outer = []; for (let k = 0; k <= 40; k++) outer.push(new THREE.Vector2(...boxRing(CAB.wsF, k / 40)));
+    const sh = new THREE.Shape(outer);
+    const st = fwdSt[fwdSt.length - 1], cy = (st.yt + st.yb) / 2;
+    sh.holes.push(new THREE.Path(ring(st, 56).slice(0, -1).reverse().map(([x, y]) => new THREE.Vector2(x * 0.997, cy + (y - cy) * 0.997))));
+    add('livery', liveryUV(tagged(tx(new THREE.ShapeGeometry(sh), 0, 0, CAB.wsF - 0.002))));
+  }
+  // Tail post (the rudder's hinge post closes the narrow end).
+  add('livery', liveryUV(tagged(rbox(0.09, 0.42, 0.04, 0.015, 0, 0.15, -5.0))));
   // Hopper lid (fibreglass): framed, hinged on the right, two latches and
   // the loading window at its front; the hopper vent.
   {
-    const st = fwdSt.filter((s) => s.z <= 0.95 && s.z >= -0.28).map((s) => ({ ...s, hw: s.hw * 0.78, yt: s.yt + 0.014, ys: s.yt - 0.06 }));
+    const st = fwdSt.filter((s) => s.z <= 0.95 && s.z >= CAB.wsF + 0.07).map((s) => ({ ...s, hw: s.hw * 0.78, yt: s.yt + 0.014, ys: s.yt - 0.06 }));
     add('lid', loft(st, 18, null, [Math.PI * 0.2, Math.PI * 0.8]));
-    for (const z of [0.95, -0.28]) add('dark', tx(new THREE.BoxGeometry(0.84, 0.022, 0.03), 0, topY(z) + 0.012, z));
+    for (const z of [0.95, CAB.wsF + 0.07]) add('dark', tx(new THREE.BoxGeometry(0.84, 0.022, 0.03), 0, topY(z) + 0.012, z));
     for (const sx of [1, -1]) add('dark', tube(st.map((s) => [sx * s.hw * 0.94, s.yt - 0.03, s.z]), 0.01, 16, 5));
-    for (const z of [0.6, 0.0]) add('steel', rbox(0.05, 0.03, 0.08, 0.01, 0.39, topY(z) + 0.012, z), true);
+    for (const z of [0.6, -0.4]) add('steel', rbox(0.05, 0.03, 0.08, 0.01, 0.39, topY(z) + 0.012, z), true);
     add('dark', tx(new THREE.CylinderGeometry(0.03, 0.03, 0.1, 10), -0.25, 0.55, 0.85)); // vent
   }
   // Hopper side quick-fill coupling (left), gatebox under the hopper, the
@@ -398,10 +470,10 @@ export function createAgCatModel(panel, opts = {}) {
   add('paint', rbox(0.5, 0.14, 0.7, 0.04, 0, -0.53, 0.35));
   add('dark', rbox(0.42, 0.04, 0.55, 0.012, 0, -0.61, 0.35));
   // Step (left) and hand-holds to the cabin.
-  add('steel', rod([0.52, -0.25, -0.75], [0.62, -0.5, -0.75], 0.012, 6));
-  add('steel', rbox(0.14, 0.012, 0.1, 0.004, 0.64, -0.51, -0.75));
+  add('steel', rod([0.52, -0.25, -1.25], [0.62, -0.5, -1.25], 0.012, 6));
+  add('steel', rbox(0.14, 0.012, 0.1, 0.004, 0.64, -0.51, -1.25));
 
-  // ---------------- engine: R-985 in a narrow ring cowl ----------------
+  // ---------------- engine: the exposed R-985 ----------------
   {
     // Nine cylinders on the black crankcase, the nose case, the ignition
     // harness ring, intake pipes from the blower case behind, exhaust
@@ -432,62 +504,67 @@ export function createAgCatModel(panel, opts = {}) {
     add('exhaust', tx(new THREE.TorusGeometry(0.43, 0.04, 8, 48), 0, HUB_Y, EZ - 0.22));
     add('exhaust', tube([[-0.3, HUB_Y - 0.33, EZ - 0.22], [-0.5, -0.36, 1.2], [-0.56, -0.45, 0.95], [-0.57, -0.48, 0.72]], 0.055, 20, 10));
     add('soot', tx(new THREE.CylinderGeometry(0.058, 0.058, 0.06, 12), -0.57, -0.485, 0.7, Math.PI / 2 - 0.1));
-    // Narrow ring cowl (Townend type) round the cylinder heads, its rolled
-    // front lip; the dark baffle plate behind the cylinders.
-    const ringG = lathe([[0.6, EZ - 0.16], [0.645, EZ - 0.16], [0.672, EZ - 0.05], [0.682, EZ + 0.06], [0.675, EZ + 0.12], [0.655, EZ + 0.15], [0.625, EZ + 0.14], [0.615, EZ + 0.1], [0.6, EZ - 0.16]], 56);
-    ringG.rotateX(Math.PI / 2); ringG.translate(0, HUB_Y, 0);
-    add('ring', ringG);
-    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; add('steel', rod([Math.cos(a) * 0.6, HUB_Y + Math.sin(a) * 0.6, EZ - 0.1], [Math.cos(a) * 0.43, HUB_Y + Math.sin(a) * 0.43, EZ - 0.28], 0.008, 5), true); }
-    add('dark', tx(new THREE.CircleGeometry(0.5, 36), 0, HUB_Y, 1.43));
-    add('dark', tx(new THREE.CircleGeometry(0.5, 36), 0, HUB_Y, 1.429, 0, Math.PI, 0)); // both faces
+    // No ring cowl (the photographs of the radial G-164A: the cylinders
+    // stand bare in front of the accessory cowl); the dark baffle plate
+    // closes the cowl's front behind them, the engine mount ring.
+    // Baffle closing the fuselage's nose, cut to its first section (both faces).
+    const bf = new THREE.Shape(ring(fwdSt[0], 56).slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y)));
+    add('dark', tx(new THREE.ShapeGeometry(bf), 0, 0, fwdSt[0].z));
+    add('dark', tx(new THREE.ShapeGeometry(bf), 0, 0, fwdSt[0].z - 0.001, 0, Math.PI, 0));
+    add('steel', tx(new THREE.TorusGeometry(0.4, 0.018, 6, 36), 0, HUB_Y, EZ - 0.3), true);
     // Oil cooler under the accessory cowl (left), carburettor air scoop below.
     add('dark', rbox(0.22, 0.16, 0.14, 0.02, 0.25, -0.33, 1.3));
     add('paint', rbox(0.24, 0.12, 0.34, 0.04, 0, -0.43, 1.18));
     add('dark', rbox(0.18, 0.07, 0.02, 0.01, 0, -0.43, 1.355));
   }
 
-  // ---------------- canopy ----------------
+  // ---------------- cabin, fairing and turtledeck (one shell) ----------------
+  // The arch over the longerons from the windshield's foot to the tail:
+  // the raked windshield, the rounded roof crest, the side windows to the
+  // door post and behind it, their rear edges curving down with the
+  // fairing; behind the cabin the painted fairing falls into the turtledeck
+  // on to the fin. Quads are sorted by region: glass, roof (scheme colour,
+  // seen from inside too), painted turtledeck.
   const glassG = [];
   {
-    const SEG = 1;
-    // Windshield (flat, raked), side windows each side split at the door
-    // post, rear pane.
-    glassG.push(patch(cside(1, wsZ(0), 0), cside(-1, wsZ(0), 0), cside(1, wsZ(1), 1), cside(-1, wsZ(1), 1), 6 * SEG, 2, 0.02, [0, 0.4, 1]));
-    for (const sx of [1, -1]) {
-      for (const [za, zb] of [[[wsZ(0), wsZ(1)], [CAB.post, CAB.post]], [[CAB.post, CAB.post], [rearZ(0), rearZ(1)]]]) {
-        glassG.push(patch(cside(sx, za[0], 0), cside(sx, zb[0], 0), cside(sx, za[1], 1), cside(sx, zb[1], 1), 3, 2, 0, [sx, 0.3, 0]));
-      }
+    const NT = 28, zs = [];
+    for (let z = CAB.wsF; z > -5.02 + 1e-6; z -= z > CAB.win - 0.1 ? 0.045 : 0.1) zs.push(z);
+    zs.push(-5.02);
+    const pos = [], col = [];
+    for (const z of zs) for (let k = 0; k <= NT; k++) { const p = shellP(z, k / NT); pos.push(...p); const g = fusAO(p[0], p[1], p[2]); col.push(g, g, g); }
+    const reg = { glass: [], roof: [], paint: [] };
+    const TW = 0.3; // side window height (fraction of the arch from each longeron)
+    for (let si = 0; si < zs.length - 1; si++) for (let k = 0; k < NT; k++) {
+      const a = si * (NT + 1) + k, b = a + 1, c = a + NT + 1, d = c + 1;
+      const zc = (zs[si] + zs[si + 1]) / 2, tc = (k + 0.5) / NT;
+      const r = zc > CAB.wsT ? 'glass' : zc > CAB.win ? (tc < TW || tc > 1 - TW ? 'glass' : 'roof') : 'paint';
+      reg[r].push(a, c, b, b, c, d);
     }
-    glassG.push(patch(cside(-1, rearZ(0), 0), cside(1, rearZ(0), 0), cside(-1, rearZ(1), 1), cside(1, rearZ(1), 1), 4, 2, 0, [0, 0.5, -1]));
-    // Frames: sill rails, windshield frame, A-posts, door posts, rear posts,
-    // roof edge rails; the roof itself (opaque, scheme colour).
-    const F = (pts, r = 0.022) => add('frame', tube(pts, r, Math.max(2, pts.length * 3), 6));
-    for (const sx of [1, -1]) {
-      F([cside(sx, wsZ(0), 0), cside(sx, rearZ(0), 0)], 0.026);
-      F([cside(sx, wsZ(0), 0), cside(sx, wsZ(1), 1)], 0.03);
-      F([cside(sx, CAB.post, 0), cside(sx, CAB.post, 1)], 0.022);
-      F([cside(sx, rearZ(0), 0), cside(sx, rearZ(1), 1)], 0.026);
-      F([cside(sx, wsZ(1), 1), cside(sx, rearZ(1), 1)], 0.024);
-      // Door handle (left: the door).
-      if (sx > 0) add('steel', rod(cside(1.04, -0.86, 0.12), cside(1.04, -0.7, 0.12), 0.008, 6), true);
+    const mk = (idx) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals(); return g; };
+    glassG.push(mk(reg.glass));
+    add('frame', mk(reg.roof));
+    add('livery', liveryUV(tagged(mk(reg.paint))));
+    // Bulkhead over the seat's back (inside, the turtledeck's front), so the
+    // cabin is closed behind the pilot.
+    {
+      const pts = []; for (let k = 0; k <= NT; k++) { const p = shellP(CAB.win, k / NT); pts.push(new THREE.Vector2(p[0], p[1])); }
+      add('frame', tx(new THREE.ShapeGeometry(new THREE.Shape(pts)), 0, 0, CAB.win - 0.005));
     }
-    F([cside(1, wsZ(0), 0), cside(-1, wsZ(0), 0)], 0.026);
-    F([cside(1, wsZ(1), 1), cside(-1, wsZ(1), 1)], 0.028);
-    F([cside(1, rearZ(1), 1), cside(-1, rearZ(1), 1)], 0.024);
-    // Roof: slightly domed sheet between the roof rails.
-    const roof = [];
-    const NU = 8, NV = 6;
-    for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) {
-      const u = i / NU, v = j / NV, x = lerp(CAB.hwR, -CAB.hwR, u), z = lerp(wsZ(1), rearZ(1), v);
-      roof.push(x, CAB.roof + 0.04 * (1 - (2 * u - 1) ** 2), z);
-    }
-    const ri = [];
-    for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) { const a = j * (NU + 1) + i, b = a + 1, c = a + NU + 1, d = c + 1; ri.push(a, c, b, b, c, d); }
-    const rg = new THREE.BufferGeometry();
-    rg.setAttribute('position', new THREE.Float32BufferAttribute(roof, 3)); rg.setIndex(ri); rg.computeVertexNormals();
-    add('frame', rg);
-    // Deck behind the canopy (between the rear pane and the turtledeck).
-    add('livery', liveryUV(tagged(tx(new THREE.PlaneGeometry(2 * 0.5, 0.06), 0, CAB.sill + 0.001, rearZ(0) - 0.03, -Math.PI / 2))));
+    // Frames along the shell: windshield foot, A-posts, the roof's front
+    // bow, roof rails, door posts, the windows' rear edges, sill rails.
+    const F = (pts, r = 0.022) => add('frame', tube(pts, r, Math.max(4, pts.length * 2), 6));
+    const alongZ = (t, z0, z1, n = 10) => Array.from({ length: n + 1 }, (_, i) => shellP(lerp(z0, z1, i / n), t));
+    const alongT = (z, t0, t1, n = 12) => Array.from({ length: n + 1 }, (_, i) => shellP(z, lerp(t0, t1, i / n)));
+    const b0 = boxAt(CAB.wsF);
+    F([[b0.w, CAB.sill + 0.01, CAB.wsF], [-b0.w, CAB.sill + 0.01, CAB.wsF]], 0.026);
+    for (const t of [0.13, 0.87]) F(alongZ(t, CAB.wsF - 0.005, CAB.wsT, 8), 0.024);
+    F(alongT(CAB.wsT, 0, 1, 20), 0.028);
+    for (const t of [TW, 1 - TW]) F(alongZ(t, CAB.wsT, CAB.win, 12), 0.022);
+    for (const [t0, t1] of [[0, TW], [1 - TW, 1]]) { F(alongT(CAB.post, t0, t1, 5), 0.022); F(alongT(CAB.win, t0, t1, 5), 0.024); }
+    for (const t of [0.002, 0.998]) F(alongZ(t, CAB.wsF, CAB.win, 12), 0.026);
+    // Door handle (left side: the door).
+    const dh = shellP(-1.45, 0.08);
+    add('steel', rod([dh[0] + 0.02, dh[1], dh[2] + 0.08], [dh[0] + 0.02, dh[1], dh[2] - 0.08], 0.008, 6), true);
   }
 
   // ---------------- wings ----------------
@@ -608,8 +685,8 @@ export function createAgCatModel(panel, opts = {}) {
   rudPivot.position.set(0, 0, HINGE_Z);
   const rudder = new THREE.Group();
   {
-    const RT = (y) => (y > 1.2 ? lerp(-0.43, -0.3, (y - 1.2) / 0.42) : y < 0.15 ? lerp(-0.3, -0.43, (y + 0.05) / 0.2) : -0.43);
-    const ys = [-0.05, 0.15, 0.5, 0.9, 1.2, 1.45, 1.6];
+    const RT = (y) => (y > 1.2 ? lerp(-0.43, -0.3, (y - 1.2) / 0.42) : y < 0.15 ? lerp(-0.3, -0.43, (y + 0.12) / 0.27) : -0.43);
+    const ys = [-0.12, 0.15, 0.5, 0.9, 1.2, 1.45, 1.6];
     const sts = ys.map((y) => ({ x: y, y: 0, le: 0, chord: -RT(y) }));
     const g = wingPanel(sts, airfoil(0, 1, 0.09, 0, 0.3, 8), 1);
     const p = g.attributes.position;
@@ -622,7 +699,7 @@ export function createAgCatModel(panel, opts = {}) {
     const mesh = new THREE.Mesh(rg, M.livery);
     mesh.castShadow = true;
     rudder.add(mesh);
-    add('steel', rod([0, -0.02, -4.97], [0, 1.5, -4.97], 0.012, 6), true);
+    add('steel', rod([0, -0.1, -4.97], [0, 1.5, -4.97], 0.012, 6), true);
   }
   rudPivot.add(rudder);
   root.add(rudPivot);
@@ -828,9 +905,16 @@ export function createAgCatModel(panel, opts = {}) {
   // The G-164A cockpit (agcatCockpit.js) in this same body frame, on the
   // cabin's anchors; its instrument textures come from agcatPanel.js.
   const C = AGCAT_CABIN;
-  const ck = buildAgCatCockpit({ panel, envMap: opts.envMap ?? null, harnessMat: M.harness, C, CAB });
+  // Built in its own frame (anchors CK_DZ forward of the body's), then moved
+  // into the cabin.
+  const loc = (v) => [v[0], v[1], v[2] - CK_DZ];
+  const ck = buildAgCatCockpit({
+    panel, envMap: opts.envMap ?? null, harnessMat: M.harness,
+    C: { ...C, eye: loc(C.eye), seat: loc(C.seat) }, CAB: { sill: CAB.sill, hwS: CAB.hwS, wsF: CAB.wsF - CK_DZ, rF: CAB.rF - CK_DZ },
+  });
   const { cockpit, stick, pedals, throttle, valve, leds } = ck;
-  const THR = AGCAT_CK.throttle;
+  cockpit.position.z = CK_DZ;
+  const THR = [AGCAT_CK.throttle[0], AGCAT_CK.throttle[1], AGCAT_CK.throttle[2] + CK_DZ];
   root.add(cockpit);
 
   // ---------------- pilot ----------------
@@ -889,7 +973,6 @@ export function createAgCatModel(panel, opts = {}) {
       swap(M.livery, liveryTextures(REG, L));
       swap(M.wing, wingTextures(L));
       for (const [m, cc] of [[M.frame, L.frame], [M.tip, L.tip], [M.stab, L.stab], [M.gear, L.gear]]) m.color.set(cc).multiplyScalar(ALB);
-      M.ring.color.set(L.ring);
       bladeMat.color.set(L.blade); tipMat.color.set(L.bladeTip);
     },
     get livery() { return livery; },

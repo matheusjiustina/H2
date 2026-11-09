@@ -3849,6 +3849,56 @@ selection. Cockpit cost against the Brave's (same scene): 116 meshes vs
 calls in the cockpit view vs 443; first cockpit frame after the selection
 32 ms (9 ms on the next entry).
 
+## Aircraft 12 — Grumman G-164A Super Ag-Cat, geometry correction and cockpit refit
+
+A surgical correction of the phase-01 exterior against the photographs
+TI-AYR, N84PG and N-48429, then the phase-02 cockpit moved into the corrected
+cabin as one block. Wings, struts and wires, gear, spray system, physics,
+menu / hangar and the optimisation path are unchanged.
+
+**What was wrong** (side and 3/4 comparisons with the photographs): the
+cabin stood 0.5 m too far forward, half under the upper wing, with a flat,
+box-like roof and a vertical rear pane; the fuselage bottom rose early, so
+the tail looked long and thin; the Townend ring (r 0.68) made the nose look
+heavier than on the photographs, where the R-985's cylinders stand in the
+air ahead of the baffle.
+
+**Exterior.** (1) Cabin moved aft: windshield foot −0.35 → −0.85 (behind the
+upper wing's trailing edge, as on the photographs), roof crest 1.235 at
+−1.6, window rear −2.22. (2) One shell from the windshield's foot to the fin
+(`CREST`, a monotone cubic through measured knots): raked windshield, a
+rounded roof crest (superellipse arch, no flat top), side windows to the door
+post and behind it, the rear edges curving down with the fairing, which falls
+in one curve into the turtledeck and on to the fin. Its quads are split by
+region into glass, roof (scheme colour) and painted turtledeck; a bulkhead
+closes the cabin behind the seat. (3) Under it a slab-sided box fuselage
+(`BOX` stations: straight sides under the longerons, superellipse belly)
+whose bottom line stays nearly straight to the tail post: the rear fuselage
+is 0.86 m deep at −3.0 and 0.58 m at −4.4 (was markedly shallower). (4) The
+forward stations square into the cabin's straight sides, with a collar at
+the windshield's foot. (5) No ring cowl: the nose baffle is cut to the
+fuselage's first section; steel engine mount ring behind the cylinders.
+(6) Rudder and hinge post down to the new tail bottom; hopper lid, latches
+and step re-placed on the longer forward deck.
+
+**Cockpit refit.** The cockpit (`AGCAT_CK`, its own frame) is placed
+`CK_DZ` = −0.5 m aft as a unit (`cockpit.position.z`), the pilot and eye with
+it: eye (0, 0.90, −1.48), 0.335 m under the roof, 0.39 m over the sill; the
+pod and boom gauge moved 1 cm aft for glass clearance; the inner side walls
+kept 1 cm in from the skin and 3 cm over the floor (where the belly curves
+in). Pedal animation now uses the cockpit-frame rest point. Roof collision /
+wire point moved to the new roof (z −1.6).
+
+**Measured** (Chromium + SwiftShader): `test/agcate2e.mjs` 16 / 16 (back
+faces 0.003 % worst view, was 0.084 % before the collar and baffle),
+`test/agcatcockpit.mjs` 8 / 8 (upper wing at 7 % of the frame's height,
+horizon 26 %, pod 78 %, nearest structure 0.333 m from the eye),
+`npm test` all pass; golden physics: only `plane.agcat.calm` changed (that
+scripted run ends in a ground contact touching the roof hard point, now on
+the roof), every other aircraft identical. Draw cost of the aircraft (same
+test): 198 meshes, 79.7 k triangles (was 198, 79.6 k), 7.98 MPx textures
+(unchanged).
+
 ## Benchmark (performance work, phase 1)
 
 Reference for all optimisation: the tag **`ultra-original-v73`** (commit

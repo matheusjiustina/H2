@@ -44,8 +44,8 @@ const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 
 // ---------------------------------------------------------------- layout
 export const AGCAT_CK = {
-  pod: { c: [0, 0.515, -0.48], tilt: 14 * D2R },
-  boom: { c: [0.258, 0.522, -0.472], tilt: 14 * D2R },
+  pod: { c: [0, 0.515, -0.49], tilt: 14 * D2R },
+  boom: { c: [0.258, 0.522, -0.482], tilt: 14 * D2R },
   // Lower panel: the centre frame's face plane, the boards' inner edges at
   // ±inner, turned `yaw` toward the pilot.
   lower: { y: 0.33, z: -0.41, inner: 0.17, tilt: 8 * D2R, yaw: 25 * D2R, top: 0.455, bottom: 0.215 },
@@ -339,7 +339,7 @@ export function buildAgCatCockpit(ctx) {
     addB('hopper', g);
     // Below it the footwell's front (vertical) and the floor.
     addB('hopper', at(new THREE.PlaneGeometry(2 * half, y1 - K.floor), 0, (y1 + K.floor) / 2, z1, 0, Math.PI, 0));
-    addB('floor', at(new THREE.PlaneGeometry(2 * K.wallX - 0.02, z1 - CAB.rF - 0.04), 0, K.floor, (z1 + CAB.rF + 0.04) / 2, -Math.PI / 2));
+    addB('floor', at(new THREE.PlaneGeometry(2 * K.wallX - 0.04, z1 - CAB.rF - 0.04), 0, K.floor, (z1 + CAB.rF + 0.04) / 2, -Math.PI / 2));
     // Coaming between the windshield's foot and the pod (the cabin's top
     // frame under the glass), seen from the seat.
     addB('black', at(new THREE.BoxGeometry(2 * (CAB.hwS - 0.02), 0.015, 0.11), 0, CAB.sill - 0.008, CAB.wsF - 0.035));
@@ -366,8 +366,11 @@ export function buildAgCatCockpit(ctx) {
     addB('tube', rod([X, yL, -1.72], [-X, yL, -1.72], 0.016));
     addB('tube', rod([X, yU, -1.72], [-X, yU, -1.72], 0.016));
     // Painted skins between the tubes (inner walls), the rear bulkhead.
-    for (const sx of [1, -1]) addB('wall', at(new THREE.PlaneGeometry(1.42, CAB.sill - K.floor), sx * K.wallX, (CAB.sill + K.floor) / 2, -1.07, 0, -sx * Math.PI / 2, 0));
-    addB('wall', at(new THREE.PlaneGeometry(2 * K.wallX, CAB.sill - K.floor), 0, (CAB.sill + K.floor) / 2, CAB.rF + 0.04));
+    // (kept 1 cm in from the skin and 3 cm over the floor, where the belly
+    // starts to curve in, so no edge shows through the fuselage outside)
+    const wx = K.wallX - 0.01, wy0 = K.floor + 0.03;
+    for (const sx of [1, -1]) addB('wall', at(new THREE.PlaneGeometry(1.42, CAB.sill - wy0), sx * wx, (CAB.sill + wy0) / 2, -1.07, 0, -sx * Math.PI / 2, 0));
+    addB('wall', at(new THREE.PlaneGeometry(2 * wx, CAB.sill - K.floor), 0, (CAB.sill + K.floor) / 2, CAB.rF + 0.04));
   }
 
   // ======================================================== 5 stick, pedals

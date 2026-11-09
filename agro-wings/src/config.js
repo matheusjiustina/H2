@@ -845,7 +845,7 @@ export const FLIGHT_AGCAT = {
     { name: 'fin', p: [0, 1.55, -4.9] },
     { name: 'stabL', p: [1.85, 0.32, -4.75] },
     { name: 'stabR', p: [-1.85, 0.32, -4.75] },
-    { name: 'roof', p: [0, 1.23, -1.0] },
+    { name: 'roof', p: [0, 1.23, -1.6] },
   ],
   hardLandingVs: 2.8,
   crashVs: 5.3,

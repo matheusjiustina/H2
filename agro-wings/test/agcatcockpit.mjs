@@ -125,7 +125,7 @@ r = await page.evaluate(async () => {
   const hz = eye.clone().addScaledVector(fwd, 2000).project(g.camera);
   return {
     near: g.camera.near, nearest: +min.toFixed(3), fov: g.camera.fov,
-    upperWing: scr([0, 1.34, 0.3]), cabaneTop: scr([-0.78, 1.37, 0.34]), pod: scr([0, 0.515, -0.48]), horizonY: +((1 - hz.y) / 2).toFixed(2),
+    upperWing: scr([0, 1.34, 0.3]), cabaneTop: scr([-0.78, 1.37, 0.34]), pod: scr(m.refs.panel.toArray()), horizonY: +((1 - hz.y) / 2).toFixed(2),
   };
 });
 ok('4 pilot view: eye clear (> near plane), upper wing at the top, horizon visible, panel in the lower part',

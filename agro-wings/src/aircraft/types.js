@@ -25,6 +25,7 @@ import { createAT802Model, AT802_SHADOW, FIREBOSS_SHADOW, at802WingY, AT802_EYE 
 import { createAT802Panel } from './at802Panel.js';
 import { createAgCatModel, AGCAT_SHADOW, AGCAT_CABIN, agcatLowerY } from './agcatModel.js';
 import { createAgCatPanel } from './agcatPanel.js';
+import { AGCAT_CK } from './agcatCockpit.js';
 import { FIREBOSS_EXPANSION } from '../game/expansions.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
@@ -584,11 +585,11 @@ AIRCRAFT_TYPES.agcat = {
   flight: FLIGHT_AGCAT,
   spray: { swath: SPRAY_AGCAT.swath, flow: SPRAY_AGCAT.flow, boom: [4.7, -0.56, -1.45] },
   work: [[0, -1.7, 0.7], [4.7, -0.68, -1.47], [-4.7, -0.68, -1.47]],
-  collide: [[0, 0.12, 2.04], [5.47, 1.42, -0.1], [-5.47, 1.42, -0.1], [5.25, -0.12, -0.6], [-5.25, -0.12, -0.6], [0, 1.6, -4.85], [0, 0.15, -5.3], [0, -1.7, 0.7], [0, 1.23, -1.0], [1.85, 0.3, -4.75], [-1.85, 0.3, -4.75]],
-  wire: [[0, 0.12, 2.04], [5.47, 1.42, -0.1], [-5.47, 1.42, -0.1], [0, 1.6, -4.85], [0, -1.7, 0.7], [2.7, -0.26, -0.6], [-2.7, -0.26, -0.6], [0, 1.5, 0.0], [0, 1.23, -1.0]],
+  collide: [[0, 0.12, 2.04], [5.47, 1.42, -0.1], [-5.47, 1.42, -0.1], [5.25, -0.12, -0.6], [-5.25, -0.12, -0.6], [0, 1.6, -4.85], [0, 0.15, -5.3], [0, -1.7, 0.7], [0, 1.23, -1.6], [1.85, 0.3, -4.75], [-1.85, 0.3, -4.75]],
+  wire: [[0, 0.12, 2.04], [5.47, 1.42, -0.1], [-5.47, 1.42, -0.1], [0, 1.6, -4.85], [0, -1.7, 0.7], [2.7, -0.26, -0.6], [-2.7, -0.26, -0.6], [0, 1.5, 0.0], [0, 1.23, -1.6]],
   smoke: [-0.57, -0.48, 0.7], // exhaust stack outlet (right side, low)
   wash: [0, -1.0, -2],
-  anim: { elev: 0.38, rud: 0.42, ail: 0.35, flap: 0, pedalZ: AGCAT_CABIN.pedals[2], propGear: 1, disc: [380, 900], wash: [1300, 2100], vib: [800, 2100] },
+  anim: { elev: 0.38, rud: 0.42, ail: 0.35, flap: 0, pedalZ: AGCAT_CK.pedals[2], propGear: 1, disc: [380, 900], wash: [1300, 2100], vib: [800, 2100] },
   // No flaps: vs0 = vs1 (58 kt at the MTOW, published 67 mph).
   vspeeds: { vs0: 58, vs1: 58, vfe: 58, vne: 128 },
   camera: { dist: 12.5, height: 3.8, orbit: 17, cockpitPitch: -0.3, cockpitFov: 70 }, // pilot view: the pod and the boards in the lower part, the upper wing at the top
