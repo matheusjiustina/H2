@@ -3897,6 +3897,67 @@ noise. Crop / road merging changes culling granularity and blend order of overla
 Rollback: `git revert` the phase-3 commit, or remove the calls in `world.js` (`freezeStatic`, `terrainMesh.update`);
 the tag / branch `ultra-original-v73` remains the untouched reference.
 
+### World optimisation engine (phase 3 revision, 2026-11)
+
+Second pass over the world with the same rule: the Ultra Original image does not change. A fresh
+diagnosis (`test/worldprobe.mjs`: draw calls / triangles per scene group, memory per group, screenshots;
+`test/worldhitch.mjs`: CPU of `world.update` per frame and per subsystem along five flight routes)
+showed that draw calls were already harvested by phases 3–5 and that what was left was **memory held
+for nothing** and **CPU spikes when new cells come into reach**:
+
+* the base's shadow pass (367 of 768 calls) is ~80 % the parked fleet (aircraft, not world — left alone);
+* crop plants and forest crowns pre-allocated their instance buffers at full capacity (14.3 + 5.1 MB, and
+  as much on the GPU) whether or not a field or forest was near;
+* terrain far blocks duplicated the vertices of the chunks they merge (2.7 MB);
+* the near and far copies of every tree cell held the same instance matrices twice;
+* the forest-crown cell cache never shrank; grass cells kept a 70-tuft scratch buffer alive each;
+* `crops.update` (6 fin patches at once), the grass row on entering a cell and the crop-plant ring on each
+  refill were the frames over 4 ms on low passes.
+
+| # | Change | Where | Look |
+|---|---|---|---|
+| 1 | Crop-plant instance buffers start at 2 048 per variant and grow (×2, up to the old cap) | `cropPlants.js` | same instances |
+| 2 | Forest-crown buffers start at 1 024 and grow; a refill only when the set of 80 m cells in reach changes | `forestCrowns.js` | same instances |
+| 3 | Bounded LRU caches (crowns: was unbounded; grass, crop plants: FIFO → LRU), grass cells exact-size | `lru.js`, `grass.js`, `cropPlants.js`, `forestCrowns.js` | — |
+| 4 | Grass and crop-plant cells ahead are generated a little per frame (1.2 ms) in a ring beyond the gathered one | `grass.js`, `cropPlants.js` | — |
+| 5 | Crop fin patches: the clearly visible ones (inside 0.8 r) as before (≤ 6 a frame); the faint outer ones only while the frame has spent < 4 ms | `crops.js` | outer fins (256–320 m, dissolving) may arrive a few frames later after a teleport on a busy CPU |
+| 6 | Tree cells: near and far copies share one instance-matrix buffer | `vegetation.js` | same matrices |
+| 7 | Tree cells: one-sided LOD hysteresis (30 m): never less detail than the plain distances, a cell only keeps its level a little longer — no flip at a boundary | `vegetation.js` (`cellLevel`) | at most more detail in a 30 m band |
+| 8 | Terrain blocks: the member chunks' level geometries are views (draw range) of the merged block | `terrain.js` | same triangles |
+
+Physics, colliders, `heightAt`, missions, fields / rows / spray / hectares, structures, strips and
+object positions are untouched; nothing is removed.
+
+**Measured** (Chromium + SwiftShader, no GPU: calls / triangles / memory are exact, CPU ms are this container):
+
+| Ultra (`?q=high`) | Before | After |
+|---|---|---|
+| Draw calls / triangles, 7 views (base, low pass, cockpit, 250 m, aerial 800 m, strip, forest) | 768 / 476 / 453 / 391 / 916 / 699 / 393 | identical (same triangles) |
+| Crop plants + crowns + tree instances + terrain blocks (start) | 23.6 MB | 1.9 MB |
+| JS heap after load (probe end) | 575 MB | 553 MB |
+| JS heap after the five routes (`worldhitch`) | 623 MB | 576 MB |
+| Frames with `world.update` > 8 ms / > 16 ms (5 routes, 14 700 frames) | 13 / 2 | 9 / 1 |
+| Subsystem calls > 4 ms (same routes) | 50 | 24 |
+| p99 `world.update` low pass / cockpit / forest | 3.3 / 3.2 / 3.6 ms | 2.4 / 2.1 / 1.7 ms |
+
+Economy (`?q=low`): same draw calls in the 7 views, heap 571 → 549 MB.
+
+**Visual check:** `worldprobe` screenshots of the 7 views with the random sequence seeded and the game
+clock reset. Two runs land in one of two simulation states depending on how many frames the game ran
+while loading (5 or 6, logged as `framesAtFreeze`) — with the same count, before vs after: 6 views
+identical (≤ 0.001 % of pixels over 8/255, the A/A level); the cockpit differs only by the camera shake,
+which draws `Math.random()` every frame (`cameras.js`) — with the shake off the cockpit view is
+identical too (max 3/255). Terrain blocks on / off (`test/p3verify.mjs`, 16 altitude/heading views):
+≤ 7 px of 230 400 differ, by ≤ 2/255. In-page state hashes (crop-plant, grass and crown instance data,
+crop fins, terrain blocks) are identical before / after at the base, on a low pass and over a native
+forest; tree cells differ only where the hysteresis kept the nearer level. Context loss / restore
+(`test/worldctx.mjs`): same draw calls, triangles and image changes as the previous build, no page error.
+
+Not done (measured, reasons): merging tree variants into one draw per cell needs `BatchedMesh` and a
+rewrite of the foliage shader (risk to the Ultra image); the parked fleet's shadow and the 142 MB of
+hidden original aircraft geometry kept beside the baked copies belong to the aircraft asset manager
+(phase 4) — see the report. Rollback: `git revert` the commit; each item is local to its module.
+
 ## Aircraft asset management (performance work, phase 4)
 
 Branch `perf/fase-4` (from `perf/fase-3`). No model, cockpit, instrument, physics, camera or

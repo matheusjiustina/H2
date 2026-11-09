@@ -32,8 +32,9 @@ const VIEWS = {
   strip: { strip: true },
   forest: { x: 1500, z: 1500, hdg: 0, agl: 40, mode: 'chase' },
 };
-await page.evaluate(() => { const g = window.__agro; g.frozen = true; g.noRender = true; g.menuAction('free'); g.screens.close(); g.setSetting('timeOfDay', 'morning'); g.setSetting('weather', 'clear'); g.time = 0; });
-const res = { q, loadS };
+const framesAtFreeze = await page.evaluate(() => { const g = window.__agro; const f = g.frames; g.frozen = true; g.noRender = true; g.menuAction('free'); g.screens.close(); g.setSetting('timeOfDay', 'morning'); g.setSetting('weather', 'clear'); g.time = 0; return f; });
+const res = { q, loadS, framesAtFreeze };
+console.log('framesAtFreeze', framesAtFreeze);
 for (const [name, v] of Object.entries(VIEWS)) {
   res[name] = await page.evaluate(async (v) => {
     const g = window.__agro, ac = g.aircraft;

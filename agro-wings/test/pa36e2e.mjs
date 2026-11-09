@@ -333,11 +333,14 @@ ok('13 memory: no growth over 15 switches and 10 paint changes', r.afterSwitches
 
 // 14. Draw cost of the model against the AgTruck's (same counting): meshes
 // (≈ draw calls), triangles near (every LOD) and far (fine parts dropped),
-// texture pixels of its own canvases.
+// texture pixels of its own canvases. Each model is built afresh from its
+// type (a parked aircraft is kept light — cockpit released, stage-1
+// memory — so the live fleet would not compare like with like).
 r = await page.evaluate(() => {
   const g = window.__agro;
   const cost = (id) => {
-    const m = g.fleet[id].model;
+    const ty = g.fleet[id].type, reg = ty.reg;
+    const m = ty.createModel(ty.createPanel({ reg }), { envMap: g.scene.environment, reg });
     let meshes = 0, tris = 0, fineTris = 0, texPx = 0; const seen = new Set();
     m.root.traverse((o) => {
       if (!o.isMesh) return;
