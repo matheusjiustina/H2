@@ -119,7 +119,10 @@ const CAB_KEYS = [FWD_KEYS[FWD_KEYS.length - 1], R_(-1.45, 0.479, 0.05, -0.82, 3
 // deep and narrow: vertical sides, a round top (radius up to 0.9 of the half
 // width), the belly a superellipse; it tapers in plan from 0.95 m behind the
 // cabin to the rudder post.
-const spineY = (z) => 0.27 - 0.225 * (-2.8 - z); // straight spine behind z −2.8
+// (Final refine, green/white PT- side photo: the rear glazing falls at ≈ 37°,
+// not 45°, and runs tangent into one straight spine — no dip, no swan neck —
+// that meets the fin's leading edge near z −3.95.)
+const spineY = (z) => 0.36 - 0.27 * (-2.85 - z); // straight spine behind z −2.85
 const coneKey = (z, hw, yb) => {
   const yt = spineY(z), D = yt - yb, ws = hw * 0.97, ys = yb + 0.42 * D, sh = ys + 0.12 * D;
   return R_(z, hw, ys, yb, 3.0, sh, ws, yt, ws, Math.min(0.9 * ws, yt - sh));
@@ -127,10 +130,10 @@ const coneKey = (z, hw, yb) => {
 const AFT_KEYS = [
   R_(-1.95, 0.476, 0.05, -0.855, 3.6, 0.46, 0.465, 0.9, 0.29, 0.1), // the cabin's rear frame (roof profile)
   R_(-2.12, 0.473, 0.04, -0.86, 3.6, 0.455, 0.46, 0.885, 0.28, 0.11), // the roof's end over the rear glazing
-  R_(-2.3, 0.466, 0.02, -0.863, 3.5, 0.44, 0.455, 0.69, 0.455, 0.2),
-  R_(-2.47, 0.457, -0.02, -0.866, 3.45, 0.3, 0.445, 0.5, 0.445, 0.18),
-  R_(-2.65, 0.445, -0.1, -0.868, 3.4, 0.0, 0.43, 0.34, 0.43, 0.25),
-  coneKey(-2.85, 0.428, -0.87), coneKey(-3.2, 0.372, -0.88), coneKey(-3.6, 0.305, -0.888), coneKey(-4.0, 0.242, -0.897),
+  R_(-2.36, 0.465, 0.02, -0.864, 3.5, 0.44, 0.455, 0.705, 0.455, 0.2),
+  R_(-2.6, 0.452, -0.03, -0.867, 3.45, 0.32, 0.442, 0.53, 0.442, 0.2),
+  R_(-2.85, 0.432, -0.1, -0.87, 3.4, 0.05, 0.425, 0.36, 0.425, 0.25),
+  coneKey(-3.1, 0.39, -0.878), coneKey(-3.6, 0.305, -0.888), coneKey(-4.0, 0.242, -0.897),
   coneKey(-4.45, 0.163, -0.912), coneKey(-4.93, 0.055, -0.94),
 ];
 const SILL_Y = 0.46, RAIL_Y = 0.8;
@@ -261,9 +264,13 @@ function liveryUV(geo) {
 // it in white, N44523) and then runs down the cone under the spine, its
 // lower edge reaching the belly at the tail (the tail bottom in the band
 // colour).
-const BAND_TOP = [[2.5, 0.31], [1.2, 0.31], [-0.9, 0.29], [-1.9, 0.27], [-2.5, 0.22], [-3.2, 0.06], [-3.8, -0.14], [-4.4, -0.38], [-5.2, -0.7]];
-const BAND_LOW = [[2.5, 0.15], [1.2, 0.14], [-0.9, 0.11], [-1.9, -0.1], [-2.5, -0.17], [-3.2, -0.29], [-3.8, -0.47], [-4.4, -0.7], [-5.2, -1.0]];
-const REG_AT = [-2.56, 0.0, 0.19]; // registration: centre z, y, letter height
+// (Final refine: the photographs PT- green/white, PR-MJG and N44523 all show
+// ONE straight band from the cowl to the rudder's foot, widening a little
+// aft and passing under the fin at the tailplane — no dive to the belly.)
+const bandLine = (z0, y0, z1, y1) => Array.from({ length: 9 }, (_, i) => { const z = lerp(z0, z1, i / 8); return [z, lerp(y0, y1, i / 8)]; });
+const BAND_TOP = bandLine(2.5, 0.31, -5.35, -0.5);
+const BAND_LOW = bandLine(2.5, 0.15, -5.35, -0.79);
+const REG_AT = [-2.75, -0.355, 0.17]; // registration in the band: centre z, y, letter height
 const FIN_LE = [[-4.0, 0.0], [-5.087, 0.84]]; // fin leading edge root → top (reference frame)
 
 function liveryTextures(reg, L = PA36_LIVERIES[0]) {
@@ -290,11 +297,11 @@ function liveryTextures(reg, L = PA36_LIVERIES[0]) {
     if (yellow) {
       line(g, off(BAND_TOP, 0.035), L.pin, 0.014 * LV.ky);
       line(g, off(BAND_TOP, 0.012), YELLOW, 0.01 * LV.ky);
-      line(g, off(BAND_LOW.slice(0, 6), -0.03), L.pin, 0.012 * LV.ky);
-      line(g, off(BAND_LOW.slice(0, 6), -0.06), BLUE, 0.02 * LV.ky);
+      line(g, off(BAND_LOW, -0.03), L.pin, 0.012 * LV.ky);
+      line(g, off(BAND_LOW, -0.06), BLUE, 0.02 * LV.ky);
     } else {
       line(g, off(BAND_TOP, 0.045), L.pin, 0.012 * LV.ky);
-      line(g, off(BAND_LOW.slice(0, 6), -0.04), L.pin, 0.01 * LV.ky);
+      line(g, off(BAND_LOW, -0.04), L.pin, 0.01 * LV.ky);
     }
     // Fin: A — red cap; B — the blue sash parallel to the leading edge.
     if (yellow) {
@@ -693,7 +700,7 @@ export function createPA36Model(panel, opts = {}) {
   // the steep back — tinted glass laid on the skin (the bulkhead stands in
   // front of it, so nothing behind needs to be seen), framed.
   {
-    const QW = { z0: ROOF.zR - 0.012, zt: -2.1, zb: -2.42, y0: SILL_Y + 0.02, y1: RAIL_Y - 0.012 };
+    const QW = { z0: ROOF.zR - 0.012, zt: -2.12, zb: -2.55, y0: SILL_Y + 0.02, y1: RAIL_Y - 0.012 };
     const qRear = (y) => lerp(QW.zb, QW.zt, (y - QW.y0) / (QW.y1 - QW.y0));
     const onSide = (sx, z, y, off) => [sx * (pa36HalfX(z, y) + off), y, z];
     for (const sx of [1, -1]) {
@@ -708,7 +715,7 @@ export function createPA36Model(panel, opts = {}) {
       for (let i = 1; i < cap.length; i++) if (cap[i][0] <= x) { const [x0, y0] = cap[i - 1], [x1, y1] = cap[i]; return lerp(y0, y1, (x - x0) / (x1 - x0 || 1)); }
       return cap[cap.length - 1][1];
     };
-    const RWz = [-2.15, -2.46], RWx = 0.24;
+    const RWz = [-2.15, -2.56], RWx = 0.24;
     add('tint', grid((u, v) => { const z = lerp(RWz[0], RWz[1], v), hx = RWx * (1 - 0.25 * v), x = lerp(-hx, hx, u); return [x, capY(z, Math.abs(x)) + 0.006, z]; }, 6, 6));
     const rim = [];
     for (let i = 0; i <= 24; i++) {
@@ -861,10 +868,13 @@ export function createPA36Model(panel, opts = {}) {
     const yy = Math.min(y, RTOP), le = finLEz(Math.min(y, FTOP)) + leCut, c = le - teZ(yy);
     return { le, c, xh: (le - hingeZ(yy)) / c };
   };
-  const finYs = [-0.85, -0.55, -0.05, 0.0, 0.03, 0.07, 0.12, 0.18, 0.35, 0.55, 0.72, FTOP - 0.03, FTOP];
+  // Below y −0.3 the fin is inside the cone everywhere (the spine never goes
+  // under −0.21): kept thin there, so it cannot show through the cone's
+  // narrow sides; full thickness from just under the spine.
+  const finYs = [-0.85, -0.32, -0.24, -0.05, 0.0, 0.03, 0.07, 0.12, 0.18, 0.35, 0.55, 0.72, FTOP - 0.03, FTOP];
   const finSt = finYs.map((y, i) => {
     const f = finSec(y, i === finYs.length - 1 ? -0.05 : 0);
-    return [y, f.le, f.c, airfoil(0, f.xh, FIN_T, 0, 0.4, 12)];
+    return [y, f.le, f.c, airfoil(0, f.xh, FIN_T * (y < -0.3 ? 0.25 : 1), 0, 0.4, 12)];
   });
   add('livery', liveryUV(tagged(slopeTop(vfin(finSt)))));
   // Rudder on its raked hinge: built in place, carried into the hinge frame.
