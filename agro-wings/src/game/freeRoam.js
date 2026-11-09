@@ -37,7 +37,7 @@ export const FREE_ROAM = {
   accel: 7, // m/s²
   radius: 0.3, // pilot's collision circle (m)
   height: 1.8,
-  boardRadius: 3.2, // m from the cockpit door point
+  boardRadius: 8, // m from the cockpit door point: BOARD shows within a few steps of the aircraft (was 3.2: right at the door)
   eye: 1.65, // m above the feet
 };
 
