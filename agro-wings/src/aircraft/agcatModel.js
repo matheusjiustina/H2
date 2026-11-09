@@ -38,6 +38,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { canvas, canvasTexture } from '../core/textures.js';
+import { buildAgCatCockpit, AGCAT_CK } from './agcatCockpit.js';
 import { rng, clamp, lerp } from '../core/math.js';
 import { FLIGHT_AGCAT } from '../config.js';
 import {
@@ -83,9 +84,9 @@ const wsZ = (v) => lerp(CAB.wsF, CAB.wsT, v);
 const rearZ = (v) => lerp(CAB.rF, CAB.rT, v);
 // Pilot and cockpit anchors (body frame) — Prompt 02 builds on these.
 export const AGCAT_CABIN = {
-  eye: [0, 0.9, -0.98], seat: [0, 0.02, -1.12], floorY: -0.38, panel: [0, 0.31, -0.36], stick: [0, -0.3, -0.58],
-  pedals: [0, -0.21, -0.06], throttle: [0.37, 0.28, -0.5], windshield: [0, 0.85, -0.5], roof: [0, CAB.roof, -1.1],
-  door: [0.5, 0.75, -0.75], gps: [-0.22, 0.55, -0.4], sill: CAB.sill, wsFoot: CAB.wsF, wsTop: CAB.wsT, roofRear: CAB.rT, rearFoot: CAB.rF, post: CAB.post,
+  eye: [0, 0.9, -0.98], seat: [0, 0.02, -1.12], floorY: -0.38, panel: [0, 0.515, -0.48], stick: [0, -0.3, -0.58],
+  pedals: [0, -0.21, -0.06], throttle: [0.43, 0.04, -0.64], windshield: [0, 0.85, -0.5], roof: [0, CAB.roof, -1.1],
+  door: [0.5, 0.75, -0.75], gps: [-0.272, 0.533, -0.476], sill: CAB.sill, wsFoot: CAB.wsF, wsTop: CAB.wsT, roofRear: CAB.rT, rearFoot: CAB.rF, post: CAB.post,
 };
 
 // Overall dimensions (tests): span, nose to rudder, the high points.
@@ -823,118 +824,18 @@ export function createAgCatModel(panel, opts = {}) {
   prop.add(disc);
   root.add(prop);
 
-  // ---------------- cockpit structure (Prompt 01) ----------------
-  // Only the structure on the final anchors: the cabin's inner walls, floor,
-  // rear bulkhead, the seat, stick, rudder pedals, the throttle quadrant on
-  // the left, the spray valve handle, and a PROVISIONAL flat panel board
-  // under the windshield (agcatPanel.js) with the game's GPS — the real
-  // Ag-Cat cockpit is Prompt 02.
+  // ---------------- cockpit (Prompt 02) ----------------
+  // The G-164A cockpit (agcatCockpit.js) in this same body frame, on the
+  // cabin's anchors; its instrument textures come from agcatPanel.js.
   const C = AGCAT_CABIN;
-  const cockpit = new THREE.Group();
-  const CB = {};
-  const cadd = (mat, g) => { (CB[mat] ||= []).push(tagged(g)); };
-  {
-    const zF = CAB.wsF + 0.02, zR = CAB.rF + 0.04, yF = C.floorY;
-    for (const sx of [1, -1]) {
-      // Inner wall (faces inward), from the floor to the sill.
-      cadd('interior', tx(new THREE.PlaneGeometry(zF - zR, CAB.sill - yF), sx * 0.49, (CAB.sill + yF) / 2, (zF + zR) / 2, 0, -sx * Math.PI / 2, 0));
-      // Upper longeron and the diagonal of the welded frame along the wall.
-      cadd('interior', rod([sx * 0.47, CAB.sill - 0.03, zF], [sx * 0.47, CAB.sill - 0.03, zR], 0.016, 6));
-      cadd('interior', rod([sx * 0.47, yF + 0.05, zF], [sx * 0.47, CAB.sill - 0.05, -1.0], 0.013, 6));
-    }
-    cadd('floor', tx(new THREE.PlaneGeometry(0.94, zF - zR), 0, yF, (zF + zR) / 2, -Math.PI / 2));
-    cadd('interior', tx(new THREE.PlaneGeometry(0.98, CAB.sill - yF), 0, (CAB.sill + yF) / 2, zR, 0, 0, 0));
-    // Front bulkhead behind the panel (the hopper's back wall).
-    cadd('interior', tx(new THREE.PlaneGeometry(0.98, CAB.sill - yF + 0.05), 0, (CAB.sill + yF) / 2, zF - 0.02, 0, Math.PI, 0));
-    // Seat: pan, back, frame.
-    cadd('seat', rbox(0.44, 0.08, 0.42, 0.03, C.seat[0], C.seat[1], C.seat[2] + 0.06));
-    cadd('seat', rbox(0.44, 0.62, 0.08, 0.03, C.seat[0], C.seat[1] + 0.33, C.seat[2] - 0.2, -0.12));
-    cadd('interior', rbox(0.4, 0.04, 0.38, 0.01, C.seat[0], C.seat[1] - 0.15, C.seat[2] + 0.05));
-    for (const sx of [1, -1]) cadd('interior', rod([sx * 0.18, C.seat[1] - 0.15, C.seat[2] + 0.2], [sx * 0.18, yF, C.seat[2] + 0.2], 0.015, 6));
-  }
-  // Provisional flat panel under the windshield.
-  const boardMat = new THREE.MeshStandardMaterial({ map: panel.texture, roughness: 0.6, emissive: 0xffffff, emissiveMap: panel.texture, emissiveIntensity: 0.12 });
-  const PW = 0.9, PH = 0.34;
-  const panelMesh = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), boardMat);
-  panelMesh.position.set(0, CAB.sill - 0.02 - PH / 2, CAB.wsF + 0.01);
-  panelMesh.lookAt(new THREE.Vector3(0, CAB.sill - 0.1, -1.5)); // its face toward the seat
-  cockpit.add(panelMesh);
-  cadd('dark', rbox(PW + 0.04, 0.05, 0.12, 0.02, 0, CAB.sill + 0.0, CAB.wsF - 0.03)); // glareshield lip
-  const gpsMat = new THREE.MeshStandardMaterial({ map: panel.gpsTexture, roughness: 0.4, emissive: 0xffffff, emissiveMap: panel.gpsTexture, emissiveIntensity: 0.35 });
-  const gpsUnit = new THREE.Group();
-  {
-    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.143), gpsMat);
-    scr.position.z = 0.021;
-    gpsUnit.add(new THREE.Mesh(tagged(new RoundedBoxGeometry(0.21, 0.153, 0.04, 2, 0.01)), M.dark), scr);
-    gpsUnit.position.set(...C.gps);
-    gpsUnit.lookAt(new THREE.Vector3(0, 0.95, -1.0));
-  }
-  cockpit.add(gpsUnit);
-  const leds = [];
-  {
-    const lightbar = new THREE.Group();
-    for (let i = 0; i < 15; i++) {
-      const led = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 4), new THREE.MeshBasicMaterial({ color: 0x220000 }));
-      led.position.set(0.075 - i * 0.0107, 0.085, 0.01);
-      lightbar.add(led);
-      leds.push(led);
-    }
-    gpsUnit.add(lightbar);
-  }
-  // Stick: boot, tube, grip with the spray trigger.
-  const stick = new THREE.Group();
-  stick.position.set(...C.stick);
-  {
-    const sp = [
-      tagged(tx(new THREE.CylinderGeometry(0.05, 0.07, 0.08, 12), 0, 0.02, 0)),
-      tagged(rod([0, 0.04, 0], [0, 0.6, 0.06], 0.014, 8)),
-    ];
-    stick.add(new THREE.Mesh(mergeGeometries(sp), M.steel));
-    stick.add(new THREE.Mesh(tagged(tx(new THREE.CylinderGeometry(0.019, 0.022, 0.13, 10), 0, 0.66, 0.07, 0.1)), M.rubber));
-    stick.add(new THREE.Mesh(tagged(ball([0, 0.735, 0.075], 0.012, 8)), M.red));
-  }
-  cockpit.add(stick);
-  const pedals = [];
-  for (const sx of [1, -1]) {
-    const p = new THREE.Group();
-    p.position.set(sx * 0.17, C.pedals[1], C.pedals[2]);
-    p.add(new THREE.Mesh(tagged(rbox(0.08, 0.14, 0.02, 0.008, 0, 0.0, 0, -0.35)), M.alu));
-    p.add(new THREE.Mesh(tagged(rod([0, -0.06, -0.02], [0, -0.16, 0.06], 0.01, 6)), M.steel));
-    cockpit.add(p);
-    pedals.push(p);
-  }
-  cadd('interior', rod([0.32, C.pedals[1] - 0.15, C.pedals[2] + 0.06], [-0.32, C.pedals[1] - 0.15, C.pedals[2] + 0.06], 0.014, 6));
-  // Throttle quadrant on the left wall: throttle (black knob), prop (blue),
-  // mixture (red) on a slotted plate.
-  const THR = C.throttle;
-  const throttle = new THREE.Group();
-  throttle.position.set(...THR);
-  {
-    throttle.add(new THREE.Mesh(tagged(rod([0, 0, 0], [0, 0.12, 0.03], 0.007, 6)), M.steel));
-    throttle.add(new THREE.Mesh(tagged(ball([0, 0.13, 0.035], 0.022, 10)), M.gloss));
-  }
-  cockpit.add(throttle);
-  cadd('dark', rbox(0.04, 0.05, 0.28, 0.01, THR[0] + 0.03, THR[1] - 0.02, THR[2] + 0.02));
-  for (const [dz, mat] of [[0.08, 'blue'], [-0.07, 'red']]) {
-    cadd('steel', rod([THR[0] + 0.005, THR[1], THR[2] + dz], [THR[0] + 0.005, THR[1] + 0.1, THR[2] + dz + 0.02], 0.006, 5));
-    cadd(mat === 'blue' ? 'ring' : 'red', ball([THR[0] + 0.005, THR[1] + 0.11, THR[2] + dz + 0.022], 0.016, 8));
-  }
-  // Spray valve handle on the right wall (red knob).
-  const valve = new THREE.Group();
-  valve.position.set(-0.42, 0.25, -0.55);
-  valve.add(new THREE.Mesh(tagged(rod([0, 0, 0], [0.04, 0.16, 0], 0.008, 6)), M.steel));
-  valve.add(new THREE.Mesh(tagged(ball([0.04, 0.17, 0], 0.02, 8)), M.red));
-  cockpit.add(valve);
-  for (const [mat, list] of Object.entries(CB)) {
-    const m = new THREE.Mesh(mergeGeometries(list), M[mat]);
-    m.receiveShadow = true;
-    cockpit.add(m);
-  }
+  const ck = buildAgCatCockpit({ panel, envMap: opts.envMap ?? null, harnessMat: M.harness, C, CAB });
+  const { cockpit, stick, pedals, throttle, valve, leds } = ck;
+  const THR = AGCAT_CK.throttle;
   root.add(cockpit);
 
   // ---------------- pilot ----------------
   const OFF = new THREE.Vector3(C.eye[0], C.eye[1] - 0.98, C.eye[2] + 0.52);
-  const thrPF = [THR[0] - OFF.x, THR[1] + 0.13 - OFF.y, THR[2] + 0.035 - OFF.z];
+  const thrPF = [THR[0] - OFF.x, THR[1] + 0.175 - OFF.y, THR[2] + 0.02 - OFF.z];
   const pilot = buildPilot(M, stick, throttle, { throttleAt: thrPF });
   pilot.position.copy(OFF);
   root.add(pilot);
@@ -962,8 +863,9 @@ export function createAgCatModel(panel, opts = {}) {
 
   const eye = new THREE.Vector3(...C.eye);
   let bladeAngle = 0.18, t = 0;
-  const update = (dt, fm) => {
+  const update = (dt, fm, ac) => {
     t += dt;
+    ck.update(dt, fm, ac);
     const o = fm.out;
     const pf = fm.shaftPower / A.maxPower;
     const target = fm.engine === 'running' ? 0.16 + 0.34 * clamp((o.airspeed - 15) / 40, 0, 1) + 0.08 * pf : 0.16;
@@ -996,7 +898,7 @@ export function createAgCatModel(panel, opts = {}) {
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, lowerAilerons: lowerAil, flaps: [], elevator, rudder,
     gear: gearGroups,
-    stick, pedals, throttle, valve, leds, panelMesh,
+    stick, pedals, throttle, valve, leds, panelMesh: ck.panelMesh, inst: { pick: ck.pick, pickables: ck.pickables, needles: ck.needles, card: ck.card },
     pumpFan, pilot, cockpit, glassMesh,
     eye,
     nozzles,

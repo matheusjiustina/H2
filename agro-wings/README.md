@@ -3698,8 +3698,8 @@ The radial Ag-Cat — Pratt & Whitney R-985 Wasp Jr, nine cylinders, 450 hp,
 direct drive, two-blade Hamilton Standard constant-speed prop — with its
 own geometry (`src/aircraft/agcatModel.js`), figures (`FLIGHT_AGCAT`,
 `SPRAY_AGCAT` in `src/config.js`), registry entry (`AIRCRAFT_TYPES.agcat`,
-after the Brave in the hangar list, parking spot `parking10`) and a
-provisional flat panel (`src/aircraft/agcatPanel.js`). Not a Turbo Ag-Cat,
+after the Brave in the hangar list, parking spot `parking10`); its phase-01
+provisional flat panel was replaced by the cockpit of phase 02 below. Not a Turbo Ag-Cat,
 not a G-164B. PR-GAC is a fictional Brazilian registration. The cockpit
 here is only its structure on the final anchors (`AGCAT_CABIN`: eye, seat,
 floor, walls, panel space, stick, pedals, quadrant, GPS point); the real
@@ -3783,6 +3783,71 @@ changes, no page error. In the game, through the touch input
 (`input.virtual`): start, take-off (192 m, 64 kt), climb to 120 m, cruise
 96 kt at 2,300 rpm / 25.9 inHg, camera switches, spraying, landing
 (touchdown 51 kt, 1.9 m/s, stopped, no damage).
+
+## Aircraft 12 — Grumman G-164A Super Ag-Cat, phase 02: cockpit
+
+The real cockpit of the radial Ag-Cat (`src/aircraft/agcatCockpit.js`,
+instrument textures in `src/aircraft/agcatPanel.js`), built inside the
+phase-01 cabin on its anchors (`AGCAT_CABIN`, `AGCAT_CK`) in the same body
+frame — the exterior geometry was not changed to fit it. The arrangement
+follows the FSX reference sent with the brief, checked against the
+photographs of real G-164A cockpits (the Satloc cockpit, two in-flight
+views, the AgAir panel); where the simulator and the photographs differ the
+photographs win (the modern Satloc / Airvision screens of the photographs
+are replaced by the game's own GPS in a compact housing, the analog panel
+kept).
+
+**Geometry.** (1) The raised black POD under the windshield: thick rounded
+rim, recessed face, airspeed (mph, knots inside), the compass window (the
+heading card scrolls behind it), altimeter, the FUEL WARNING lamp with its
+placard and the red boost-pump switch; the white boom-pressure gauge on its
+own bracket at the pod's left; the guidance light bar on the pod's top.
+(2) The angular LOWER PANEL: two boards turned 25° toward the pilot with a
+cut outer corner — oil (pressure / temperature) and the tachometer with its
+hour meter on the left; manifold pressure, fuel quantity (white face) and
+cylinder-head temperature on the right — and the centre frame (top band,
+two straps, the perforated plate). (3) The hopper's sloped rear wall seen
+below the pod, translucent fibreglass with the GROUND / FLIGHT gallon scale
+and the product level behind it, down to the footwell. (4) The welded tube
+frame (longerons, posts, wall diagonals, the cross tubes, the V from the
+floor to the panel's corners) over painted skins. (5) The centre stick (floor
+pivot, boot, shaft, black grip with the spray trigger), the aluminium
+pedals on their hinge tube with the brake cylinders. (6) Left: the throttle
+quadrant on the wall (throttle, propeller, mixture), the magneto switch,
+the red hopper dump handle and its red V linkage; right wall: the
+electrical panel. (7) Floor plates, seat and harness. (8) AGROWINGS NAV
+(the game's GPS: navigation, AB lines, talhões, coverage, mission) in a
+compact housing on a bracket at the pod's right, its keys clickable /
+touchable.
+
+**Instruments** (every needle from `Aircraft.instruments()`, damped, only
+while the camera is in the cockpit or within 9 m): airspeed, altimeter (100 ft
+and 1,000 ft hands), compass card (heading), tachometer, manifold pressure,
+oil pressure and temperature, cylinder-head temperature, fuel (US gal of
+the 46-gal tank), the fuel lamp (under 15 % with the master on), the
+magneto key (off / both / start from the engine state). The boom-pressure
+gauge reads the sprayer's metered flow as a fraction of its full flow on a
+40 psi working pressure — the game has no pressure model, so this is the
+one gauge mapped rather than measured. Dial faces are drawn once into a
+2048×1024 atlas; needles are 3D meshes turned per frame (no texture redrawn
+per frame); the hopper level is redrawn only when it moves by 1 %.
+
+**Camera.** Eye (0, 0.90, −0.98): 0.30 m under the roof, 0.39 m over the
+sill, ≈ 0.85 m from the pod; default pitch −0.30 rad, 70° FOV, near plane
+0.05 m (the nearest structure is 0.34 m from the eye). The pod sits at 77 %
+of the frame's height, the horizon at 26 %, the upper wing at the top; the
+side views show both wings, the interplane N struts and the wires.
+
+**Measured** (`test/agcatcockpit.mjs`, all pass; Chromium + SwiftShader):
+needles within 0.2° of the value for each instrument; the four GPS keys
+answer a click on the screen; stick at full travel (±0.25 rad both axes)
+≥ 8.7 cm from every surface; pedals and throttle follow the controls; eye
+clear; fuel lamp; cockpit in / out ×10 with no geometry / texture growth;
+parked, its cockpit geometry and canvases are released and rebuilt on
+selection. Cockpit cost against the Brave's (same scene): 116 meshes vs
+133, 15.7 k triangles vs 36.3 k, 2.98 MPx of textures vs 5.15 MPx, 453 draw
+calls in the cockpit view vs 443; first cockpit frame after the selection
+32 ms (9 ms on the next entry).
 
 ## Benchmark (performance work, phase 1)
 

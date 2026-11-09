@@ -591,7 +591,7 @@ AIRCRAFT_TYPES.agcat = {
   anim: { elev: 0.38, rud: 0.42, ail: 0.35, flap: 0, pedalZ: AGCAT_CABIN.pedals[2], propGear: 1, disc: [380, 900], wash: [1300, 2100], vib: [800, 2100] },
   // No flaps: vs0 = vs1 (58 kt at the MTOW, published 67 mph).
   vspeeds: { vs0: 58, vs1: 58, vfe: 58, vne: 128 },
-  camera: { dist: 12.5, height: 3.8, orbit: 17, cockpitPitch: -0.22, cockpitFov: 70 },
+  camera: { dist: 12.5, height: 3.8, orbit: 17, cockpitPitch: -0.3, cockpitFov: 70 }, // pilot view: the pod and the boards in the lower part, the upper wing at the top
   // Nine-cylinder R-985, direct drive, two blades: its own radial sound.
   audio: { profile: 'r985', blades: 2, propGear: 1 },
   fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
