@@ -59,6 +59,7 @@ export class Game {
   private menuAngle = 0;
   private focus = new THREE.Vector3();
   private wasLocked = false;
+  private hotkeyCool = 0;
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.store.load();
@@ -243,10 +244,12 @@ export class Game {
 
   pause() {
     if (this.state !== 'play') return;
+    this.hotkeyCool = 0.3;
     this.setState('pause');
     this.menus.pause();
   }
   resume() {
+    this.hotkeyCool = 0.3;
     this.menus.close();
     this.setState('play');
     this.last = performance.now();
@@ -267,8 +270,10 @@ export class Game {
   }
 
   // ------------------------------------------------------------------ main loop
-  private hotkeys() {
+  private hotkeys(dt: number) {
     const inp = this.input;
+    this.hotkeyCool -= dt;
+    if (this.hotkeyCool > 0) return;
     if (this.state === 'play') {
       if (inp.rawHit('Escape') || inp.rawHit('KeyP') || inp.rawPadHit('pause')) this.pause();
       else if (inp.rawHit('Tab')) {
@@ -316,7 +321,7 @@ export class Game {
     this.last = now;
     const inp = this.input;
     inp.pollGamepad();
-    this.hotkeys();
+    this.hotkeys(dt);
     const r = this.renderer;
     this.camera.aspect = r.width / r.height;
 
@@ -346,6 +351,7 @@ export class Game {
       this.time += dt;
       this.frame++;
       this.menuAngle += dt * 0.05;
+      if (!this.cam.cine) this.cam.cine = { pos: this.camera.position.clone(), look: new THREE.Vector3(P.tower.x, 55, P.tower.z), fov: 52 };
       const c = this.cam.cine;
       if (c) c.pos.set(P.tower.x + Math.cos(this.menuAngle) * 210, 70 + Math.sin(this.menuAngle * 0.7) * 18, P.tower.z + 60 + Math.sin(this.menuAngle) * 210);
       this.player.update(dt);
@@ -356,7 +362,8 @@ export class Game {
     }
     r.flash = Math.max(0, r.flash - dt * 1.6);
     r.desat = this.atmo.wet * 0.22 + (this.player.state === 'down' ? 0.6 : 0);
-    this.focus.copy(this.state === 'menu' ? this.cam.cine!.look : this.player.pos);
+    this.focus.copy(this.state === 'menu' && this.cam.cine ? this.cam.cine.look : this.player.pos);
+    this.atmo.covered = this.state === 'play' && this.heat.hidden && this.world.roofAbove(this.player.pos.x, this.player.pos.z, this.player.pos.y + 1);
     this.atmo.update(this.state === 'pause' ? 0 : dt, this.camera, this.focus, this.save.settings, r.preset);
     shared.sunK.value = this.atmo.sunK();
     this.world.waterMat.uniforms.uTime.value = this.time;

@@ -304,6 +304,7 @@ export class Missions {
   private doneT = -1;
   private pendingStart = 0;
   objective = '';
+  lastFail = '';
   private ending = -1;
 
   constructor(private g: Game) {
@@ -413,6 +414,7 @@ export class Missions {
     const g = this.g;
     if (this.failT >= 0 || !this.run) return;
     this.failT = 0;
+    this.lastFail = reason || 'player down';
     if (reason) {
       g.hud.banner('MISSION FAILED', reason, 'bad');
       g.audio.play('fail', 0.9);
@@ -563,8 +565,10 @@ export class Missions {
     }
     if (this.failT >= 0) {
       this.failT += dt;
-      if (this.failT > 2.4) g.fade(() => this.restart());
-      if (this.failT > 2.4) this.failT = -100;
+      if (this.failT > 2.4) {
+        this.failT = -100;
+        g.fade(() => this.restart());
+      }
       return;
     }
     if (this.failT < -1) return;
@@ -655,6 +659,65 @@ export class Missions {
         this.complete();
         g.menus.credits(true);
       });
+    }
+  }
+
+  /**
+   * Test hook: plays the current objective "perfectly" (teleports to markers, flips
+   * switches, clears mission enemies). Used by the automated campaign smoke test.
+   */
+  debugSkip() {
+    const r = this.run, g = this.g, p = g.player;
+    if (!r || r.finished || this.failT !== -1 || this.ending >= 0) return;
+    const s = r.def.steps[r.step];
+    r.data.dbg = (r.data.dbg ?? 0) + 1;
+    for (const n of g.npcs.list) if (n.tag === 'mission' && g.npcs.isHostile(n) && n.state !== 'down') {
+      n.hp = 0;
+      n.state = 'down';
+      n.t = 0;
+    }
+    for (const t of [...g.combat.targets]) if (t.alive) g.combat.hitTarget(t, 9999);
+    for (const sw of [...g.interact.switches]) sw.onUse();
+    if (s.survive) r.timer = Math.min(r.timer, 0.2);
+    if (r.def.id === 'm10') r.data.hide = 99;
+    const txt = typeof s.text === 'function' ? s.text(r) : s.text;
+    if (!s.marker && /lose|lie low|wait|vanish|stay out|kill the engine|let the search|shake/i.test(txt)) {
+      g.heat.floor = 0;
+      g.heat.locked = false;
+      g.heat.clear(true);
+    }
+    if (p.state === 'chute') {
+      p.pos.y = g.world.groundAt(p.pos.x, p.pos.z, p.pos.y) + 2;
+      return;
+    }
+    const mk = typeof s.marker === 'function' ? s.marker(r) : s.marker;
+    if (!mk) return;
+    for (const d of g.world.interacts) {
+      if ((d.kind === 'elevator' || d.kind === 'ladder') && d.to && this.allowInteract(d.id) && Math.hypot(d.x - mk.x, d.z - mk.z) < 4 && Math.abs(d.y - (mk.y ?? d.y)) < 3 && !p.vehicle) {
+        p.place(d.to.x, d.to.y, d.to.z);
+        return;
+      }
+    }
+    const y = mk.y ?? g.world.groundAt(mk.x, mk.z, 300);
+    const phase = r.data.dbg % 6;
+    if (phase < 3) {
+      if (p.vehicle && phase === 0 && r.data.dbg > 6) p.forceExit();
+      if (p.vehicle) {
+        p.vehicle.x = mk.x;
+        p.vehicle.z = mk.z;
+        p.vehicle.y = y;
+        p.vehicle.speed = p.vehicle.vx = p.vehicle.vz = 0;
+      } else p.place(mk.x, y, mk.z);
+    } else {
+      if (!p.vehicle) {
+        const own = [...r.cars.values()].find((v) => v.mode !== 'wreck' && v.mode !== 'heliAI' && !v.siren);
+        p.enter(own ?? g.vehicles.spawn('suv', p.pos.x, p.pos.z, 0, { tag: 'mission', persistent: true }));
+      }
+      const v = p.vehicle!;
+      v.x = mk.x;
+      v.z = mk.z;
+      v.y = y;
+      v.speed = v.vx = v.vz = 0;
     }
   }
 

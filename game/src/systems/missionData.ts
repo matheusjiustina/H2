@@ -160,7 +160,7 @@ const m04: MissionDef = {
 
 const m05: MissionDef = {
   id: 'm05', num: 5, act: 1, title: 'Presidential Getaway', intro: 'The limousine is in the garage. The beach house is far away.',
-  where: at(P.parking.x + 50, 228), heatCap: 4, time: 18.6,
+  where: at(P.parking.x + 50, 228), heatCap: 4, time: 18.6, exempt: true,
   steps: [
     goTo('Get to the VIP garage under Liberty Square', at(P.garage.x, P.garage.z, P.garage.y), 10, { y: true }),
     {

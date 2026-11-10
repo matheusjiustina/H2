@@ -180,6 +180,8 @@ export class Atmosphere {
   timeOverride: number | null = null;
   weatherOverride: 'clear' | 'rain' | null = null;
   sunDir = new THREE.Vector3(0.5, 0.8, 0.3);
+  /** Set when the camera subject is under a roof: no rain streaks indoors. */
+  covered = false;
   private dome: THREE.Mesh;
   private skyMat: THREE.ShaderMaterial;
   private rain: THREE.LineSegments;
@@ -356,7 +358,7 @@ export class Atmosphere {
     M.glow.emissive.copy(this.glowColor);
 
     // --- rain
-    this.rain.visible = wet > 0.03;
+    this.rain.visible = wet > 0.03 && !this.covered;
     this.rainMat.uniforms.uTime.value = this.clock;
     this.rainMat.uniforms.uAlpha.value = wet * 0.4;
     camera.getWorldPosition(this.rainMat.uniforms.uCam.value as THREE.Vector3);

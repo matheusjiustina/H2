@@ -32,6 +32,9 @@ export class Signs {
   material: THREE.MeshBasicMaterial;
   texture: THREE.CanvasTexture;
   readonly size = 2048;
+  /** Tiles that did not fit (should stay 0). */
+  overflow = 0;
+  used = 0;
 
   constructor() {
     this.cv.width = this.cv.height = this.size;
@@ -53,6 +56,7 @@ export class Signs {
     }
     if (this.shelfY + h + 2 > this.size) {
       // atlas full: reuse the first tile rather than failing
+      this.overflow++;
       return this.tiles.values().next().value!;
     }
     t = { x: this.cursorX, y: this.shelfY, w, h };
@@ -102,7 +106,7 @@ export class Signs {
 
   /** Simple lettered sign. */
   text(x: number, y: number, z: number, rot: number, w: number, h: number, text: string, bg = '#f6ecd0', fg = '#1d1a2e', both = false, font = HEAD_FONT) {
-    const pw = Math.min(512, Math.max(64, Math.round(w * 42)));
+    const pw = Math.min(360, Math.max(64, Math.round(w * 26)));
     const ph = Math.max(24, Math.round((pw * h) / w));
     this.add(`t|${text}|${bg}|${fg}|${pw}x${ph}`, x, y, z, rot, w, h, pw, ph, (g, W, H) => {
       g.fillStyle = bg;
@@ -118,6 +122,8 @@ export class Signs {
   }
 
   build(): THREE.Mesh {
+    if (this.overflow) console.warn(`[signs] atlas full: ${this.overflow} signs reuse a tile`);
+    this.used = (this.shelfY + this.shelfH) / this.size;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));

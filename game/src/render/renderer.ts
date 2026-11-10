@@ -111,6 +111,8 @@ export class Renderer {
   flash = 0;
   flashColor = new THREE.Color(0xffffff);
   desat = 0;
+  calls = 0;
+  tris = 0;
 
   constructor(public canvas: HTMLCanvasElement) {
     this.three = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
@@ -230,6 +232,8 @@ export class Renderer {
     u.uDesat.value = this.desat;
     this.three.setRenderTarget(this.rt);
     this.three.render(scene, camera);
+    this.calls = this.three.info.render.calls;
+    this.tris = this.three.info.render.triangles;
     this.three.setRenderTarget(null);
     this.three.render(this.postScene, this.postCam);
   }

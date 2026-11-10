@@ -252,7 +252,7 @@ export class Hud {
       }
       this.minimap.draw();
       this.drawCompass();
-      if (g.save.settings.showFps) this.fps.textContent = `${Math.round(g.renderer.fps)} fps · ${g.renderer.three.info.render.calls} calls · ${(g.renderer.three.info.render.triangles / 1000) | 0}k tris`;
+      if (g.save.settings.showFps) this.fps.textContent = `${Math.round(g.renderer.fps)} fps · ${g.renderer.calls} calls · ${(g.renderer.tris / 1000) | 0}k tris`;
       else if (this.fps.textContent) this.fps.textContent = '';
     }
 

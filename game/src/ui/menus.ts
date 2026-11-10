@@ -200,7 +200,7 @@ export class Menus {
     const s = this.sheet(final ? 'TRUMP SURVIVED AMERICA.' : 'CREDITS', done);
     this.screen = 'credits';
     if (final) {
-      g.setState('menu');
+      g.setState('pause');
       el('p', '', `Campaign complete. Cancelled ${g.save.stats.cancelled} times, ${g.save.stats.escapes} clean getaways, ${g.save.stats.knockouts} knockouts, ${(g.save.stats.distance / 1609).toFixed(1)} miles travelled.`, s);
       el('p', '', 'Free roam is open: every district, every challenge, every Golden T. The Golden Chopper waits on the tower roof.', s);
     }

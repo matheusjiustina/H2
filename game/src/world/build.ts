@@ -1,4 +1,3 @@
-import { PAL } from '../render/materials';
 import { World } from './world';
 import { buildDowntown } from './districts/downtown';
 import { buildWallStreet } from './districts/wallstreet';
@@ -8,6 +7,7 @@ import { buildBeach } from './districts/beach';
 import { buildHarbor } from './districts/harbor';
 import { buildDesert } from './districts/desert';
 import { buildOutskirts } from './districts/outskirts';
+import { tunnel } from './landmarks';
 
 /** Cars parked along the kerb of ordinary city streets. */
 function curbParking(w: World) {
@@ -50,9 +50,9 @@ export function buildWorld(): World {
   buildHarbor(w);
   buildDesert(w);
   buildOutskirts(w);
+  tunnel(w);
   curbParking(w);
   streetSigns(w);
-  void PAL;
   w.finish();
   return w;
 }

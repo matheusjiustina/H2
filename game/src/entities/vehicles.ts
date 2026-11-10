@@ -79,7 +79,6 @@ export class Vehicle {
         w.scale.set(s.cls === 'bike' ? 0.16 : kind === 'armored' ? 0.4 : 0.28, s.wheelR, s.wheelR);
         w.position.set(wx, s.wheelR, wz);
         w.rotation.order = 'YXZ';
-        w.castShadow = true;
         this.group.add(w);
         this.wheels.push(w);
       }
@@ -828,7 +827,7 @@ export class Vehicles {
       v.lightBar[1].visible = !v.siren || !on;
     }
     const d2 = dist2(v.x, v.z, this.g.player.pos.x, this.g.player.pos.z);
-    v.group.visible = d2 < 420 * 420;
+    v.group.visible = d2 < (v.mode === 'parked' ? 230 * 230 : 420 * 420);
   }
 
   /** Pursuit spawns: a police unit placed on a road node out of sight. */

@@ -338,10 +338,10 @@ export function billboard(w: World, x: number, z: number, rot: number, ad: numbe
   }
   b.box(x, y0 + bh / 2, z, bw + 0.5, bh + 0.5, 0.4, PAL.dark, rot, 0);
   const [fx, fz] = rotP(x, z, rot, 0, 0.22);
-  w.signs.add(`ad${ad}`, fx, y0 + bh / 2, fz, rot, bw, bh, 384, 192, drawAd(ad));
+  w.signs.add(`ad${ad % 16}`, fx, y0 + bh / 2, fz, rot, bw, bh, 320, 160, drawAd(ad));
   if (o.both !== false) {
     const [gx, gz] = rotP(x, z, rot, 0, -0.22);
-    w.signs.add(`ad${ad + 5}`, gx, y0 + bh / 2, gz, rot + Math.PI, bw, bh, 384, 192, drawAd(ad + 5));
+    w.signs.add(`ad${(ad + 5) % 16}`, gx, y0 + bh / 2, gz, rot + Math.PI, bw, bh, 320, 160, drawAd(ad + 5));
   }
 }
 
