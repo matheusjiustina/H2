@@ -75,7 +75,7 @@ r = await page.evaluate(() => {
   const water = w.water.children.filter((o) => o.isMesh).length;
   return { ribbons, falls, water };
 });
-ok('4 six strip surfaces, two waterfalls (sheet + foam each), the new lagoons and rivers drawn', r.ribbons === 6 && r.falls === 4 && r.water >= 25, JSON.stringify(r));
+ok('4 six strip surfaces, two waterfalls (sheet + foam each), the original 13 water meshes plus the new lagoons and rivers merged into 3 (one per region with water)', r.ribbons === 6 && r.falls === 4 && r.water === 16, JSON.stringify(r));
 
 // Shots of the new regions.
 for (const [name, cam, at] of [['serra', [4420, 60, -3120], [4680, -3020]], ['cerrado', [-3400, 45, -4500], [-2700, -4660]], ['mata', [-4250, 40, 2620], [-4850, 2600]], ['varzea', [1900, 40, 5300], [2450, 5420]]]) {

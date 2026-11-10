@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CREEK, WATER, ROADS, pondRadius } from './layout.js';
 import { ATMO_U } from './atmosphere.js';
+import { EXP_REGIONS } from './expansion.js';
 
 // Contact ripples / wake (src/world/waterFx.js): up to RIP rings in world
 // space, [x, z, start time, strength]; one uniform array, no textures.
@@ -263,8 +264,27 @@ export function createWater(terrain, noise) {
   const add = (geo, name) => { const m = new THREE.Mesh(geo, mat); m.name = name; m.renderOrder = 1; m.receiveShadow = true; group.add(m); };
   // Creek: the water surface under its banks (terrainData.waterLevel).
   add(ribbon(terrain, CREEK.points, CREEK.width * 0.5 + 3, (x, z) => terrain.waterLevel(x, z)), 'creek');
-  for (const st of WATER.streams) add(ribbon(terrain, st.points, st.width * 0.5 + 10, (x, z) => terrain.waterLevel(x, z)), 'stream');
-  for (const p of WATER.ponds) add(pondGeometry(terrain, p), 'pond');
+  // World Expansion 2.0 water (exp: true) is merged into one mesh per region
+  // (same material): a handful of draw calls at most, and a region out of
+  // view is culled as a whole. The original creek, streams and ponds keep
+  // their own meshes.
+  const expGeo = new Map();
+  const region = (x, z) => EXP_REGIONS.reduce((b, r) => (Math.hypot(x - r.c[0], z - r.c[1]) < Math.hypot(x - b.c[0], z - b.c[1]) ? r : b), EXP_REGIONS[0]);
+  const put = (geo, x, z, name, exp) => {
+    if (!exp) { add(geo, name); return; }
+    const r = region(x, z);
+    if (!expGeo.has(r)) expGeo.set(r, []);
+    expGeo.get(r).push(geo);
+  };
+  for (const st of WATER.streams) {
+    const m = st.points[Math.floor(st.points.length / 2)];
+    put(ribbon(terrain, st.points, st.width * 0.5 + 10, (x, z) => terrain.waterLevel(x, z)), m[0], m[1], 'stream', st.exp);
+  }
+  for (const p of WATER.ponds) put(pondGeometry(terrain, p), p.x, p.z, 'pond', p.exp);
+  for (const [r, geos] of expGeo) {
+    add(geos.length > 1 ? mergeGeometries(geos) : geos[0], `water-${r.id ?? 'exp'}`);
+    if (geos.length > 1) for (const g of geos) g.dispose();
+  }
   group.add(buildBridges(terrain));
   return group;
 }
