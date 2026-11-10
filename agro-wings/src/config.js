@@ -527,6 +527,104 @@ export const SPRAY_E203 = {
   flow: 4.4,
 };
 
+// Embraer EMB-201A Ipanema (fictional PR-IPC): the classic Ipanema before
+// the 202. Published figures used: span 11.69 m, length 7.43 m, height
+// 2.20 m, wing 19.94 m² (constant 1.71 m chord, drooped tips); Lycoming
+// IO-540-K1J5D 300 hp at 2,700 rpm on avgas, Hartzell two-blade
+// constant-speed prop of 2.13 m; hopper 680 L; fuel 292 L in two wing
+// tanks; empty ≈ 1,011 kg, maximum 1,800 kg (agricultural category).
+// Geometry from the blueprint's side view (axis level, scaled by the
+// 7.43 m length) and the photographs: main axle 2.03 m behind the spinner
+// tip, wing LE ≈ 2.1 m, CG at 25 % chord 2.53 m behind the tip; ≈ 10°
+// three-point attitude. Derived (not published): the polar from the
+// family's (FLIGHT / FLIGHT_E203) scaled to this wing; inertias from mass
+// and size.
+export const FLIGHT_E201 = {
+  ...FLIGHT,
+  emptyMass: 1011,
+  mtow: 1800,
+  pilotMass: 85,
+  wingArea: 19.94,
+  span: 11.69,
+  chord: 1.71,
+  oswald: 0.8,
+  inertiaEmpty: [2650, 3800, 2550],
+
+  CL0: 0.3, CLa: 4.8, alphaStall: 0.27, alphaStallNeg: -0.21,
+  CD0: 0.054,
+  CDflap: 0.05, CLflap: 0.7,
+  Cm0: 0.045, CmaWB: 0.25, CmaTail: -1.3, Cmq: -14, Cmde: 0.44, Cmflap: -0.05,
+  Clb: -0.09, Clp: -0.5, Clr: 0.11, Clda: 0.085,
+  Cnb: 0.085, Cnr: -0.17, Cndr: 0.08, Cnda: -0.012,
+  CYb: -0.6, CYdr: 0.12,
+
+  engineType: 'piston-cs',
+  maxPower: 223.7e3, // 300 hp
+  propRadius: 1.065, // Hartzell 84 in, two blades
+  maxRpm: 2700,
+  idleRpm: 650,
+  radial: {
+    gear: 1.0,
+    crank: 1.4,
+    crankRpm: 280,
+    govThrottle: 0.36,
+    mpIdle: 12, mpMax: 28.3, mpAmbient: 28.8,
+    idleFrac: 0.03,
+    govFrac: 0.32,
+    etaStatic: 0.7,
+    etaCruise: 0.82,
+    discDrag: 0.1,
+    spool: 0.6,
+  },
+  fuelFlowFull: 95 / 3600, // L/s of avgas at take-off power (≈ 25 US gal/h)
+  fuelFlowIdle: 10 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.72,
+
+  fuelCapacity: 292,
+  hopperCapacity: 680,
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.35, // hopper between the firewall and the cabin, ahead of the CG
+  fuelTankSpanY: 2.4,
+  loadByWeight: true,
+
+  // Tubular V main legs from the lower fuselage at the firewall; the
+  // tailwheel on its spring under the rudder: ≈ 10° three-point.
+  gear: [
+    { name: 'mainL', p: [1.0, -1.43, 0.5], k: 95000, c: 9500, travel: 0.2, radius: 0.31, steer: false },
+    { name: 'mainR', p: [-1.0, -1.43, 0.5], k: 95000, c: 9500, travel: 0.2, radius: 0.31, steer: false },
+    { name: 'tail', p: [0, -0.46, -4.66], k: 28000, c: 2400, travel: 0.12, radius: 0.1, steer: true },
+  ],
+  tailSteer: 0.42,
+
+  hard: [
+    { name: 'wingtipL', p: [5.84, 0.18, -0.4] },
+    { name: 'wingtipR', p: [-5.84, 0.18, -0.4] },
+    { name: 'boomL', p: [5.0, -0.1, -1.1] },
+    { name: 'boomR', p: [-5.0, -0.1, -1.1] },
+    { name: 'prop', p: [0, -0.95, 2.3] },
+    { name: 'spinner', p: [0, 0.12, 2.53] },
+    { name: 'belly', p: [0, -0.5, 0.2] },
+    { name: 'tail', p: [0, -0.12, -4.85] },
+    { name: 'fin', p: [0, 1.57, -4.45] },
+    { name: 'stabL', p: [2.0, 0.45, -4.3] },
+    { name: 'stabR', p: [-2.0, 0.45, -4.3] },
+    { name: 'roof', p: [0, 1.21, -1.2] },
+  ],
+  hardLandingVs: 2.6,
+  crashVs: 5.0,
+
+  wheelPoint: [0, -1.43, 0.5],
+  aglOffset: 1.43,
+  wingDrop: 0.45,
+};
+
+export const SPRAY_E201 = {
+  // ≈ 10 m boom on the same 11.69 m wing as the PR-AGW: its swath and flow.
+  swath: 24,
+  flow: 3.9,
+};
+
 // Cessna A188B AgTruck (fictional Brazilian marks): Continental IO-520-D,
 // 300 hp for take-off (5 min) at 2,850 rpm, 285 hp continuous at 2,700;
 // McCauley three-blade constant-speed prop (2.13 m); span 12.70 m, length

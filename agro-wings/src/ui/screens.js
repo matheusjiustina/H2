@@ -25,6 +25,7 @@ const PAINTS = {
   a188: { key: 'a188Livery', tags: ['A', 'B'], names: ['Red', 'Orange'] },
   pa36: { key: 'pa36Livery', tags: ['A', 'B'], names: ['Classic red', 'Yellow & blue'] },
   agcat: { key: 'agcatLivery', tags: ['A', 'B'], names: ['Classic yellow', 'Yellow & blue'] },
+  e201: { key: 'e201Livery', tags: ['A', 'B'], names: ['Green, Brazilian flag', 'Yellow & blue'] },
   at802: { key: 'at802Livery', tags: ['A', 'B'], names: ['Yellow & green', 'Yellow & blue'] },
   at802f: { key: 'fbLivery', tags: ['A', 'B'], names: ['Yellow & red', 'Yellow & blue'] },
 };

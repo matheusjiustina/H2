@@ -50,7 +50,7 @@ export function buildZones(sites = SITES, margin = FREE_ROAM.zoneMargin) {
     const xs = [r.x0, r.x1, a.x0, a.x1, h.x - h.w / 2, h.x + h.w / 2];
     const half = r.width / 2 + (r.shoulder ?? 0);
     const zs = [r.z - half, r.z + half, a.z0, a.z1, h.z - h.d / 2, h.z + h.d / 2];
-    for (const k of ['crewBase', 'helipad', 'parking7', 'parking8', 'parking9', 'parking10', 'fuelTank', 'truck']) if (s[k]) { xs.push(s[k].x); zs.push(s[k].z); }
+    for (const k of ['crewBase', 'helipad', 'parking7', 'parking8', 'parking9', 'parking10', 'parking11', 'fuelTank', 'truck']) if (s[k]) { xs.push(s[k].x); zs.push(s[k].z); }
     const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
     const rot = Math.atan2(0, 1); // runway direction (x axis)
     return { id: s.id, site: s, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, hw: (x1 - x0) / 2, hd: (z1 - z0) / 2, rot };

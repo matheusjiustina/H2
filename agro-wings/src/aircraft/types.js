@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_PA36, FLIGHT_AT802, FLIGHT_FIREBOSS, FLIGHT_AGCAT, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_PA36, SPRAY_AT802, SPRAY_AGCAT, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_PA36, FLIGHT_AT802, FLIGHT_FIREBOSS, FLIGHT_AGCAT, FLIGHT_E201, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_PA36, SPRAY_AT802, SPRAY_AGCAT, SPRAY_E201, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createE203Panel } from './e203Panel.js';
@@ -26,6 +26,9 @@ import { createAT802Panel } from './at802Panel.js';
 import { createAgCatModel, AGCAT_SHADOW, AGCAT_CABIN, agcatLowerY } from './agcatModel.js';
 import { createAgCatPanel } from './agcatPanel.js';
 import { AGCAT_CK } from './agcatCockpit.js';
+import { createE201Model, E201_SHADOW, E201_CABIN, e201WingY } from './e201Model.js';
+import { createE201Panel } from './e201Panel.js';
+import { E201_CK } from './e201Cockpit.js';
 import { FIREBOSS_EXPANSION } from '../game/expansions.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
@@ -619,7 +622,54 @@ AIRCRAFT_TYPES.agcat = {
   createShadow: () => createContactShadow(AGCAT_SHADOW),
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'agcat', 'at802', 'at802f'];
+// Embraer EMB-201A Ipanema (FLIGHT_E201 on the piston + constant-speed
+// branch): its own exterior (e201Model.js) and cockpit (e201Cockpit.js,
+// textures e201Panel.js). Fictional registration.
+AIRCRAFT_TYPES.e201 = {
+  id: 'e201',
+  slot: '13',
+  parkSpot: 'parking11',
+  label: 'Ipanema 201',
+  reg: 'PR-IPC',
+  name: 'Embraer EMB-201A Ipanema',
+  get role() { return t('Classic Agricultural Aircraft'); },
+  get engineName() { return t('Lycoming IO-540-K1J5D · 300 hp · Hartzell 2-blade'); },
+  get summary() { return t('680 L hopper · 292 L fuel · 11.69 m span · 1,800 kg MTOW'); },
+  flight: FLIGHT_E201,
+  spray: { swath: SPRAY_E201.swath, flow: SPRAY_E201.flow, boom: [5.0, e201WingY(5.0) - 0.23, -1.1] },
+  work: [[0, -1.43, 0.5], [5.0, e201WingY(5.0) - 0.35, -1.13], [-5.0, e201WingY(5.0) - 0.35, -1.13]],
+  collide: [[0, 0.12, 2.53], [5.84, 0.18, -0.4], [-5.84, 0.18, -0.4], [0, 1.57, -4.45], [0, -0.12, -4.85], [0, -1.43, 0.5], [0, 1.21, -1.2], [2.0, 0.45, -4.3], [-2.0, 0.45, -4.3]],
+  wire: [[0, 0.12, 2.53], [5.84, 0.18, -0.4], [-5.84, 0.18, -0.4], [0, 1.57, -4.45], [0, -1.43, 0.5], [2.9, -0.2, -0.4], [-2.9, -0.2, -0.4], [0, 1.21, -1.2]],
+  smoke: [0.45, -0.34, 0.88], // exhaust stack outlet (left side, low)
+  wash: [0, -1.0, -2],
+  anim: { elev: 0.35, rud: 0.42, ail: 0.33, flap: 0.52, pedalZ: E201_CK.pedals[2], disc: [380, 900], wash: [1500, 2600], vib: [1500, 2700] },
+  vspeeds: { vs0: 50, vs1: 58, vfe: 95, vne: 140 },
+  camera: { dist: 12, height: 3.6, orbit: 18, cockpitPitch: -0.25, cockpitFov: 68 }, // pilot view: the panel in the lower third, the cowl over the lip, the horizon at ≈ 30 % (EMB-202 video proportions)
+  // The IO-540 on avgas with the two-blade Hartzell.
+  audio: { profile: 'ipanema', blades: 2, cfg: { blades: 2, propDiameter: 2.13 } },
+  fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
+  loads: { free: { fuel: 220, hopper: 450 }, boot: 120 },
+  loadSheet: { bankKt: 90, roll: [154, 1300, 2.0] }, // fit to the measured rolls (test/e201.test.mjs)
+  service: {
+    rates: { fuel: 4.5, liquid: 15 },
+    local: { A: [6.8, -2.0], B: [4.0, -1.8], F: [2.1, -1.5], P: [1.15, -0.7] },
+    keepOut: { wing: [5.85, -1.28, 0.43], wingY: e201WingY, fus: [0.5, -0.5, 1.21, -4.9, 2.53], stab: [2.02, 0.38, 0.47, -4.54, -3.62] },
+    veto: 8,
+  },
+  stub: { eye: E201_CABIN.eye, fuelFiller: [2.1, e201WingY(2.1) + 0.14, -0.17], hopperPort: [0.54, -0.22, 0.1] },
+  // Fuselage and cabin, wing, fin and rudder, tailplane, main wheels,
+  // propeller disc.
+  bounds: [
+    [-0.5, 0.5, -0.5, 1.22, -4.9, 2.53], [-5.85, 5.85, -0.45, 0.32, -1.3, 0.45], [-0.06, 0.06, 0.4, 1.58, -4.9, -3.35],
+    [-2.02, 2.02, 0.38, 0.47, -4.54, -3.62], [0.88, 1.12, -1.43, -0.81, 0.18, 0.82], [-1.12, -0.88, -1.43, -0.81, 0.18, 0.82],
+    [-1.08, 1.08, -0.96, 1.2, 2.22, 2.32],
+  ],
+  createModel: (panel, opts) => createE201Model(panel, opts),
+  createPanel: (opts) => createE201Panel(opts),
+  createShadow: () => createContactShadow(E201_SHADOW),
+};
+
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'agcat', 'e201', 'at802', 'at802f'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
 
 // Registrations: each type keeps its factory marks as `reg0`; `reg` reads the

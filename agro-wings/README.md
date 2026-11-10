@@ -3899,6 +3899,61 @@ the roof), every other aircraft identical. Draw cost of the aircraft (same
 test): 198 meshes, 79.7 k triangles (was 198, 79.6 k), 7.98 MPx textures
 (unchanged).
 
+## Aircraft 13 — Embraer EMB-201A Ipanema (PR-IPC): exterior, physics and cockpit
+
+A new aircraft with its own geometry (`src/aircraft/e201Model.js`), cockpit
+(`e201Cockpit.js`, instrument textures `e201Panel.js`) and flight figures
+(`FLIGHT_E201`); nothing is taken from the EMB-202A or 203 models — only the
+shared machinery (lofting helpers, the dial-atlas technique, the game's GPS,
+the pilot figure).
+
+**References.** The blueprint's side view (axis level, scaled by the
+published 7.43 m length: spinner tip → windshield base 3.0 m, roof front
+3.37, roof rear 4.1, the rear fairing meets the dorsal at 4.67, fin LE root
+5.9 / top 6.5, rudder 7.32; main axle 2.03; roof 1.08 and dorsal 0.51 over
+the thrust line, fin top 1.45; ≈ 10° three-point); photographs PT-UCV, the
+yellow / blue 201 in flight, PT-UDY and the SAE orange 201; the yellow-cabin
+cockpit photograph; the EMB-202 cockpit video for the pilot's perspective
+only. Published figures: span 11.69 m, length 7.43 m, wing 19.94 m²,
+IO-540-K1J5D 300 hp, two-blade Hartzell 2.13 m, hopper 680 L, fuel 292 L,
+empty ≈ 1,011 kg, maximum 1,800 kg.
+
+**Exterior.** Slim cowl to a pointed spinner with two cooling inlets and the
+left exhaust stack; hopper lid with its loading box; the cabin a framed
+"doghouse" on the flat-topped fuselage — raked windshield with a centre
+strip, flat side windows leaning in, the roof with a small visor, a short
+convex fairing with the quarter window — then a straight dorsal at the
+hopper's height into the fin (one shell over a slab-sided box fuselage
+whose bottom line runs nearly straight to a 0.55 m deep tail post); tall fin
+with a straight 32° leading edge and flat top; rectangular tailplane on the
+cone; constant-chord wing with 7° dihedral and drooped tips (no winglets),
+flaps and ailerons; tubular V main legs, spring tailwheel under the rudder;
+booms on four hangers a side (18 nozzles each), wind-driven pump. Paint A —
+green with the Brazilian flag on the fin and a yellow/white cheat line;
+paint B — yellow-orange with the straight blue band widening over the tail
+cone, blue fin cap and tips (menu A/B, `e201Livery`).
+
+**Cockpit.** Grey panel (its own outline, the lower edge stepping down on
+the right) under a dark matte padded lip curved in plan; seven 3D
+instruments placed as on the photograph (CHT, oil, fuel and the digital hour
+meter on the left; altimeter over airspeed and tachometer on the right,
+manifold pressure lower right; dial legends assigned from the flight model's
+values, not read off the photograph), the magneto key, the low-fuel lamp,
+the switch / breaker row, dimmer, the control box with the spray lamp; the
+game's GPS in a housing left of the centre where the photograph's moving map
+sits, its page keys in the coloured row; the hopper's front wall with the
+round sight window and the live product level; light lower walls with frame
+ribs, floor plates, the bent-tube stick, pedals, the throttle / propeller /
+mixture quadrant on the left wall, the red dump handle, the brown leather
+seat, the grab handle. Eye (0, 0.88, −1.38), pitch −0.25 rad, 68° FOV.
+
+**Measured** (Chromium + SwiftShader): `test/e201.test.mjs` 7/7 (300 hp at
+2,700 rpm; full-power level 117 kt; climb 813 ft/min at 1,800 kg, 1,248 at
+1,400 kg; clean stall 60 kt at MTOW; take-off roll 127 m light, 294 m at
+MTOW; three-point 10.8°, 2.24 m); `test/e201e2e.mjs` and
+`test/e201cockpit.mjs` (see the report); golden physics: only the two new
+`plane.e201.*` scenarios added, every other aircraft unchanged.
+
 ## AT-802A / Fire Boss: paint B
 
 Both now offer paint A / B on the menu card (`at802Livery`, `fbLivery`). B
