@@ -4101,6 +4101,16 @@ animated in their shaders (no CPU), their mist only within 450 m and not on
 the low profile; trees use the existing streamed instanced cells; colliders
 are plain boxes from the data.
 
+### Room past the map edge
+
+An aircraft is turned back only 600 m past the map edge (`EDGE_ROOM`, was
+100 m before it), so a balão at a field or strip near the edge fits. Past the
+edge the ground is the horizon ring exactly as drawn (`farRingHeight`, shared
+with the ring mesh), eased in over the first 200 m from the map's own edge
+height so there is no step (test: no 5 m step over 1.2 m, slopes under 8°).
+Checked in the browser: flying east from x 5,700 m the aircraft was turned
+back at x 6,599 m (before: 5,900 m), no page error.
+
 ## Benchmark (performance work, phase 1)
 
 Reference for all optimisation: the tag **`ultra-original-v73`** (commit

@@ -9,6 +9,7 @@ import { EXP_ROADS, EXP_FORESTS, EXP_STREAMS, EXP_PONDS } from './expansion.js';
 
 export const WORLD_HALF = 6000;
 export const FAR_HALF = 24000; // horizon ring
+export const EDGE_ROOM = 600; // m an aircraft may fly past the map edge before it is turned back (was -100)
 
 export const RUNWAY = { x0: -400, x1: 400, z: 0, width: 24, shoulder: 10 };
 

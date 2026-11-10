@@ -301,7 +301,14 @@ export class TerrainData {
   heightAt(x, z) {
     const N = this.n;
     let fx = (x + WORLD_HALF) / CELL, fz = (z + WORLD_HALF) / CELL;
-    if (fx < 0 || fz < 0 || fx >= GRID_N || fz >= GRID_N) return rawHeight(x, z) - 0.5;
+    if (fx < 0 || fz < 0 || fx >= GRID_N || fz >= GRID_N) {
+      // Past the map edge: the horizon ring as drawn, eased in over 200 m from
+      // the map's own edge height (the ring's 500 m lattice differs from it
+      // by a few metres along the seam), so there is no step to hit.
+      const lim = WORLD_HALF - 1e-3, cx = clamp(x, -lim, lim), cz = clamp(z, -lim, lim);
+      const out = Math.max(Math.abs(x), Math.abs(z)) - WORLD_HALF;
+      return lerp(this.heightAt(cx, cz), farRingHeight(x, z), smoothstep(0, 200, out));
+    }
     const ix = Math.floor(fx), iz = Math.floor(fz);
     fx -= ix; fz -= iz;
     const i = iz * N + ix;
@@ -392,3 +399,26 @@ export class TerrainData {
 }
 
 export { creekDist, polyDist, clamp, naturalHeight };
+
+// The horizon ring beyond the map (terrain.js createFarRing): vertex heights
+// on a 500 m lattice, and the surface between them (same b-d diagonal), so
+// what is flown over past the edge is exactly what is drawn there.
+export const FAR_STEP = 500;
+export function farRingVertex(x, z) {
+  let h = rawHeight(x, z) * 1.6;
+  const inside = Math.abs(x) < WORLD_HALF && Math.abs(z) < WORLD_HALF;
+  const onEdge = Math.abs(x) <= WORLD_HALF && Math.abs(z) <= WORLD_HALF && !inside;
+  if (inside) h = -60;
+  else if (onEdge) h = rawHeight(x, z) - 0.4;
+  // Fall off very slowly toward the horizon so the edge never shows.
+  return h - Math.max(0, Math.hypot(x, z) - 9000) * 0.004;
+}
+export function farRingHeight(x, z) {
+  const S = FAR_STEP;
+  const ix = Math.floor(x / S), iz = Math.floor(z / S);
+  const x0 = ix * S, z0 = iz * S, fx = (x - x0) / S, fz = (z - z0) / S;
+  const a = farRingVertex(x0, z0), d = farRingVertex(x0 + S, z0), b = farRingVertex(x0, z0 + S);
+  if (fx + fz <= 1) return a + (d - a) * fx + (b - a) * fz;
+  const c = farRingVertex(x0 + S, z0 + S);
+  return c + (b - c) * (1 - fx) + (d - c) * (1 - fz);
+}

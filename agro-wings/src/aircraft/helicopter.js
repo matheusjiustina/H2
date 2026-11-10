@@ -13,7 +13,7 @@ import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
 import { t } from '../i18n/index.js';
 import { UNITS } from '../config.js';
-import { POWERLINE, MAIN_SITE, padOf, WORLD_HALF } from '../world/layout.js';
+import { POWERLINE, MAIN_SITE, padOf, WORLD_HALF, EDGE_ROOM } from '../world/layout.js';
 import { approach, clamp, smoothstep, damp, KT, FT } from '../core/math.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
@@ -401,7 +401,9 @@ export class Helicopter {
     const fm = this.fm, o = fm.out;
     const att = FlightModel.attitude(fm, this._att || (this._att = {}));
     if (o.onGround && o.groundSpeed < 2 && (Math.abs(att.bank) > 0.7 || Math.abs(att.pitch) > 0.6)) this.flipT += dt; else this.flipT = 0;
-    const far = Math.abs(fm.pos.x) > WORLD_HALF - 100 || Math.abs(fm.pos.z) > WORLD_HALF - 100;
+    // Room past the map edge for a full balão at a field near it (the ground
+    // there is the horizon ring, flown exactly as drawn: farRingHeight).
+    const far = Math.abs(fm.pos.x) > WORLD_HALF + EDGE_ROOM || Math.abs(fm.pos.z) > WORLD_HALF + EDGE_ROOM;
     this.stuck = this.flipT > 2.5 || far;
     if (far) {
       this._toast('far', t('Leaving the farm area — turning back.'), 8);

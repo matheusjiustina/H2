@@ -150,3 +150,25 @@ test('access roads follow the terrain (grade ≤ 12 %) and are dirt surfaces', (
     assert.equal(td.surfaceAt(mx, mz), 'dirt');
   }
 });
+
+test('past the map edge: room for a balão, ground continuous with the map and the horizon ring', async () => {
+  const { EDGE_ROOM, WORLD_HALF: W } = await import('../src/world/layout.js');
+  const { farRingHeight } = await import('../src/world/terrainData.js');
+  assert.ok(EDGE_ROOM >= 500);
+  let step = 0, slope = 0;
+  for (let s = -W - EDGE_ROOM; s <= W + EDGE_ROOM; s += 37) {
+    for (const [ux, uz, vx, vz] of [[1, 0, 0, 1], [-1, 0, 0, 1], [0, 1, 1, 0], [0, -1, 1, 0]]) {
+      let prev = null;
+      for (let d = W - 100; d <= W + EDGE_ROOM + 50; d += 5) {
+        const x = ux * d + vx * s, z = uz * d + vz * s, h = td.heightAt(x, z);
+        if (prev !== null) step = Math.max(step, Math.abs(h - prev));
+        prev = h;
+        slope = Math.max(slope, slopeDeg(x, z));
+      }
+    }
+  }
+  assert.ok(step < 1.2, `largest 5 m step ${step}`);
+  assert.ok(slope < 8, `steepest ${slope}°`);
+  // 200 m past the edge the ground is the drawn horizon ring.
+  assert.ok(Math.abs(td.heightAt(W + 250, 1234) - farRingHeight(W + 250, 1234)) < 1e-6);
+});

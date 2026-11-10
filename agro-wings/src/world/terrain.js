@@ -10,7 +10,7 @@ import {
   WORLD_HALF, FAR_HALF, RUNWAY, BASE, FIELDS, ROADS, CREEK, FARM_SITES, WATER, SITES,
 } from './layout.js';
 import { biomeWeights } from './expansion.js';
-import { rawHeight } from './terrainData.js';
+import { rawHeight, farRingVertex, FAR_STEP } from './terrainData.js';
 import { makeGroundDetail } from '../core/textures.js';
 import { CUT_U, NCUT, CROP_U } from './cutState.js';
 
@@ -705,20 +705,13 @@ export function createTerrain(td, noiseTex) {
 }
 
 function createFarRing(mat) {
-  const step = 500;
+  const step = FAR_STEP;
   const n = (FAR_HALF * 2) / step;
   const pos = [], idx = [];
   for (let j = 0; j <= n; j++) {
     for (let i = 0; i <= n; i++) {
       const x = -FAR_HALF + i * step, z = -FAR_HALF + j * step;
-      let h = rawHeight(x, z) * 1.6;
-      const inside = Math.abs(x) < WORLD_HALF && Math.abs(z) < WORLD_HALF;
-      const onEdge = Math.abs(x) <= WORLD_HALF && Math.abs(z) <= WORLD_HALF && !inside;
-      if (inside) h = -60;
-      else if (onEdge) h = rawHeight(x, z) - 0.4;
-      // Fall off very slowly toward the horizon so the edge never shows.
-      h -= Math.max(0, Math.hypot(x, z) - 9000) * 0.004;
-      pos.push(x, h, z);
+      pos.push(x, farRingVertex(x, z), z); // (shared with the physics: farRingHeight)
     }
   }
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
