@@ -19,7 +19,9 @@ import { EXP_REGIONS, AUX_STRIPS, EXP_PROPS, EXP_PASTURES, EXP_FALLS, EXP_STREAM
 import { ATMO_U } from './atmosphere.js';
 import { rng } from '../core/math.js';
 
-const BUILD_R = 3200, RELEASE_R = 4600; // m beyond a region's own radius
+// m beyond a region's own radius: from the main base (every region's outline
+// is 2.85 km or more away) nothing is built, and a region left behind is released.
+const BUILD_R = 2000, RELEASE_R = 2800;
 const NEAR_R = 2500; // small items (markers, fences, troughs)
 const SCAN = 0.25;
 

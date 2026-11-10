@@ -4093,8 +4093,9 @@ are. The biome texture is held at zero near every strip, apron and field;
 the ground shader's pond list stays the original one.
 
 **Performance.** Nothing new is built at start except data: a region's
-meshes are built when the camera comes within 3.2 km of it and released
-beyond 4.6 km (one region per scan); everything is merged per material;
+meshes are built when the camera comes within 2.0 km of its outline and
+released beyond 2.8 km (one region per scan; from the main base every
+outline is 2.85 km or more away, so nothing is built there); everything is merged per material;
 markers, fences and troughs are hidden beyond 2.5 km; the waterfalls are
 animated in their shaders (no CPU), their mist only within 450 m and not on
 the low profile; trees use the existing streamed instanced cells; colliders
