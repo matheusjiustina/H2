@@ -2,7 +2,7 @@
 // model, panel, spray boom, crew service points, cameras, audio, load sheet)
 // reads it from the active aircraft's type, so a new aircraft is one entry
 // here plus its config, model and panel.
-import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_PA36, FLIGHT_AT802, FLIGHT_FIREBOSS, FLIGHT_AGCAT, FLIGHT_E201, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_PA36, SPRAY_AT802, SPRAY_AGCAT, SPRAY_E201, GAME } from '../config.js';
+import { FLIGHT, FLIGHT_AT502, FLIGHT_R44, FLIGHT_M18, FLIGHT_T510G, FLIGHT_B206, FLIGHT_E203, FLIGHT_A188, FLIGHT_PA36, FLIGHT_AT802, FLIGHT_FIREBOSS, FLIGHT_AGCAT, FLIGHT_E201, FLIGHT_AT401, SPRAY, SPRAY_AT502, SPRAY_M18, SPRAY_T510G, SPRAY_E203, SPRAY_A188, SPRAY_PA36, SPRAY_AT802, SPRAY_AGCAT, SPRAY_E201, SPRAY_AT401, GAME } from '../config.js';
 import { createAircraftModel, createContactShadow, wingY } from './model.js';
 import { createPanel } from './panel.js';
 import { createE203Panel } from './e203Panel.js';
@@ -29,6 +29,9 @@ import { AGCAT_CK } from './agcatCockpit.js';
 import { createE201Model, E201_SHADOW, E201_CABIN, e201WingY } from './e201Model.js';
 import { createE201Panel } from './e201Panel.js';
 import { E201_CK } from './e201Cockpit.js';
+import { createAT401Model, AT401_SHADOW, AT401_CABIN, at401WingY } from './at401Model.js';
+import { createAT401Panel } from './at401Panel.js';
+import { AT401_CK } from './at401Cockpit.js';
 import { FIREBOSS_EXPANSION } from '../game/expansions.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
@@ -669,7 +672,52 @@ AIRCRAFT_TYPES.e201 = {
   createShadow: () => createContactShadow(E201_SHADOW),
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'agcat', 'e201', 'at802', 'at802f'];
+// Air Tractor AT-401B (FLIGHT_AT401 on the radial branch): its own exterior
+// (at401Model.js) and cockpit (at401Cockpit.js, textures at401Panel.js).
+// Fictional registration.
+AIRCRAFT_TYPES.at401 = {
+  id: 'at401',
+  slot: '14',
+  parkSpot: 'parking12',
+  label: 'AT-401B',
+  reg: 'PR-ATR',
+  name: 'Air Tractor AT-401B',
+  get role() { return t('Radial Agricultural Aircraft'); },
+  get engineName() { return t('Pratt & Whitney R-1340 radial · 600 hp · Hamilton Standard 2-blade'); },
+  get summary() { return t('1,514 L hopper · 477 L fuel · 15.57 m span · 3,565 kg MTOW'); },
+  flight: FLIGHT_AT401,
+  spray: { swath: SPRAY_AT401.swath, flow: SPRAY_AT401.flow, boom: [6.6, at401WingY(6.6) - 0.25, -1.5] },
+  work: [[0, -1.53, 0.78], [6.5, at401WingY(6.5) - 0.42, -1.53], [-6.5, at401WingY(6.5) - 0.42, -1.53]],
+  collide: [[0, 0.2, 2.62], [7.78, 0.0, -0.45], [-7.78, 0.0, -0.45], [0, 2.27, -5.2], [0, 0.3, -5.5], [0, -1.53, 0.78], [0, 1.76, -1.5], [2.7, 0.76, -5.0], [-2.7, 0.76, -5.0]],
+  wire: [[0, 0.2, 2.62], [7.78, 0.0, -0.45], [-7.78, 0.0, -0.45], [0, 2.27, -5.2], [0, -1.53, 0.78], [3.8, -0.2, -0.45], [-3.8, -0.2, -0.45], [0, 1.9, -1.17]],
+  smoke: [-0.6, -0.43, 0.98], // exhaust stack outlet (right side, low)
+  wash: [0, -1.0, -2],
+  anim: { elev: 0.36, rud: 0.42, ail: 0.33, flap: 0.6, pedalZ: AT401_CK.pedals[2], propGear: 1, disc: [380, 900], wash: [1300, 2100], vib: [800, 2100] },
+  vspeeds: { vs0: 55, vs1: 68, vfe: 100, vne: 150 },
+  camera: { dist: 15, height: 4.4, orbit: 22, cockpitPitch: -0.22, cockpitFov: 68 },
+  // Nine-cylinder radial, direct drive, two blades: the radial sound profile.
+  audio: { profile: 'r985', blades: 2, propGear: 1 },
+  fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },
+  loads: { free: { fuel: 300, hopper: 800 }, boot: 160 },
+  loadSheet: { bankKt: 95, roll: [233, 2600, 2.05] }, // fit to the measured rolls (test/at401.test.mjs)
+  service: {
+    rates: { fuel: 5.5, liquid: 22 },
+    local: { A: [8.6, -2.4], B: [5.2, -2.2], F: [2.9, -1.9], P: [1.3, -0.4] },
+    keepOut: { wing: [7.8, -1.37, 0.46], wingY: at401WingY, fus: [0.66, -0.4, 1.77, -5.61, 2.62], stab: [2.7, 0.7, 0.85, -5.35, -4.35] },
+    veto: 10,
+  },
+  stub: { eye: AT401_CABIN.eye, fuelFiller: [2.4, at401WingY(2.4) + 0.15, -0.18], hopperPort: [0.6, -0.2, 0.0] },
+  bounds: [
+    [-0.66, 0.66, -0.45, 1.77, -5.61, 2.62], [-7.8, 7.8, -0.42, 0.12, -1.37, 0.46], [-0.06, 0.06, 0.4, 2.28, -5.61, -3.95],
+    [-2.7, 2.7, 0.7, 0.85, -5.35, -4.35], [1.27, 1.55, -1.53, -0.95, 0.5, 1.06], [-1.55, -1.27, -1.53, -0.95, 0.5, 1.06],
+    [-1.33, 1.33, -1.12, 1.53, 2.36, 2.62],
+  ],
+  createModel: (panel, opts) => createAT401Model(panel, opts),
+  createPanel: (opts) => createAT401Panel(opts),
+  createShadow: () => createContactShadow(AT401_SHADOW),
+};
+
+export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'agcat', 'e201', 'at401', 'at802', 'at802f'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
 
 // Registrations: each type keeps its factory marks as `reg0`; `reg` reads the

@@ -27,7 +27,7 @@ const point = (brg) => t(POINTS[Math.round(brg / 45) % 8]);
 const bearing = (dx, dz) => ((Math.atan2(dx, -dz) * 180) / Math.PI + 360) % 360;
 // Aircraft the strip takes, or every one; short names.
 const fleetFor = (f) => AIRCRAFT_ORDER.filter((id) => stripAllows(f, id));
-const AC_SHORT = { ipanema: 'Ipanema', at502: 'AT-502B', m18: 'M-18B Dromader', r44: 'R44', thrush: 'Thrush 510G', b206: 'Bell 206B', e203: 'Ipanema 203', a188: 'AgTruck', pa36: 'Brave', agcat: 'Ag-Cat', e201: 'Ipanema 201' };
+const AC_SHORT = { ipanema: 'Ipanema', at502: 'AT-502B', m18: 'M-18B Dromader', r44: 'R44', thrush: 'Thrush 510G', b206: 'Bell 206B', e203: 'Ipanema 203', a188: 'AgTruck', pa36: 'Brave', agcat: 'Ag-Cat', e201: 'Ipanema 201', at401: 'AT-401B' };
 const acName = (id) => AC_SHORT[id] ?? AIRCRAFT_TYPES[id].name;
 
 export function showOffice(screens, tab = 'inbox') {

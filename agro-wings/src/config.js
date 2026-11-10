@@ -962,6 +962,107 @@ export const SPRAY_AGCAT = {
   flow: 3.3,
 };
 
+// Air Tractor AT-401B (fictional PR-ATR): the radial Air Tractor. Published
+// figures (Air Tractor / reference works, cross-checked): P&W R-1340 nine-
+// cylinder radial, 600 hp take-off at 2,250 rpm, direct drive; Hamilton
+// Standard two-blade metal prop, 8.645 ft (2.63 m); span 51 ft 1¼ in
+// (15.57 m, the 401B's revised tips); length 27 ft (8.23 m); empty 4,135 lb
+// (1,876 kg), maximum 7,860 lb (3,565 kg); hopper 400 US gal (1,514 L);
+// fuel 126 US gal (477 L). The reference package's aircraft.cfg (an old
+// FS9 model, not imported) only confirmed the layout: root chord 6 ft,
+// mains 0.32 m ahead of the wing's leading edge, ≈ 10.8° three-point, flaps
+// to 20° / 45°. Derived here (not published): the polar from the AT-502's
+// (same family, same wing section): ≈ 68 kt clean / ≈ 55 kt with flaps at
+// the maximum weight (125 kg/m²); inertias scaled from mass and size.
+export const FLIGHT_AT401 = {
+  ...FLIGHT,
+  emptyMass: 1876,
+  mtow: 3565,
+  pilotMass: 85,
+  wingArea: 28.5,
+  span: 15.57,
+  chord: 1.83,
+  oswald: 0.8,
+  inertiaEmpty: [7200, 10400, 7600],
+
+  CL0: 0.3, CLa: 5.0, alphaStall: 0.27, alphaStallNeg: -0.2,
+  CD0: 0.062, // radial cowl, booms, wire cutters
+  CDflap: 0.06, CLflap: 0.8,
+  Cm0: 0.04, CmaWB: 0.25, CmaTail: -1.35, Cmq: -16, Cmde: 0.53, Cmflap: -0.06, // a big elevator for the nose-heavy hopper
+  Clb: -0.085, Clp: -0.52, Clr: 0.11, Clda: 0.08,
+  Cnb: 0.09, Cnr: -0.18, Cndr: 0.075, Cnda: -0.012,
+  CYb: -0.6, CYdr: 0.12,
+
+  engineType: 'radial',
+  maxPower: 447.4e3, // 600 hp take-off, sea level
+  propRadius: 1.318, // Hamilton Standard two-blade, 8.645 ft
+  maxRpm: 2250, // direct drive: prop rpm = crank rpm
+  idleRpm: 550,
+  radial: {
+    gear: 1.0,
+    crank: 2.8, // s of inertia starter before it catches
+    crankRpm: 170,
+    govThrottle: 0.36,
+    mpIdle: 12, mpMax: 36, mpAmbient: 29.6,
+    idleFrac: 0.03,
+    govFrac: 0.3,
+    etaStatic: 0.7,
+    etaCruise: 0.82,
+    discDrag: 0.1,
+    spool: 0.75,
+    lapse: true,
+  },
+  fuelFlowFull: 220 / 3600, // L/s of avgas at take-off power (≈ 58 gal/h, rich)
+  fuelFlowIdle: 18 / 3600,
+  fuelBurnScale: 2.5,
+  fuelDensity: 0.72,
+
+  fuelCapacity: 477, // 126 US gal in the wing tanks
+  hopperCapacity: 1514, // 400 US gal
+  liquidDensity: 1.0,
+  hopperOffsetZ: 0.6, // the hopper sits between the engine and the cockpit, ahead of the CG
+  fuelTankSpanY: 2.2,
+  loadByWeight: true,
+
+  // Spring main legs at the wing's leading edge (2.8 m track, 8.50-10
+  // tyres); the tailwheel on its spring under the rudder: ≈ 10.6° three-point.
+  gear: [
+    { name: 'mainL', p: [1.4, -1.53, 0.78], k: 160000, c: 16000, travel: 0.2, radius: 0.29, steer: false },
+    { name: 'mainR', p: [-1.4, -1.53, 0.78], k: 160000, c: 16000, travel: 0.2, radius: 0.29, steer: false },
+    { name: 'tail', p: [0, -0.37, -5.45], k: 45000, c: 4000, travel: 0.12, radius: 0.12, steer: true },
+  ],
+  tailSteer: 0.4,
+
+  hard: [
+    { name: 'wingtipL', p: [7.78, 0.0, -0.45] },
+    { name: 'wingtipR', p: [-7.78, 0.0, -0.45] },
+    { name: 'boomL', p: [6.5, -0.45, -1.5] },
+    { name: 'boomR', p: [-6.5, -0.45, -1.5] },
+    { name: 'prop', p: [0, -1.12, 2.35] },
+    { name: 'spinner', p: [0, 0.2, 2.62] },
+    { name: 'belly', p: [0, -0.4, -1.0] },
+    { name: 'tail', p: [0, 0.3, -5.5] },
+    { name: 'fin', p: [0, 2.27, -5.2] },
+    { name: 'stabL', p: [2.7, 0.76, -5.0] },
+    { name: 'stabR', p: [-2.7, 0.76, -5.0] },
+    { name: 'roof', p: [0, 1.76, -1.5] },
+  ],
+  hardLandingVs: 2.8,
+  crashVs: 5.3,
+
+  wheelPoint: [0, -1.53, 0.78],
+  aglOffset: 1.53,
+  wingDrop: 0.5,
+  assistSpeedScale: 1.12, // stall speed ratio to the PR-AGW at max weight
+};
+
+export const SPRAY_AT401 = {
+  // ≈ 13 m boom under the trailing edge: the AT-502's swath scaled by the
+  // boom span, the flow for the same dose at the 401's ≈ 105 kt working speed.
+  swath: 28,
+  flow: 5.4,
+};
+
 // ---------------------------------------------------------------------------
 // Air Tractor AT-802 family (fictional registrations): one airframe, two
 // configurations with their own mass, engine, equipment and physics.

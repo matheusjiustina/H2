@@ -24,7 +24,7 @@ function hash(a) { let h = 2166136261 >>> 0; const s = JSON.stringify(a); for (l
 const out = {};
 const rec = (name, trace, extra = {}) => { out[name] = { hash: hash(trace), n: trace.length, samples: trace.filter((_, i) => i % 8 === 0).slice(0, 12), ...extra }; };
 
-const PLANES = ['ipanema', 'at502', 'm18', 'thrush', 'e203', 'a188', 'pa36', 'agcat', 'e201', 'at802', 'at802f'].filter((k) => AIRCRAFT_TYPES[k]);
+const PLANES = ['ipanema', 'at502', 'm18', 'thrush', 'e203', 'a188', 'pa36', 'agcat', 'e201', 'at401', 'at802', 'at802f'].filter((k) => AIRCRAFT_TYPES[k]);
 // 1+2+5+6: loaded take-off, power step, turn + altitude change, short-field landing — per aeroplane, with and without wind.
 for (const id of PLANES) for (const wind of [false, true]) {
   const T = AIRCRAFT_TYPES[id], A = T.flight;
