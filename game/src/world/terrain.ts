@@ -105,7 +105,7 @@ export class Terrain {
     if (d === 'harbor') return shade(0xcbc7ba, 0.95 + n * 0.08);
     if (d === 'ocean') return Math.hypot(x - ISLAND.x, z - ISLAND.z) < ISLAND.r - 6 ? shade(PAL.lawn, 0.92 + n * 0.14) : shade(PAL.sand, 0.95);
     if (d === 'outskirts' || out) {
-      if (slope > 0.75) return shade(0x9a8f7a, 0.9 + n * 0.2);
+      if (slope > 0.9) return shade(0x7f9a6a, 0.9 + n * 0.15);
       const g = mix(PAL.grass, PAL.grassDark, n * 0.7 + clamp(h / 45, 0, 0.5));
       return h > 70 ? mix(g, 0xcfd3c8, clamp((h - 70) / 40, 0, 1)) : g;
     }

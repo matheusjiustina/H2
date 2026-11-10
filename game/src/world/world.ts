@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { clamp, lerp, Rect } from '../core/util';
 import { RNG } from '../core/rng';
 import { ChunkMesh, Geo } from '../render/geo';
-import { M, PAL } from '../render/materials';
+import { M, PAL, toonColor } from '../render/materials';
 import { BOUNDS, DistrictId, districtAt, POI, SEA, Zone } from './layout';
 import { RoadNet } from './roads';
 import { Terrain } from './terrain';
@@ -88,6 +88,10 @@ export class World {
   flags: { x: number; y: number; z: number; rot: number; s: number }[] = [];
   billboards: { x: number; y: number; z: number; rot: number; w: number; h: number; ad: number; lit: boolean }[] = [];
   waterMat!: THREE.ShaderMaterial;
+  ferris: { x: number; y: number; z: number; r: number } | null = null;
+  windmills: { x: number; y: number; z: number; rot: number }[] = [];
+  railLines: { x0: number; x1: number; z: number }[] = [];
+  gates = new Map<string, { solid: Solid; mesh: THREE.Mesh; open: boolean }>();
   tris = 0;
 
   // ------------------------------------------------------------------ solids
@@ -293,6 +297,25 @@ export class World {
   clampBounds(p: { x: number; z: number }) {
     p.x = clamp(p.x, BOUNDS.x0, BOUNDS.x1);
     p.z = clamp(p.z, BOUNDS.z0, BOUNDS.z1);
+  }
+
+  /** A barrier that missions can open and close (lockdown gates, the tunnel door…). */
+  addGate(id: string, x: number, z: number, w: number, d: number, y0: number, y1: number, rot: number, color: number, open = true) {
+    const solid = this.addBox(x, z, w, d, y0, y1, rot, { dynamic: true, tag: 'gate' });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, y1 - y0, d), toonColor(color));
+    mesh.position.set(x, (y0 + y1) / 2, z);
+    mesh.rotation.y = rot;
+    mesh.castShadow = true;
+    this.group.add(mesh);
+    this.gates.set(id, { solid, mesh, open });
+    this.setGate(id, open);
+  }
+  setGate(id: string, open: boolean) {
+    const g = this.gates.get(id);
+    if (!g) return;
+    g.open = open;
+    g.solid.on = !open;
+    g.mesh.visible = !open;
   }
 
   // ------------------------------------------------------------------ build

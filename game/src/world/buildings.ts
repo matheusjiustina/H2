@@ -118,6 +118,39 @@ function rooftop(w: World, b: MeshBuilder, x: number, z: number, bw: number, bd:
   }
 }
 
+/** Glass curtain wall shaft: spandrel bands, mullions and randomly lit panels. */
+export function curtain(w: World, x: number, z: number, sw: number, sd: number, y0: number, y1: number, glass: Col, frame: Col, rot = 0, lit = 0.45, solid = true) {
+  const b = w.geo.at('world', x, z), g = w.geo.at('glow', x, z);
+  const sh = y1 - y0;
+  b.box(x, y0 + sh / 2, z, sw, sh, sd, glass, rot, 8, 0x8e8a86);
+  const cs = Math.cos(rot), sn = Math.sin(rot);
+  for (const [nx, nz, fw, dist] of [[0, 1, sw, sd / 2], [0, -1, sw, sd / 2], [1, 0, sd, sw / 2], [-1, 0, sd, sw / 2]]) {
+    const rxl = nz, rzl = -nx;
+    const rwx = rxl * cs + rzl * sn, rwz = -rxl * sn + rzl * cs;
+    const nwx = nx * cs + nz * sn, nwz = -nx * sn + nz * cs;
+    const ox = x + nx * dist * cs + nz * dist * sn, oz = z - nx * dist * sn + nz * dist * cs;
+    const fl = 3.6;
+    const nf = Math.max(1, Math.floor(sh / fl));
+    for (let f = 1; f <= nf; f++)
+      b.wallQuad(ox + nwx * 0.12 - rwx * (fw / 2), y0 + f * fl - 0.5, oz + nwz * 0.12 - rwz * (fw / 2), rwx, rwz, fw, 0.5, f % 4 === 0 ? shade(frame, 0.8) : frame);
+    const nb = Math.max(2, Math.round(fw / 3.4));
+    for (let k = 0; k <= nb; k++) {
+      const off = -fw / 2 + (fw * k) / nb - 0.1;
+      b.wallQuad(ox + nwx * 0.18 + rwx * off, y0, oz + nwz * 0.18 + rwz * off, rwx, rwz, 0.2, sh, frame);
+    }
+    const cellW = fw / nb;
+    const count = Math.round(nf * nb * 0.2);
+    for (let c = 0; c < count; c++) {
+      const f = w.rng.int(0, nf - 1), k = w.rng.int(0, nb - 1);
+      const off = -fw / 2 + k * cellW + 0.15;
+      const isLit = w.rng.chance(lit);
+      (isLit ? g : b).wallQuad(ox + nwx * 0.07 + rwx * off, y0 + f * fl + 0.05, oz + nwz * 0.07 + rwz * off, rwx, rwz, cellW - 0.3, fl - 0.6,
+        shade(glass, isLit ? 1.3 : w.rng.range(1.1, 1.28)));
+    }
+  }
+  if (solid) w.addBox(x, z, sw, sd, y0 - 0.01, y1, rot);
+}
+
 export interface TowerOpts {
   glass: Col;
   frame?: Col;
@@ -128,57 +161,24 @@ export interface TowerOpts {
   podium?: number;
 }
 
-/** Glass curtain-wall tower with spandrel bands, mullions, podium and crown. Returns roof height. */
+/** Glass tower with podium and crown. Returns roof height. */
 export function tower(w: World, x: number, z: number, bw: number, bd: number, h: number, o: TowerOpts): number {
   const rot = o.rot ?? 0;
-  const b = w.geo.at('world', x, z), g = w.geo.at('glow', x, z);
-  const frame = o.frame ?? shade(o.glass, 0.55);
+  const b = w.geo.at('world', x, z);
+  const frame = o.frame ?? shade(o.glass, 0.66);
   const base = o.base ?? PAL.stone;
   const pod = o.podium ?? 7;
   b.box(x, SLAB_Y + pod / 2, z, bw + 1.2, pod, bd + 1.2, base, rot, 8);
   windows(w, x, z, bw + 1.2, bd + 1.2, rot, SLAB_Y, 1, { floorH: pod, w: 3.2, h: pod - 2.6, gap: 1.4, sill: 0.6, glass: PAL.glassDark, frame: PAL.dark, lit: 0.6, margin: 1.5 });
-  const shaft = (sw: number, sd: number, y0: number, y1: number) => {
-    const sh = y1 - y0;
-    b.box(x, y0 + sh / 2, z, sw, sh, sd, o.glass, rot, 8, 0x8e8a86);
-    const cs = Math.cos(rot), sn = Math.sin(rot);
-    for (const [nx, nz, fw, dist] of [[0, 1, sw, sd / 2], [0, -1, sw, sd / 2], [1, 0, sd, sw / 2], [-1, 0, sd, sw / 2]]) {
-      const rxl = nz, rzl = -nx;
-      const rwx = rxl * cs + rzl * sn, rwz = -rxl * sn + rzl * cs;
-      const nwx = nx * cs + nz * sn, nwz = -nx * sn + nz * cs;
-      const ox = x + (nx * dist) * cs + (nz * dist) * sn, oz = z - (nx * dist) * sn + (nz * dist) * cs;
-      // spandrel bands
-      const fl = 3.6;
-      const nf = Math.floor(sh / fl);
-      for (let f = 1; f <= nf; f++)
-        b.wallQuad(ox + nwx * 0.1 - rwx * (fw / 2), y0 + f * fl - 0.5, oz + nwz * 0.1 - rwz * (fw / 2), rwx, rwz, fw, 0.5, f % 4 === 0 ? shade(frame, 0.8) : frame);
-      // mullions
-      const nb = Math.max(2, Math.round(fw / 3.4));
-      for (let k = 0; k <= nb; k++) {
-        const off = -fw / 2 + (fw * k) / nb - 0.1;
-        b.wallQuad(ox + nwx * 0.14 + rwx * off, y0, oz + nwz * 0.14 + rwz * off, rwx, rwz, 0.2, sh, frame);
-      }
-      // random lit / light panels
-      const cellW = fw / nb;
-      const count = Math.round(nf * nb * 0.2);
-      for (let c = 0; c < count; c++) {
-        const f = w.rng.int(0, nf - 1), k = w.rng.int(0, nb - 1);
-        const off = -fw / 2 + k * cellW + 0.15;
-        const lit = w.rng.chance(o.lit ?? 0.45);
-        (lit ? g : b).wallQuad(ox + nwx * 0.07 + rwx * off, y0 + f * fl + 0.05, oz + nwz * 0.07 + rwz * off, rwx, rwz, cellW - 0.3, fl - 0.6,
-          lit ? PAL.windowLight : shade(o.glass, w.rng.range(1.12, 1.35)));
-      }
-    }
-    w.addBox(x, z, sw, sd, y0 - 0.01, y1, rot);
-  };
-  const top = SLAB_Y + h;
   w.addBox(x, z, bw + 1.2, bd + 1.2, 0, SLAB_Y + pod, rot);
+  const top = SLAB_Y + h;
   const crown = o.crown ?? 'flat';
   if (crown === 'step') {
     const h1 = SLAB_Y + pod + (h - pod) * 0.72;
-    shaft(bw, bd, SLAB_Y + pod, h1);
-    shaft(bw * 0.7, bd * 0.7, h1, top);
+    curtain(w, x, z, bw, bd, SLAB_Y + pod, h1, o.glass, frame, rot, o.lit);
+    curtain(w, x, z, bw * 0.7, bd * 0.7, h1, top, o.glass, frame, rot, o.lit);
   } else {
-    shaft(bw, bd, SLAB_Y + pod, top);
+    curtain(w, x, z, bw, bd, SLAB_Y + pod, top, o.glass, frame, rot, o.lit);
     if (crown === 'spire') {
       b.pyramid(x, top, z, bw * 0.55, bd * 0.55, h * 0.16, frame, rot);
       b.cyl(x, top + h * 0.14, z, 0.25, 0.08, h * 0.14, 4, PAL.dark);

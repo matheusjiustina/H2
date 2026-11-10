@@ -1,18 +1,22 @@
+import '@fontsource/bangers';
+import '@fontsource/barlow-condensed/600.css';
+import '@fontsource/barlow-condensed/700.css';
 import * as THREE from 'three';
 import { Renderer } from './render/renderer';
 import { Atmosphere } from './render/sky';
-import { World } from './world/world';
+import { buildWorld } from './world/build';
 import { shared } from './render/materials';
 import { defaultSettings } from './core/save';
 
+await Promise.race([Promise.all([document.fonts.load('32px Bangers'), document.fonts.load('700 32px "Barlow Condensed"')]), new Promise((r) => setTimeout(r, 2500))]);
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 document.body.style.margin = '0';
 document.body.style.overflow = 'hidden';
 const r = new Renderer(canvas);
 const scene = new THREE.Scene();
 const cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.4, 2500);
-const world = new World();
-world.finish();
+const world = buildWorld();
+
 scene.add(world.group);
 const atmo = new Atmosphere(scene);
 const q = new URLSearchParams(location.search);

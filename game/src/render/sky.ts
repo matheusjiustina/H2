@@ -20,14 +20,14 @@ interface Key {
 }
 
 const NIGHT: Omit<Key, 't'> = { zen: 0x0d1230, hor: 0x252d5c, sun: 0x8ea2ff, sunI: 1.0, hs: 0x4450a0, hg: 0x1f2440, hi: 1.5, fog: 0x1c2250, cloud: 0x4a548e, night: 1 };
-const DAY: Omit<Key, 't'> = { zen: 0x4fb9d6, hor: 0xa9e3e0, sun: 0xfff1d0, sunI: 3.0, hs: 0xaab8ff, hg: 0xe6d6b0, hi: 1.95, fog: 0xbfe6e2, cloud: 0xffffff, night: 0 };
+const DAY: Omit<Key, 't'> = { zen: 0x4fb9d6, hor: 0xa9e3e0, sun: 0xfff1d0, sunI: 2.7, hs: 0xbcc8ff, hg: 0xeadcb8, hi: 2.5, fog: 0xbfe6e2, cloud: 0xffffff, night: 0 };
 const KEYS: Key[] = [
   { t: 0, ...NIGHT },
   { t: 5, ...NIGHT },
   { t: 6.4, zen: 0x5a6fae, hor: 0xffb48a, sun: 0xffa772, sunI: 2.0, hs: 0x9a94d0, hg: 0xd8a888, hi: 1.6, fog: 0xf0bfa0, cloud: 0xffd0b8, night: 0.3 },
   { t: 8.2, ...DAY },
   { t: 15.5, ...DAY },
-  { t: 17.4, zen: 0x5fb1d2, hor: 0xf6dba8, sun: 0xffd08a, sunI: 2.9, hs: 0xa8a8ee, hg: 0xe8cfa0, hi: 1.85, fog: 0xead9b6, cloud: 0xfff0d8, night: 0 },
+  { t: 17.4, zen: 0x5fb1d2, hor: 0xf6dba8, sun: 0xffd08a, sunI: 2.7, hs: 0xb4b0f0, hg: 0xe8cfa0, hi: 2.3, fog: 0xead9b6, cloud: 0xfff0d8, night: 0 },
   { t: 19.2, zen: 0x47508f, hor: 0xff9860, sun: 0xff8a50, sunI: 2.1, hs: 0x8a80c4, hg: 0xd89870, hi: 1.55, fog: 0xe8a580, cloud: 0xffb492, night: 0.4 },
   { t: 20.6, ...NIGHT },
   { t: 24, ...NIGHT },

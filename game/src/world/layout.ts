@@ -148,11 +148,11 @@ export interface POI {
   y?: number;
 }
 export const P = {
-  tower: { x: -65, z: -2 },
-  towerDoor: { x: -65, z: 26 },
-  towerElevator: { x: -65, z: -16 },
-  towerRoof: { x: -65, z: -2, y: 150 },
-  helipad: { x: -65, z: -2, y: 150 },
+  tower: { x: -65, z: 4 },
+  towerDoor: { x: -65, z: 33 },
+  towerElevator: { x: -65, z: -14 },
+  towerRoof: { x: -65, z: 6, y: 150 },
+  helipad: { x: -65, z: 8, y: 150 },
   square: { x: -65, z: 105 },
   garage: { x: -70, z: 126, y: -5 },
   garageRamp: { x: -105, z: 66 },
@@ -179,7 +179,7 @@ export const P = {
   school: { x: -500, z: 10 },
   mall: { x: -395, z: 100 },
   park: { x: -605, z: 105 },
-  safeSuburb: { x: -706, z: 196 },
+  safeSuburb: { x: -718.5, z: 216 },
   safeBeach: { x: -520, z: 285 },
   safeHarbor: { x: 240, z: 285 },
   safeDesert: { x: 742, z: -205 },

@@ -247,14 +247,7 @@ export function slab(w: World, r: Rect, o: SlabOpts = {}) {
   const y = SLAB_Y + 0.012;
   if (o.inner !== undefined) {
     const m = o.innerInset ?? 3.2;
-    const cx = rectCx(r), cz = rectCz(r), sw = r.x1 - r.x0 - m * 2, sd = r.z1 - r.z0 - m * 2;
-    const nx = Math.max(1, Math.ceil(sw / 70)), nz = Math.max(1, Math.ceil(sd / 70));
-    if (sw > 1 && sd > 1)
-      for (let i = 0; i < nx; i++)
-        for (let j = 0; j < nz; j++) {
-          const tx = cx - sw / 2 + (sw * (i + 0.5)) / nx, tz = cz - sd / 2 + (sd * (j + 0.5)) / nz;
-          w.geo.at('decal', tx, tz).flat(tx, y, tz, sw / nx, sd / nz, o.inner);
-        }
+    patch(w, { x0: r.x0 + m, z0: r.z0 + m, x1: r.x1 - m, z1: r.z1 - m }, o.inner, y, h ? { x0: h.x0 - 0.6, x1: h.x1 + 0.6, z0: h.z0 - 0.6, z1: h.z1 + 0.6 } : undefined);
   }
   if (o.joints !== false) {
     // expansion joints across the sidewalk ring
@@ -271,9 +264,17 @@ export function slab(w: World, r: Rect, o: SlabOpts = {}) {
   }
 }
 
-/** Coloured ground patch on top of a slab (lawns, plazas, courts). */
-export function patch(w: World, r: Rect, c: Col, y = SLAB_Y + 0.02) {
+/** Coloured ground patch on top of a slab (lawns, plazas, courts). `hole` leaves a rectangular cut-out. */
+export function patch(w: World, r: Rect, c: Col, y = SLAB_Y + 0.02, hole?: Rect) {
+  if (hole) {
+    if (hole.z0 > r.z0) patch(w, { x0: r.x0, x1: r.x1, z0: r.z0, z1: hole.z0 }, c, y);
+    if (hole.z1 < r.z1) patch(w, { x0: r.x0, x1: r.x1, z0: hole.z1, z1: r.z1 }, c, y);
+    if (hole.x0 > r.x0) patch(w, { x0: r.x0, x1: hole.x0, z0: Math.max(r.z0, hole.z0), z1: Math.min(r.z1, hole.z1) }, c, y);
+    if (hole.x1 < r.x1) patch(w, { x0: hole.x1, x1: r.x1, z0: Math.max(r.z0, hole.z0), z1: Math.min(r.z1, hole.z1) }, c, y);
+    return;
+  }
   const sw = r.x1 - r.x0, sd = r.z1 - r.z0;
+  if (sw <= 0 || sd <= 0) return;
   const nx = Math.max(1, Math.ceil(sw / 70)), nz = Math.max(1, Math.ceil(sd / 70));
   for (let i = 0; i < nx; i++)
     for (let j = 0; j < nz; j++) {
