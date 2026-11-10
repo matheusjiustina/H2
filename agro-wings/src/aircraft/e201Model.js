@@ -58,9 +58,15 @@ export const E201_SHADOW = { W: 13.4, L: 9.4, wing: [5.9, -1.28, 0.43], fus: [0.
 // band (PT-UCV, the yellow 201 in flight, PT-UDY): a straight band along
 // the side that widens over the tail cone, blue fin cap and wing tips.
 const GREEN = '#1d6b3b', YELLOW = '#f2c419', WHITE = '#f3f3ee', BLUE = '#233a92', ORANGE = '#f2a21a', NAVY = '#1c2a6e';
+const LIME = '#4fbf34', DEEPBLUE = '#1b2a78', MIDBLUE = '#2f62c4';
 export const E201_LIVERIES = [
   { id: 'brasil', name: 'Paint A — green, Brazilian flag', base: GREEN, roof: GREEN, frame: GREEN, wing: GREEN, tip: YELLOW, stab: GREEN, gear: '#2b2f33', text: WHITE, seam: 'rgba(8,24,14,0.35)', rivet: 'rgba(6,18,10,0.3)' },
   { id: 'azul', name: 'Paint B — yellow-orange, blue band', base: ORANGE, roof: ORANGE, frame: ORANGE, wing: ORANGE, tip: BLUE, stab: ORANGE, gear: ORANGE, text: NAVY, seam: 'rgba(90,60,0,0.3)', rivet: 'rgba(80,55,0,0.28)' },
+  // C — bright Brazilian green with dark-blue sweeping graphics (after the
+  // green SAE operator Ipanemas): two curved blue bands from the cowl up
+  // under the cabin windows and down the tail cone, the registration in
+  // blue under them, the flag on the fin; green wings and tips.
+  { id: 'verde', name: 'Paint C — green, blue graphics', base: LIME, roof: LIME, frame: LIME, wing: LIME, tip: LIME, stab: LIME, gear: '#2b2f33', text: DEEPBLUE, seam: 'rgba(14,50,10,0.32)', rivet: 'rgba(10,40,8,0.28)' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -68,28 +74,30 @@ export const E201_LIVERIES = [
 // the cowl lip just larger than the spinner, opening out to the firewall;
 // the hopper bay squaring into the cabin's straight sides.
 const FWD_KEYS = [
-  K(2.16, 0.235, 0.11, -0.12, 0.28, 2.3, 2.2),
-  K(2.04, 0.29, 0.09, -0.2, 0.34, 2.5, 2.4),
-  K(1.75, 0.36, 0.06, -0.3, 0.41, 2.9, 2.8),
-  K(1.35, 0.415, 0.03, -0.38, 0.46, 3.4, 3.2),
-  K(1.03, 0.445, 0.01, -0.43, 0.49, 3.8, 3.6),
-  K(0.5, 0.475, -0.02, -0.48, 0.55, 4.4, 4.2),
-  K(0.0, 0.485, -0.03, -0.49, 0.6, 5.5, 5),
-  K(-0.47, 0.485, -0.03, -0.49, 0.62, 9, 6),
+  K(2.16, 0.225, 0.11, -0.11, 0.27, 2.4, 2.2),
+  K(2.04, 0.275, 0.09, -0.18, 0.33, 2.6, 2.4),
+  K(1.75, 0.335, 0.06, -0.27, 0.4, 3.0, 2.8),
+  K(1.35, 0.385, 0.03, -0.35, 0.45, 3.4, 3.2),
+  K(1.03, 0.415, 0.01, -0.4, 0.49, 3.8, 3.6),
+  K(0.5, 0.445, -0.02, -0.45, 0.55, 4.4, 4.2),
+  K(0.0, 0.46, -0.03, -0.46, 0.6, 5.5, 5),
+  K(-0.47, 0.46, -0.03, -0.46, 0.62, 9, 6),
 ];
 // Cabin and the aft fuselage: a box under the longerons (straight sides,
 // superellipse belly) and over it one shell (cabin, rear fairing, dorsal)
 // whose crest follows CREST. [z, half width, longeron y, side→belly y,
 // bottom y, belly exponent].
-export const CAB = { wsB: -0.47, roofF: -0.85, roofR: -1.57, bPost: -1.5, win: -1.95, fair: -2.14, sill: 0.6, roof: 1.21, end: -4.5 };
+export const CAB = { wsB: -0.47, roofF: -0.85, roofR: -1.57, bPost: -1.5, win: -1.95, fair: -2.14, sill: 0.47, roof: 1.21, end: -4.5 };
 const BOX = [
-  [CAB.wsB, 0.485, 0.6, -0.03, -0.49, 6],
-  [-1.2, 0.485, 0.6, -0.03, -0.475, 5.6],
-  [CAB.fair, 0.465, 0.58, -0.02, -0.42, 4.8],
-  [-3.0, 0.395, 0.53, 0.0, -0.33, 4.2],
-  [-3.8, 0.27, 0.47, 0.04, -0.22, 3.5],
-  [-4.25, 0.16, 0.43, 0.07, -0.15, 3.0],
-  [CAB.end, 0.075, 0.42, 0.1, -0.11, 2.6],
+  [CAB.wsB, 0.46, 0.6, -0.03, -0.46, 6],
+  [-0.7, 0.46, CAB.sill, -0.03, -0.46, 5.8],
+  [-1.2, 0.46, CAB.sill, -0.03, -0.45, 5.6],
+  [CAB.win, 0.445, CAB.sill + 0.01, -0.025, -0.415, 5.0],
+  [CAB.fair, 0.43, 0.5, -0.02, -0.4, 4.8],
+  [-3.0, 0.33, 0.5, 0.0, -0.29, 4.2],
+  [-3.8, 0.215, 0.46, 0.04, -0.17, 3.5],
+  [-4.25, 0.135, 0.43, 0.07, -0.11, 3.0],
+  [CAB.end, 0.07, 0.42, 0.1, -0.08, 2.6],
 ];
 const CREST = [[CAB.wsB, 0.62], [-0.6, 0.83], [-0.72, 1.02], [-0.8, 1.14], [-0.86, 1.195], [-1.2, 1.215], [-1.57, 1.2],
   [-1.72, 1.13], [-1.9, 0.94], [-2.05, 0.74], [-2.2, 0.66], [-2.6, 0.635], [-3.37, 0.6], [-4.0, 0.545], [CAB.end, 0.5]];
@@ -161,7 +169,7 @@ function liveryTextures(reg, L = E201_LIVERIES[0]) {
   const g = c.getContext('2d'), gb = b.getContext('2d');
   gb.fillStyle = '#808080'; gb.fillRect(0, 0, LV.W, LV.H);
   orangePeel(gb, LV.W, LV.H, 83);
-  const brasil = L.id === 'brasil';
+  const brasil = L.id === 'brasil', verde = L.id === 'verde';
   for (const side of [1, -1]) {
     const P = (z, y) => lvPix(side, z, y);
     const oy = side > 0 ? 0 : LV.H / 2;
@@ -181,14 +189,38 @@ function liveryTextures(reg, L = E201_LIVERIES[0]) {
     g.save();
     g.beginPath(); g.rect(0, oy, LV.W, LV.H / 2); g.clip();
     g.fillStyle = L.base; g.fillRect(0, oy, LV.W, LV.H / 2);
-    if (brasil) {
-      // Cheat line: yellow over white, straight from the cowl to the tail
-      // post (it follows the fuselage's side, where the sides are flat).
-      poly([[2.2, 0.06], [-4.6, 0.2], [-4.6, 0.25], [2.2, 0.11]], YELLOW);
-      poly([[2.2, 0.035], [-4.6, 0.175], [-4.6, 0.19], [2.2, 0.05]], WHITE);
+    if (brasil || verde) {
+      if (brasil) {
+        // Cheat line: yellow over white, straight from the cowl to the tail
+        // post (it follows the fuselage's side, where the sides are flat).
+        poly([[2.2, 0.06], [-4.6, 0.2], [-4.6, 0.25], [2.2, 0.11]], YELLOW);
+        poly([[2.2, 0.035], [-4.6, 0.175], [-4.6, 0.19], [2.2, 0.05]], WHITE);
+      } else {
+        // Sweeping bands: a centre line (z, y) through Catmull-Rom points
+        // with a half thickness that tapers to points at both ends.
+        const band = (pts, half, fill) => {
+          const S = [];
+          for (let i = 0; i < pts.length - 1; i++) for (let k = 0; k < 12; k++) {
+            const t = k / 12, p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+            const cr = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
+            S.push([cr(p0[0], p1[0], p2[0], p3[0]), cr(p0[1], p1[1], p2[1], p3[1])]);
+          }
+          S.push(pts[pts.length - 1]);
+          const n = S.length, up = [], dn = [];
+          for (let i = 0; i < n; i++) {
+            const f = i / (n - 1), w = half * Math.min(1, f / 0.12, (1 - f) / 0.3) ** 0.7;
+            up.push([S[i][0], S[i][1] + w]); dn.push([S[i][0], S[i][1] - w]);
+          }
+          poly(up.concat(dn.reverse()), fill);
+        };
+        band([[2.0, 0.02], [1.1, 0.12], [0.1, 0.25], [-1.0, 0.31], [-2.1, 0.26], [-3.3, 0.15], [-4.45, 0.12]], 0.075, DEEPBLUE);
+        band([[1.75, -0.06], [0.8, 0.03], [-0.4, 0.13], [-1.6, 0.15], [-2.8, 0.06], [-4.2, 0.0]], 0.026, MIDBLUE);
+        band([[0.45, 0.38], [-0.3, 0.41], [-1.2, 0.43], [-2.0, 0.4]], 0.016, DEEPBLUE);
+      }
       // Fin and rudder: the flag — the yellow rhombus, the blue globe with
       // its white band (proportions of the flag, fitted to the fin's middle).
       const cz = -4.27, cy = 1.06, hz = 0.52, hy = 0.36;
+      if (verde) poly([[-3.47, 0.72], [-4.95, 0.72], [-4.95, 1.43], [-3.9, 1.43]], '#0f8a3a'); // the flag's own green on the lime fin
       poly([[cz + hz, cy], [cz, cy + hy], [cz - hz, cy], [cz, cy - hy]], YELLOW);
       const [gx, gy] = P(cz, cy);
       const rg = 0.2 * LV.ky;
@@ -198,9 +230,17 @@ function liveryTextures(reg, L = E201_LIVERIES[0]) {
       g.beginPath(); g.ellipse(gx + (side > 0 ? 1 : -1) * 0.12 * LV.kx, gy + 0.33 * LV.ky, 0.36 * LV.kx, 0.36 * LV.ky, 0, side > 0 ? 3.75 : -0.6, side > 0 ? 4.35 : 0.0); g.stroke();
       g.fillStyle = WHITE;
       for (let k = 0; k < 9; k++) { const r = rng(5 + k); const [sx, sy] = P(cz - 0.12 + r() * 0.24, cy - 0.1 + r() * 0.12); g.fillRect(sx, sy, 2, 2); }
-      text(-3.25, 0.37, reg, 0.24, L.text, 'bold', 1.1);
-      text(1.62, 0.25, 'IPANEMA', 0.085, YELLOW, 'italic bold', 1.05);
-      text(-1.95, 0.42, 'RESTRITA', 0.032, WHITE, 'bold');
+      if (brasil) {
+        text(-3.25, 0.37, reg, 0.24, L.text, 'bold', 1.1);
+        text(1.62, 0.25, 'IPANEMA', 0.085, YELLOW, 'italic bold', 1.05);
+        text(-1.95, 0.42, 'RESTRITA', 0.032, WHITE, 'bold');
+      } else {
+        text(-2.75, -0.1, reg, 0.22, DEEPBLUE, 'bold', 1.05);
+        text(-2.75, 0.43, 'SERVIÇO AÉREO', 0.034, '#141a22', 'bold');
+        text(-2.75, 0.385, 'ESPECIALIZADO', 0.034, '#141a22', 'bold');
+        text(-1.55, 0.37, 'RESTRITA', 0.032, '#f4f4ee', 'bold');
+        text(-4.22, 0.64, 'IPANEMA', 0.07, DEEPBLUE, 'bold', 1.05);
+      }
     } else {
       // Blue band, straight from the cowl lip to the tail; over the cone it
       // drops to cover the lower rear fuselage and the rudder's foot; a fine
@@ -213,7 +253,7 @@ function liveryTextures(reg, L = E201_LIVERIES[0]) {
       text(1.62, 0.32, 'IPANEMA', 0.075, NAVY, 'italic bold', 1.05);
       text(-1.95, 0.45, 'RESTRITA', 0.032, NAVY, 'bold');
     }
-    text(-4.25, 1.3, 'EMB-201A', 0.04, brasil ? WHITE : NAVY, 'bold');
+    if (!verde) text(-4.25, 1.3, 'EMB-201A', 0.04, brasil ? WHITE : NAVY, 'bold');
     // Belly grime and the exhaust streak (left side).
     const [, belly] = P(0, -0.36);
     const grd = g.createLinearGradient(0, belly, 0, oy + LV.H / 2);
@@ -230,10 +270,10 @@ function liveryTextures(reg, L = E201_LIVERIES[0]) {
     // cabin frames, the left door, aft frames, the tail access door.
     const seams = [
       [[2.16, -0.12], [2.16, 0.28]], [[1.03, -0.43], [1.03, 0.49]], [[2.05, 0.08], [1.1, 0.04]], [[1.9, 0.3], [1.15, 0.38]],
-      [[0.5, -0.48], [0.5, 0.55]], [[CAB.wsB, -0.49], [CAB.wsB, 0.6]], [[CAB.fair, -0.42], [CAB.fair, 0.6]],
+      [[0.5, -0.48], [0.5, 0.55]], [[CAB.wsB, -0.46], [CAB.wsB, 0.6]], [[CAB.fair, -0.4], [CAB.fair, 0.5]],
       [[-2.9, -0.34], [-2.9, 0.55]], [[-3.6, -0.25], [-3.6, 0.5]], [[0.5, -0.25], [CAB.fair, -0.24]], [[CAB.fair, -0.24], [-4.4, -0.1]],
     ];
-    if (side > 0) seams.push([[-0.62, 0.58], [-0.62, -0.05], [-1.45, -0.05], [-1.45, 0.58]]);
+    if (side > 0) seams.push([[-0.62, CAB.sill - 0.01], [-0.62, -0.05], [-1.45, -0.05], [-1.45, CAB.sill - 0.01]]);
     for (const s of seams) {
       line(g, s, L.seam, 2); line(gb, s, '#3c3c3c', 2.6);
       for (let q = 0; q < s.length - 1; q++) {
@@ -252,7 +292,7 @@ function liveryTextures(reg, L = E201_LIVERIES[0]) {
       g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.arc(px, py, 2.4, 0, Math.PI * 2); g.fill();
     }
     for (let k = 0; k < 5; k++) line(g, [[1.3 - k * 0.06, -0.2], [1.27 - k * 0.06, -0.32]], 'rgba(0,0,0,0.45)', 3);
-    text(0.75, -0.36, 'AVGAS 100', 0.03, brasil ? 'rgba(240,240,236,0.8)' : 'rgba(30,30,30,0.7)', 'bold');
+    text(0.75, -0.36, 'AVGAS 100', 0.03, brasil || verde ? 'rgba(240,240,236,0.8)' : 'rgba(30,30,30,0.7)', 'bold');
     speckle(g, 0, oy, LV.W, LV.H / 2, 2400, side > 0 ? 41 : 42, 0.08);
     g.restore();
   }
@@ -546,8 +586,9 @@ export function createE201Model(panel, opts = {}) {
     // Visor: the roof's front edge stands proud of the windshield's top.
     add('roof', grid((u, v) => { const t = lerp(TW - 0.01, 1 - TW + 0.01, u); const p = shellP(CAB.roofF + 0.05, t), q = shellP(CAB.roofF - 0.06, t); return lerp3([p[0] * 1.02, p[1] + 0.012, CAB.roofF + 0.05], [q[0], q[1] + 0.012, q[2]], v); }, 16, 2));
     // Door (left): handle and hinges on the sill side.
-    const dh = shellP(-1.32, 0.1);
-    add('steel', rod([dh[0] + 0.015, dh[1], dh[2] + 0.07], [dh[0] + 0.015, dh[1], dh[2] - 0.07], 0.008, 6), true);
+    // (On the door frame at the sill, under the window — not in the glass.)
+    const dh = shellP(-1.36, 0.003);
+    add('steel', rod([dh[0] + 0.03, dh[1] - 0.035, dh[2] + 0.07], [dh[0] + 0.03, dh[1] - 0.035, dh[2] - 0.07], 0.008, 6), true);
   }
   // Mast over the windshield and the wire to the fin top; a whip aerial.
   const mastTop = [0, CAB.roof + 0.1, CAB.roofF - 0.02];

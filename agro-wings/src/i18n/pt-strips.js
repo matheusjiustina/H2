@@ -182,6 +182,7 @@ export default {
   'Lycoming IO-540-K1J5D · 300 hp · Hartzell 2-blade': 'Lycoming IO-540-K1J5D · 300 hp · Hartzell bipá',
   '680 L hopper · 292 L fuel · 11.69 m span · 1,800 kg MTOW': 'Hopper 680 L · combustível 292 L · envergadura 11,69 m · PMD 1.800 kg',
   'Green, Brazilian flag': 'Verde, bandeira do Brasil',
+  'Green, blue graphics': 'Verde, grafismos azuis',
   'Radial Agricultural Aircraft': 'Avião agrícola radial',
   'Pratt & Whitney R-1340 radial · 600 hp · Hamilton Standard 2-blade': 'Radial Pratt & Whitney R-1340 · 600 hp · Hamilton Standard bipá',
   '1,514 L hopper · 477 L fuel · 15.57 m span · 3,565 kg MTOW': 'Hopper 1.514 L · combustível 477 L · envergadura 15,57 m · PMD 3.565 kg',
