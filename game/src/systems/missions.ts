@@ -547,11 +547,7 @@ export class Missions {
         this.startBeam.position.set(nx.where.x, y, nx.where.z);
         this.startBeam.scale.set(2.6, 60, 2.6);
         const d2 = dist2(p.pos.x, p.pos.z, nx.where.x, nx.where.z);
-        if (d2 < 4.5 * 4.5 && Math.abs(p.pos.y - y) < 4 && this.pendingStart <= 0 && p.state !== 'down' && g.heat.level < 3) this.start(nx);
-        else if (d2 < 4.5 * 4.5 && g.heat.level >= 3 && this.pendingStart <= 0) {
-          this.pendingStart = 4;
-          g.hud.toast('Lose the heat before starting a mission', 'warn');
-        }
+        if (d2 < 4.5 * 4.5 && Math.abs(p.pos.y - y) < 4 && this.pendingStart <= 0 && p.state !== 'down') this.start(nx);
       }
       return;
     }

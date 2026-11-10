@@ -19,7 +19,7 @@ interface Key {
   night: number;
 }
 
-const NIGHT: Omit<Key, 't'> = { zen: 0x0d1230, hor: 0x252d5c, sun: 0x8ea2ff, sunI: 1.0, hs: 0x4450a0, hg: 0x1f2440, hi: 1.5, fog: 0x1c2250, cloud: 0x4a548e, night: 1 };
+const NIGHT: Omit<Key, 't'> = { zen: 0x0d1230, hor: 0x252d5c, sun: 0x9eb0ff, sunI: 1.25, hs: 0x5562b8, hg: 0x2a3058, hi: 2.0, fog: 0x1c2250, cloud: 0x4a548e, night: 1 };
 const DAY: Omit<Key, 't'> = { zen: 0x4fb9d6, hor: 0xa9e3e0, sun: 0xfff1d0, sunI: 2.7, hs: 0xbcc8ff, hg: 0xeadcb8, hi: 2.5, fog: 0xbfe6e2, cloud: 0xffffff, night: 0 };
 const KEYS: Key[] = [
   { t: 0, ...NIGHT },
