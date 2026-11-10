@@ -28,7 +28,7 @@ test('runway, base, hangar, headquarters and every spawn spot stay level', () =>
     assert.equal(reliefAt(p.x, p.z), 0);
     assert.ok(slopeDeg(p.x, p.z) < 2, `slope at ${p.x},${p.z}`);
   }
-  for (const f of FIELDS.filter((f) => f.level === 1 && !f.farm)) assert.equal(reliefAt((f.x0 + f.x1) / 2, (f.z0 + f.z1) / 2), 0, f.name);
+  for (const f of FIELDS.filter((f) => f.level === 1 && !f.farm && !f.beginner)) assert.equal(reliefAt((f.x0 + f.x1) / 2, (f.z0 + f.z1) / 2), 0, f.name);
 });
 
 test('secondary farm strips and service areas sit on level platforms', () => {
@@ -98,7 +98,7 @@ test('the three zones have the relief their level promises', () => {
 
 test('contract fields carry their terrain level: relief grows from level 1 to 3', () => {
   const byLevel = { 1: [], 2: [], 3: [] };
-  for (const c of CONTRACTS.filter((c) => !c.school)) {
+  for (const c of CONTRACTS.filter((c) => !c.school && !c.beginner)) {
     const fields = c.fields.map((n) => FIELDS.find((f) => f.name === n));
     assert.ok(fields.every((f) => f.level === c.level), c.id);
     const T = fieldsTerrain(td, fields);

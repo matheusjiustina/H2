@@ -223,6 +223,17 @@ FIELDS.push(
   field('E-01', 'soy', -220, 120, 150, 230, 0.9, 'x', { contract: 'school-1', school: true }),
   field('E-02', 'cotton', -220, 200, 45, 125, 0.9, 'x', { contract: 'school-2', school: true }),
 );
+// Beginner talhões: five small level-1 fields (460 × 190 m, 8.7 ha — about
+// three times a school talhão, half of T-07) on flat open ground 1.9–3.7 km
+// from the base, in areas that were empty: short east–west passes, no wires,
+// no forest within the run-in. Appended after the school so no id changes.
+FIELDS.push(
+  field('I-01', 'soy', -1930, -1470, -3595, -3405, 0.85, 'x', { contract: 'beg-1', beginner: true }),
+  field('I-02', 'cotton', -3430, -2970, -2295, -2105, 0.85, 'x', { contract: 'beg-2', beginner: true }),
+  field('I-03', 'soy', -2330, -1870, 505, 695, 0.9, 'x', { contract: 'beg-3', beginner: true }),
+  field('I-04', 'soy', 870, 1330, 1955, 2145, 0.8, 'x', { contract: 'beg-4', beginner: true }),
+  field('I-05', 'cotton', 1870, 2330, 1205, 1395, 0.9, 'x', { contract: 'beg-5', beginner: true }),
+);
 for (const f of FIELDS) f.level ??= 1;
 
 export const CONTRACT_FIELDS = FIELDS.filter((f) => f.contract);

@@ -3221,6 +3221,29 @@ School 2 through all 5 (85.1 %). Board and guide box captured at
 1280 × 720 and at phone landscape with touch. Not checked: a real phone,
 or a human beginner flying it.
 
+### Beginner talhões (Talhões de iniciante)
+
+Between the school and the full-size Level 1 orders, a group of five small
+talhões has its own section on the service board (green tag *Iniciante*).
+Each is 460 × 190 m (8.7 ha: about three school talhões, half of T-07),
+east–west rows, level 1, on flat open ground that was empty (relief
+0.5–2.2 m across the field, slope ≤ 1°), 1.9–3.7 km from the base:
+
+| Talhão | Crop | Where | R$/ha | Bonus |
+|---|---|---|---|---|
+| I-01 | soybean | north, 3.7 km, edge of the cerrado | 240 | 1,500 |
+| I-02 | cotton | north-west, 3.6 km | 250 | 1,600 |
+| I-03 | soybean | west, 1.9 km (forest 200 m north) | 230 | 1,200 |
+| I-04 | soybean | south, 2.5 km, beside a farm road | 240 | 1,400 |
+| I-05 | cotton | east, 2.8 km (forest 370 m past the east end) | 250 | 1,800 |
+
+Pay sits between the school (200–220/ha) and Level 1 (260+/ha). No power
+line, road, water, fence, prop or forest block lies in a field or its
+320 m run-in corridors (`test/beginner.test.mjs`). The fields are appended
+after the school's, so no id changes; every random tree stream draws as
+before (the beginner fields are left out of all placements) and the trees
+inside the talhões and their run-ins are removed at the end.
+
 ### Spraying a little high, and continuing a job
 
 **A pass flown a little high still counts.** The 'Too high to spray'

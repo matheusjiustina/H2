@@ -507,6 +507,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 
 .card .tag.lv0 { border-color: rgba(90,200,250,.6); color: #6cd0ff; }
 .lvl.school { color: #6cd0ff; }
+.card .tag.lvb { border-color: rgba(120,220,140,.6); color: #86e09a; }
+.lvl.beg { color: #86e09a; }
 
 /* On foot (PilotFreeRoamSystem): a small GET OUT / BOARD button; the flight
    readouts and touch flight controls step aside. */

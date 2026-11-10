@@ -106,7 +106,7 @@ export function createVegetation(terrain, quality) {
   // numbers against these only, so every tree of the original farm stays
   // exactly where it was. Trees that the outer fields, their pass corridors
   // and the outer roads now claim are removed afterwards (see `cleared`).
-  const FIELDS0 = FIELDS.filter((f) => f.level === 1 && !f.farm && !f.school), ROADS0 = ROADS.filter((rd) => !rd.mesh);
+  const FIELDS0 = FIELDS.filter((f) => f.level === 1 && !f.farm && !f.school && !f.beginner), ROADS0 = ROADS.filter((rd) => !rd.mesh);
   const avoid = (x, z, m = 6) => {
     if (Math.abs(z) < 60 && x > RUNWAY.x0 - 250 && x < RUNWAY.x1 + 250) return true; // strip approach
     // (The original apron: the random streams draw against it; the main
@@ -125,6 +125,17 @@ export function createVegetation(terrain, quality) {
   // (World Expansion 2.0 roads, forests and water — exp: true — are left out of
   // every original placement, so those trees stay exactly where they were;
   // the new regions are planted and cleared further down.)
+  // The beginner talhões (added last) are left out of every placement — all
+  // random streams draw exactly as before — and cleared at the end with their
+  // run-in corridors (begCleared).
+  const FIELDS_R = FIELDS.filter((f) => !f.beginner), FIELDS_B = FIELDS.filter((f) => f.beginner);
+  const begCleared = (x, z, tall, m) => FIELDS_B.some((f) => {
+    if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
+    if (!tall) return false;
+    const along = f.rowAxis === 'x', a = along ? x : z, c = along ? z : x;
+    const a0 = along ? f.x0 : f.z0, a1 = along ? f.x1 : f.z1, c0 = along ? f.z0 : f.x0, c1 = along ? f.z1 : f.x1;
+    return c > c0 - 35 && c < c1 + 35 && a > a0 - 320 && a < a1 + 320;
+  });
   const FIELDS2 = FIELDS.filter((f) => f.level > 1 || f.farm || f.school), ROADS2 = ROADS.filter((rd) => rd.mesh && !rd.exp);
   // The outer roads' segments in a 200 m grid (each in every cell its
   // corridor touches), so a point only checks the segments near it.
@@ -498,7 +509,7 @@ export function createVegetation(terrain, quality) {
     }
   };
   const openGround = (x, z, m) => inRing(x, z) && !inForest(x, z, m) && !cleared(x, z, true, m) && !fieldNear(x, z, m);
-  const fieldNear = (x, z, m) => FIELDS.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
+  const fieldNear = (x, z, m) => FIELDS_R.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
   for (let i = 0; i < 230; i++) {
     const [x, z] = ringPt();
     if (!openGround(x, z, 25)) continue;
@@ -699,11 +710,11 @@ export function createVegetation(terrain, quality) {
   const crewTree = (x, z) => Math.hypot(x - BASE.crewPost.x - 8, z - BASE.crewPost.z + 14) < 0.5;
   for (let i = trees.length - 1; i >= 0; i--) {
     const t = trees[i];
-    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || expCleared(t.x, t.z, isTall(t.kind)) || inWater(t.x, t.z) || (!crewTree(t.x, t.z) && onMainApron(t.x, t.z, 1.5))) trees.splice(i, 1);
+    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || begCleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || expCleared(t.x, t.z, isTall(t.kind)) || inWater(t.x, t.z) || (!crewTree(t.x, t.z) && onMainApron(t.x, t.z, 1.5))) trees.splice(i, 1);
   }
   for (let i = colliders.length - 1; i >= 0; i--) {
     const c = colliders[i];
-    if (!c.box && (cleared(c.x, c.z, true, 6) || expCleared(c.x, c.z, true) || inWater(c.x, c.z) || (!crewTree(c.x, c.z) && onMainApron(c.x, c.z, 1.5)))) colliders.splice(i, 1);
+    if (!c.box && (cleared(c.x, c.z, true, 6) || begCleared(c.x, c.z, true, 6) || expCleared(c.x, c.z, true) || inWater(c.x, c.z) || (!crewTree(c.x, c.z) && onMainApron(c.x, c.z, 1.5)))) colliders.splice(i, 1);
   }
 
   terrain.releaseBaseline?.();
