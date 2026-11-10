@@ -342,7 +342,9 @@ export class Atmosphere {
     this.sun.target.updateMatrixWorld();
 
     // --- fog distance
-    const far = preset.drawDist * (1 - wet * 0.4) * (1 - this.night * 0.12);
+    camera.getWorldPosition(this.rainMat.uniforms.uCam.value as THREE.Vector3);
+    const alt = Math.max(0, (this.rainMat.uniforms.uCam.value as THREE.Vector3).y - 25);
+    const far = (preset.drawDist + alt * 2.4) * (1 - wet * 0.4) * (1 - this.night * 0.12);
     this.fog.near = far * 0.3;
     this.fog.far = far;
 

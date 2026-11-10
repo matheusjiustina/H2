@@ -1,45 +1,51 @@
 import '@fontsource/bangers';
 import '@fontsource/barlow-condensed/600.css';
 import '@fontsource/barlow-condensed/700.css';
-import * as THREE from 'three';
-import { Renderer } from './render/renderer';
-import { Atmosphere } from './render/sky';
-import { buildWorld } from './world/build';
-import { shared } from './render/materials';
-import { defaultSettings } from './core/save';
+import './ui/styles.css';
+import { Game } from './game';
 
-await Promise.race([Promise.all([document.fonts.load('32px Bangers'), document.fonts.load('700 32px "Barlow Condensed"')]), new Promise((r) => setTimeout(r, 2500))]);
+const ui = document.getElementById('ui') as HTMLElement;
 const canvas = document.getElementById('game') as HTMLCanvasElement;
-document.body.style.margin = '0';
-document.body.style.overflow = 'hidden';
-const r = new Renderer(canvas);
-const scene = new THREE.Scene();
-const cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.4, 2500);
-const world = buildWorld();
 
-scene.add(world.group);
-const atmo = new Atmosphere(scene);
-const q = new URLSearchParams(location.search);
-cam.position.set(+(q.get('x') ?? -200), +(q.get('y') ?? 60), +(q.get('z') ?? 120));
-cam.lookAt(+(q.get('tx') ?? -65), +(q.get('ty') ?? 0), +(q.get('tz') ?? 0));
-const settings = defaultSettings();
-settings.time = (q.get('time') as any) ?? 'day';
-r.setQuality((q.get('q') as any) ?? 'medium');
-let last = performance.now();
-(window as any).__ready = false;
-function loop() {
-  const now = performance.now();
-  const dt = Math.min(0.05, (now - last) / 1000);
-  last = now;
-  cam.aspect = r.width / r.height;
-  cam.updateProjectionMatrix();
-  atmo.update(dt, cam, new THREE.Vector3(-65, 0, 0), settings, r.preset);
-  shared.sunK.value = atmo.sunK();
-  world.waterMat.uniforms.uTime.value = now / 1000;
-  world.cull(cam.position.x, cam.position.z, r.preset.drawDist + 200);
-  r.render(scene, cam, dt);
-  (window as any).__ready = true;
-  (window as any).__info = { tris: world.tris, calls: r.three.info.render.calls, nodes: world.roads.nodes.length, edges: world.roads.edges.length };
-  requestAnimationFrame(loop);
+function fatal(msg: string) {
+  let e = document.querySelector('.err') as HTMLElement | null;
+  if (!e) {
+    e = document.createElement('div');
+    e.className = 'err panel';
+    document.body.appendChild(e);
+  }
+  e.textContent = msg;
 }
-loop();
+window.addEventListener('error', (ev) => {
+  console.error(ev.error ?? ev.message);
+  if (!(window as unknown as { __game?: Game }).__game) fatal(`Something went wrong while starting the game: ${ev.message}`);
+});
+
+const loading = document.createElement('div');
+loading.className = 'loading';
+loading.innerHTML = 'BUILDING UNITED STATES CITY…<small>pouring concrete · planting trees · printing protest signs</small>';
+document.body.appendChild(loading);
+
+async function boot() {
+  // Fonts are drawn into canvas textures (signs, billboards), so wait for them first.
+  await Promise.race([
+    Promise.all([document.fonts.load('32px Bangers'), document.fonts.load('700 32px "Barlow Condensed"'), document.fonts.load('600 32px "Barlow Condensed"')]),
+    new Promise((r) => setTimeout(r, 2500)),
+  ]);
+  await new Promise((r) => setTimeout(r, 30));
+  const probe = document.createElement('canvas');
+  if (!probe.getContext('webgl2')) {
+    loading.remove();
+    fatal('This game needs WebGL 2. Please use a current version of Chrome, Edge, Firefox or Safari with hardware acceleration enabled.');
+    return;
+  }
+  try {
+    const game = new Game(canvas, ui);
+    (window as unknown as { __game: Game }).__game = game;
+  } catch (err) {
+    console.error(err);
+    fatal(`Could not start the game: ${(err as Error).message}`);
+  }
+  loading.remove();
+}
+void boot();

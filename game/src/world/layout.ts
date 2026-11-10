@@ -206,7 +206,7 @@ export const P = {
   restaurant: { x: -300, z: -290 },
   crossing: { x: -640, z: RAIL_Z },
   cabin: { x: -850, z: -480 },
-  dropZone: { x: -180, z: 100, y: 330 },
+  dropZone: { x: -150, z: 285, y: 300 },
 } satisfies Record<string, POI>;
 
 /** Rural places that the terrain must keep flat. */

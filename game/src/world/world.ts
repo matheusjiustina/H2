@@ -129,6 +129,13 @@ export class World {
     if (i >= 0) this.dyn.splice(i, 1);
   }
 
+  /** Every static solid once (minimap footprints). */
+  allSolids(): Solid[] {
+    const set = new Set<Solid>();
+    for (const arr of this.hash.values()) for (const s of arr) set.add(s);
+    return [...set];
+  }
+
   private topAt(s: Solid, lx: number, lz: number): number {
     if (s.ramp === 0) return s.y1;
     const t = s.ramp === 1 ? (lx + s.hw) / (2 * s.hw) : (lz + s.hd) / (2 * s.hd);

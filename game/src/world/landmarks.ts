@@ -108,6 +108,7 @@ export function goldenTower(w: World) {
     { id: 'tower-down', kind: 'elevator', x: cx, y: ry, z: cz - 7.6, r: 2.6, label: 'Ride the elevator down to the lobby', to: { x: cx, y: y0, z: cz - 17 } },
   );
   w.parkSpots.push({ x: P.helipad.x, z: P.helipad.z, rot: 0, y: ry, kind: 'heli', id: 'tower-heli' });
+  w.addGate('tower-door', cx, cz + half - 0.5, 7, 1, y0, y0 + 4.6, 0, GOLD_HI, true);
   w.collectSpots.push({ x: cx - 10, z: cz + 10, y: ry }, { x: cx + 19, z: cz - 19, y: 110 });
 }
 
@@ -184,6 +185,7 @@ export function garage(w: World) {
     { x: R.x1 - 24, z: R.z1 - 3.2, rot: Math.PI, y: yB, kind: 'sports' },
     { x: R.x1 - 34, z: R.z0 + 3.2, rot: 0, y: yB, kind: 'suv' },
     { x: R.x1 - 46, z: R.z0 + 3.2, rot: 0, y: yB, kind: 'moto' },
+    { x: R.x1 - 58, z: R.z1 - 3.4, rot: Math.PI, y: yB, kind: 'armored', id: 'garage-beast' },
   );
   w.interacts.push({ id: 'safe-garage', kind: 'safehouse', x: R.x1 - 4, y: yB, z: (R.z0 + R.z1) / 2, r: 3.5, label: 'Lay low in the VIP garage', data: 'downtown' });
   rb.box(R.x1 - 1.2, yB + 1.2, (R.z0 + R.z1) / 2, 1.6, 2.4, 3, GOLD_HI, 0, 8);
@@ -511,6 +513,9 @@ export function exchange(w: World) {
   for (const lx of [332, 448]) for (const lz of [58, 80]) lamp(w, lx, lz, lx < x ? Math.PI / 2 : -Math.PI / 2);
   bull(w, P.bull.x, P.bull.z);
   w.zones.push({ id: 'exchange', kind: 'arena', rect: plaza });
+  w.addGate('ex-w', 325.2, 70, 0.7, 31, 0, 3.4, 0, 0x4a4f66, true);
+  w.addGate('ex-e', 454.8, 70, 0.7, 31, 0, 3.4, 0, 0x4a4f66, true);
+  w.addGate('ex-s', 390, 85.2, 130, 0.7, 0, 3.4, 0, 0x4a4f66, true);
   w.collectSpots.push({ x: x + 30, z: z, y: top });
   w.protestSites.push({ x: x + 30, z: 72, r: 9, d: 'wallstreet' });
 }
