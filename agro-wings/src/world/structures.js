@@ -54,7 +54,7 @@ function noiseTex(base, var1, seed = 3, n = 2500) {
   return canvasTexture(c, { repeat: true });
 }
 
-function makeMaterials() {
+export function makeMaterials() {
   const M = {};
   const std = (o) => new THREE.MeshStandardMaterial(o);
   const roofT = corrugatedTex('#c4c7c6', '#959a9a');
@@ -102,7 +102,7 @@ function makeMaterials() {
 
 // ---------------------------------------------------------------------------
 // Static geometry builder: collect transformed geometries per material.
-class Builder {
+export class Builder {
   constructor(M) { this.M = M; this.parts = new Map(); this.colliders = []; }
   add(geo, mat, x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
     const g = geo.index ? geo.toNonIndexed() : geo.clone();
@@ -163,7 +163,7 @@ function scaleBoxUV(g, w, h, d, s) {
 }
 
 // Gable roof made of two sloped slabs.
-function gableRoof(B, mat, cx, cy, cz, w, d, rise, ry = 0, over = 0.6) {
+export function gableRoof(B, mat, cx, cy, cz, w, d, rise, ry = 0, over = 0.6) {
   const half = w / 2 + over;
   const slope = Math.atan2(rise, w / 2);
   const len = Math.hypot(half, rise);
@@ -945,7 +945,7 @@ function buildFarmSite(B, M, group, H, site, dyn) {
 }
 
 // One piece of farm scenery at (x, z) of the site's frame (y from Hl).
-function buildProp(B, M, g, Hl, kind, x, z, rot, site, far, dyn) {
+export function buildProp(B, M, g, Hl, kind, x, z, rot, site, far, dyn) {
   const y = Hl(x, z);
   const cs = Math.cos(rot), sn = Math.sin(rot);
   const at = (lx, lz) => [x + lx * cs + lz * sn, z - lx * sn + lz * cs];
@@ -1164,7 +1164,7 @@ function buildFences(B, M, group, H, dyn) {
   group.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x55585a, transparent: true, opacity: 0.8 })));
 }
 
-function buildWindsock(B, M, group, x, y, z) {
+export function buildWindsock(B, M, group, x, y, z) {
   B.cyl(0.07, 0.09, 6.5, M.white, x, y + 3.25, z, 8);
   const pivot = new THREE.Group();
   pivot.position.set(x, y + 6.3, z);

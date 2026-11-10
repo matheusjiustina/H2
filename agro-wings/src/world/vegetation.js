@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FORESTS, CREEK, FIELDS, HQ, BASE, APRON0, ROADS, RUNWAY, FARM_SITES, WATER, pondRadius, siteById } from './layout.js';
 import { reliefWeights, RING } from './relief.js';
+import { EXP_REGIONS, EXP_PROPS, EXP_BOXES, inStripCorridor, biomeWeights } from './expansion.js';
 import { rng, fbm, segDist } from '../core/math.js';
 import {
   makeFoliageAtlas, makeCanopyTexture, foliageMaterial, tileRect, TILES,
@@ -95,6 +96,11 @@ export function createVegetation(terrain, quality) {
   const r = rng(2024);
   const trees = []; // {kind, v, x, z, s, rot}
   const colliders = []; // {x, z, r, top}
+  // The original placements that branch on the terrain read it as it was
+  // before the World Expansion 2.0 (TerrainData.buildBaseline), so their
+  // random sequences — every tree after them — are unchanged.
+  terrain.buildBaseline?.();
+  const H0 = (x, z) => (terrain.heightAt0 ? terrain.heightAt0(x, z) : terrain.heightAt(x, z));
 
   // The original farm's fields and roads: the placement below draws its random
   // numbers against these only, so every tree of the original farm stays
@@ -116,7 +122,10 @@ export function createVegetation(terrain, quality) {
   // and the outer access roads: kept clear of trees (low scrub may stay
   // outside the fields themselves).
   // The flight-school talhões by the strip join them (cleared afterwards).
-  const FIELDS2 = FIELDS.filter((f) => f.level > 1 || f.farm || f.school), ROADS2 = ROADS.filter((rd) => rd.mesh);
+  // (World Expansion 2.0 roads, forests and water — exp: true — are left out of
+  // every original placement, so those trees stay exactly where they were;
+  // the new regions are planted and cleared further down.)
+  const FIELDS2 = FIELDS.filter((f) => f.level > 1 || f.farm || f.school), ROADS2 = ROADS.filter((rd) => rd.mesh && !rd.exp);
   // The outer roads' segments in a 200 m grid (each in every cell its
   // corridor touches), so a point only checks the segments near it.
   const RG = 200, roadGrid = new Map();
@@ -171,7 +180,7 @@ export function createVegetation(terrain, quality) {
   // their own random stream. keep(x, z): drop trees buried in a neighbouring
   // block (ring blocks overlap so their roofs close without a seam).
   const canopyParts = [];
-  const FOR0 = FORESTS.filter((f) => !f.ring), FOR_RING = FORESTS.filter((f) => f.ring);
+  const FOR0 = FORESTS.filter((f) => !f.ring), FOR_RING = FORESTS.filter((f) => f.ring && !f.exp), FOR_EXP = FORESTS.filter((f) => f.exp);
   const forestBlock = (fb, r, add, keep = () => true) => {
     if (fb.kind === 'eucalyptus') {
       for (let x = fb.x0 + 2; x < fb.x1; x += 4.2) for (let z = fb.z0 + 2; z < fb.z1; z += 4.2) {
@@ -184,7 +193,7 @@ export function createVegetation(terrain, quality) {
     }
     const w = fb.x1 - fb.x0, d = fb.z1 - fb.z0;
     const narrow = Math.min(w, d) < 120;
-    if (!narrow) canopyParts.push({ g: forestCanopy(fb, terrain, fb.ring ? FOR_RING.filter((o) => o !== fb && o.kind === 'mata') : []), key: Math.floor((fb.x0 + fb.x1) / 6000) + ',' + Math.floor((fb.z0 + fb.z1) / 6000) });
+    if (!narrow) canopyParts.push({ g: forestCanopy(fb, terrain, fb.ring ? (fb.exp ? FOR_EXP : FOR_RING).filter((o) => o !== fb && o.kind === 'mata') : []), key: Math.floor((fb.x0 + fb.x1) / 6000) + ',' + Math.floor((fb.z0 + fb.z1) / 6000) });
     // Edge trees, two staggered rows facing inward; emergents inside.
     const spacing = 7.5;
     const sides = [
@@ -339,11 +348,11 @@ export function createVegetation(terrain, quality) {
       if (w.roll < 0.3 && w.hill < 0.1) continue;
       const px = x + r3() * 60, pz = z + r3() * 60;
       if (avoid(px, pz, 12) || cleared(px, pz, true, 12)) continue;
-      const h = terrain.heightAt(px, pz);
+      const h = H0(px, pz);
       // Valley depth: height against the mean of the surroundings (200 m).
-      const around = (terrain.heightAt(px + 200, pz) + terrain.heightAt(px - 200, pz) + terrain.heightAt(px, pz + 200) + terrain.heightAt(px, pz - 200)) / 4;
+      const around = (H0(px + 200, pz) + H0(px - 200, pz) + H0(px, pz + 200) + H0(px, pz - 200)) / 4;
       const rel = h - around;
-      const gx = terrain.heightAt(px + 10, pz) - terrain.heightAt(px - 10, pz), gz = terrain.heightAt(px, pz + 10) - terrain.heightAt(px, pz - 10);
+      const gx = H0(px + 10, pz) - H0(px - 10, pz), gz = H0(px, pz + 10) - H0(px, pz - 10);
       const slope = Math.hypot(gx, gz) / 20;
       const k = r3();
       if (rel < -3.5 && slope < 0.08 && k < 0.55) {
@@ -404,8 +413,8 @@ export function createVegetation(terrain, quality) {
       else { add('mata', x, z, 0.75 + rw() * 0.45); colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + 18 }); }
     }
   };
-  for (const st of WATER.streams) if (!st.ring) streamMargin(st, rw, add);
-  for (const p of WATER.ponds) if (!p.ring) pondMargin(p, rw, add);
+  for (const st of WATER.streams) if (!st.ring && !st.exp) streamMargin(st, rw, add);
+  for (const p of WATER.ponds) if (!p.ring && !p.exp) pondMargin(p, rw, add);
 
   // Cerrado vegetation (own random stream): clumps of crooked cerrado trees,
   // macaúba palms, a pink ipê here and there and dead snags in the open
@@ -416,7 +425,8 @@ export function createVegetation(terrain, quality) {
     trees.push({ kind, v: Math.floor(r6() * variants[kind].length), x, z, s, rot: r6() * Math.PI * 2 });
     if (kind !== 'bush') colliders.push({ x, z, r: kind === 'macauba' ? 2 : 3, top: terrain.heightAt(x, z) + (kind === 'macauba' ? 14 : 10) * s });
   };
-  const inForest = (x, z, m = 0) => FORESTS.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
+  const FOR_OLD = FORESTS.filter((f) => !f.exp);
+  const inForest = (x, z, m = 0) => FOR_OLD.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
   for (let i = 0; i < 420; i++) {
     const cx = -3800 + r6() * 7600, cz = -3800 + r6() * 7600;
     if (avoid(cx, cz, 30) || inForest(cx, cz, 20)) continue;
@@ -523,10 +533,10 @@ export function createVegetation(terrain, quality) {
       if (!inRing(x + 30, z + 30)) continue;
       const px = x + r7() * 60, pz = z + r7() * 60;
       if (!openGround(px, pz, 12)) continue;
-      const h = terrain.heightAt(px, pz);
-      const around = (terrain.heightAt(px + 200, pz) + terrain.heightAt(px - 200, pz) + terrain.heightAt(px, pz + 200) + terrain.heightAt(px, pz - 200)) / 4;
+      const h = H0(px, pz);
+      const around = (H0(px + 200, pz) + H0(px - 200, pz) + H0(px, pz + 200) + H0(px, pz - 200)) / 4;
       const rel = h - around;
-      const gx = terrain.heightAt(px + 10, pz) - terrain.heightAt(px - 10, pz), gz = terrain.heightAt(px, pz + 10) - terrain.heightAt(px, pz - 10);
+      const gx = H0(px + 10, pz) - H0(px - 10, pz), gz = H0(px, pz + 10) - H0(px, pz - 10);
       const slope = Math.hypot(gx, gz) / 20;
       const k = r7();
       if (rel < -3.5 && slope < 0.08 && k < 0.5) {
@@ -552,6 +562,129 @@ export function createVegetation(terrain, quality) {
     }
   }
 
+  // World Expansion 2.0 (own random stream: nothing placed above moves).
+  // The Mata do Jatobá's blocks (canopy, edge rows, capoeira, orla), the
+  // margins of the new rivers and lagoons, and over every new region the
+  // vegetation of its biome: cerrado clumps and termite mounds, gallery
+  // woods and buritis on the wet ground, capões and isolated shade trees on
+  // the hills, sparse scrub on the serra's talus (none on the cliffs).
+  const r8 = rng(20261110);
+  const add8 = (kind, x, z, s = 1) => {
+    trees.push({ kind, v: Math.floor(r8() * variants[kind].length), x, z, s, rot: r8() * Math.PI * 2 });
+    if (kind === 'mata' || kind === 'buriti') colliders.push({ x, z, r: 3, top: terrain.heightAt(x, z) + 20 });
+    else if (kind === 'shade' || kind === 'ipe') colliders.push({ x, z, r: 4.5 * s, top: terrain.heightAt(x, z) + 11 * s });
+    else if (kind === 'cerrado' || kind === 'macauba' || kind === 'ipeRoxo' || kind === 'snag') colliders.push({ x, z, r: kind === 'macauba' ? 2 : 3, top: terrain.heightAt(x, z) + (kind === 'macauba' ? 14 : 10) * s });
+  };
+  const addE = (kind, x, z, s = 1) => {
+    trees.push({ kind, v: Math.floor(r8() * variants[kind].length), x, z, s, rot: r8() * Math.PI * 2 });
+  };
+  // Ground the new roads, strips, buildings and water keep (as `cleared`).
+  const EXPR = ROADS.filter((rd) => rd.exp), ERG = new Map();
+  for (const rd of EXPR) for (let i = 0; i < rd.pts.length - 1; i++) {
+    const [ax, az] = rd.pts[i], [bx, bz] = rd.pts[i + 1], m = rd.w / 2 + 5;
+    const seg = [ax, az, bx, bz, m];
+    for (let cx = Math.floor((Math.min(ax, bx) - m) / RG); cx <= Math.floor((Math.max(ax, bx) + m) / RG); cx++) {
+      for (let cz = Math.floor((Math.min(az, bz) - m) / RG); cz <= Math.floor((Math.max(az, bz) + m) / RG); cz++) {
+        const k = cx * 4096 + cz;
+        if (!ERG.has(k)) ERG.set(k, []);
+        ERG.get(k).push(seg);
+      }
+    }
+  }
+  const nearExpRoad = (x, z) => {
+    const list = ERG.get(Math.floor(x / RG) * 4096 + Math.floor(z / RG));
+    if (list) for (const [ax, az, bx, bz, m] of list) if (segDist(x, z, ax, az, bx, bz) < m) return true;
+    return false;
+  };
+  const EPROPS = EXP_PROPS.map(([kind, x, z]) => ({ x, z, r: kind === 'corral' ? 26 : kind === 'mast' ? 14 : 18 }));
+  const slopeAt = (x, z) => Math.hypot(terrain.heightAt(x + 6, z) - terrain.heightAt(x - 6, z), terrain.heightAt(x, z + 6) - terrain.heightAt(x, z - 6)) / 12;
+  const expCleared = (x, z, tall = true) => inStripCorridor(x, z, tall) || nearExpRoad(x, z)
+    || EPROPS.some((p) => Math.abs(x - p.x) < p.r && Math.abs(z - p.z) < p.r)
+    // (cliffs: only on the new landforms — the original slopes keep their trees)
+    || (tall && EXP_BOXES.some((b) => x >= b[0] && x <= b[1] && z >= b[2] && z <= b[3]) && slopeAt(x, z) > 0.7);
+  const keepE = (x, z) => !expCleared(x, z, true);
+  for (const fb of FOR_EXP) {
+    const buried = (x, z) => FOR_EXP.some((o) => o !== fb && x > o.x0 + 1 && x < o.x1 - 1 && z > o.z0 + 1 && z < o.z1 - 1);
+    const keep = (x, z) => !buried(x, z) && keepE(x, z);
+    forestBlock(fb, r8, addE, keep);
+    if (fb.kind === 'mata') { capoeira(fb, r8, addE, keep); orla(fb, r8, add8, keep); }
+  }
+  for (const st of WATER.streams) if (st.exp) streamMargin(st, r8, (k, x, z, s) => { if (keepE(x, z)) addE(k, x, z, s); });
+  for (const p of WATER.ponds) if (p.exp) pondMargin(p, r8, (k, x, z, s) => { if (keepE(x, z)) addE(k, x, z, s); });
+  const inExpForest = (x, z, m = 0) => FOR_EXP.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
+  const openE = (x, z, m) => !inForest(x, z, m) && !inExpForest(x, z, m) && !cleared(x, z, true, m) && !fieldNear(x, z, m) && !expCleared(x, z, true);
+  const bw = [0, 0, 0, 0];
+  for (const reg of EXP_REGIONS) {
+    const R = Math.max(reg.half[0], reg.half[1]) + reg.fall;
+    for (let z = reg.c[1] - R; z < reg.c[1] + R; z += 34) {
+      for (let x = reg.c[0] - R; x < reg.c[0] + R; x += 34) {
+        const px = x + r8() * 34, pz = z + r8() * 34, k = r8();
+        if (Math.max(Math.abs(px), Math.abs(pz)) > EDGE) continue;
+        biomeWeights(px, pz, bw);
+        const [cer, wet, lush, rock] = bw;
+        if (cer + wet + lush + rock < 0.05) continue;
+        // Each point belongs to the region whose biome is strongest there
+        // (the others' loops skip it), so overlaps never double the density.
+        const own = reg.biome === 'cerrado' ? cer : reg.biome === 'varzea' ? wet : reg.biome === 'mata' ? lush : reg.biome === 'serra' ? rock : Math.max(lush, cer * 0.9);
+        if (own < Math.max(cer, wet, lush, rock) * 0.999 && reg.biome !== 'morros') continue;
+        if (!openE(px, pz, 8)) continue;
+        const sl = slopeAt(px, pz);
+        if (reg.biome === 'cerrado') {
+          if (k < 0.075 * cer) {
+            const n = 2 + Math.floor(r8() * 5);
+            for (let i = 0; i < n; i++) {
+              const qx = px + (r8() - 0.5) * 46, qz = pz + (r8() - 0.5) * 46;
+              if (!openE(qx, qz, 6)) continue;
+              const q = r8();
+              if (q < 0.48) add8('cerrado', qx, qz, 0.8 + r8() * 0.5);
+              else if (q < 0.6) add8('macauba', qx, qz, 0.85 + r8() * 0.3);
+              else if (q < 0.65) add8('ipeRoxo', qx, qz, 0.85 + r8() * 0.3);
+              else if (q < 0.7) add8('snag', qx, qz, 0.8 + r8() * 0.4);
+              else addE('bush', qx, qz, 0.6 + r8() * 0.6);
+            }
+          } else if (k < 0.075 * cer + 0.06 * cer) addE('mound', px, pz, 0.5 + r8() * 0.8);
+          else if (k < 0.075 * cer + 0.06 * cer + 0.07 * cer) addE('bush', px, pz, 0.5 + r8() * 0.6);
+        } else if (reg.biome === 'varzea') {
+          if (k < 0.05 * wet) {
+            // Capão (island of trees) or a buriti grove on the wet ground.
+            const n = 3 + Math.floor(r8() * 5), palm = r8() < 0.45;
+            for (let i = 0; i < n; i++) {
+              const qx = px + (r8() - 0.5) * 40, qz = pz + (r8() - 0.5) * 40;
+              if (!openE(qx, qz, 6)) continue;
+              if (palm || r8() < 0.2) add8('buriti', qx, qz, 0.85 + r8() * 0.3); else add8('mata', qx, qz, 0.8 + r8() * 0.4);
+            }
+          } else if (k < 0.05 * wet + 0.1 * wet) addE('bush', px, pz, 0.6 + r8() * 0.7);
+        } else if (reg.biome === 'mata') {
+          // Transition: the forest thins out in steps (capoeira, isolated
+          // emergent trees) instead of ending at a line.
+          if (k < 0.12 * lush) add8('mata', px, pz, 0.8 + r8() * 0.5);
+          else if (k < 0.12 * lush + 0.14 * lush) addE('bush', px, pz, 0.7 + r8() * 0.8);
+          else if (k < 0.12 * lush + 0.14 * lush + 0.02 * lush) add8('macauba', px, pz, 0.85 + r8() * 0.3);
+        } else if (reg.biome === 'serra') {
+          if (sl > 0.45) { if (k < 0.08 * rock) addE('bush', px, pz, 0.5 + r8() * 0.6); continue; }
+          if (k < 0.035 * rock) {
+            const n = 1 + Math.floor(r8() * 4);
+            for (let i = 0; i < n; i++) {
+              const qx = px + (r8() - 0.5) * 36, qz = pz + (r8() - 0.5) * 36;
+              if (!openE(qx, qz, 6) || slopeAt(qx, qz) > 0.45) continue;
+              const q = r8();
+              if (q < 0.5) add8('cerrado', qx, qz, 0.7 + r8() * 0.4);
+              else if (q < 0.62) add8('snag', qx, qz, 0.8 + r8() * 0.3);
+              else addE('bush', qx, qz, 0.5 + r8() * 0.6);
+            }
+          } else if (k < 0.035 * rock + 0.05 * rock) addE('bush', px, pz, 0.45 + r8() * 0.5);
+        } else {
+          // Morros: pasture with isolated shade trees and ipês, scrub on the
+          // steeper flanks.
+          const w = Math.max(lush, cer, 0.25);
+          if (k < 0.012 * w * 4) add8(r8() < 0.18 ? 'ipe' : 'shade', px, pz, 0.9 + r8() * 0.45);
+          else if (sl > 0.12 && k < 0.012 * w * 4 + 0.05) addE('bush', px, pz, 0.5 + r8() * 0.6);
+          else if (k < 0.012 * w * 4 + 0.07) addE('mound', px, pz, 0.5 + r8() * 0.7);
+        }
+      }
+    }
+  }
+
   // Nothing grows in the açudes, the lake or the stream channels.
   const inWater = (x, z) => WATER.ponds.some((p) => Math.hypot(x - p.x, z - p.z) < pondRadius(p, Math.atan2(z - p.z, x - p.x)) * 1.08)
     || WATER.streams.some((st) => st.points.some((q, i) => i < st.points.length - 1 && segDist(x, z, q[0], q[1], st.points[i + 1][0], st.points[i + 1][1]) < st.width * 0.5 + 7));
@@ -566,12 +699,14 @@ export function createVegetation(terrain, quality) {
   const crewTree = (x, z) => Math.hypot(x - BASE.crewPost.x - 8, z - BASE.crewPost.z + 14) < 0.5;
   for (let i = trees.length - 1; i >= 0; i--) {
     const t = trees[i];
-    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || inWater(t.x, t.z) || (!crewTree(t.x, t.z) && onMainApron(t.x, t.z, 1.5))) trees.splice(i, 1);
+    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || expCleared(t.x, t.z, isTall(t.kind)) || inWater(t.x, t.z) || (!crewTree(t.x, t.z) && onMainApron(t.x, t.z, 1.5))) trees.splice(i, 1);
   }
   for (let i = colliders.length - 1; i >= 0; i--) {
     const c = colliders[i];
-    if (!c.box && (cleared(c.x, c.z, true, 6) || inWater(c.x, c.z) || (!crewTree(c.x, c.z) && onMainApron(c.x, c.z, 1.5)))) colliders.splice(i, 1);
+    if (!c.box && (cleared(c.x, c.z, true, 6) || expCleared(c.x, c.z, true) || inWater(c.x, c.z) || (!crewTree(c.x, c.z) && onMainApron(c.x, c.z, 1.5)))) colliders.splice(i, 1);
   }
+
+  terrain.releaseBaseline?.();
 
   // --- build instanced cells ----------------------------------------------
   const cells = new Map();

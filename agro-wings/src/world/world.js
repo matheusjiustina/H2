@@ -17,6 +17,7 @@ import { createWater } from './water.js';
 import { createForestCrowns } from './forestCrowns.js';
 import { freezeStatic } from './staticFreeze.js';
 import { WorldStreaming } from './worldStreaming.js';
+import { createExpansionScenery, expansionColliders } from './expansionScenery.js';
 
 export class World {
   constructor(renderer, scene, quality) {
@@ -52,6 +53,12 @@ export class World {
     this.structures = await step('Base', () => createStructures(this.terrain, this.scene));
     this.water = createWater(this.terrain, this.noise);
     this.scene.add(this.water);
+    // World Expansion 2.0: the new regions' strips, sítios, fences, rocks and
+    // waterfalls (streamed per region) and their colliders (plain boxes).
+    this.expansion = createExpansionScenery(this.terrain, this.scene, this.structures.M, this.noise, this.quality);
+    this.expansion.wind = this.visualWind;
+    this.updaters.push(this.expansion);
+    this.expColliders = expansionColliders(this.terrain);
     this.treeHit = makeTreeCollider(this.vegetation);
     this.activity = createFieldActivity(this.scene, this.structures.M, this.terrain);
     // The harrowing tractor on T-08 (audio, older checks).
@@ -71,6 +78,7 @@ export class World {
     for (const c of this.structures.colliders) {
       if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y < c.top && !(y < c.bottom)) return c.name;
     }
+    for (const c of this.expColliders) if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y < c.top) return c.name;
     return this.extraObstacle?.(x, y, z) ?? null;
   }
 
@@ -85,6 +93,7 @@ export class World {
     }
     top = Math.max(top, this.treeTopNear(x, z, rad));
     for (const c of this.structures.colliders) if (x > c.x0 - rad && x < c.x1 + rad && z > c.z0 - rad && z < c.z1 + rad) top = Math.max(top, c.top);
+    for (const c of this.expColliders) if (x > c.x0 - rad && x < c.x1 + rad && z > c.z0 - rad && z < c.z1 + rad) top = Math.max(top, c.top);
     for (const w of this.structures.wires) {
       const [ax, ay, az] = w.a, [bx, by, bz] = w.b, dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
       const k = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));

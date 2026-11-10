@@ -5,6 +5,8 @@
 // Detailed terrain extent: 12 x 12 km. The original 8 x 8 km farm country
 // sits in the middle unchanged; the outer ring carries the farms added with
 // the airstrips expansion (FARMS below).
+import { EXP_ROADS, EXP_FORESTS, EXP_STREAMS, EXP_PONDS } from './expansion.js';
+
 export const WORLD_HALF = 6000;
 export const FAR_HALF = 24000; // horizon ring
 
@@ -628,3 +630,12 @@ export function windFactorAt(x, z) {
 // Service pad of a site for an aircraft kind (a helipad for a helicopter:
 // padKey names which, 'helipad' by default).
 export const padOf = (site, kind, padKey = 'helipad') => (kind === 'heli' ? site[padKey] ?? site.helipad : site.pad);
+
+// World Expansion 2.0 (src/world/expansion.js): the new regions' roads,
+// forest blocks, rivers and lagoons join the shared lists, flagged exp: true
+// (appended last, so every original index, id and random placement stays).
+ROADS.push(...EXP_ROADS);
+FORESTS.push(...EXP_FORESTS);
+WATER.streams.push(...EXP_STREAMS);
+WATER.ponds.push(...EXP_PONDS);
+for (const p of EXP_PONDS) p.rmax = p.r * (1 + (p.lobes ?? POND_LOBES).reduce((sm, v) => sm + Math.abs(v), 0));

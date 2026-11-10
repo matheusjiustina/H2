@@ -1,6 +1,7 @@
 // Farm map rendering for the minimap and the full map (M).
 import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ, GRAIN_POINTS, WORLD_HALF, FARM_SITES, SITES, WATER, pondRadius } from '../world/layout.js';
 import { rawHeight } from '../world/terrainData.js';
+import { AUX_STRIPS } from '../world/expansion.js';
 
 const EXT = WORLD_HALF - 100; // half extent of the base map (m)
 const CROP_COL = { soy: '#3f8f2c', corn: '#2f7224', cotton: '#5f8f4a', stubble: '#b79a5a', fallow: '#9a3a1c', pasture: '#6f9a3a' };
@@ -130,6 +131,16 @@ export function buildBaseMap(size = 1024) {
     g.fillStyle = '#d8d8d0';
     g.fillRect(st.hangar.x - 10, st.hangar.z - 7, 20, 14);
   }
+  // Auxiliary strips (World Expansion 2.0, no service): the strip only,
+  // drawn along its heading.
+  for (const a2 of AUX_STRIPS) {
+    g.save();
+    g.translate(a2.c[0], a2.c[1]); g.rotate(a2.psi);
+    g.fillStyle = a2.surface === 2 ? '#8fb46a' : a2.surface === 4 ? '#a8603a' : a2.surface === 5 ? '#d8c08e' : '#c98a5c';
+    g.fillRect(-a2.len / 2, -a2.width, a2.len, a2.width * 2);
+    g.restore();
+  }
+  g.fillStyle = '#d8d8d0';
   for (const si of HQ.silos) { g.beginPath(); g.arc(si.x, si.z, 6, 0, Math.PI * 2); g.fill(); }
   for (const gp of GRAIN_POINTS) for (let i = 0; i < gp.n; i++) { g.beginPath(); g.arc(gp.x + (gp.axis === 'x' ? i * 28 : 0), gp.z + (gp.axis === 'z' ? i * 28 : 0), 6, 0, Math.PI * 2); g.fill(); }
   g.strokeStyle = '#ff8a2a';

@@ -7,8 +7,9 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { ATMO_U } from './atmosphere.js';
 import { GRID_N, CELL, RELIEF_SHADE } from './terrainData.js';
 import {
-  WORLD_HALF, FAR_HALF, RUNWAY, BASE, FIELDS, ROADS, CREEK, FARM_SITES, WATER,
+  WORLD_HALF, FAR_HALF, RUNWAY, BASE, FIELDS, ROADS, CREEK, FARM_SITES, WATER, SITES,
 } from './layout.js';
+import { biomeWeights } from './expansion.js';
 import { rawHeight } from './terrainData.js';
 import { makeGroundDetail } from '../core/textures.js';
 import { CUT_U, NCUT, CROP_U } from './cutState.js';
@@ -43,6 +44,7 @@ uniform vec4 uStreamBox;
 uniform vec4 uPond[NPOND];
 uniform vec4 uPondA[NPOND];
 uniform float uCutKind[NCUT];
+uniform sampler2D uBiome; // World Expansion 2.0: cerrado, wet, lush forest floor, rock
 
 // Micro-relief written by terrainColor() and turned into a bump normal later.
 float tBump = 0.0;
@@ -260,6 +262,27 @@ vec3 terrainColor(vec2 p, out float rough) {
   float steep = smoothstep(0.992, 0.955, vTN);
   col = mix(col, dirtColor(nB, nC, nD) * 0.92, steep * 0.34 * smoothstep(0.35, 0.7, nC.g + nA.g * 0.5));
 
+  // World Expansion 2.0 biomes (zero everywhere else, so the rest of the
+  // map is drawn exactly as before): cerrado — drier, paler grass with the
+  // red latosol in patches; wet lowland — deep green, darker damp hollows;
+  // forest floor — darker green; serra — sandstone on the steep ground
+  // (strata bands), pale sandy patches on the tops.
+  vec4 bio = texture2D(uBiome, p / (2.0 * uWorldHalf) + 0.5);
+  if (bio.r + bio.g + bio.b + bio.a > 0.004) {
+    vec3 dryG = mix(vec3(0.24, 0.20, 0.09), vec3(0.33, 0.27, 0.13), nC.g) * (0.85 + 0.3 * nA.r);
+    col = mix(col, dryG, bio.r * 0.78 * smoothstep(0.15, 0.6, nA.b + 0.3));
+    col = mix(col, dirtColor(nB, nC, nD) * 0.95, bio.r * 0.4 * smoothstep(0.55, 0.78, nB.r));
+    col = mix(col, vec3(0.055, 0.14, 0.04) * (0.85 + 0.3 * nB.g), bio.g * 0.7);
+    col = mix(col, vec3(0.06, 0.075, 0.035), bio.g * 0.35 * smoothstep(0.6, 0.85, nD.g));
+    col = mix(col, vec3(0.045, 0.10, 0.035) * (0.9 + 0.25 * nA.g), bio.b * 0.5);
+    float cliff = clamp(bio.a * smoothstep(0.9, 0.62, vTN) * 1.3, 0.0, 1.0);
+    float strata = 0.5 + 0.5 * sin(vWPos.y * 0.9 + nB.r * 5.0 + nC.r * 2.0);
+    vec3 rockC = mix(vec3(0.36, 0.20, 0.12), vec3(0.58, 0.40, 0.27), strata * 0.45 + nB.b * 0.35 + nC.g * 0.2);
+    col = mix(col, vec3(0.36, 0.30, 0.21) * (0.9 + 0.2 * nD.r), bio.a * 0.16 * smoothstep(0.58, 0.8, nC.g) * (1.0 - cliff));
+    col = mix(col, rockC * (0.9 + 0.2 * nD.b), cliff);
+    rough = mix(rough, 0.85, cliff);
+  }
+
   // Fields + carreadores. Regions: a pixel of the original 8 x 8 km map
   // looks through its fields only, one of the outer ring through the ring's
   // (fields near the border are in both ranges).
@@ -382,6 +405,41 @@ vec3 terrainBump(vec3 surf_pos, vec3 surf_norm, float faceDirection) {
 }
 `;
 
+// World Expansion 2.0: the new regions' biome weights in one small texture
+// (192 × 192 over the map, 62.5 m a texel, linear: the transitions are
+// gradual), held at zero near every farm's strip, apron and field so the
+// farms look exactly as before.
+const BIOME_N = 192;
+function biomeTexture() {
+  const N = BIOME_N, data = new Uint8Array(N * N * 4), w = [0, 0, 0, 0];
+  const rects = [];
+  for (const s of SITES) {
+    const r = s.runway;
+    rects.push([Math.min(r.x0, s.apron.x0), Math.max(r.x1, s.apron.x1), Math.min(r.z - r.width / 2, s.apron.z0), Math.max(r.z + r.width / 2, s.apron.z1)]);
+  }
+  for (const f of FIELDS) rects.push([f.x0, f.x1, f.z0, f.z1]);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    // Texel centres; the border row stays zero (the far ring beyond).
+    if (i === 0 || j === 0 || i === N - 1 || j === N - 1) continue;
+    const x = -WORLD_HALF + ((i + 0.5) / N) * WORLD_HALF * 2, z = -WORLD_HALF + ((j + 0.5) / N) * WORLD_HALF * 2;
+    biomeWeights(x, z, w);
+    if (w[0] + w[1] + w[2] + w[3] <= 0) continue;
+    let d = 1e9;
+    for (const r of rects) d = Math.min(d, Math.hypot(Math.max(r[0] - x, 0, x - r[1]), Math.max(r[2] - z, 0, z - r[3])));
+    const k = Math.min(1, Math.max(0, (d - 250) / 300));
+    const o = (j * N + i) * 4;
+    for (let c = 0; c < 4; c++) data[o + c] = Math.round(Math.min(1, w[c]) * k * 255);
+  }
+  const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+  t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearFilter;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.needsUpdate = true;
+  return t;
+}
+// The ground shader's pond list: the original ones (the new lagoons' wet
+// margins come from the biome texture), so its cost stays as it was.
+const PONDS0 = WATER.ponds.filter((q) => !q.exp);
+
 export function createTerrainMaterial(noiseTex, detailTex) {
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0.0 });
   const nf = FIELDS.length;
@@ -399,7 +457,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   const nc = CREEK.points.length;
   const stp = WATER.streams[0].points;
   mat.defines = {
-    NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: WATER.ponds.length,
+    NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: PONDS0.length,
     RING_IN: RING_IN.toFixed(1), NF_IN1: inOnly.length + both.length, NF_RING0: inOnly.length, NS_IN: nsIn,
   };
   const uniforms = {
@@ -430,10 +488,11 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uCropTop: CROP_U.top,
     uStream: { value: stp.map((q) => new THREE.Vector2(q[0], q[1])) },
     uStreamBox: { value: new THREE.Vector4(Math.min(...stp.map((q) => q[0])), Math.min(...stp.map((q) => q[1])), Math.max(...stp.map((q) => q[0])), Math.max(...stp.map((q) => q[1]))) },
-    uPond: { value: WATER.ponds.map((q) => new THREE.Vector4(q.x, q.z, q.r, q.ph)) },
-    uPondA: { value: WATER.ponds.map((q) => new THREE.Vector4(...(q.lobes ?? [0.16, 0.09, 0, 0]))) },
+    uPond: { value: PONDS0.map((q) => new THREE.Vector4(q.x, q.z, q.r, q.ph)) },
+    uPondA: { value: PONDS0.map((q) => new THREE.Vector4(...(q.lobes ?? [0.16, 0.09, 0, 0]))) },
     uCutKind: CUT_U.kinds,
     uWet: ATMO_U.wet,
+    uBiome: { value: biomeTexture() },
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -448,7 +507,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => 'terrain-v6';
+  mat.customProgramCacheKey = () => 'terrain-v7';
   return mat;
 }
 

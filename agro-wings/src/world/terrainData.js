@@ -2,6 +2,11 @@
 // and tests can query the exact same triangulated surface the renderer draws.
 import { fbm, smoothstep, lerp, segDist, clamp } from '../core/math.js';
 import { reliefAt, ringReliefAt } from './relief.js';
+import { expansionReliefAt, expansionMesas, AUX_STRIPS, stripUV, auxStripLevel, auxStripAt, EXP_BOXES } from './expansion.js';
+
+// World Expansion 2.0 switch: off only while TerrainData.buildBaseline()
+// evaluates the ground as it was before the expansion (see there).
+let EXP = true;
 import {
   WORLD_HALF, RUNWAY, BASE, FIELDS, CREEK, ROADS, HQ, fieldAt, cropHeight, FARM_SITES, stripLevel, WATER, pondRadius,
 } from './layout.js';
@@ -76,8 +81,11 @@ function naturalHeight(x, z) {
   const cd = x < CREEK_X[0] || x > CREEK_X[1] ? 1e9 : creekDist(x, z);
   // Rolling country and hills in the outer zones (exactly zero over the farm
   // core). The creek keeps a calm floodplain through them.
-  const rel = reliefAt(x, z) + ringReliefAt(x, z);
+  // (World Expansion 2.0 landforms: zero outside their own support.)
+  const rel = reliefAt(x, z) + ringReliefAt(x, z) + (EXP ? expansionReliefAt(x, z) : 0);
   if (rel !== 0) h += rel * smoothstep(110, 480, cd);
+  // Chapadas and buttes (World Expansion 2.0): flat tops at their own height.
+  if (EXP) h = expansionMesas(h, x, z);
   // Creek valley + channel.
   const v = 1 - smoothstep(0, CREEK.valley, cd);
   h -= CREEK.valleyDepth * v * v;
@@ -86,7 +94,7 @@ function naturalHeight(x, z) {
   // only falls downstream.
   for (const st of WATER.streams) {
     const b = st.box;
-    if (x < b[0] || x > b[1] || z < b[2] || z > b[3]) continue;
+    if (x < b[0] || x > b[1] || z < b[2] || z > b[3] || (st.exp && !EXP)) continue;
     const q = polyNearest(st.points, x, z, _pn);
     if (q.d > st.valley || !st.levels) continue;
     const v2 = 1 - smoothstep(0, st.valley, q.d);
@@ -100,7 +108,7 @@ function naturalHeight(x, z) {
   for (const p of WATER.ponds) {
     const dx = x - p.x, dz = z - p.z;
     const box = p.lobes ? p.rmax * (p.blend ?? 2.2) * 1.02 : p.r * 2.6;
-    if (Math.abs(dx) > box || Math.abs(dz) > box || p.level === undefined) continue;
+    if (Math.abs(dx) > box || Math.abs(dz) > box || p.level === undefined || (p.exp && !EXP)) continue;
     const d = Math.hypot(dx, dz) / pondRadius(p, Math.atan2(dz, dx));
     const blend = p.blend ?? 2.2, bankK = p.bank ? p.bank * p.r : 1.2;
     if (d < 1) h = Math.min(h, p.level - 0.15 - p.depth * (1 - d * d));
@@ -147,7 +155,28 @@ export function rawHeight(x, z) {
     const ms = rectMask(x, z, r.x0 - 80, r.x1 + 40, r.z - 160, r.z + 40, s.farm.blend ?? 160);
     if (ms > 0) h = lerp(h, stripLevel(s, x, z), ms);
   }
+  // Auxiliary strips (World Expansion 2.0): a graded platform along the
+  // strip (its grade, bank and, on the rough one, the gentle undulation),
+  // blended into the land around it.
+  if (EXP) for (const a of AUX_STRIPS) {
+    const R = a.len / 2 + 60 + a.blend;
+    if (Math.abs(x - a.c[0]) > R || Math.abs(z - a.c[1]) > R) continue;
+    const [u, v] = stripUV(a, x, z);
+    const du = Math.max(Math.abs(u) - a.len / 2 - 60, 0), dv = Math.max(Math.abs(v) - a.width / 2 - 35, 0);
+    const ma = 1 - smoothstep(0, a.blend, Math.hypot(du, dv));
+    if (ma > 0) h = lerp(h, auxStripLevel(a, u, v), ma);
+  }
   return h;
+}
+// Auxiliary strip level: the mean natural ground along the strip, fitted
+// along its grade (and undulation) so it follows its slope.
+for (const a of AUX_STRIPS) {
+  let sum = 0, n = 0;
+  for (let u = -a.len / 2 - 40; u <= a.len / 2 + 40; u += 20) for (let v = -a.width; v <= a.width; v += a.width / 2) {
+    const x = a.c[0] + u * a.ax - v * a.az, z = a.c[1] + u * a.az + v * a.ax;
+    sum += naturalHeight(x, z) - auxStripLevel(a, u, v); n++;
+  }
+  a.y0 = Math.round((sum / n) * 10) / 10;
 }
 // Site level: mean natural ground under the strip and its apron (outer-ring
 // farms: fitted along the strip's grade and bank, so a sloping strip follows
@@ -228,6 +257,46 @@ export class TerrainData {
     this.creekLevelCache = new Map();
   }
 
+  // The ground as it was before the World Expansion 2.0, for the original
+  // tree placements only: their random sequences branch on the terrain, so
+  // they read these heights to stay exactly where they were (the trees still
+  // stand on the real ground). Only the grid nodes the expansion can reach
+  // are re-evaluated; the copy is released once the vegetation is built.
+  buildBaseline() {
+    const N = this.n, h0 = this.h.slice(), seen = new Uint8Array(N * N);
+    const boxes = [...EXP_BOXES];
+    for (const a of AUX_STRIPS) { const R = a.len / 2 + 60 + a.blend + 20; boxes.push([a.c[0] - R, a.c[0] + R, a.c[1] - R, a.c[1] + R]); }
+    for (const st of WATER.streams) if (st.exp) boxes.push(st.box);
+    for (const p of WATER.ponds) if (p.exp) { const R = p.rmax * (p.blend ?? 2.2) * 1.05; boxes.push([p.x - R, p.x + R, p.z - R, p.z + R]); }
+    EXP = false;
+    try {
+      for (const [x0, x1, z0, z1] of boxes) {
+        const i0 = Math.max(0, Math.floor((x0 + WORLD_HALF) / CELL)), i1 = Math.min(N - 1, Math.ceil((x1 + WORLD_HALF) / CELL));
+        const j0 = Math.max(0, Math.floor((z0 + WORLD_HALF) / CELL)), j1 = Math.min(N - 1, Math.ceil((z1 + WORLD_HALF) / CELL));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const k = j * N + i;
+          if (seen[k]) continue;
+          seen[k] = 1;
+          h0[k] = rawHeight(-WORLD_HALF + i * CELL, -WORLD_HALF + j * CELL);
+        }
+      }
+    } finally { EXP = true; }
+    this.h0 = h0;
+  }
+  releaseBaseline() { this.h0 = null; }
+  heightAt0(x, z) {
+    if (!this.h0) return this.heightAt(x, z);
+    const N = this.n;
+    let fx = (x + WORLD_HALF) / CELL, fz = (z + WORLD_HALF) / CELL;
+    if (fx < 0 || fz < 0 || fx >= GRID_N || fz >= GRID_N) return this.heightAt(x, z);
+    const ix = Math.floor(fx), iz = Math.floor(fz);
+    fx -= ix; fz -= iz;
+    const i = iz * N + ix, H = this.h0;
+    const a = H[i], d = H[i + 1], b = H[i + N], c = H[i + N + 1];
+    if (fx + fz <= 1) return a + (d - a) * fx + (b - a) * fz;
+    return c + (b - c) * (1 - fx) + (d - c) * (1 - fz);
+  }
+
   // Height on the triangulated grid (matches the rendered mesh exactly).
   heightAt(x, z) {
     const N = this.n;
@@ -270,6 +339,8 @@ export class TerrainData {
       if (Math.abs(dx) < box && Math.abs(dz) < box && Math.hypot(dx, dz) < pondRadius(p, Math.atan2(dz, dx)) * 1.02) return p.level;
     }
     for (const st of WATER.streams) {
+      const b = st.box;
+      if (x < b[0] || x > b[1] || z < b[2] || z > b[3]) continue; // (beyond its valley: never within the channel)
       const q = polyNearest(st.points, x, z, _pn);
       if (q.d < st.width * 0.5 + 10) return lerp(st.levels[q.i], st.levels[q.i + 1], q.t);
     }
@@ -301,6 +372,9 @@ export class TerrainData {
       if ((x >= a2.x0 && x <= a2.x1 && z >= a2.z0 && z <= a2.z1) || (x >= t2.x0 && x <= t2.x1 && z >= t2.z0 && z <= t2.z1)) return 'dirt';
       if (Math.hypot(x - s.helipad.x, z - s.helipad.z) <= 9) return 'dirt'; // earth helipad clearing
     }
+    // Auxiliary strips: grass, rough earth and sand roll like grass.
+    const as = auxStripAt(x, z);
+    if (as) return as.surface === 2 || as.surface >= 4 ? 'grass' : 'dirt';
     if (onRoad(x, z)) return 'dirt';
     const f = fieldAt(x, z);
     if (f) {
