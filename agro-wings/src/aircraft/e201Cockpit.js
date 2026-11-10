@@ -139,7 +139,7 @@ function leatherTex() {
 }
 
 export function buildE201Cockpit(ctx) {
-  const { panel, envMap = null, M, C, CAB, boxX, shellP, TW } = ctx;
+  const { panel, envMap = null, M, C, CAB, boxX, shellP, TW, TQ } = ctx;
   const cockpit = new THREE.Group();
   cockpit.name = 'e201-cockpit';
   const eye = new THREE.Vector3(...C.eye);
@@ -149,7 +149,8 @@ export function buildE201Cockpit(ctx) {
   const CM = {
     panel: std(0xffffff, { map: plateTex(41, '#aeb2b0', 1600), roughness: 0.62, metalness: 0.18 }), // light-grey painted face
     back: std(0x55595c, { roughness: 0.8, metalness: 0.2 }),
-    glare: std(0x161718, { roughness: 0.92, metalness: 0.02 }), // matte padded lip
+    glare: std(0x161718, { roughness: 0.92, metalness: 0.02 }), // matte padded hood
+    center: std(0x2a2c2f, { roughness: 0.7, metalness: 0.15 }), // the dark centre plate
     bezel: std(0x16181a, { roughness: 0.45, metalness: 0.35 }),
     can: std(0x0b0c0d, { roughness: 0.9, side: THREE.DoubleSide }),
     dial: std(0xffffff, { map: panel.dials, roughness: 0.45, metalness: 0.05, emissive: 0xffffff, emissiveMap: panel.dials, emissiveIntensity: 0.22 }),
@@ -208,27 +209,45 @@ export function buildE201Cockpit(ctx) {
   const pf = panelFrame(K.panel.c, K.panel.tilt);
   cockpit.add(pf);
   const put = frameBuild(pf);
-  const outline = () => {
-    // The top edge rises toward the centre (the lip above follows it).
-    const pts = [];
-    const [tl, ...rest] = P.outline;
-    pts.push(tl);
-    for (const p of rest) pts.push(p);
-    const top = [];
-    for (let i = 0; i <= 16; i++) { const u = lerp(0.44, -0.44, i / 16); top.push([u, 0.16 + P.topArc * (1 - (u / 0.44) ** 2)]); }
-    return pts.slice(0, -1).concat(top);
+  // The face as three plates (see E201_PANEL): the top edge on the hood's
+  // arch, the outer sides leaning in toward the bottom, rounded lower
+  // corners.
+  const TOPV = (u) => P.top + P.topArc * (1 - (u / P.half) ** 2);
+  const sideU = (v, s) => s * lerp(P.halfBot, P.half, clamp((v - P.bottom) / (TOPV(P.half) - P.bottom), 0, 1));
+  const plateOutline = (u0, u1, bottom) => {
+    const pts = [], r = 0.025;
+    const oL = u0 <= -P.half + 1e-6, oR = u1 >= P.half - 1e-6;
+    const bl = oL ? sideU(bottom, -1) : u0, br = oR ? sideU(bottom, 1) : u1;
+    pts.push([oL ? bl + r : bl, bottom]);
+    if (oR) { pts.push([br - r, bottom]); for (let i = 1; i <= 4; i++) { const a = -Math.PI / 2 + (i / 4) * (Math.PI / 2); pts.push([br - r + Math.cos(a) * r, bottom + r + Math.sin(a) * r]); } } else pts.push([br, bottom]);
+    if (oR) for (let i = 1; i <= 8; i++) { const v = lerp(bottom + r, TOPV(P.half), i / 8); pts.push([sideU(v, 1), v]); }
+    const a0 = oR ? P.half : u1, a1 = oL ? -P.half : u0;
+    for (let i = oR ? 1 : 0; i <= 16; i++) { const u = lerp(a0, a1, i / 16); pts.push([u, TOPV(u)]); }
+    if (oL) {
+      for (let i = 1; i <= 8; i++) { const v = lerp(TOPV(P.half), bottom + r, i / 8); pts.push([sideU(v, -1), v]); }
+      for (let i = 1; i < 4; i++) { const a = Math.PI + (i / 4) * (Math.PI / 2); pts.push([bl + r + Math.cos(a) * r, bottom + r + Math.sin(a) * r]); }
+    }
+    return pts.map(([u, v]) => new THREE.Vector2(u, v));
   };
+  const [S0, S1] = P.split;
+  const plateOf = (u) => (u < S0 ? 0 : u > S1 ? 2 : 1);
   {
-    const out = outline().map(([u, v]) => new THREE.Vector2(u, v));
-    // Face plate with the holes: instruments, the hour meter, the GPS.
-    const fs = new THREE.Shape(out);
-    for (const d of Object.values(P.dials)) { const h = new THREE.Path(); h.absarc(d.u, d.v, d.f + 0.0025, 0, Math.PI * 2, true); fs.holes.push(h); }
-    fs.holes.push(rrect(new THREE.Path(), P.hobbs.u, P.hobbs.v, P.hobbs.w + 0.006, P.hobbs.h + 0.006, 0.003, true));
-    put('panel', new THREE.ExtrudeGeometry(fs, { depth: 0.004, bevelEnabled: false, curveSegments: 18 }).translate(0, 0, -0.004));
-    // Body behind the face (reaching forward under the lip to the hopper).
-    put('back', new THREE.ExtrudeGeometry(new THREE.Shape(out), { depth: P.depth, bevelEnabled: false }).translate(0, 0, -0.013 - P.depth));
-    // Screws round the edge.
-    for (const [u, v] of [[-0.425, 0.145], [-0.425, -0.185], [0.425, 0.145], [0.425, -0.225], [0.06, -0.185], [-0.2, 0.168], [0.2, 0.168], [-0.2, -0.188], [0.32, -0.225]]) put('screw', at(new THREE.CylinderGeometry(0.0032, 0.0032, 0.0018, 8), u, v, 0.0009, Math.PI / 2), true);
+    const plates = [[-P.half, S0, P.bottom], [S0, S1, P.bottomC], [S1, P.half, P.bottom]].map(([u0, u1, b]) => new THREE.Shape(plateOutline(u0, u1, b)));
+    for (const d of Object.values(P.dials)) { const h = new THREE.Path(); h.absarc(d.u, d.v, d.f + 0.0025, 0, Math.PI * 2, true); plates[plateOf(d.u)].holes.push(h); }
+    plates[plateOf(P.hobbs.u)].holes.push(rrect(new THREE.Path(), P.hobbs.u, P.hobbs.v, P.hobbs.w + 0.006, P.hobbs.h + 0.006, 0.003, true));
+    // Side plates 12 mm thick (their inner edges are the steps down to the
+    // centre plate), the centre plate dark and set back.
+    put('panel', new THREE.ExtrudeGeometry(plates[0], { depth: 0.012, bevelEnabled: false, curveSegments: 18 }).translate(0, 0, -0.012));
+    put('panel', new THREE.ExtrudeGeometry(plates[2], { depth: 0.012, bevelEnabled: false, curveSegments: 18 }).translate(0, 0, -0.012));
+    put('center', new THREE.ExtrudeGeometry(plates[1], { depth: 0.006, bevelEnabled: false }).translate(0, 0, -P.recess - 0.006));
+    // Body behind the face (reaching forward under the hood to the hopper).
+    put('back', new THREE.ExtrudeGeometry(new THREE.Shape(plateOutline(-P.half, P.half, P.bottom)), { depth: P.depth, bevelEnabled: false }).translate(0, 0, -0.025 - P.depth));
+    // Screws round each plate.
+    const scr = (u, v, z = 0) => put('screw', at(new THREE.CylinderGeometry(0.0032, 0.0032, 0.0018, 8), u, v, z + 0.0009, Math.PI / 2), true);
+    for (const s of [1, -1]) {
+      for (const [u, v] of [[0.402, 0.128], [0.385, -0.122], [0.145, 0.172], [0.145, -0.122], [0.27, 0.165], [0.27, -0.128]]) scr(s * u, v);
+    }
+    for (const [u, v] of [[-0.115, 0.165], [0.105, 0.165], [-0.115, -0.112], [0.105, -0.112]]) scr(u, v, -P.recess);
   }
   // Instruments: dial face, can, bezel, glass, hub and the needles.
   const instrument = (frame, putF, id, d) => {
@@ -264,8 +283,10 @@ export function buildE201Cockpit(ctx) {
   // Black placard right of the altimeter (operating limitations), AVGAS
   // plate beside the fuel gauge, the limits plate under the tachometer.
   put('placard', placardUV(at(new THREE.PlaneGeometry(P.label.w, P.label.h), P.label.u, P.label.v, 0.0006), 2));
-  put('placard', placardUV(at(new THREE.PlaneGeometry(0.06, 0.012), 0.025, 0.09, 0.0006), 1));
-  put('placard', placardUV(at(new THREE.PlaneGeometry(0.11, 0.013), 0.2, -0.118, 0.0006), 7));
+  put('placard', placardUV(at(new THREE.PlaneGeometry(0.06, 0.012), P.avgas.u, P.avgas.v, -P.recess + 0.0006), 1));
+  // The slot above the GPS (dark, open).
+  put('black', at(new RoundedBoxGeometry(P.slot.w, P.slot.h, 0.008, 1, 0.003), P.slot.u, P.slot.v, -P.recess + 0.002));
+  put('placard', placardUV(at(new THREE.PlaneGeometry(P.limits.w, P.limits.h), P.limits.u, P.limits.v, 0.0006), 7));
   // Eyeball air vents (right end of the panel): chrome ring, dark ball
   // with its nozzle.
   for (const [u, v] of P.vents) {
@@ -315,7 +336,7 @@ export function buildE201Cockpit(ctx) {
   const G = P.gps, pickables = [];
   const gpsG = new THREE.Group();
   {
-    gpsG.position.set(G.u, G.v, 0);
+    gpsG.position.set(G.u, G.v, -P.recess);
     pf.add(gpsG);
     const CG = {};
     const addG = (mat, g) => (CG[mat] ||= []).push(g);
@@ -341,25 +362,28 @@ export function buildE201Cockpit(ctx) {
     for (const [mat, list] of Object.entries(CG)) gpsG.add(new THREE.Mesh(mergeAll(list), CM[mat]));
     const gl = new THREE.Mesh(new THREE.PlaneGeometry(S.w, S.h).translate(0, 0.016, GD - 0.003), CM.glass);
     gl.renderOrder = 8; gpsG.add(gl);
-    for (const [u, v] of [[-G.w / 2 + 0.008, G.h / 2 - 0.008], [G.w / 2 - 0.008, G.h / 2 - 0.008], [-G.w / 2 + 0.008, -G.h / 2 + 0.008], [G.w / 2 - 0.008, -G.h / 2 + 0.008]]) put('screw', at(new THREE.CylinderGeometry(0.003, 0.003, 0.002, 8), G.u + u, G.v + v, GD + 0.0025, Math.PI / 2), true);
+    for (const [u, v] of [[-G.w / 2 + 0.008, G.h / 2 - 0.008], [G.w / 2 - 0.008, G.h / 2 - 0.008], [-G.w / 2 + 0.008, -G.h / 2 + 0.008], [G.w / 2 - 0.008, -G.h / 2 + 0.008]]) put('screw', at(new THREE.CylinderGeometry(0.003, 0.003, 0.002, 8), G.u + u, G.v + v, GD + 0.0025 - P.recess, Math.PI / 2), true);
   }
 
-  // ======================================================== 2 the lip
-  // Dark matte padded lip over the panel, curved in plan (deepest at the
-  // centre), its front against the windshield's base.
+  // ======================================================== 2 the hood
+  // Thick padded roll over the panel (as on the photographs): arched with
+  // the panel's top edge, a rounded front lip overhanging the instruments,
+  // reaching forward under the windshield, closing at both ends.
   {
     const Gl = K.glare;
-    const pts = [];
-    const N = 24;
-    for (let i = 0; i <= N; i++) { const x = lerp(Gl.half, -Gl.half, i / N); pts.push(new THREE.Vector2(x, -Gl.front)); }
-    for (let i = 0; i <= N; i++) { const x = lerp(-Gl.half, Gl.half, i / N); const zb = lerp(Gl.backSide, Gl.back, 1 - (x / Gl.half) ** 2); pts.push(new THREE.Vector2(x, -zb)); }
-    const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: Gl.t - 0.016, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 3, curveSegments: 4 });
-    g.rotateX(-Math.PI / 2);
-    g.translate(0, Gl.y + 0.008, 0);
-    addB('glare', g);
-    // Its stitched lower edge strip along the back.
-    const edge = []; for (let i = 0; i <= N; i++) { const x = lerp(-Gl.half + 0.02, Gl.half - 0.02, i / N); edge.push(new THREE.Vector3(x, Gl.y + 0.002, lerp(Gl.backSide, Gl.back, 1 - (x / Gl.half) ** 2) + 0.004)); }
-    addB('black', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(edge), 24, 0.004, 5, false));
+    const H = P.half, NU = 44, NS = 18;
+    const hood = skin((a, b) => {
+      const u = lerp(-H, H, a), e = Math.max(0, 1 - Math.abs(u / H) ** 10) ** 0.5; // end caps
+      const th = b * Math.PI * 2, c = Math.cos(th), sn = Math.sin(th);
+      const sp = (x, p) => Math.sign(x) * Math.abs(x) ** (2 / p);
+      const aw = 0.08 * e + 0.004, av = 0.036 * e + 0.003;
+      return [u, TOPV(u) + 0.03 + av * sp(sn, 2.6), -0.03 + aw * sp(c, 2.6)];
+    }, NU, NS);
+    hood.applyMatrix4(pf.matrix.clone().compose(pf.position, pf.quaternion, new THREE.Vector3(1, 1, 1)));
+    addB('glare', hood);
+    // Stitched seam along the hood's front lip.
+    const seam = []; for (let i = 0; i <= 30; i++) { const u = lerp(-H + 0.03, H - 0.03, i / 30); seam.push(new THREE.Vector3(u, TOPV(u) + 0.03, 0.048).applyMatrix4(new THREE.Matrix4().compose(pf.position, pf.quaternion, new THREE.Vector3(1, 1, 1)))); }
+    addB('black', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seam), 30, 0.003, 4, false));
     // Side fillers between the panel's ends and the walls.
     for (const sx of [1, -1]) {
       const x0 = sx * 0.44, x1 = sx * (boxX(-0.62, 0.3) - 0.012);
@@ -405,6 +429,9 @@ export function buildE201Cockpit(ctx) {
       const rail = []; for (let i = 0; i <= 10; i++) rail.push(new THREE.Vector3(...inset(shellP(lerp(CAB.roofF - 0.03, CAB.roofR, i / 10), t), 0.026)));
       addB('seal', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rail), 12, 0.009, 6, false));
     }
+    // Behind the roof: the rear fairing lined inside too (its outside paint
+    // is single-sided — looking back, the cabin read as open to the sky).
+    addB('liner', skin((u, v) => inset(shellP(lerp(CAB.roofR + 0.03, CAB.win - 0.05, v), lerp(TQ - 0.005, 1 - TQ + 0.005, u)), 0.012), 20, 10)); // (the quarter windows stay clear)
     // Magnetic compass on the bow, at the centre of the windshield's top.
     const cp = inset(shellP(CAB.roofF - 0.03, 0.5), 0.07);
     addB('black', at(new RoundedBoxGeometry(0.07, 0.05, 0.06, 2, 0.01), cp[0], cp[1], cp[2] + 0.01));

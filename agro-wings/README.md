@@ -4151,6 +4151,21 @@ real 201 cockpit:
   browser: the map moves with the aircraft, the DEST page shows the bearing
   to the base, the page keys switch pages).
 
+**Panel after real 201 panels (v48).** The face is three plates: light-grey
+left and right instrument plates and a dark centre plate set 15 mm back
+holding the GPS, with a slot and the AVGAS plate above it; the top edge
+arches with a thick padded hood (a rounded roll overhanging the dials,
+closing at both ends), the outer sides lean in toward the bottom, the lower
+corners are rounded, screws on each plate. Left plate: fuel and altimeter,
+the dimmer, tachometer and airspeed, the key and the switch / breaker strip;
+right plate: manifold pressure and the hour meter, oil and CHT, the spray
+box and the placards. **Cabin shape:** the cabin narrows as it rises (sides
+leaning in 26 % at the roof) and the turtledeck behind it is raised and
+rounded (crest +0.05–0.07 m, rounder section), the aft sides tapering.
+**Closed cabin:** the rear fairing's outside paint is single-sided, so
+looking back the cabin read as open to the sky; it is lined inside now (the
+quarter windows stay clear) and the bulkhead behind the seat is grey.
+
 Measured (Chromium + SwiftShader, same views): pilot view 410 → 410 draw
 calls, panel view 419 → 422, behind-the-seat view 411 → 423; triangles
 +2.6–4.8 % (part of it the narrower FOV). `test/e201e2e.mjs`: all 16 checks

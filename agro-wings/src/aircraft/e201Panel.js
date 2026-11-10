@@ -30,35 +30,42 @@ const INK = '#f1f0ea', DIM = '#c9c9c1', GREEN = '#22a94a', YELLOW = '#f1c21b', R
 // Panel-local metres: u to the pilot's right, v up the face (origin: the
 // face's centre).
 export const E201_PANEL = {
-  // Outline of the face (pilot's view): the full cabin width, square, the
-  // lower edge stepping down under the GPS box on the right (as on the
-  // photograph of the cockpit).
-  outline: [[-0.44, 0.16], [-0.44, -0.2], [0.07, -0.2], [0.11, -0.24], [0.44, -0.24], [0.44, 0.16]],
-  topArc: 0.02, // the top edge rises this much at the centre
+  // The face, after the photographs of real 201 panels: three plates —
+  // light-grey instrument plates left and right, a dark centre plate set
+  // back holding the GPS — under an arched padded hood; the top edge arches
+  // up toward the centre, the sides lean in toward the bottom.
+  half: 0.435, halfBot: 0.405, top: 0.15, topArc: 0.05, bottom: -0.14, bottomC: -0.125,
+  split: [-0.13, 0.12], // left plate | centre | right plate
+  recess: 0.015, // the centre plate's depth behind the side plates
   depth: 0.12,
-  // Left: the flight and engine instruments in two rows of three, as the
-  // photograph shows them (a smaller dial at each row's outer end).
+  // Left plate: fuel and altimeter on top, the dimmer, tachometer and
+  // airspeed below, the switch strip at the bottom. Right plate: manifold
+  // pressure and the hour meter on top, oil and cylinder-head temperature
+  // below, the spray box and the placards at the bottom.
   dials: {
-    cht: { u: -0.355, v: 0.075, r: 0.034, f: 0.03, cell: 5 },
-    asi: { u: -0.245, v: 0.075, r: 0.048, f: 0.043, cell: 0 },
-    alt: { u: -0.133, v: 0.075, r: 0.048, f: 0.043, cell: 1 },
-    oil: { u: -0.355, v: -0.045, r: 0.037, f: 0.033, cell: 4 },
-    rpm: { u: -0.245, v: -0.045, r: 0.048, f: 0.043, cell: 2 },
-    mp: { u: -0.133, v: -0.045, r: 0.048, f: 0.043, cell: 3 },
-    fuel: { u: -0.035, v: 0.09, r: 0.031, f: 0.027, cell: 6 },
+    fuel: { u: -0.3, v: 0.118, r: 0.034, f: 0.03, cell: 6 },
+    alt: { u: -0.195, v: 0.118, r: 0.042, f: 0.038, cell: 1 },
+    rpm: { u: -0.3, v: 0.02, r: 0.046, f: 0.041, cell: 2 },
+    asi: { u: -0.19, v: 0.02, r: 0.046, f: 0.041, cell: 0 },
+    mp: { u: 0.215, v: 0.1, r: 0.046, f: 0.041, cell: 3 },
+    oil: { u: 0.205, v: -0.02, r: 0.042, f: 0.038, cell: 4 },
+    cht: { u: 0.31, v: -0.02, r: 0.036, f: 0.032, cell: 5 },
   },
-  hobbs: { u: -0.035, v: 0.03, w: 0.056, h: 0.03 },
-  // Right: the GPS in its own raised box (the photograph's equipment on
-  // the right), the page keys under the screen.
-  gps: { u: 0.2, v: 0.025, w: 0.25, h: 0.22, d: 0.07, screen: { w: 0.19, h: 0.128 }, keysV: -0.075, keysU: [-0.075, -0.025, 0.025, 0.075] },
-  label: { u: -0.03, v: -0.1, w: 0.07, h: 0.03 }, // black placard (operating limitations)
-  key: { u: -0.035, v: -0.035 }, // magneto key
-  switches: { u0: -0.405, u1: -0.14, v: -0.135, n: 8 },
-  breakers: { u0: -0.4, u1: -0.145, v: -0.17, n: 9 },
-  dimmer: { u: -0.085, v: -0.135 },
-  box: { u: 0.2, v: -0.175, w: 0.16, h: 0.06 }, // the spray control box under the GPS
-  lamp: { u: 0.025, v: 0.132 },
-  vents: [[0.398, 0.095], [0.398, -0.155]],
+  hobbs: { u: 0.33, v: 0.105, w: 0.056, h: 0.03 },
+  // Centre: the GPS (the game's AGROWINGS NAV) in its box, the page keys
+  // under the screen; a slot and the AVGAS plate above it.
+  gps: { u: -0.005, v: -0.008, w: 0.23, h: 0.2, d: 0.07, screen: { w: 0.19, h: 0.128 }, keysV: -0.075, keysU: [-0.075, -0.025, 0.025, 0.075] },
+  slot: { u: -0.035, v: 0.128, w: 0.1, h: 0.026 },
+  label: { u: 0.37, v: 0.045, w: 0.07, h: 0.028 }, // black placard (operating limitations)
+  limits: { u: 0.37, v: -0.11, w: 0.07, h: 0.013 },
+  avgas: { u: 0.065, v: 0.128 },
+  key: { u: -0.395, v: -0.08 }, // magneto key
+  switches: { u0: -0.355, u1: -0.165, v: -0.075, n: 7 },
+  breakers: { u0: -0.355, u1: -0.165, v: -0.108, n: 8 },
+  dimmer: { u: -0.395, v: 0.03 },
+  box: { u: 0.25, v: -0.105, w: 0.15, h: 0.045 }, // the spray control box
+  lamp: { u: -0.395, v: 0.12 },
+  vents: [],
 };
 
 // Dial angles (radians, clockwise from twelve o'clock as the pilot sees them).

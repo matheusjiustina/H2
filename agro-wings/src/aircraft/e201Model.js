@@ -93,14 +93,14 @@ const BOX = [
   [-0.7, 0.46, CAB.sill, -0.03, -0.46, 5.8],
   [-1.2, 0.46, CAB.sill, -0.03, -0.45, 5.6],
   [CAB.win, 0.445, CAB.sill + 0.01, -0.025, -0.415, 5.0],
-  [CAB.fair, 0.43, 0.5, -0.02, -0.4, 4.8],
-  [-3.0, 0.33, 0.5, 0.0, -0.29, 4.2],
-  [-3.8, 0.215, 0.46, 0.04, -0.17, 3.5],
-  [-4.25, 0.135, 0.43, 0.07, -0.11, 3.0],
-  [CAB.end, 0.07, 0.42, 0.1, -0.08, 2.6],
+  [CAB.fair, 0.42, 0.47, -0.02, -0.4, 4.2],
+  [-3.0, 0.32, 0.44, 0.0, -0.29, 3.6],
+  [-3.8, 0.205, 0.42, 0.04, -0.17, 3.0],
+  [-4.25, 0.13, 0.41, 0.07, -0.11, 2.7],
+  [CAB.end, 0.07, 0.4, 0.1, -0.08, 2.4],
 ];
 const CREST = [[CAB.wsB, 0.62], [-0.6, 0.83], [-0.72, 1.02], [-0.8, 1.14], [-0.86, 1.195], [-1.2, 1.215], [-1.57, 1.2],
-  [-1.72, 1.13], [-1.9, 0.94], [-2.05, 0.74], [-2.2, 0.66], [-2.6, 0.635], [-3.37, 0.6], [-4.0, 0.545], [CAB.end, 0.5]];
+  [-1.72, 1.14], [-1.9, 0.98], [-2.05, 0.83], [-2.2, 0.75], [-2.6, 0.71], [-3.37, 0.645], [-4.0, 0.575], [CAB.end, 0.515]];
 function pchip(Kn) {
   const n = Kn.length, xs = Kn.map((k) => -k[0]), ys = Kn.map((k) => k[1]);
   const d = [], m = new Array(n).fill(0);
@@ -126,7 +126,7 @@ export const boxAt = (z) => {
 const cabinF = (z) => 1 - smoothstep(CAB.roofR - 0.1, CAB.fair - 0.25, z) * 1; // 1 in the cabin, 0 on the dorsal
 export const shellP = (z, t) => {
   const b = boxAt(z), top = Math.max(b.yl + 0.002, crestY(z)), f = cabinF(z);
-  const p = lerp(2.3, 4.6, f), lean = lerp(1, 0.86, f);
+  const p = lerp(2.15, 3.3, f), lean = lerp(0.88, 0.74, f); // the cabin narrows as it rises; the turtledeck rounds over
   const a = Math.PI * t, c = Math.cos(a), sn = Math.sin(a);
   const v = Math.abs(sn) ** (2 / p);
   return [b.w * Math.sign(c) * Math.abs(c) ** (2 / p) * lerp(1, lean, v), b.yl + (top - b.yl) * v, z];
@@ -423,7 +423,7 @@ export function createE201Model(panel, opts = {}) {
     // grazing angle and would wash out to white over the wing.)
     glass: new THREE.MeshPhysicalMaterial({ color: 0xa8bcc6, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.12, clearcoat: 0.35, clearcoatRoughness: 0.08, specularIntensity: 0.35, envMapIntensity: 0.45, depthWrite: false, side: THREE.DoubleSide }),
     lens: new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.35, clearcoat: 1, depthWrite: false }),
-    interior: new THREE.MeshStandardMaterial({ color: 0xd9d6cc, roughness: 0.75, metalness: 0.12, vertexColors: true, side: THREE.DoubleSide }),
+    interior: new THREE.MeshStandardMaterial({ color: 0x6f7372, roughness: 0.8, metalness: 0.12, vertexColors: true, side: THREE.DoubleSide }), // the bulkhead behind the seat, grey like the walls
     seat: new THREE.MeshStandardMaterial({ color: 0x6b4a32, roughness: 0.82, vertexColors: true }),
     harness: new THREE.MeshStandardMaterial({ color: 0x2d3a52, roughness: 0.8 }),
     red: new THREE.MeshStandardMaterial({ color: 0xc8261b, roughness: 0.45, emissive: 0x330000, vertexColors: true }),
@@ -594,7 +594,7 @@ export function createE201Model(panel, opts = {}) {
   const mastTop = [0, CAB.roof + 0.1, CAB.roofF - 0.02];
   add('ink', rod([0, CAB.roof, CAB.roofF - 0.06], mastTop, 0.012, 6));
   add('wire', rod(mastTop, [0, FIN.top[1] + 0.01, FIN.top[0] - 0.05], 0.0035, 4));
-  add('white', rod([0, 0.62, -2.9], [0, 0.95, -3.1], 0.006, 5), true);
+  add('white', rod([0, 0.67, -2.9], [0, 0.98, -3.1], 0.006, 5), true);
 
   // ---------------- wing ----------------
   const leY = (x) => e201WingY(x);
@@ -670,8 +670,8 @@ export function createE201Model(panel, opts = {}) {
   add('livery', liveryUV(tagged(vfin(airfoil(0, 1, 0.12, 0, 0.4, 12), finSt))));
   // Dorsal fillet into the fin's leading edge.
   add('livery', liveryUV(tagged(loft(sampleStations([
-    K(-2.95, 0.012, 0.61, 0.6, 0.618, 2.2, 2.2), K(-3.1, 0.03, 0.6, 0.59, 0.64, 2.2, 2.2),
-    K(-3.25, 0.045, 0.59, 0.58, 0.68, 2.2, 2.2), K(-3.36, 0.05, 0.585, 0.575, 0.72, 2.2, 2.2),
+    K(-2.95, 0.012, 0.66, 0.65, 0.668, 2.2, 2.2), K(-3.1, 0.03, 0.64, 0.63, 0.68, 2.2, 2.2),
+    K(-3.25, 0.045, 0.62, 0.61, 0.71, 2.2, 2.2), K(-3.36, 0.05, 0.61, 0.6, 0.74, 2.2, 2.2),
   ], 20), 12, null))));
   const rudSt = [[FIN.bottom, FIN.hinge, 0.36], [0.1, FIN.hinge, 0.4], [0.5, FIN.hinge, 0.4], [1.0, FIN.hinge, 0.4], [1.5, FIN.hinge, 0.4], [FIN.top[1], FIN.hinge, 0.39]];
   const rudGeo = liveryUV(tagged(vfin(airfoil(0, 1, 0.13, 0, 0.3, 8), rudSt)));
