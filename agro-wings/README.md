@@ -3954,6 +3954,62 @@ MTOW; three-point 10.8°, 2.24 m); `test/e201e2e.mjs` and
 `test/e201cockpit.mjs` (see the report); golden physics: only the two new
 `plane.e201.*` scenarios added, every other aircraft unchanged.
 
+## Aircraft 14 — Air Tractor AT-401B (PR-ATR): exterior, physics and cockpit
+
+A new radial aircraft with its own geometry (`src/aircraft/at401Model.js`),
+cockpit (`at401Cockpit.js`, instrument textures `at401Panel.js`) and flight
+figures (`FLIGHT_AT401`, the existing radial branch of the flight model);
+nothing is taken from the AT-402 / 502 / 802 models or another cockpit.
+
+**The reference package (fsxat401.zip) was studied, not imported.** Its
+`aircraft.cfg` / `panel.cfg` only confirmed the layout (instrument list of
+the 2D panel, eyepoint, contact points); its MDL (FS2004 BGL/MDL8) could not
+be decoded with the tools available, so no geometry, UV, animation, texture,
+sound or `.air` data was used. Proportions come from the photographs
+(PR-DDD side view rotated to the 10.6° three-point attitude and scaled by
+the published 8.23 m length; N7317E; the low front views; the cockpit
+photographs) and the published figures: span 15.57 m, length 8.23 m, wing
+28.5 m², P&W R-1340 600 hp at 2,250 rpm, Hamilton Standard two-blade 2.63 m,
+hopper 1,514 L, fuel 477 L, MTOW 3,565 kg.
+
+**Exterior.** Round ring cowl with the nine R-1340 cylinders, collector ring
+and the low right exhaust stack; slab-sided hopper bay rising to a tall
+greenhouse canopy with a centre post, wire cutter and deflector cable to the
+fin; long tapering rear fuselage, tall swept fin, strut-braced tailplane;
+constant-chord wing with flaps and ailerons, squared tips, nav lights,
+walkway; spring main legs on big tyres, tailwheel; booms with 22 nozzles a
+side, wind-driven pump; bare-hub two-blade prop. Paint A — yellow with the
+blue band between black pinlines and a blue fin band; paint B — factory
+yellow, black cheat line, black fin band, blue tips (`at401Livery`). Parked
+on its own apron spot `parking12` (−490, −114), clear of the windbreak.
+
+**Cockpit.** Black panel whose top edge is the cabin's own section (inset),
+so it arches under the windshield, with the raised housing of three engine
+dials (MP, tachometer, fuel flow) and the magnetic compass on it; along the
+arch the turn coordinator at the centre, airspeed / altimeter / VSI to the
+right, oil P/T, CHT, fuel and hopper stepping down to the left; six
+push-button annunciators (fuel low, oil pressure, start, stall, park brake,
+spray); the game's GPS (AGROWINGS NAV) low in the centre, the big white
+spray-flow gauge low on the right, the yellow hour meter, magneto key,
+warning lamps, guarded boost-pump switch, switch / breaker panels; black
+coaming to the windshield base; yellow walls, floor and tube frame; left
+quadrant (throttle, propeller, mixture), right console with the spray valve
+lever, the floor flap lever (follows the flaps), stick with the black grip
+and red button, pedals, red mesh seat with harness. Every dial reads
+`Aircraft.instruments()`; nothing the simulator does not compute is shown
+(no volts / amps). Eye (0, 1.4, −1.4), pitch −0.22 rad, 68° FOV.
+
+**Measured** (Chromium + SwiftShader): `test/at401.test.mjs` 7/7 (574 hp
+static at 2,248 rpm; level 120 kt; climb 636 ft/min at 3,565 kg, 1,117 at
+2,600 kg; polar stall 67.7 kt at MTOW; take-off 151 m at 2,105 kg, 445 m
+at 3,565 kg; three-point 10.8°, 2.75 m); `test/at401e2e.mjs` 15/15
+(span 15.57, length 8.23, height 2.75; faces; clearances; 22 nozzles a side;
+parking; memory; 171 meshes / 99.6 k triangles, in line with the Dromader);
+`test/at401cockpit.mjs` 9/9 (needles ≤ 3°, GPS keys, controls and grip
+clearance, view, lamps / annunciators, containment of every cockpit vertex
+in the fuselage section, cockpit in/out ×10 and parked release with no
+growth); golden physics: only `plane.at401.*` added.
+
 ## AT-802A / Fire Boss: paint B
 
 Both now offer paint A / B on the menu card (`at802Livery`, `fbLivery`). B
