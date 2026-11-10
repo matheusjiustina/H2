@@ -4019,6 +4019,64 @@ tip bands; the Fire Boss floats carry the blue stripe (FIRE BOSS lettering
 kept). Only the canvases and the accent colour change (`setLivery`): no
 geometry, physics or cockpit change.
 
+## World Expansion 2.0 — new landscapes inside the same map
+
+The map keeps its size (12 × 12 km) and every farm, strip, field, road,
+forest, lake, stream, spawn point, mission and system as it was; the new
+content fills the stretches that were visually empty.
+
+**Audit.** The map was cut into 576 cells of 500 m and each classified by
+what it holds (`fieldAt`, forests, water, surfaces, structure colliders,
+tree counts, relief range): 292 cells (51 %) had no field, forest, water or
+building and fewer than 30 tall trees. The largest empty stretches: the
+north-west between Dois Lagos and Horizonte, the north-east between Serra do
+Cedro and Ipê Amarelo, the east between Ipê Amarelo and Vale Verde, the
+west south of Mata Alta, and the south-east past the creek near Terra
+Vermelha. The outer ring already carries swells of ±20–30 m, so the new
+rivers follow its real valleys.
+
+**Plan (one region per empty stretch, each its own identity).**
+
+| Region | Biome / landform | Water | Strip |
+|---|---|---|---|
+| Cerrado do Chapéu (NW) | cerrado: drier grass, red latosol patches, crooked trees, macaúbas, ipê-roxo, termite mounds; low colinas; the Morro do Chapéu butte | — | A Pista do Cerrado (open, red earth, fenced pasture, sítio, road to the Horizonte road); F Pista Esquecida (remote, sand, stones only, no road) |
+| Serra das Pedras (NE) | Chapada das Pedras (52 m flat top, sandstone cliff, talus), a lower step, the Serra do Tatu ridge, the Morro do Frade butte; rock on the steep ground, sparse scrub, radio mast (landmark) | Rio das Pedras: Cachoeira do Véu (≈ 25 m) and Cachoeira da Grota (≈ 17 m), plunge pools, Lagoa das Pedras | E Pista da Grota (rough, gentle undulations, 3 % grade) |
+| Morros do Leste (E) | rounded hills (Morro Redondo), pasture with shade trees, capões on the hilltops | — | C Pista do Morro Redondo (2.2 % grade among the hills), sítio, road to the Vale Verde road |
+| Mata do Jatobá (W) | dense forest blocks with lobed edges, the transition thinning out through capoeira | Córrego da Mata and Rio Jatobá into the Lagoa do Jatobá (bridge on the track) | D Clareira do Jatobá (narrow, forest walls, narrow track to the Chapada road) |
+| Várzea do Taquaral (S) | lowland eased down, deep green wet ground, buriti groves and capões | Córrego do Taquaral into the Lagoa do Taquaral, two more lagoons | B Pista Velha do Taquaral (old worn grass, sítio, road to the south fields) |
+
+**Code.** `src/world/expansion.js` holds everything as pure data and
+functions (regions, landforms, strips, rivers, lagoons, roads, forest
+blocks, props, pastures, biome weights): the terrain grid
+(`terrainData.js`: landforms in `naturalHeight`, mesas with absolute flat
+tops, strip platforms in `rawHeight`, strip surfaces in `surfaceAt`), the
+flight model and the tests read the same functions. The new roads, forests,
+streams and lagoons join the shared lists flagged `exp: true`, so the roads
+(`roads.js`), water and bridges (`water.js`), forest crowns and the map are
+drawn by the existing systems. `expansionScenery.js` draws the strips,
+sítios, fences, rocks and waterfalls; `terrain.js` reads one 192 × 192
+biome texture. The strips are shown on the map (no GPS, mission or service
+change).
+
+**Keeping the old map exactly.** Every landform has compact support and
+sits away from the farms (test: no height change within 80 m of a farm,
+strip, field, original road, forest or water, none over 1 m within 150 m;
+9 % of the map's samples changed, all in the new regions). The original
+tree placements branch on the terrain, so they read it as it was before
+(`TerrainData.buildBaseline` re-evaluates only the nodes the expansion can
+reach, released after the vegetation is built): of the 56,953 original
+trees none moved; 142 were removed where the new strips, roads and water
+are. The biome texture is held at zero near every strip, apron and field;
+the ground shader's pond list stays the original one.
+
+**Performance.** Nothing new is built at start except data: a region's
+meshes are built when the camera comes within 3.2 km of it and released
+beyond 4.6 km (one region per scan); everything is merged per material;
+markers, fences and troughs are hidden beyond 2.5 km; the waterfalls are
+animated in their shaders (no CPU), their mist only within 450 m and not on
+the low profile; trees use the existing streamed instanced cells; colliders
+are plain boxes from the data.
+
 ## Benchmark (performance work, phase 1)
 
 Reference for all optimisation: the tag **`ultra-original-v73`** (commit
