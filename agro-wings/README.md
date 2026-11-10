@@ -4111,6 +4111,52 @@ height so there is no step (test: no 5 m step over 1.2 m, slopes under 8°).
 Checked in the browser: flying east from x 5,700 m the aircraft was turned
 back at x 6,599 m (before: 5,900 m), no page error.
 
+## EMB-201 Ipanema — exterior revision, paint C and cockpit rebuild
+
+**Exterior** (`e201Model.js`, visual only — FLIGHT_E201, gear points and
+hard points unchanged). After the green PT-UCJ photograph, the SAE orange
+201 and the BRSim Ipanema video (volumes only; nothing copied):
+- nose and body narrower (half width 0.485 → 0.46 m), belly shallower
+  (−0.49 → −0.46 m);
+- the cabin sill lowered (0.60 → 0.47 m): the side windows reach down to
+  the cheat-line height as on the real 201; the sill frame tube sits on the
+  sill line itself (it ran 10 cm above it);
+- the tail cone narrows from right behind the cabin (half width at −3.0 m
+  0.395 → 0.33, at −3.8 m 0.27 → 0.215);
+- the door handle that floated in the side glass (seen from outside as a
+  bar across the window) sits on the door under the glass;
+- the windshield's centre strip is a slim dark rod (r 6 mm); no winglets
+  (the drooped tips stay).
+
+**Paint C** — bright green with two dark-blue sweeping bands from the cowl
+under the windows and down the tail cone, the registration in blue under
+them, SERVIÇO AÉREO ESPECIALIZADO, the flag (on its own green) and IPANEMA on
+the fin; green wings and tips. Same geometry and UVs as A and B (only the
+canvases and colours change); hangar selector A / B / C.
+
+**Cockpit** (`e201Cockpit.js`, `e201Panel.js`), after the photograph of a
+real 201 cockpit:
+- the panel spans the cabin (±0.44 m): flight and engine dials in two rows
+  of three on the left (CHT, airspeed, altimeter / oil, tachometer, manifold
+  pressure), fuel gauge, hour meter and magneto key in the centre, the GPS
+  in its own raised box on the right with the page keys, the spray control
+  box under it, eyeball vents, switches and breakers along the bottom;
+- dark headliner under the roof, padded bow over the windshield with the
+  magnetic compass, window hinges and latch levers, brown scat ducts down
+  both walls, darker painted-aluminium walls;
+- eye 4 cm forward (z −1.38 → −1.34), cockpit FOV 68 → 64°.
+- **GPS**: the shared AGROWINGS NAV (`agroNav.js`, the same Guidance as every
+  aircraft). Its screen sat 3 mm behind the front of its own housing, so the
+  map was never visible in this cockpit; it is now in front (checked in the
+  browser: the map moves with the aircraft, the DEST page shows the bearing
+  to the base, the page keys switch pages).
+
+Measured (Chromium + SwiftShader, same views): pilot view 410 → 410 draw
+calls, panel view 419 → 422, behind-the-seat view 411 → 423; triangles
++2.6–4.8 % (part of it the narrower FOV). `test/e201e2e.mjs`: all 16 checks
+pass, paints A/B/C switch and persist, no memory growth over 15 switches and
+10 paint changes, no page errors.
+
 ## Benchmark (performance work, phase 1)
 
 Reference for all optimisation: the tag **`ultra-original-v73`** (commit

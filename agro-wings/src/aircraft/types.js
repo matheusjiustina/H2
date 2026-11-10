@@ -647,7 +647,7 @@ AIRCRAFT_TYPES.e201 = {
   wash: [0, -1.0, -2],
   anim: { elev: 0.35, rud: 0.42, ail: 0.33, flap: 0.52, pedalZ: E201_CK.pedals[2], disc: [380, 900], wash: [1500, 2600], vib: [1500, 2700] },
   vspeeds: { vs0: 50, vs1: 58, vfe: 95, vne: 140 },
-  camera: { dist: 12, height: 3.6, orbit: 18, cockpitPitch: -0.25, cockpitFov: 68 }, // pilot view: the panel in the lower third, the cowl over the lip, the horizon at ≈ 30 % (EMB-202 video proportions)
+  camera: { dist: 12, height: 3.6, orbit: 18, cockpitPitch: -0.25, cockpitFov: 64 }, // pilot view: the panel in the lower third, the cowl over the lip, the horizon at ≈ 30 % (EMB-202 video proportions)
   // The IO-540 on avgas with the two-blade Hartzell.
   audio: { profile: 'ipanema', blades: 2, cfg: { blades: 2, propDiameter: 2.13 } },
   fuel: { name: 'avgas 100LL', price: GAME.fuelPrice * 1.6 },

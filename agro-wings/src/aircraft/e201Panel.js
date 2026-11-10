@@ -30,30 +30,35 @@ const INK = '#f1f0ea', DIM = '#c9c9c1', GREEN = '#22a94a', YELLOW = '#f1c21b', R
 // Panel-local metres: u to the pilot's right, v up the face (origin: the
 // face's centre).
 export const E201_PANEL = {
-  // Outline of the face (pilot's view): square on the left, the lower edge
-  // stepping down on the right where the panel reaches toward the right
-  // wall (as on the photograph).
-  outline: [[-0.43, 0.16], [-0.43, -0.165], [0.06, -0.165], [0.2, -0.235], [0.43, -0.235], [0.43, 0.16]],
-  topArc: 0.018, // the top edge rises this much at the centre
-  depth: 0.11,
+  // Outline of the face (pilot's view): the full cabin width, square, the
+  // lower edge stepping down under the GPS box on the right (as on the
+  // photograph of the cockpit).
+  outline: [[-0.44, 0.16], [-0.44, -0.2], [0.07, -0.2], [0.11, -0.24], [0.44, -0.24], [0.44, 0.16]],
+  topArc: 0.02, // the top edge rises this much at the centre
+  depth: 0.12,
+  // Left: the flight and engine instruments in two rows of three, as the
+  // photograph shows them (a smaller dial at each row's outer end).
   dials: {
-    cht: { u: -0.37, v: 0.075, r: 0.03, f: 0.026, cell: 5 },
-    oil: { u: -0.37, v: -0.005, r: 0.033, f: 0.029, cell: 4 },
-    fuel: { u: -0.293, v: -0.005, r: 0.033, f: 0.029, cell: 6 },
-    alt: { u: 0.105, v: 0.085, r: 0.042, f: 0.037, cell: 1 },
-    asi: { u: 0.105, v: -0.02, r: 0.046, f: 0.041, cell: 0 },
-    rpm: { u: 0.218, v: -0.02, r: 0.046, f: 0.041, cell: 2 },
-    mp: { u: 0.33, v: -0.115, r: 0.036, f: 0.031, cell: 3 },
+    cht: { u: -0.355, v: 0.075, r: 0.034, f: 0.03, cell: 5 },
+    asi: { u: -0.245, v: 0.075, r: 0.048, f: 0.043, cell: 0 },
+    alt: { u: -0.133, v: 0.075, r: 0.048, f: 0.043, cell: 1 },
+    oil: { u: -0.355, v: -0.045, r: 0.037, f: 0.033, cell: 4 },
+    rpm: { u: -0.245, v: -0.045, r: 0.048, f: 0.043, cell: 2 },
+    mp: { u: -0.133, v: -0.045, r: 0.048, f: 0.043, cell: 3 },
+    fuel: { u: -0.035, v: 0.09, r: 0.031, f: 0.027, cell: 6 },
   },
-  hobbs: { u: -0.29, v: 0.085, w: 0.056, h: 0.03 },
-  gps: { u: -0.105, v: 0.035, w: 0.19, h: 0.15, d: 0.07, screen: { w: 0.145, h: 0.098 }, keysV: -0.058, keysU: [-0.054, -0.018, 0.018, 0.054] },
-  label: { u: 0.225, v: 0.085, w: 0.1, h: 0.04 }, // black placard right of the altimeter
-  key: { u: -0.205, v: 0.09 }, // magneto key
-  switches: { u0: -0.405, u1: -0.075, v: -0.12, n: 9 },
-  breakers: { u0: -0.4, u1: -0.08, v: -0.145, n: 10 },
-  dimmer: { u: -0.03, v: -0.12 },
-  box: { u: 0.13, v: -0.155, w: 0.14, h: 0.055 }, // the control box at the bottom right
-  lamp: { u: 0.33, v: 0.03 },
+  hobbs: { u: -0.035, v: 0.03, w: 0.056, h: 0.03 },
+  // Right: the GPS in its own raised box (the photograph's equipment on
+  // the right), the page keys under the screen.
+  gps: { u: 0.2, v: 0.025, w: 0.25, h: 0.22, d: 0.07, screen: { w: 0.19, h: 0.128 }, keysV: -0.075, keysU: [-0.075, -0.025, 0.025, 0.075] },
+  label: { u: -0.03, v: -0.1, w: 0.07, h: 0.03 }, // black placard (operating limitations)
+  key: { u: -0.035, v: -0.035 }, // magneto key
+  switches: { u0: -0.405, u1: -0.14, v: -0.135, n: 8 },
+  breakers: { u0: -0.4, u1: -0.145, v: -0.17, n: 9 },
+  dimmer: { u: -0.085, v: -0.135 },
+  box: { u: 0.2, v: -0.175, w: 0.16, h: 0.06 }, // the spray control box under the GPS
+  lamp: { u: 0.025, v: 0.132 },
+  vents: [[0.398, 0.095], [0.398, -0.155]],
 };
 
 // Dial angles (radians, clockwise from twelve o'clock as the pilot sees them).

@@ -382,7 +382,7 @@ const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 
 
 // Pilot and cockpit anchors (body frame), on this cabin.
 export const E201_CABIN = {
-  eye: [0, 0.88, -1.38], seat: [0, -0.06, -1.55], floorY: -0.4,
+  eye: [0, 0.87, -1.34], seat: [0, -0.06, -1.55], floorY: -0.4,
   roof: [0, CAB.roof, -1.2], door: [0.47, 0.35, -1.0], windshield: [0, 0.9, -0.66],
 };
 
@@ -576,18 +576,18 @@ export function createE201Model(panel, opts = {}) {
     const alongT = (z, t0, t1, n = 12) => Array.from({ length: n + 1 }, (_, i) => shellP(z, lerp(t0, t1, i / n)));
     F(alongT(CAB.wsB - 0.012, 0, 1, 20), 0.022);
     for (const t of [TW, 1 - TW]) F(alongZ(t, CAB.wsB - 0.01, CAB.roofF, 10), 0.024);
-    F(alongZ(0.5, CAB.wsB - 0.01, CAB.roofF, 8).map(([x, y, z]) => [x, y + 0.004, z]), 0.008);
+    add('ink', tube(alongZ(0.5, CAB.wsB - 0.01, CAB.roofF, 8).map(([x, y, z]) => [x, y + 0.004, z]), 0.006, 16, 6)); // the slim dark centre rod
     F(alongT(CAB.roofF, TW, 1 - TW, 16), 0.024);
     for (const t of [TW, 1 - TW]) F(alongZ(t, CAB.roofF, CAB.roofR, 10), 0.02);
     for (const [t0, t1] of [[0, TW], [1 - TW, 1]]) F(alongT(CAB.bPost, t0, t1, 6), 0.022);
     for (const [t0, t1] of [[0, TQ], [1 - TQ, 1]]) F(alongT(CAB.win, t0, t1, 5), 0.02);
-    for (const t of [0.003, 0.997]) F(alongZ(t, CAB.wsB, CAB.win, 12), 0.022);
+    for (const t of [0, 1]) F(alongZ(t, CAB.wsB, CAB.win, 12), 0.022); // on the sill line itself
     for (const t of [TQ, 1 - TQ]) F(alongZ(t, CAB.bPost, CAB.win, 6), 0.016);
     // Visor: the roof's front edge stands proud of the windshield's top.
     add('roof', grid((u, v) => { const t = lerp(TW - 0.01, 1 - TW + 0.01, u); const p = shellP(CAB.roofF + 0.05, t), q = shellP(CAB.roofF - 0.06, t); return lerp3([p[0] * 1.02, p[1] + 0.012, CAB.roofF + 0.05], [q[0], q[1] + 0.012, q[2]], v); }, 16, 2));
     // Door (left): handle and hinges on the sill side.
     // (On the door frame at the sill, under the window — not in the glass.)
-    const dh = shellP(-1.36, 0.003);
+    const dh = shellP(-1.36, 0); // the sill line itself: the handle sits on the painted door, under the glass
     add('steel', rod([dh[0] + 0.03, dh[1] - 0.035, dh[2] + 0.07], [dh[0] + 0.03, dh[1] - 0.035, dh[2] - 0.07], 0.008, 6), true);
   }
   // Mast over the windshield and the wire to the fin top; a whip aerial.

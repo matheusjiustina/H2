@@ -49,14 +49,14 @@ ok('1 select the EMB-201, free flight on the pad', r.id === 'e201', JSON.stringi
 r = await page.evaluate(() => {
   const g = window.__agro, m = g.aircraft.model;
   const out = [];
-  for (const k of [1, 0, 1]) {
+  for (const k of [1, 2, 0, 1]) {
     const map0 = m.M.livery.map;
     g.setAircraftOption('e201Livery', k);
     out.push({ k, livery: m.livery, setting: g.settings.e201Livery, swapped: m.M.livery.map !== map0 || k === 0 && out.length === 0 });
   }
   return out;
 });
-ok('2 paint schemes A/B switch and persist', r.every((o) => o.livery === o.k && o.setting === o.k), JSON.stringify(r));
+ok('2 paint schemes A/B/C switch and persist', r.every((o) => o.livery === o.k && o.setting === o.k), JSON.stringify(r));
 for (const k of [0, 1]) {
   await page.evaluate((k) => {
     const g = window.__agro, ac = g.aircraft;

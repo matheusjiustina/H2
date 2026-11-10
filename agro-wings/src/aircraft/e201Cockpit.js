@@ -36,7 +36,7 @@ const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 // Body frame (+Z nose, +Y up, +X left).
 export const E201_CK = {
   panel: { c: [0, 0.43, -0.66], tilt: 14 * D2R },
-  glare: { y: 0.586, front: -0.5, back: -0.655, backSide: -0.625, half: 0.45, t: 0.03 },
+  glare: { y: 0.586, front: -0.5, back: -0.655, backSide: -0.625, half: 0.445, t: 0.03 },
   hopperWall: { z: -0.585, top: 0.25 },
   floor: -0.4,
   stick: [0, -0.37, -1.0],
@@ -111,7 +111,7 @@ function plateTex(seed, base, n = 1800, specks = ['255,255,250', '20,18,14']) {
 function wallTex() {
   const c = canvas(256, 256), g = c.getContext('2d');
   const gr = g.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#c3c4bf'); gr.addColorStop(1, '#8e908c');
+  gr.addColorStop(0, '#7f8381'); gr.addColorStop(1, '#4c504f'); // painted grey aluminium, darker low
   g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
   const r = rng(7);
   for (let i = 0; i < 1600; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '255,255,250' : '20,18,14'},${0.025 + r() * 0.05})`; g.fillRect(r() * 256, r() * 256, 1 + r() * 2, 1 + r() * 2); }
@@ -139,7 +139,7 @@ function leatherTex() {
 }
 
 export function buildE201Cockpit(ctx) {
-  const { panel, envMap = null, M, C, CAB, boxX } = ctx;
+  const { panel, envMap = null, M, C, CAB, boxX, shellP, TW } = ctx;
   const cockpit = new THREE.Group();
   cockpit.name = 'e201-cockpit';
   const eye = new THREE.Vector3(...C.eye);
@@ -176,6 +176,9 @@ export function buildE201Cockpit(ctx) {
     blue: std(0x2b5fb0, { roughness: 0.4, metalness: 0.1 }),
     white: std(0xe9e9e4, { roughness: 0.42 }),
     seat: std(0xffffff, { map: leatherTex(), roughness: 0.68, metalness: 0.02 }),
+    liner: std(0x4b4f52, { roughness: 0.9, metalness: 0.05, side: THREE.DoubleSide }), // headliner under the roof
+    hose: std(0x7a5a3a, { roughness: 0.85 }), // the brown scat ducts
+    seal: std(0x101112, { roughness: 0.95 }), // window rubber
   };
   const lampMat = std(0x3a2a08, { roughness: 0.3, emissive: 0xffa21a, emissiveIntensity: 0 });
   const sprayLamp = std(0x0f2a14, { roughness: 0.3, emissive: 0x39ff5a, emissiveIntensity: 0 });
@@ -212,7 +215,7 @@ export function buildE201Cockpit(ctx) {
     pts.push(tl);
     for (const p of rest) pts.push(p);
     const top = [];
-    for (let i = 0; i <= 16; i++) { const u = lerp(0.43, -0.43, i / 16); top.push([u, 0.16 + P.topArc * (1 - (u / 0.43) ** 2)]); }
+    for (let i = 0; i <= 16; i++) { const u = lerp(0.44, -0.44, i / 16); top.push([u, 0.16 + P.topArc * (1 - (u / 0.44) ** 2)]); }
     return pts.slice(0, -1).concat(top);
   };
   {
@@ -225,7 +228,7 @@ export function buildE201Cockpit(ctx) {
     // Body behind the face (reaching forward under the lip to the hopper).
     put('back', new THREE.ExtrudeGeometry(new THREE.Shape(out), { depth: P.depth, bevelEnabled: false }).translate(0, 0, -0.013 - P.depth));
     // Screws round the edge.
-    for (const [u, v] of [[-0.415, 0.145], [-0.415, -0.15], [0.415, 0.145], [0.415, -0.22], [0.05, -0.15], [-0.18, 0.165], [0.18, 0.165], [0.25, -0.22]]) put('screw', at(new THREE.CylinderGeometry(0.0032, 0.0032, 0.0018, 8), u, v, 0.0009, Math.PI / 2), true);
+    for (const [u, v] of [[-0.425, 0.145], [-0.425, -0.185], [0.425, 0.145], [0.425, -0.225], [0.06, -0.185], [-0.2, 0.168], [0.2, 0.168], [-0.2, -0.188], [0.32, -0.225]]) put('screw', at(new THREE.CylinderGeometry(0.0032, 0.0032, 0.0018, 8), u, v, 0.0009, Math.PI / 2), true);
   }
   // Instruments: dial face, can, bezel, glass, hub and the needles.
   const instrument = (frame, putF, id, d) => {
@@ -261,8 +264,15 @@ export function buildE201Cockpit(ctx) {
   // Black placard right of the altimeter (operating limitations), AVGAS
   // plate beside the fuel gauge, the limits plate under the tachometer.
   put('placard', placardUV(at(new THREE.PlaneGeometry(P.label.w, P.label.h), P.label.u, P.label.v, 0.0006), 2));
-  put('placard', placardUV(at(new THREE.PlaneGeometry(0.06, 0.012), -0.332, -0.05, 0.0006), 1));
-  put('placard', placardUV(at(new THREE.PlaneGeometry(0.11, 0.013), 0.165, -0.084, 0.0006), 7));
+  put('placard', placardUV(at(new THREE.PlaneGeometry(0.06, 0.012), 0.025, 0.09, 0.0006), 1));
+  put('placard', placardUV(at(new THREE.PlaneGeometry(0.11, 0.013), 0.2, -0.118, 0.0006), 7));
+  // Eyeball air vents (right end of the panel): chrome ring, dark ball
+  // with its nozzle.
+  for (const [u, v] of P.vents) {
+    put('chrome', at(new THREE.TorusGeometry(0.019, 0.0035, 6, 20), u, v, 0.002));
+    put('black', ball([u, v, 0.004], 0.016, 14));
+    put('black', at(new THREE.CylinderGeometry(0.006, 0.007, 0.012, 10), u + 0.002, v + 0.001, 0.018, Math.PI / 2 - 0.25, 0.2));
+  }
   // Low-fuel lamp (amber) with its bezel.
   put('chrome', at(new THREE.TorusGeometry(0.0085, 0.0022, 6, 18), P.lamp.u, P.lamp.v, 0.002));
   pf.add(new THREE.Mesh(new THREE.SphereGeometry(0.0075, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2).translate(P.lamp.u, P.lamp.v, 0.0015), lampMat));
@@ -309,28 +319,29 @@ export function buildE201Cockpit(ctx) {
     pf.add(gpsG);
     const CG = {};
     const addG = (mat, g) => (CG[mat] ||= []).push(g);
-    addG('gpsBody', new RoundedBoxGeometry(G.w, G.h, 0.034, 2, 0.006).translate(0, 0, 0.017 - 0.006));
+    const GD = 0.05; // the box stands proud of the face
+    addG('gpsBody', new RoundedBoxGeometry(G.w, G.h, GD, 2, 0.006).translate(0, 0, GD / 2 - 0.006));
     const S = G.screen;
     const fs = rrect(new THREE.Shape(), 0, 0, G.w - 0.006, G.h - 0.006, 0.006);
     fs.holes.push(rrect(new THREE.Path(), 0, 0.016, S.w + 0.004, S.h + 0.004, 0.002, true));
     const fp = new THREE.ShapeGeometry(fs, 6);
     const uv = fp.attributes.uv, pp = fp.attributes.position;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (pp.getX(i) + G.w / 2) / G.w, (pp.getY(i) + G.h / 2) / G.h);
-    addG('gpsBezel', fp.translate(0, 0, 0.0285));
-    addG('screen', new THREE.PlaneGeometry(S.w, S.h).translate(0, 0.016, 0.025));
+    addG('gpsBezel', fp.translate(0, 0, GD + 0.0015));
+    addG('screen', new THREE.PlaneGeometry(S.w, S.h).translate(0, 0.016, GD - 0.005)); // in front of the box's face (GD - 0.006)
     const keyGeo = new RoundedBoxGeometry(0.026, 0.011, 0.006, 1, 0.002);
     const keyCols = [0xc8261b, 0xe0a41c, 0xe0a41c, 0x27a043];
     NAV_PAGES.forEach((pg, i) => {
       const k = new THREE.Mesh(keyGeo, std(keyCols[i % keyCols.length], { roughness: 0.5, emissive: 0x52d8ff, emissiveIntensity: 0 }));
-      k.position.set(G.keysU[i], G.keysV, 0.031);
+      k.position.set(G.keysU[i], G.keysV, GD + 0.003);
       k.userData.gpsPage = pg;
       gpsG.add(k);
       pickables.push(k);
     });
     for (const [mat, list] of Object.entries(CG)) gpsG.add(new THREE.Mesh(mergeAll(list), CM[mat]));
-    const gl = new THREE.Mesh(new THREE.PlaneGeometry(S.w, S.h).translate(0, 0.016, 0.0275), CM.glass);
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry(S.w, S.h).translate(0, 0.016, GD - 0.003), CM.glass);
     gl.renderOrder = 8; gpsG.add(gl);
-    for (const [u, v] of [[-G.w / 2 + 0.008, G.h / 2 - 0.008], [G.w / 2 - 0.008, G.h / 2 - 0.008], [-G.w / 2 + 0.008, -G.h / 2 + 0.008], [G.w / 2 - 0.008, -G.h / 2 + 0.008]]) put('screw', at(new THREE.CylinderGeometry(0.003, 0.003, 0.002, 8), G.u + u, G.v + v, 0.0295, Math.PI / 2), true);
+    for (const [u, v] of [[-G.w / 2 + 0.008, G.h / 2 - 0.008], [G.w / 2 - 0.008, G.h / 2 - 0.008], [-G.w / 2 + 0.008, -G.h / 2 + 0.008], [G.w / 2 - 0.008, -G.h / 2 + 0.008]]) put('screw', at(new THREE.CylinderGeometry(0.003, 0.003, 0.002, 8), G.u + u, G.v + v, GD + 0.0025, Math.PI / 2), true);
   }
 
   // ======================================================== 2 the lip
@@ -351,7 +362,7 @@ export function buildE201Cockpit(ctx) {
     addB('black', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(edge), 24, 0.004, 5, false));
     // Side fillers between the panel's ends and the walls.
     for (const sx of [1, -1]) {
-      const x0 = sx * 0.43, x1 = sx * (boxX(-0.62, 0.3) - 0.012);
+      const x0 = sx * 0.44, x1 = sx * (boxX(-0.62, 0.3) - 0.012);
       addB('back', skin((u, v) => [lerp(x0, x1, u), lerp(0.22, Gl.y, v), -0.64 + 0.06 * v], 2, 2));
     }
   }
@@ -379,6 +390,53 @@ export function buildE201Cockpit(ctx) {
     const xr = -(boxX(-1.0, 0.55) - 0.035);
     const gh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([[xr - 0.005, CAB.sill - 0.025, -0.82], [xr + 0.012, CAB.sill + 0.035, -0.86], [xr + 0.012, CAB.sill + 0.035, -1.02], [xr - 0.005, CAB.sill - 0.025, -1.06]].map((p) => new THREE.Vector3(...p))), 16, 0.008, 6, false), M.frame);
     cockpit.add(gh);
+  }
+
+  // ======================================================== 3b roof, window hardware, ducts
+  {
+    // Headliner: the roof's underside a dark grey lining set just inside the
+    // shell (the outside paint is not seen from the seat), a padded bow
+    // along the windshield's top edge, the frame rails' rubber seals.
+    const inset = (p, k = 0.014) => [p[0] * (1 - k / 0.46), p[1] - k, p[2]];
+    addB('liner', skin((u, v) => inset(shellP(lerp(CAB.roofF - 0.02, CAB.roofR + 0.02, v), lerp(TW - 0.01, 1 - TW + 0.01, u))), 14, 8));
+    const bow = []; for (let i = 0; i <= 16; i++) bow.push(new THREE.Vector3(...inset(shellP(CAB.roofF - 0.03, lerp(TW - 0.005, 1 - TW + 0.005, i / 16)), 0.03)));
+    addB('black', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(bow), 24, 0.022, 8, false));
+    for (const t of [TW, 1 - TW]) {
+      const rail = []; for (let i = 0; i <= 10; i++) rail.push(new THREE.Vector3(...inset(shellP(lerp(CAB.roofF - 0.03, CAB.roofR, i / 10), t), 0.026)));
+      addB('seal', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rail), 12, 0.009, 6, false));
+    }
+    // Magnetic compass on the bow, at the centre of the windshield's top.
+    const cp = inset(shellP(CAB.roofF - 0.03, 0.5), 0.07);
+    addB('black', at(new RoundedBoxGeometry(0.07, 0.05, 0.06, 2, 0.01), cp[0], cp[1], cp[2] + 0.01));
+    addB('black', rod([0, cp[1] + 0.02, cp[2]], [0, cp[1] + 0.065, cp[2] - 0.01], 0.008, 6));
+    addB('white', at(new THREE.CircleGeometry(0.019, 16), 0, cp[1], cp[2] - 0.0205, 0, Math.PI, 0));
+    // Side windows: hinge blocks on the A-post, a latch lever at the B-post
+    // (the window opens out from the rear edge).
+    for (const sx of [1, -1]) {
+      for (const z of [-0.9, -1.15]) {
+        const h = inset(shellP(z, sx > 0 ? TW - 0.02 : 1 - TW + 0.02), 0.02);
+        addB('black', at(new THREE.BoxGeometry(0.012, 0.02, 0.035), h[0], h[1], h[2]), true);
+      }
+      const l = inset(shellP(CAB.bPost + 0.03, sx > 0 ? 0.12 : 0.88), 0.03);
+      addB('black', at(new THREE.BoxGeometry(0.014, 0.035, 0.022), l[0], l[1], l[2]));
+      addB('orange', rod([l[0], l[1] + 0.02, l[2] + 0.012], [l[0] - sx * 0.02, l[1] + 0.085, l[2] + 0.03], 0.0065, 6));
+    }
+    // Ventilation: brown ribbed scat ducts from behind the panel's ends down
+    // the walls to the floor vents (as on the photograph).
+    for (const sx of [1, -1]) {
+      const pts = [[sx * 0.39, 0.24, -0.6], [sx * 0.41, 0.1, -0.66], [sx * 0.405, -0.12, -0.7], [sx * 0.37, -0.33, -0.76]].map((p) => new THREE.Vector3(...p));
+      const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 36, 0.035, 10, false);
+      // Ribs: the radius breathing along the tube.
+      const pp = g.attributes.position, c = new THREE.CatmullRomCurve3(pts), q = new THREE.Vector3();
+      for (let i = 0; i < pp.count; i++) {
+        const seg = Math.floor(i / 11), u = seg / 36;
+        c.getPoint(u, q);
+        const k = 1 + 0.12 * Math.cos(seg * Math.PI);
+        pp.setXYZ(i, q.x + (pp.getX(i) - q.x) * k, q.y + (pp.getY(i) - q.y) * k, q.z + (pp.getZ(i) - q.z) * k);
+      }
+      g.computeVertexNormals();
+      addB('hose', g);
+    }
   }
 
   // ======================================================== 4 stick
