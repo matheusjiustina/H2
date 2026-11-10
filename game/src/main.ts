@@ -1,0 +1,41 @@
+import * as THREE from 'three';
+import { Renderer } from './render/renderer';
+import { Atmosphere } from './render/sky';
+import { World } from './world/world';
+import { shared } from './render/materials';
+import { defaultSettings } from './core/save';
+
+const canvas = document.getElementById('game') as HTMLCanvasElement;
+document.body.style.margin = '0';
+document.body.style.overflow = 'hidden';
+const r = new Renderer(canvas);
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.4, 2500);
+const world = new World();
+world.finish();
+scene.add(world.group);
+const atmo = new Atmosphere(scene);
+const q = new URLSearchParams(location.search);
+cam.position.set(+(q.get('x') ?? -200), +(q.get('y') ?? 60), +(q.get('z') ?? 120));
+cam.lookAt(+(q.get('tx') ?? -65), +(q.get('ty') ?? 0), +(q.get('tz') ?? 0));
+const settings = defaultSettings();
+settings.time = (q.get('time') as any) ?? 'day';
+r.setQuality((q.get('q') as any) ?? 'medium');
+let last = performance.now();
+(window as any).__ready = false;
+function loop() {
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  cam.aspect = r.width / r.height;
+  cam.updateProjectionMatrix();
+  atmo.update(dt, cam, new THREE.Vector3(-65, 0, 0), settings, r.preset);
+  shared.sunK.value = atmo.sunK();
+  world.waterMat.uniforms.uTime.value = now / 1000;
+  world.cull(cam.position.x, cam.position.z, r.preset.drawDist + 200);
+  r.render(scene, cam, dt);
+  (window as any).__ready = true;
+  (window as any).__info = { tris: world.tris, calls: r.three.info.render.calls, nodes: world.roads.nodes.length, edges: world.roads.edges.length };
+  requestAnimationFrame(loop);
+}
+loop();
