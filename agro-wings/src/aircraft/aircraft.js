@@ -2,6 +2,7 @@
 // control shaping (Tidemark rates), engine start/stop, brakes, damage,
 // obstacle collisions, part animation and ground effects.
 import * as THREE from 'three';
+import { buildCabinProxy } from './cabinProxy.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { Assist } from '../flight/assist.js';
 import { planeAid } from '../flight/pilotAid.js';
@@ -557,6 +558,9 @@ export class Aircraft {
 
   _animate(dt) {
     const m = this.model, fm = this.fm;
+    // Cabin stand-in (cabinProxy.js): shown whenever the detailed cockpit is not.
+    if (m.cabinProxy === undefined && m.cockpit?.children.length) m.cabinProxy = buildCabinProxy(m.root, m.cockpit, m.pilot) ?? null; // (per model: a rebuilt model gets its own)
+    if (m.cabinProxy) m.cabinProxy.visible = !m.cockpit.visible;
     if (this.state === 'crashed') {
       this.crashT += dt;
       const k = Math.exp(-this.crashT * 1.5);

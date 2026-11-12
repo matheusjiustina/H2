@@ -1284,11 +1284,9 @@ export function createAT802Model(panel, opts = {}) {
   const state = { probes: 0, door: 0 };
   const update = (dt, fm, ac) => {
     t += dt;
-    // The interior is drawn only from the cockpit or a camera within 12 m
-    // (the chase camera at 18 m and distant views skip its ≈ 65 draw calls).
-    const g = ac?.game;
-    if (g?.camera) cockpit.visible = g.cameraMode === 'cockpit' || g.cameraMode === 'free' || g.camera.position.distanceToSquared(root.position) < 12 * 12;
-    if (cockpit.visible && cockpitWrap.visible) ck.update(dt, fm, ac);
+    // The interior is drawn only from the cockpit or a close camera: the camera
+    // rig switches the wrapper (cabinProxy.js stands in beyond).
+    if (cockpitWrap.visible) ck.update(dt, fm, ac);
     const o = fm.out;
     let target;
     if (fm.engine === 'off' && (o.onGround || fm.rpm < 150)) target = FEATHER;

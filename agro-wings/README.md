@@ -4798,3 +4798,21 @@ payments and progression untouched):
 - **Result when parked**: with the job complete, stopping on the ground with
   the engine cut brings up the result wherever that is, not only in the
   loading zone. Tests: `test/replaylast.mjs`, `test/resultpark.mjs`.
+
+## Cabin seen from outside (no empty, see-through canopy)
+The AT-802's detailed interior was dropped beyond 12 m, so from the default
+chase or a zoomed-out orbit camera the canopy looked empty with the ground
+showing through; other types kept theirs to 30 m (60–130 draw calls) or always.
+One rule now, in the camera rig (`src/aircraft/cameras.js`): the detailed
+cockpit is drawn only from the cockpit view or inside 9.5 m (kept to 11 m, no
+flicker); beyond that `src/aircraft/cabinProxy.js` draws a stand-in — one mesh
+of about 50 triangles, no textures, built from the cockpit's own extents: a dark
+inward-facing liner whose roof follows the canopy (highest over the pilot's
+head, falling to the glareshield and to the rear deck, so it never pokes
+through the skin), a panel block and a seat. Built per model (also before a
+parked aircraft's cockpit is released), so every type and helicopter has it.
+Measured in the chase view (calls / triangles, SwiftShader, before → after):
+e203 843 → 707, thrush 797 → 711, ipanema 746 → 699, r44 801 → 688,
+b206 801 → 701; AT-802 unchanged (706). The interior-vs-skin check (cockpit on
+vs off, 6 angles, 14 aircraft) found the interior only through the windows.
+Test: `node test/cabinproxy.mjs`.
