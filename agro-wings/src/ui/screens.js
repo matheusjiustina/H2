@@ -14,6 +14,7 @@ import { drawMap, mapControls, mapPoint } from './maps.js';
 import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
 import { aircraftUnlocked, isUnlocked, premiumEnforced, EXPANSIONS } from '../game/expansions.js';
+import { MAPS, MAP_ID, storeMapChoice } from '../world/activeMap.js';
 import { FIRE_JOBS } from '../game/fireJobs.js';
 
 // Paint schemes offered on the menu (the settings keys the models read).
@@ -210,7 +211,18 @@ export class Screens {
   // purchase, checkout or unlock happens here — the platform's premium
   // system grants it (src/game/expansions.js).
   expansions(focusId = null) {
-    const rows = EXPANSIONS.map((x) => {
+    // Maps: the main world and the premium map expansions. Choosing one
+    // stores the choice and reloads the page (the two worlds are never in
+    // memory together); a locked map cannot be chosen.
+    const mapRows = Object.values(MAPS).map((m) => {
+      const open = !m.premium || isUnlocked(m.premium), on = m.id === MAP_ID;
+      const desc = m.id === 'main' ? t('The original farm country: 12 × 12 km of fields, farms and strips.') : t('Premium map: a compact mountain valley of banana plantations, forested ridges and three rustic strips.');
+      const state = on ? t('Active map') : !open ? t('Locked') : m.premium ? (premiumEnforced() ? t('Unlocked') : t('Open to everyone during the testing phase')) : '';
+      return `<div class="fl-row${on ? ' sel' : ''}"><span class="fl-img map-ico">${m.id === 'main' ? '🌾' : '🍌'}</span>
+        <div class="fl-txt"><div class="name">${m.name}</div><div class="desc">${desc}</div><div class="meta"><span>${state}</span></div></div>
+        ${on || !open ? '' : `<button class="btn primary small" data-map="${m.id}">${t('Fly this map')}</button>`}</div>`;
+    }).join('');
+    const rows = EXPANSIONS.filter((x) => x.aircraft).map((x) => {
       const ty = AIRCRAFT_TYPES[x.aircraft], open = isUnlocked(x.id);
       return `<div class="fl-row${focusId === x.aircraft ? ' sel' : ''}">
         <span class="fl-img">${this._thumbOf(x.aircraft) ? `<img src="${this._thumbOf(x.aircraft)}" alt="">` : ''}</span>
@@ -220,9 +232,22 @@ export class Screens {
     }).join('');
     const el = h(`<div class="panel wide"><h2>${t('Expansions')}</h2>
       <div class="sub">${t('Premium expansions are unlocked by the platform’s premium system once the purchase is confirmed. Nothing on this screen buys or unlocks content; a locked aircraft can be looked at in the hangar but not flown.')}</div>
+      <h3 class="lvl">${t('Maps')} <span>${t('Changing the map reloads the game; progress and money are kept.')}</span></h3>
+      <div class="fl-list">${mapRows}</div>
+      <h3 class="lvl">${t('Aircraft')}</h3>
       <div class="fl-list">${rows}</div>
-      <div class="row2"><span></span><div class="btn-row"><button class="btn small" data-a="close">${t('Close')}</button></div></div></div>`);
-    el.addEventListener('click', (e) => { if (e.target.closest('[data-a="close"]')) this.close(); });
+      <div class="row2"><span class="map-note"></span><div class="btn-row"><button class="btn small" data-a="close">${t('Close')}</button></div></div></div>`);
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-a="close"]')) { this.close(); return; }
+      const mb = e.target.closest('[data-map]');
+      if (!mb) return;
+      const m = MAPS[mb.dataset.map];
+      if (!m || (m.premium && !isUnlocked(m.premium))) return; // (checked again here, not only in the list)
+      this.game.career?.save?.();
+      const stored = storeMapChoice(m.id);
+      el.querySelector('.map-note').textContent = stored ? t('Loading the map…') : t('This browser does not allow saving the choice.');
+      if (stored) setTimeout(() => { try { location.reload(); } catch { /* sandboxed */ } el.querySelector('.map-note').textContent = t('Close and open the game again to load the chosen map.'); }, 150);
+    });
     this._show('expansions', el);
   }
 
@@ -307,7 +332,7 @@ export class Screens {
         <div class="prog">${on ? t('In progress · {0} of {1} out', fj.spots().filter((f) => f.state === 'out').length, j.spots.length) : t('Not started')}</div>
         <div class="btn-row" style="justify-content:flex-start">${on ? `<button class="btn small" data-fire-cancel="1">${t('Hand in current job')}</button>` : `<button class="btn primary small" data-fire="${j.id}">${t('Accept')}</button>`}</div></div>`;
     }).join('')}</div>` : '';
-    const cards = fireCards + [0, 'b', 1, 2, 3].map((lv) => `<h3 class="lvl${lv === 0 ? ' school' : lv === 'b' ? ' beg' : ''}">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => (lv === 'b' ? !!c.beginner : c.level === lv && !c.beginner)).map(card).join('')}</div>`).join('');
+    const cards = fireCards + [0, 'b', 1, 2, 3].filter((lv) => CONTRACTS.some((c) => (lv === 'b' ? !!c.beginner : c.level === lv && !c.beginner))).map((lv) => `<h3 class="lvl${lv === 0 ? ' school' : lv === 'b' ? ' beg' : ''}">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => (lv === 'b' ? !!c.beginner : c.level === lv && !c.beginner)).map(card).join('')}</div>`).join('');
     const el = h(`<div class="panel"><h2>${t('Service orders')}</h2>
       <div class="sub">${t('Choose a job, set the load, and the badeco will service the aircraft on the pad.')}</div>
       ${cards}

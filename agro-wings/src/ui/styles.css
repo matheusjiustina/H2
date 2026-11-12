@@ -410,6 +410,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .fl-row { display: flex; align-items: center; gap: 14px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
 .fl-row.sel { border-color: var(--accent); }
 .fl-img { flex: 0 0 auto; width: 160px; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: linear-gradient(180deg, #4d6a85, #8fa3ad 62%, #6d5540 64%, #47372a); }
+.fl-img.map-ico { display: flex; align-items: center; justify-content: center; font-size: 44px; }
+.map-note { font-size: 12px; opacity: .8; }
 .fl-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .fl-txt { flex: 1; min-width: 0; }
 .fl-txt .name { font-weight: 700; font-size: 15px; }

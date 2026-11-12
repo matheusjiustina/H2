@@ -6,12 +6,21 @@
 // sits in the middle unchanged; the outer ring carries the farms added with
 // the airstrips expansion (FARMS below).
 import { EXP_ROADS, EXP_FORESTS, EXP_STREAMS, EXP_PONDS } from './expansion.js';
+// Premium map expansion 01 (Serra das Bananeiras): when it is the active map
+// (chosen at load, src/world/activeMap.js) the lists below are filled from
+// src/world/serra.js instead — same shapes, so every system reads them the
+// same way. With the main map active nothing here changes.
+import { SERRA } from './activeMap.js';
+import * as SB from './serra.js';
+const swap = (list, items) => { list.length = 0; list.push(...items); };
 
-export const WORLD_HALF = 6000;
+export const WORLD_HALF = SERRA ? SB.SERRA_WORLD_HALF : 6000;
+// Half size of the area an aircraft may fly (the whole map on the main one).
+export const PLAY_HALF = SERRA ? SB.SERRA_PLAY_HALF : WORLD_HALF;
 export const FAR_HALF = 24000; // horizon ring
 export const EDGE_ROOM = 600; // m an aircraft may fly past the map edge before it is turned back (was -100)
 
-export const RUNWAY = { x0: -400, x1: 400, z: 0, width: 24, shoulder: 10 };
+export const RUNWAY = SERRA ? { ...SB.SERRA_RUNWAY } : { x0: -400, x1: 400, z: 0, width: 24, shoulder: 10 };
 
 // Service-area layout shared by the secondary farms (their apron and shed
 // sit where the main base's first ones did; FARM_SITES below).
@@ -92,6 +101,7 @@ export const BASE = {
   truck: { x: -331, z: -98, heading: -Math.PI / 2 },
   windsocks: [{ x: -330, z: 26 }, { x: 360, z: -26 }],
 };
+if (SERRA) BASE.windsocks = [{ x: -330, z: 24 }, { x: RUNWAY.x1 - 40, z: -24 }];
 
 // Crop presets: canopy height at full growth, row spacing, look.
 export const CROPS = {
@@ -101,6 +111,8 @@ export const CROPS = {
   stubble: { height: 0.18, rowSpacing: 0.5, label: 'Stubble' },
   fallow: { height: 0, rowSpacing: 0.9, label: 'Fallow' },
   pasture: { height: 0, rowSpacing: 0, label: 'Pasture' },
+  // (Serra das Bananeiras: the canopy of a banana plantation.)
+  banana: { height: 3.4, rowSpacing: 3, label: 'Banana' },
 };
 
 let fid = 0;
@@ -235,6 +247,7 @@ FIELDS.push(
   field('I-04', 'soy', 870, 1330, 1955, 2145, 0.8, 'x', { contract: 'beg-4', beginner: true }),
   field('I-05', 'cotton', 1870, 2330, 1205, 1395, 0.9, 'x', { contract: 'beg-5', beginner: true }),
 );
+if (SERRA) { fid = 0; swap(FIELDS, SB.SERRA_FIELDS.map((f) => field(f.name, 'banana', f.x0, f.x1, f.z0, f.z1, f.growth ?? 1, f.rowAxis ?? 'x', f.extra ?? {}))); }
 for (const f of FIELDS) f.level ??= 1;
 
 export const CONTRACT_FIELDS = FIELDS.filter((f) => f.contract);
@@ -252,6 +265,8 @@ export const CREEK = {
   valley: 160,
   valleyDepth: 7,
 };
+
+if (SERRA) Object.assign(CREEK, SB.SERRA_CREEK);
 
 // Other water: a tributary stream through the Vale do Rio valley into the
 // creek, and small farm reservoirs (açudes) / a valley lake. Pond outlines
@@ -295,6 +310,7 @@ export const WATER = {
     { name: 'Lagoa do Buritizal', ring: true, x: -4000, z: 3850, r: 120, depth: 2.6, ph: 2.6, bank: 0.04, blend: 2.4, trees: 1.6, open: 0.7, lobes: [0.1, 0.17, 0.09, 0.05] },
   ],
 };
+if (SERRA) { swap(WATER.streams, SB.SERRA_STREAMS); swap(WATER.ponds, SB.SERRA_PONDS); }
 // Radius of a pond's shoreline towards angle a.
 // lobes [a2, a3, a5, a7]: the harmonics' amplitudes (default 0.16, 0.09, 0, 0,
 // the original shape); rmax: the largest radius (bounding checks).
@@ -346,12 +362,16 @@ export const FORESTS = [
   { kind: 'eucalyptus', x0: -540, x1: -500, z0: -270, z1: -175 },
 ];
 
+if (SERRA) swap(FORESTS, SB.SERRA_FORESTS);
+
 // Power line along the east side of the corn talhão: obstacle at the end of each pass.
 export const POWERLINE = {
   points: [[310, 130], [310, 260], [310, 390], [310, 520], [310, 640], [330, 690], [450, 692], [570, 694], [690, 696], [810, 698], [930, 700]],
   height: 10.5,
   sag: 1.4,
 };
+
+if (SERRA) swap(POWERLINE.points, []);
 
 // Main farm roads (centre polylines). Field perimeters get carreadores automatically.
 export const ROADS = [
@@ -423,6 +443,8 @@ ROADS.push(
   track(6, [-4962, 4922], [-5200, 4600], [-5520, 4260], [-5980, 4100]),
 );
 
+if (SERRA) swap(ROADS, SB.SERRA_ROADS);
+
 // Farm headquarters (sede) and grain storage.
 export const HQ = {
   house: { x: -1260, z: -260, rot: 0.0 },
@@ -443,6 +465,8 @@ export const GRAIN_POINTS = [
   { x: 1560, z: -180, axis: 'x', n: 2, name: 'AGRO WINGS' },
 ];
 
+if (SERRA) swap(GRAIN_POINTS, []);
+
 // Fences with gates (porteiras) along the base and HQ approaches.
 export const FENCES = [
   { pts: [[-560, -140], [-560, 230]], gateAt: 0.15 },
@@ -455,6 +479,8 @@ export const FENCES = [
   ...pasture(-3400, -2900, -3300, -3000, 'e', 0.6), // T-36
   ...pasture(-4880, -4420, 5120, 5380, 'w', 0.5), // CV-02 (Chapada dos Ventos)
 ];
+
+if (SERRA) swap(FENCES, []);
 
 // Four fence sides 3 m inside a pasture, with the gate on one side.
 function pasture(x0, x1, z0, z1, gateSide, gateAt) {
@@ -564,6 +590,8 @@ export const FARMS = [
     props: [['house', -490, -210, 0], ['mast', 300, -480], ['turbine', -800, 560], ['turbine', -560, 660], ['turbine', -320, 730]],
   },
 ];
+
+if (SERRA) swap(FARMS, SB.SERRA_FARMS);
 
 const mv = (p, dx, dz) => ({ ...p, x: p.x + dx, z: p.z + dz });
 const mvr = (r, dx, dz) => ({ x0: r.x0 + dx, x1: r.x1 + dx, z0: r.z0 + dz, z1: r.z1 + dz });

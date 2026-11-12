@@ -87,6 +87,10 @@ function termiteMound(seed) {
   return g;
 }
 
+import { SERRA } from './activeMap.js';
+import { serraForestBoxes, SERRA_WORLD_HALF } from './serra.js';
+import { serraCanopy } from './serraScenery.js';
+
 export function createVegetation(terrain, quality) {
   const group = new THREE.Group();
   group.name = 'vegetation';
@@ -718,6 +722,33 @@ export function createVegetation(terrain, quality) {
   }
 
   terrain.releaseBaseline?.();
+
+  // --- Serra das Bananeiras: the continuous forest (canopy with an organic
+  // outline, trees along its edge, emergents over the roof) -----------------
+  if (SERRA) {
+    const { parts, density } = serraCanopy(terrain);
+    canopyParts.push(...parts);
+    const rs = rng(20261111), H = SERRA_WORLD_HALF - 30;
+    for (let z = -H; z < H; z += 9) for (let x = -H; x < H; x += 9) {
+      const px = x + rs() * 9, pz = z + rs() * 9, d = density(px, pz), k = rs();
+      if (d <= 0.03) continue;
+      const edge = d < 0.5;
+      if (edge ? k < 0.5 : k < 0.035) {
+        const sc = edge ? 0.8 + rs() * 0.5 : 1.25 + rs() * 0.45, kind = edge && rs() < 0.12 ? (rs() < 0.5 ? 'macauba' : 'buriti') : edge && rs() < 0.06 ? 'ipe' : 'mata';
+        trees.push({ kind, v: Math.floor(rs() * variants[kind].length), x: px, z: pz, s: sc, rot: rs() * Math.PI * 2 });
+        if (edge) colliders.push({ x: px, z: pz, r: 3, top: terrain.heightAt(px, pz) + 19 * sc });
+      }
+    }
+    for (const b of serraForestBoxes()) colliders.push({ box: b, top: 22 });
+    // The banana talhões are flown over a 3.4 m canopy: no tree beside a
+    // talhão (18 m) nor in the run-in at the ends of its rows (70 m).
+    const byTalhao = (x, z) => FIELDS.some((f) => {
+      const ax = f.rowAxis === 'x', mx = ax ? 70 : 18, mz = ax ? 18 : 70;
+      return x > f.x0 - mx && x < f.x1 + mx && z > f.z0 - mz && z < f.z1 + mz;
+    });
+    for (let i = trees.length - 1; i >= 0; i--) if (isTall(trees[i].kind) && byTalhao(trees[i].x, trees[i].z)) trees.splice(i, 1);
+    for (let i = colliders.length - 1; i >= 0; i--) if (!colliders[i].box && byTalhao(colliders[i].x, colliders[i].z)) colliders.splice(i, 1);
+  }
 
   // --- build instanced cells ----------------------------------------------
   const cells = new Map();

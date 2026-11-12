@@ -38,6 +38,7 @@ import { windAt } from '../flight/env.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { t } from '../i18n/index.js';
 import { aircraftUnlocked } from './expansions.js';
+import { mapAllowed, storeMapChoice } from '../world/activeMap.js';
 import { FireField } from '../world/fires.js';
 import { WaterFx } from '../world/waterFx.js';
 import { FireJobs } from './fireJobs.js';
@@ -451,6 +452,13 @@ export class Game {
     this.audio.start();
     // Leaving the walk (menu, a new flight, a reset): back into the aircraft first.
     if (['title', 'free', 'freeAir', 'career', 'continue', 'resetPad', 'resetRwy'].includes(a)) this.freeRoam?.forceBoard();
+    // A premium map whose access is not (or no longer) granted is not flown:
+    // back to the main map (the choice is stored, the page reloads).
+    if (['free', 'freeAir', 'career', 'continue'].includes(a) && !mapAllowed()) {
+      this.toast(t('This map is a premium expansion: returning to the main map.'));
+      if (storeMapChoice('main')) setTimeout(() => { try { location.reload(); } catch { /* sandboxed */ } }, 600);
+      return;
+    }
     switch (a) {
       case 'career':
         this._enterPlay('career');

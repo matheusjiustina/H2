@@ -4172,6 +4172,108 @@ calls, panel view 419 → 422, behind-the-seat view 411 → 423; triangles
 pass, paints A/B/C switch and persist, no memory growth over 15 switches and
 10 paint changes, no page errors.
 
+## Premium Expansion 01 — Serra das Bananeiras (a separate map)
+
+A second, compact map: a mountain valley of banana country (mar de morros,
+forested ridges, a gorge down to a remote lowland) with three rustic strips.
+The main map (terrain, strips, farms, missions, spawn points, size, visuals)
+and every aircraft are untouched: with the main map active no line of the
+new data runs (measured below: identical counts).
+
+**Architecture — one map per page.** `src/world/activeMap.js` chooses the
+map ONCE when the page loads (stored choice `agrowings.map`; `?map=` and the
+`AGRO_MAP` environment variable for development and tests), before any world
+module evaluates. With the Serra active, `layout.js`, `expansion.js`,
+`terrainData.js` and the contract modules take their data from
+`src/world/serra.js` / `src/game/serraContracts.js` in the very shapes the
+engine already uses (runway, farm sites, fields, creek, streams, pond, roads,
+forest colliders, scenery props, biome weights) — so terrain grid, strips,
+service crews, farm offices, GPS/guidance, coverage, hand-in, weather,
+replay and streaming are the existing systems, not copies. Switching maps
+(Expansions → Maps) stores the choice and reloads the page: the two worlds
+are never in memory together. The career (money, histories, aircraft) is
+shared; each map's jobs are kept aside while the other map is flown
+(`Career.otherJobs`).
+
+**Premium.** `SERRA_EXPANSION` (`expansion.map-serra-das-bananeiras`) joins
+`EXPANSIONS` in `src/game/expansions.js`; the map is offered, loaded and
+flown only where `isUnlocked()` says so — the same entitlement source as the
+Fire Boss (the platform may install it before load as
+`globalThis.AGROWINGS_ENTITLEMENTS`, or later with `setEntitlementSource`).
+A locked map is not loaded at start-up (fallback to the main map), is shown
+as locked in the selector, and is left on entering a mode if access was
+withdrawn. No purchase, payment, login or account code was added or changed.
+As for the Fire Boss, enforcement is off during the testing phase
+(`setPremiumEnforced`), and a client-side check alone is not authoritative.
+
+**Dimensions.** Detailed terrain 6 × 6 km on the same 768² grid (7.8 m
+cells); playable area 4.6 × 4.6 km = 21.2 km², 14.7 % of the main map's
+144 km²; the far ring beyond is forested mountain. Heights −28 … 343 m.
+
+**Terrain (`serraNatural`).** A: the central valley (level floor, main strip
+and base); B: rolling banana hills round it (mamelons of 20–60 m, side
+valleys); C: the forested serra — a ridge along the north and the rim, with
+the Pedra dome; D: the Baixadão, a remote lowland 27 m below the valley,
+reached by the creek through a wooded gorge; E: the rugged south-west
+shoulder. Masks are products of smooth distances (no creases); strips sit on
+the engine's platforms.
+
+**Strips (three).** 01 Vale das Bananeiras — 720 × 20 m dirt, the base
+(hangar, service, crew); 02 Pista do Baixadão — 430 × 16 m grass and earth,
+level, forest on two sides; 03 Pista da Serra — 380 × 14 m rough earth, 3 %
+up-slope eastbound, small aircraft only.
+
+**Banana.** `growPlot` grows each plot from a seed over the terrain: bands
+60 m deep laid along the contour, each reaching as far as the ground stays
+near its height and workable — a plot is a stack of rectangles with stepped
+ends that follows its hillside (62 plots, 261 ha). 11 plots are contracts
+(35 bands as engine FIELDS: coverage, GPS, 3.4 m canopy for the terrain
+following and crop strikes); the rest are plantations of the same making
+(scenery). Plants (`src/world/serraScenery.js`): 3 variants of ~96
+triangles and a 28-triangle far model, instanced per 96 m cell, both LODs on
+one instance buffer, density and distances by graphics profile, cells built
+lazily (3 per frame) and released beyond the far distance (210 824 plants in
+593 cells; ~90–200 cells alive). Trees are kept 18 m from a talhão and out of
+the 70 m run-in at the ends of its rows.
+
+**Forest, water, rural.** Forest is a continuous density (`serraWild`):
+canopy mesh with the terrain's own outline, edge trees, emergents, ground
+tint and obstacle boxes all read it. One stream (Córrego das Bananeiras,
+down the gorge, the Poço do Baixadão, out to the south-east) on the existing
+water system. Seven red-earth tracks; five sítios found on level ground by
+the tracks (house, shed / water tank / corral) with the forest cleared round
+them.
+
+**Contracts.** 5 orders at the base, 3 requests at each farm office (banana
+talhões by plot, pay by relief), Portuguese and English.
+
+**Tests.** `npm test` (main map, 244) and `npm run test:serra` (10: size,
+strips, relief, plots, clearances, contracts, water, determinism, premium);
+`test/serrae2e.mjs` in the browser (25 checks: selector, switch both ways
+with the career kept, order → load → take-off → all bands sprayed → hand-in
+from each of the three strips, farm offices, edge of the map, no page
+errors, no untranslated text).
+
+**Measured (Chromium + SwiftShader, 1280 × 720; counts exact, times are CPU).**
+
+| | calls | triangles | geometries | textures | JS heap |
+|---|---|---|---|---|---|
+| Main map, base view — before | 1148 | 1 953 377 | 1127 | 153 | 635 MB |
+| Main map, base view — after | 1148 | 1 953 377 | 1127 | 153 | 594 MB |
+| Main map, high view — before / after | 1146 / 1146 | 1 983 280 / 1 983 280 | 1259 / 1259 | 154 / 154 | 591 / 591 MB |
+| Serra, LOW — aerial / valley / low pass | 1317 / 1310 / 656 | 2 095 946 / 1 762 426 / 1 610 439 | 1186–1346 | 141 | 493–514 MB |
+| Serra, MEDIUM — aerial / valley / low pass | 1380 / 1353 / 859 | 2 467 914 / 2 198 468 / 2 250 704 | 1188–1346 | 141 | 501–519 MB |
+
+Load to first frames: main 63.5 s before / 66.7 s after (one run each, same
+noise), Serra 60–61 s; map switch (store + reload + load) 62–75 s in this
+software-rendered container — real devices were not measured.
+
+**Known limits.** The test autopilot (`startAutopilot`, not a player
+feature) is written for the main base and the main map's open fields and is
+not supported on the Serra. The base reuses the main hangar and fleet
+apron. No waterfall mesh in the gorge. Not tested: real phones, Safari /
+Firefox, real GPUs.
+
 ## Benchmark (performance work, phase 1)
 
 Reference for all optimisation: the tag **`ultra-original-v73`** (commit

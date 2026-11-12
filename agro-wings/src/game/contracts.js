@@ -5,6 +5,8 @@ import { GAME, SPRAY } from '../config.js';
 import { readSafe, writeSafe } from '../core/safeStore.js';
 import { t } from '../i18n/index.js';
 import { FARM_CONTRACTS } from './farmContracts.js';
+import { SERRA } from '../world/activeMap.js';
+import { SERRA_CONTRACTS } from './serraContracts.js';
 
 export { FARM_CONTRACTS };
 export const contractById = (id) => CONTRACTS.find((c) => c.id === id) ?? FARM_CONTRACTS.find((c) => c.id === id);
@@ -243,6 +245,12 @@ export const LEVELS = {
   3: { get label() { return t('Level 3 · Hilly agricultural fields'); }, get short() { return t('L3'); }, get blurb() { return t('Noticeable hills and valleys: 25–37 m of relief, slopes up to 7°.'); } },
 };
 
+// Serra das Bananeiras (a separate map): its own orders and board heading.
+if (SERRA) {
+  CONTRACTS.length = 0; CONTRACTS.push(...SERRA_CONTRACTS);
+  LEVELS[2] = { get label() { return t('Serra das Bananeiras · banana talhões'); }, get short() { return t('Banana'); }, get blurb() { return t('Small talhões laid along the hillsides: short passes that follow the terrain.'); } };
+}
+
 const STORE = 'agrowings.save.v1';
 
 export class Career {
@@ -279,12 +287,12 @@ export class Career {
 
   save() {
     try {
-      const jobs = {};
+      const jobs = { ...(this.otherJobs || {}) };
       for (const [id, j] of Object.entries(this.jobs)) jobs[id] = j.serialize();
       const r = this.onSave?.();
       if (r !== undefined) this.resume = r;
       // (phase 05: hashed envelope + previous good copy, see core/safeStore.js)
-      writeSafe(STORE, { resume: this.resume, money: this.money, completed: this.completed, jobs, history: this.history.slice(-30), history2: this.history2.slice(-30), read: this.read, seq: this.seq, tutorialDone: this.tutorialDone }, 1);
+      writeSafe(STORE, { resume: this.resume ?? this.otherResume ?? null, money: this.money, completed: this.completed, jobs, history: this.history.slice(-30), history2: this.history2.slice(-30), read: this.read, seq: this.seq, tutorialDone: this.tutorialDone }, 1);
     } catch { /* storage unavailable: progress stays in memory */ }
   }
   load() {
@@ -301,9 +309,13 @@ export class Career {
       this.seq = s.seq ?? this.history.length + this.history2.length;
       this.tutorialDone = !!s.tutorialDone;
       this.resume = s.resume && contractById(s.resume.job) ? s.resume : null;
+      // Jobs (and the job in hand) of another map — the main world while a
+      // premium map is flown, or the other way round — are kept as they were
+      // saved and written back unchanged, so no map loses progress.
+      this.otherResume = s.resume && !this.resume ? s.resume : null;
       for (const [id, js] of Object.entries(s.jobs || {})) {
         const c = contractById(id);
-        if (!c) continue;
+        if (!c) { (this.otherJobs ||= {})[id] = js; continue; }
         const j = new Job(c);
         j.restore(js);
         this.jobs[id] = j;
@@ -320,6 +332,7 @@ export class Career {
     this.seq = 0;
     this.tutorialDone = false;
     this.resume = null;
+    this.otherJobs = {}; this.otherResume = null;
     this.save();
   }
 }

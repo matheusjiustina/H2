@@ -18,6 +18,8 @@ import { createForestCrowns } from './forestCrowns.js';
 import { freezeStatic } from './staticFreeze.js';
 import { WorldStreaming } from './worldStreaming.js';
 import { createExpansionScenery, expansionColliders } from './expansionScenery.js';
+import { SERRA } from './activeMap.js';
+import { createBananas } from './serraScenery.js';
 
 export class World {
   constructor(renderer, scene, quality) {
@@ -59,6 +61,8 @@ export class World {
     this.expansion.wind = this.visualWind;
     this.updaters.push(this.expansion);
     this.expColliders = expansionColliders(this.terrain);
+    // Serra das Bananeiras: the banana plantations (instanced, streamed).
+    if (SERRA) { this.bananas = createBananas(this.terrain, this.quality); this.scene.add(this.bananas.group); this.updaters.push(this.bananas); }
     this.treeHit = makeTreeCollider(this.vegetation);
     this.activity = createFieldActivity(this.scene, this.structures.M, this.terrain);
     // The harrowing tractor on T-08 (audio, older checks).

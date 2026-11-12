@@ -11,10 +11,11 @@ import {
 } from './layout.js';
 import { biomeWeights } from './expansion.js';
 import { rawHeight, farRingVertex, FAR_STEP } from './terrainData.js';
+import { SERRA } from './activeMap.js';
 import { makeGroundDetail } from '../core/textures.js';
 import { CUT_U, NCUT, CROP_U } from './cutState.js';
 
-const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5 };
+const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5, banana: 6 };
 
 const GLSL_FUNCS = /* glsl */ `
 varying vec3 vWPos;
@@ -125,6 +126,18 @@ vec3 fieldColor(vec2 p, vec4 info, float edgeIn, vec4 nA, vec4 nB, vec4 nC, vec4
   float s = rows(coord, info.w > 0.0 ? info.w : 0.9, fade);
   vec3 soil = mix(vec3(0.160, 0.058, 0.028), vec3(0.230, 0.085, 0.040), nC.r);
   vec3 c;
+#ifdef SERRA_MAP
+  // Banana plantation floor: shaded earth under the canopy, dry leaf
+  // litter between the rows, green weeds in patches.
+  if (type > 5.5) {
+    vec3 litter = mix(vec3(0.20, 0.15, 0.07), vec3(0.30, 0.24, 0.12), nD.r);
+    c = mix(soil * 0.85, litter, smoothstep(0.35, 0.75, nC.g * 0.7 + nD.g * 0.5) * 0.7);
+    c = mix(c, vec3(0.07, 0.15, 0.04) * (0.85 + 0.3 * nB.g), smoothstep(0.45, 0.75, nB.r + nC.b * 0.3) * 0.55);
+    c *= 0.62 + 0.2 * nA.g;
+    // Far away the closed canopy is what is seen.
+    return mix(c, vec3(0.035, 0.105, 0.03) * (0.85 + 0.3 * nB.g), smoothstep(160.0, 620.0, distance(vWPos, cameraPosition)));
+  }
+#endif
   if (type < 2.5) {
     // Under soy, corn and cotton: Mato Grosso latossolo (red-brown, finer
     // and darker where it is moist), straw from the last crop between the
@@ -248,7 +261,12 @@ vec3 terrainColor(vec2 p, out float rough) {
   vec4 nC = texture2D(uNoise, p * 0.13);
   vec4 nD = texture2D(uNoise, p * 0.9);
   rough = 0.95;
+#ifdef SERRA_MAP
+  // Serra das Bananeiras: forested mountains beyond the map.
+  if (abs(p.x) > uWorldHalf - 2.0 || abs(p.y) > uWorldHalf - 2.0) return vec3(0.040, 0.085, 0.036) * (0.78 + 0.4 * nA.g) * (0.86 + 0.28 * nB.r);
+#else
   if (abs(p.x) > uWorldHalf - 2.0 || abs(p.y) > uWorldHalf - 2.0) return farPatchwork(p, nA, nB, nC, nD, rough);
+#endif
   float near;
   vec4 det = detailAt(p, near);
   vec3 col = grassColor(p, nA, nB, nC, nD);
@@ -426,7 +444,7 @@ function biomeTexture() {
     if (w[0] + w[1] + w[2] + w[3] <= 0) continue;
     let d = 1e9;
     for (const r of rects) d = Math.min(d, Math.hypot(Math.max(r[0] - x, 0, x - r[1]), Math.max(r[2] - z, 0, z - r[3])));
-    const k = Math.min(1, Math.max(0, (d - 250) / 300));
+    const k = SERRA ? 1 : Math.min(1, Math.max(0, (d - 250) / 300)); // (the Serra's own tints are placed by its own rules)
     const o = (j * N + i) * 4;
     for (let c = 0; c < 4; c++) data[o + c] = Math.round(Math.min(1, w[c]) * k * 255);
   }
@@ -457,6 +475,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   const nc = CREEK.points.length;
   const stp = WATER.streams[0].points;
   mat.defines = {
+    ...(SERRA ? { SERRA_MAP: 1 } : {}),
     NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: PONDS0.length,
     RING_IN: RING_IN.toFixed(1), NF_IN1: inOnly.length + both.length, NF_RING0: inOnly.length, NS_IN: nsIn,
   };
@@ -468,7 +487,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uFieldRect: { value: SF.map((f) => new THREE.Vector4(f.x0, f.z0, f.x1, f.z1)) },
     uFieldInfo: {
       value: SF.map((f) => {
-        const sp = { soy: 0.5, corn: 0.8, cotton: 0.9, stubble: 0.5, fallow: 0.9, pasture: 0 }[f.crop];
+        const sp = { soy: 0.5, corn: 0.8, cotton: 0.9, stubble: 0.5, fallow: 0.9, pasture: 0, banana: 3 }[f.crop];
         return new THREE.Vector4(CROP_CODE[f.crop], f.rowAxis === 'x' ? 0 : 1, f.growth, sp);
       }),
     },
@@ -507,7 +526,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => 'terrain-v7';
+  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : 'terrain-v7');
   return mat;
 }
 

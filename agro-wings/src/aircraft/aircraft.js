@@ -10,7 +10,7 @@ import { aircraftType } from './types.js';
 import { WaterSystem, FireBossFx } from './fireboss.js';
 import { t } from '../i18n/index.js';
 import { FLIGHT, UNITS } from '../config.js';
-import { POWERLINE, MAIN_SITE, padOf, WORLD_HALF, EDGE_ROOM } from '../world/layout.js';
+import { POWERLINE, MAIN_SITE, padOf, PLAY_HALF, EDGE_ROOM } from '../world/layout.js';
 import { approach, clamp, smoothstep, damp, KT, FT } from '../core/math.js';
 
 const FLAP_NOTCHES = [0, 1 / 3, 2 / 3, 1];
@@ -527,7 +527,7 @@ export class Aircraft {
     if (resting && o.groundSpeed < 3 && (Math.abs(att.bank) > 0.9 || att.pitch < -0.45 || Math.abs(att.pitch) > 1.2)) this.flipT += dt; else this.flipT = 0;
     // Room past the map edge for a full balão at a field near it (the ground
     // there is the horizon ring, flown exactly as drawn: farRingHeight).
-    const far = Math.abs(fm.pos.x) > WORLD_HALF + EDGE_ROOM || Math.abs(fm.pos.z) > WORLD_HALF + EDGE_ROOM;
+    const far = Math.abs(fm.pos.x) > PLAY_HALF + EDGE_ROOM || Math.abs(fm.pos.z) > PLAY_HALF + EDGE_ROOM; // (PLAY_HALF: the whole map on the main one)
     this.stuck = this.stuckT > 6 || this.flipT > 2.5 || far;
     if (far) {
       // Turn the aircraft back toward the farm.

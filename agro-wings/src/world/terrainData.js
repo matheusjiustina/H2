@@ -2,6 +2,8 @@
 // and tests can query the exact same triangulated surface the renderer draws.
 import { fbm, smoothstep, lerp, segDist, clamp } from '../core/math.js';
 import { reliefAt, ringReliefAt } from './relief.js';
+import { SERRA } from './activeMap.js';
+import { serraNatural } from './serra.js';
 import { expansionReliefAt, expansionMesas, AUX_STRIPS, stripUV, auxStripLevel, auxStripAt, EXP_BOXES } from './expansion.js';
 
 // World Expansion 2.0 switch: off only while TerrainData.buildBaseline()
@@ -77,12 +79,12 @@ for (const st of WATER.streams) {
 
 // Natural ground before the farm pads (strip/base platforms, HQ pad).
 function naturalHeight(x, z) {
-  let h = baseHeight(x, z) - H0;
+  let h = SERRA ? serraNatural(x, z) : baseHeight(x, z) - H0;
   const cd = x < CREEK_X[0] || x > CREEK_X[1] ? 1e9 : creekDist(x, z);
   // Rolling country and hills in the outer zones (exactly zero over the farm
   // core). The creek keeps a calm floodplain through them.
   // (World Expansion 2.0 landforms: zero outside their own support.)
-  const rel = reliefAt(x, z) + ringReliefAt(x, z) + (EXP ? expansionReliefAt(x, z) : 0);
+  const rel = SERRA ? 0 : reliefAt(x, z) + ringReliefAt(x, z) + (EXP ? expansionReliefAt(x, z) : 0);
   if (rel !== 0) h += rel * smoothstep(110, 480, cd);
   // Chapadas and buttes (World Expansion 2.0): flat tops at their own height.
   if (EXP) h = expansionMesas(h, x, z);
@@ -145,7 +147,7 @@ export function rawHeight(x, z) {
   const m = rectMask(x, z, RUNWAY.x0 - 80, RUNWAY.x1 + 60, -160, 45, 220);
   h = lerp(h, 0, m);
   // Farm headquarters pad.
-  const hq = rectMask(x, z, HQ.house.x - 70, -920, -430, -190, 90);
+  const hq = SERRA ? 0 : rectMask(x, z, HQ.house.x - 70, -920, -430, -190, 90);
   if (hq > 0) h = lerp(h, hqLevel, hq);
   // Secondary farm strips and service areas: a platform at the site level
   // (a graded strip rises east), blended into the land around it.

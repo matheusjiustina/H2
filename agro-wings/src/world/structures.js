@@ -1,6 +1,7 @@
 // Buildings, base equipment, vehicles, fences, strip markings, windsocks,
 // power line and creek water. Static parts are merged per material.
 import * as THREE from 'three';
+import { SERRA } from './activeMap.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BASE, APRON0, HANGAR0, RUNWAY, HQ, GRAIN_POINTS, FENCES, POWERLINE, CREEK, FARM_SITES, WATER } from './layout.js';
 import { canvas, canvasTexture, makeLabel } from '../core/textures.js';
@@ -188,13 +189,12 @@ export function createStructures(terrain, scene) {
   dyn.hangar = buildHangar(B, M, group);
   buildService(B, M, group, H);
   buildCrewBase(B, M, group);
-  apronLights(B, M);
-  basePortal(B, M, group);
+  if (!SERRA) { apronLights(B, M); basePortal(B, M, group); } // (a rustic valley strip: no floodlights, no gateway)
   buildHelipad(B, M, group, H);
   buildVehicles(B, M, H);
   buildStripMarks(B, M, group, H, RUNWAY);
   dyn.sites = FARM_SITES.map((site) => buildFarmSite(B, M, group, H, site, dyn));
-  buildHQ(B, M, group, H);
+  if (!SERRA) buildHQ(B, M, group, H);
   buildFences(B, M, group, H, dyn);
   for (const w of BASE.windsocks) dyn.windsocks.push(buildWindsock(B, M, group, w.x, H(w.x, w.z), w.z));
   const wires = buildPowerLine(B, M, group, H);

@@ -7,6 +7,8 @@
 // penalised by the weather.
 import { t } from '../i18n/index.js';
 import { FARMS } from '../world/layout.js';
+import { SERRA } from '../world/activeMap.js';
+import { SERRA_FARM_CONTRACTS, SERRA_FARM_INFO } from './serraContracts.js';
 
 export const FARM_CONTRACTS = [
   {
@@ -295,6 +297,9 @@ export const FARM_CONTRACTS = [
   },
 ];
 
+// Serra das Bananeiras (a separate map): its own requests.
+if (SERRA) { FARM_CONTRACTS.length = 0; FARM_CONTRACTS.push(...SERRA_FARM_CONTRACTS); }
+
 // Farm difficulty (1-5) of a request.
 export const contractStars = (c) => FARMS.find((f) => f.id === c.farm)?.difficulty ?? c.level;
 
@@ -376,3 +381,4 @@ export const FARM_INFO = {
     get weather() { return t('Strong, gusty wind'); },
   },
 };
+if (SERRA) Object.assign(FARM_INFO, SERRA_FARM_INFO);

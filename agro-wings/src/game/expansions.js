@@ -19,9 +19,21 @@ export const FIREBOSS_EXPANSION = Object.freeze({
   name: 'Air Tractor AT-802AF Fire Boss',
 });
 
-export const EXPANSIONS = Object.freeze([FIREBOSS_EXPANSION]);
+// Premium map expansion 01: a separate map (src/world/serra.js), chosen at
+// load (src/world/activeMap.js).
+export const SERRA_EXPANSION = Object.freeze({
+  id: 'expansion.map-serra-das-bananeiras', // stable: do not rename
+  map: 'serra',
+  name: 'Serra das Bananeiras',
+});
 
+export const EXPANSIONS = Object.freeze([FIREBOSS_EXPANSION, SERRA_EXPANSION]);
+
+// The platform's premium system may install its answer BEFORE the game
+// loads (a function on globalThis.AGROWINGS_ENTITLEMENTS), so that what is
+// decided at load — which map this page runs — is validated by it too.
 let source = null;
+try { if (typeof globalThis.AGROWINGS_ENTITLEMENTS === 'function') source = globalThis.AGROWINGS_ENTITLEMENTS; } catch { /* no globals */ }
 
 // TESTING PHASE: premium expansions are not enforced yet — the Fire Boss is
 // open to everyone while it is being flown and tested. The lock (and the
