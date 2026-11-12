@@ -500,6 +500,7 @@ export class Screens {
         <button class="btn primary" data-a="resume">${t('Resume')}</button>
         <button class="btn" data-a="board">${t('Service orders')}</button>
         <button class="btn" data-a="map">${t('Map')}</button>
+        ${g.replay.lastAvailable() ? `<button class="btn" data-a="lastReplay">▶ ${t('Last replay')}</button>` : ''}
         <button class="btn" data-a="settings">${t('Settings')}</button>
         <button class="btn" data-a="help">${t('Controls')}</button>
         <button class="btn" data-a="resetPad">${t('Reset aircraft to the pad')}</button>
@@ -510,6 +511,7 @@ export class Screens {
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (!a) return;
       if (a === 'resume') this.close();
+      else if (a === 'lastReplay') { g.freeRoam?.forceBoard(); g.replay.playLast(); }
       else g.menuAction(a);
     });
     this._show('pause', el);

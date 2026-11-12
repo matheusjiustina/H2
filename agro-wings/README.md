@@ -4786,3 +4786,15 @@ payments and progression untouched):
   own theme.
 - Test: `node test/gpsflow.mjs <out>` (browser; 13 aircraft × situations +
   the Fire Boss order, 114 checks).
+
+## Replay: track off by default, last replay always kept; result when parked anywhere
+- The flown track and the talhão outline in the replay scene are **off by
+  default**; the **Trilha** button (or `T`) shows them and the choice is
+  remembered (`settings.replayTrail`).
+- **The last replay is always kept** — handed in or not (leaving the job, or
+  closing the page, saves the recording; also in localStorage). It opens from
+  the pause menu (Esc → *Último replay*) and with `L`; the flight in progress
+  is playable too. Hand-in replays keep their history entries as before.
+- **Result when parked**: with the job complete, stopping on the ground with
+  the engine cut brings up the result wherever that is, not only in the
+  loading zone. Tests: `test/replaylast.mjs`, `test/resultpark.mjs`.

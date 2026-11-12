@@ -18,6 +18,7 @@ const RATE = 5; // samples per second while recording
 const MAX = 12000; // samples kept (40 min at 5 Hz; decimated beyond)
 const STRIDE = 26; // bytes per sample
 const STORE = 'agrowings.replays.v1';
+const STORE_LAST = 'agrowings.replay.last.v1'; // the most recent flight, always kept (hand-in or not)
 const KEEP = 4; // replays kept in localStorage
 export const REPLAY_CAMERAS = ['chase', 'side', 'orbit', 'cinematic', 'observer', 'free'];
 
@@ -90,11 +91,44 @@ export class ReplayManager {
     this.saved = new Map(); // history n -> { track, meta }
     this.active = false;
     this.recT = 0;
+    this.last = null; // { track, meta }: the most recent recording, handed in or not
     this._load();
+    // Closing the page mid-flight keeps what has been recorded so far.
+    try { window.addEventListener('pagehide', () => this._keepCurrent()); } catch { /* no window */ }
+  }
+
+  // The recording in progress (or just ended) as a playable { track, meta }.
+  _current() {
+    const tr = this.track;
+    if (!tr || tr.n < 10 || !this.trackJob) return null;
+    return { track: tr, meta: { id: this.trackJob.c.id, ac: this.trackAc, rate: tr.rate } };
+  }
+  // Remember the recording in progress as the last replay (storage included).
+  _keepCurrent() {
+    const c = this._current();
+    if (!c) return;
+    this.last = c;
+    this._storeLast();
+  }
+  _storeLast() {
+    try {
+      const r = this.last;
+      if (!r) return;
+      localStorage.setItem(STORE_LAST, JSON.stringify({ ...r.meta, data: r.track.pack() }));
+    } catch { /* storage full or blocked: it stays in memory */ }
+  }
+  // What "the last replay" is: the recording of the flight in progress when
+  // there is enough of it, else the last one kept.
+  lastAvailable() { return this._current() ?? this.last; }
+  playLast() {
+    const r = this.lastAvailable();
+    return r ? this._play(r, null) : false;
   }
 
   // ------------------------------------------------------------ recording
   begin(job) {
+    // A flight left without being handed in is still kept as the last replay.
+    if (this.track && this.trackJob !== job) this._keepCurrent();
     if (!job) { this.track = null; return; }
     if (this.track && this.trackJob === job) return;
     this.track = new Track();
@@ -124,6 +158,7 @@ export class ReplayManager {
   // Hand-in: the recording goes with the history entry. Returns fields for it.
   finish(job) {
     const tr = this.track;
+    if (tr && tr.n >= 10 && this.trackJob === job) this._keepCurrent();
     this.track = null;
     if (!tr || tr.n < 10 || this.trackJob !== job) return {};
     this._pending = { track: tr, meta: { id: job.c.id, ac: this.trackAc, rate: tr.rate } };
@@ -151,13 +186,19 @@ export class ReplayManager {
       const a = JSON.parse(localStorage.getItem(STORE) || '[]');
       for (const r of a) this.saved.set(r.n, { track: Track.unpack(r.data, r.rate), meta: { id: r.id, ac: r.ac, rate: r.rate } });
     } catch { /* corrupt or blocked */ }
+    try {
+      const l = JSON.parse(localStorage.getItem(STORE_LAST) || 'null');
+      if (l?.data) this.last = { track: Track.unpack(l.data, l.rate), meta: { id: l.id, ac: l.ac, rate: l.rate } };
+    } catch { /* corrupt or blocked */ }
   }
-  clear() { this.saved.clear(); try { localStorage.removeItem(STORE); } catch { /* blocked */ } }
+  clear() { this.saved.clear(); this.last = null; try { localStorage.removeItem(STORE); localStorage.removeItem(STORE_LAST); } catch { /* blocked */ } }
 
   // ------------------------------------------------------------ playback
   play(n) {
     n = Number(n);
-    const r = this.saved.get(n);
+    return this._play(this.saved.get(n), n);
+  }
+  _play(r, n) {
     const g = this.game;
     if (!r || this.active) return false;
     const ac = g.fleet[r.meta.ac] ?? g.aircraft;
@@ -226,6 +267,7 @@ export class ReplayManager {
     lg.setAttribute('color', new THREE.BufferAttribute(col, 3));
     this.trail = new THREE.Line(lg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.75, depthWrite: false }));
     this.trail.frustumCulled = false;
+    this.trail.visible = !!g.settings.replayTrail;
     this.group.add(this.trail);
     // Talhão boundaries, draped on the terrain.
     const c = contractById(r.meta.id);
@@ -250,12 +292,14 @@ export class ReplayManager {
       bg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
       const b = new THREE.LineSegments(bg, new THREE.LineBasicMaterial({ color: 0xffe14a, transparent: true, opacity: 0.8, depthWrite: false }));
       b.frustumCulled = false;
+      b.visible = !!g.settings.replayTrail;
+      this.bounds = b;
       this.group.add(b);
       this.fieldCentre = new THREE.Vector3(pts[0], pts[1], pts[2]);
       let sx = 0, sz = 0, k = 0;
       for (let i = 0; i < pts.length; i += 3) { sx += pts[i]; sz += pts[i + 2]; k++; }
       this.fieldCentre.set(sx / k, 0, sz / k);
-    } else this.fieldCentre = null;
+    } else { this.fieldCentre = null; this.bounds = null; }
     g.scene.add(this.group);
     this.fov0 = g.camera.fov;
   }
@@ -265,13 +309,14 @@ export class ReplayManager {
     const camLabel = { chase: t('Chase'), side: t('Side'), orbit: t('Orbit'), cinematic: t('Cinematic'), observer: t('Observer'), free: t('Free') };
     const el = document.createElement('div');
     el.className = 'replay-ui interactive';
-    el.innerHTML = `<div class="rp-top"><b>REPLAY</b> · ${c?.title ?? r.meta.id} · ${ac.type.reg} · #${this.n}</div>
+    el.innerHTML = `<div class="rp-top"><b>REPLAY</b> · ${c?.title ?? r.meta.id} · ${ac.type.reg}${this.n != null ? ` · #${this.n}` : ''}</div>
       <div class="rp-bar">
         <button class="rp-btn" data-a="play">❚❚</button>
         <input class="rp-seek" type="range" min="0" max="1000" value="0">
         <span class="rp-time">0:00</span>
         <div class="rp-speeds">${[0.5, 1, 2, 4].map((s) => `<button class="rp-btn ${s === 1 ? 'on' : ''}" data-speed="${s}">${s}×</button>`).join('')}</div>
         <div class="rp-cams">${REPLAY_CAMERAS.map((k, i) => `<button class="rp-btn ${k === 'chase' ? 'on' : ''}" data-cam="${k}" title="${i + 1}">${camLabel[k]}</button>`).join('')}</div>
+        <button class="rp-btn ${this.game.settings.replayTrail ? 'on' : ''}" data-a="trail" title="${t('Flight track and talhão outline')}">${t('Track')}</button>
         <button class="rp-btn rp-close" data-a="close">✕ ${t('Close')}</button>
       </div>`;
     el.addEventListener('click', (e) => {
@@ -279,6 +324,7 @@ export class ReplayManager {
       if (!d) return;
       if (d.a === 'close') this.close();
       else if (d.a === 'play') this.togglePause();
+      else if (d.a === 'trail') this.toggleTrail();
       else if (d.speed) this.setSpeed(Number(d.speed));
       else if (d.cam) this.setCamera(d.cam);
     });
@@ -289,6 +335,7 @@ export class ReplayManager {
       const k = e.code;
       if (k === 'Escape') this.close();
       else if (k === 'Space') this.togglePause();
+      else if (k === 'KeyT') this.toggleTrail();
       else if (/^Digit[1-6]$/.test(k)) this.setCamera(REPLAY_CAMERAS[Number(k.slice(5)) - 1]);
       else if (k === 'ArrowRight') this.t = Math.min(r.track.duration, this.t + 10);
       else if (k === 'ArrowLeft') this.t = Math.max(0, this.t - 10);
@@ -302,6 +349,13 @@ export class ReplayManager {
     this.uiTime = el.querySelector('.rp-time');
   }
 
+  // The flown track and the talhão outline drawn in the scene (off by default).
+  toggleTrail(on = !this.game.settings.replayTrail) {
+    this.game.setSetting('replayTrail', !!on);
+    if (this.trail) this.trail.visible = !!on;
+    if (this.bounds) this.bounds.visible = !!on;
+    this.ui?.querySelector('[data-a="trail"]')?.classList.toggle('on', !!on);
+  }
   togglePause() { this.paused = !this.paused; this.ui.querySelector('[data-a="play"]').textContent = this.paused ? '▶' : '❚❚'; }
   setSpeed(s) { this.speed = s; for (const b of this.ui.querySelectorAll('[data-speed]')) b.classList.toggle('on', Number(b.dataset.speed) === s); }
   setCamera(k) {

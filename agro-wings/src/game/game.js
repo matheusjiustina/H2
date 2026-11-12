@@ -65,7 +65,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, agcatLivery: 0, e201Livery: 0, at401Livery: 0, at802Livery: 0, fbLivery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, agcatLivery: 0, e201Livery: 0, at401Livery: 0, at802Livery: 0, fbLivery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, replayTrail: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
     try { const r = readSafe(SETTINGS); if (r.data && typeof r.data === 'object') Object.assign(this.settings, r.data); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -903,7 +903,7 @@ export class Game {
         if (input.wasPressed('jobs') && this.mode === 'career') this.screens.board();
         if (input.wasPressed('office') && this.mode === 'career') this.screens.office();
         if (input.wasPressed('help')) this.screens.help();
-        if (input.wasPressed('replay') && this.replay.latest() >= 0) { this.freeRoam?.forceBoard(); this.replay.play(this.replay.latest()); }
+        if (input.wasPressed('replay') && this.replay.lastAvailable()) { this.freeRoam?.forceBoard(); this.replay.playLast(); }
       }
     }
     const paused = (this.playing && (modal === 'pause' || modal === 'settings' || modal === 'help' || modal === 'office')) || this.replay.active;
@@ -1067,7 +1067,12 @@ export class Game {
 
   _autoResults() {
     if (!this.job || this.resultShown || !this.job.complete()) return;
-    if (this._atPadStopped() && !this.service.busy() && !this.screens.open) {
+    // Job done and the aircraft stopped on the ground with the engine cut:
+    // the result comes up wherever that is (the pad, the apron, the strip,
+    // the field edge) — not only at the loading zone.
+    const ac = this.aircraft, fm = ac.fm;
+    const parked = fm.out.onGround && fm.engine === 'off' && fm.out.groundSpeed < 0.3 && ac.state === 'ok' && !this._rotorTurning();
+    if ((parked || this._atPadStopped()) && !this.service.busy() && !this.screens.open) {
       this.resultShown = true;
       this.handIn();
     }
