@@ -4810,3 +4810,21 @@ camera within 30 m (kept to 34 m, no flicker); beyond that the canopy is a few
 pixels across and the interior is skipped. No extra geometry exists. The black
 panels on the AT-802 cowl top and the wing roots are its anti-glare panel and
 walkways (paint, as on the real aircraft). Test: `node test/cockpitview.mjs`.
+
+## Turboprop reverse (AT-502B, Thrush 510G, AT-802 / Fire Boss)
+Only the turboprops, only with a wheel on the ground (locked out in flight);
+pistons and radials unchanged.
+- **PC**: with the power at idle, tap Ctrl and press it again quickly (within
+  0.45 s) and hold — the lever runs behind the gate into reverse up to 100 %;
+  released, it stays where it is. Shift brings it back to idle first.
+- **Phone**: on the ground the power slider shows a REV range (the lowest
+  22 %, below a white idle mark); dragging into it reverses, deeper = more.
+- **Physics** (`flightModel.js`): behind the gate the lever schedules the gas
+  generator up again (to `reverseNg` of the forward range); reverse thrust ≈
+  42 % of the static thrust at that power (actuator disc). AT-502B from
+  28 m/s: roll 285 m in beta idle, 192 m in full reverse. Forward flight and
+  every other aircraft untouched (all 244 existing tests pass).
+- **Sound**: a deep, rough roar beating at the blade-pass rate plus a raspy
+  upper band and a louder, harsher prop buzz — the growl of a reversing PT6 —
+  rising with reverse and power. HUD reads *Reverso n %*.
+- Tests: `test/reverse.test.mjs` (in `npm test`), `node test/reverseflow.mjs`.

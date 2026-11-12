@@ -184,6 +184,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .touch.flying .tb.down, .touch.flying .tb.on { opacity: .9; }
 .t-thr { position: absolute; right: var(--edger); top: 66px; bottom: calc(var(--bot) + 90px); width: 34px; border-radius: 17px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.35); }
 .t-thr span { position: absolute; left: 3px; right: 3px; bottom: 3px; border-radius: 14px; background: rgba(242,179,27,.55); }
+/* Reverse range (turboprops on the ground): the lowest 22 % of the lever, below the idle mark. */
+.t-thr .rev-zone, .t-thr .rev-fill { display: none; position: absolute; left: 3px; right: 3px; bottom: 3px; }
+.t-thr.rev-ok .rev-zone { display: block; height: 22%; border-radius: 0 0 14px 14px; border-top: 2px solid rgba(255,255,255,.75); background: rgba(255,90,60,.16); }
+.t-thr.rev-ok .rev-zone b { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font: 700 9px/1 system-ui, sans-serif; color: rgba(255,255,255,.85); letter-spacing: .04em; }
+.t-thr.rev-ok .rev-fill { display: block; top: calc(78% - 3px); bottom: auto; border-radius: 0 0 14px 14px; background: rgba(255,90,60,.6); }
+.t-thr.rev-ok span { bottom: calc(22% + 3px); }
 .t-btns { position: absolute; right: calc(var(--edger) + 44px); bottom: calc(var(--bot) + 90px); display: flex; flex-direction: column; gap: 8px; }
 .t-btns .tb { width: 46px; height: 46px; font-size: 10px; }
 .t-btns .tb.small { height: 36px; border-radius: 18px; width: 46px; }
@@ -521,3 +527,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .on-foot .readouts, .on-foot .spraybadge, .on-foot .trimbadge, .on-foot .warnings, .on-foot .levels { display: none !important; }
 .touch.on-foot .t-btns, .touch.on-foot .t-thr, .touch.on-foot .t-rud, .touch.on-foot .t-flaps, .touch.on-foot .t-trim, .touch.on-foot .t-dpad, .touch.on-foot .t-tilt, .touch.on-foot .t-fb, .touch.on-foot .t-look, .touch.on-foot .t-strip, .touch.on-foot .cam { display: none !important; }
 .touch.on-foot .t-stick { display: block !important; width: 116px; height: 116px; border-radius: 50%; background: rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.35); }
+
+/* Turboprop reverse: the power readout turns amber and reads Reverse. */
+.ro.r-pwr.rev .v { color: #ffb347; }

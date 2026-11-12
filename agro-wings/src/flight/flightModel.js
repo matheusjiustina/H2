@@ -45,6 +45,8 @@ export class FlightModel {
     this.engine = 'off'; this.crankTime = 0; this.rpm = 0; this.roughness = 0;
     // Turboprop state (gas-generator %, ITT °C, torque ft·lb, fuel flow L/h).
     this.ng = 0; this.itt = 30; this.torque = 0; this.fuelFlow = 0; this.shaftPower = 0; this.beta = false;
+    // Turboprop reverse: power lever behind the idle gate (0..1), on the ground only.
+    this.reverse = 0;
     // Radial piston state (manifold pressure inHg, cylinder head and oil °C, oil psi).
     this.mp = A.radial?.mpAmbient ?? 0; this.cht = 30; this.oilT = 30; this.oilP = 0;
     this.fuel = A.fuelCapacity * 0.6;
@@ -92,6 +94,7 @@ export class FlightModel {
     this.elevator = this.aileron = this.rudder = 0;
     this.trim = speed > 0 ? 0.12 : 0;
     this.throttle = engineOn ? 0.62 : 0;
+    this.reverse = 0;
     this.flaps = this.flapsCmd = flaps;
     this.engine = engineOn ? 'running' : 'off';
     this.rpm = engineOn ? 2200 : 0;
@@ -527,7 +530,10 @@ export class FlightModel {
       if (!fuelOn && this.crankTime > T.lightoff + 1) this.engine = 'off';
     } else if (this.engine === 'running') {
       fuelOn = true;
-      ngT = T.idleNg + (T.maxNg - T.idleNg) * Math.pow(this.throttle, 0.7);
+      // Behind the gate the lever schedules the gas generator up again (reverse
+      // power), to T.reverseNg of the forward range at full reverse.
+      const lev = this.reverse > 0 ? this.reverse * (T.reverseNg ?? 0.8) : this.throttle;
+      ngT = T.idleNg + (T.maxNg - T.idleNg) * Math.pow(lev, 0.7);
       tau = 0.9;
       lim = ngT > this.ng ? T.accel : T.decel;
     }
@@ -539,7 +545,9 @@ export class FlightModel {
     if (fuelOn) frac = this.ng >= T.idleNg - 1 ? T.idleFrac + (1 - T.idleFrac) * x ** 1.5 : T.idleFrac * smoothstep(25, T.idleNg, this.ng);
     frac *= Math.min(1, sigma / T.flatSigma) * (1 - this.roughness * 0.4);
     this.shaftPower = frac * A.maxPower;
-    this.beta = this.engine === 'running' && this.throttle < 0.04 && this.out.onGround;
+    // Reverse only with a wheel on the ground (the lever is locked out in flight).
+    if (!(this.out.wheelsOnGround > 0 || this.out.onGround)) this.reverse = 0;
+    this.beta = this.engine === 'running' && (this.throttle < 0.04 || this.reverse > 0) && this.out.onGround;
 
     // Prop rpm: governed, on the fine stop, windmilling or running down.
     const gov = Math.sqrt(clamp((frac - T.idleFrac) / (T.govFrac - T.idleFrac), 0, 1));
@@ -659,6 +667,13 @@ export class FlightModel {
     const fine = 1 - smoothstep(T.idleFrac * 2, T.govFrac * 0.6, this.shaftPower / A.maxPower);
     t -= 0.5 * rho * u * u * disc * T.discDrag * fine * (this.rpm > 50 || !this.out.onGround ? 1 : 0);
     if (this.beta) t = -T.betaDrag * smoothstep(1.5, 12, u);
+    // Reverse: the blades at negative pitch push the slipstream forward. Static
+    // reverse thrust of a constant-speed turboprop ≈ 40–45 % of its forward
+    // static thrust at the same power (actuator disc, T = ∛(2ρA(ηP)²)).
+    if (this.reverse > 0 && this.engine === 'running' && P > 1) {
+      const ts = Math.cbrt(2 * rho * disc * (T.etaStatic * P) ** 2);
+      t = Math.min(t, -(T.betaDrag * smoothstep(1.5, 12, u) * (1 - this.reverse)) - (T.reverseEff ?? 0.42) * ts);
+    }
     return t;
   }
 

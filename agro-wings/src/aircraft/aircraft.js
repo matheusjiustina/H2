@@ -253,10 +253,34 @@ export class Aircraft {
     }
     // Throttle
     let thr = fm.throttle;
-    if (input.isDown('throttleUp')) thr += dt * 0.55;
-    if (input.isDown('throttleDown')) thr -= dt * 0.55;
+    // Turboprop reverse (PC): at idle, tap Ctrl and press it again quickly —
+    // held, the lever runs back into reverse up to 100 %; released, it stays.
+    // Power up brings it back out of reverse to idle first. Only with a wheel
+    // on the ground (reverseOk); never for piston or radial engines.
+    const revType = !!this.A.turbine;
+    const revOk = revType && fm.engine === 'running' && (fm.out.wheelsOnGround > 0 || fm.out.onGround);
+    this.reverseOk = revOk;
+    const lp = revType ? input.lastPresses('throttleDown') : null;
+    if (lp && lp[2] !== this._ctrlSeen) {
+      // A new press since the last frame: the second of two within 450 ms at idle arms reverse.
+      if (this._ctrlSeen !== undefined && revOk && fm.throttle <= 0.01 && lp[0] - lp[1] < 450) this.revArmed = true;
+      this._ctrlSeen = lp[2];
+    }
+    if (!revOk) { this.revArmed = false; fm.reverse = 0; }
+    if (fm.reverse > 0 || this.revArmed) {
+      let r = fm.reverse;
+      if (this.revArmed && input.isDown('throttleDown')) r += dt * 0.6;
+      if (input.isDown('throttleUp')) r -= dt * 0.9;
+      fm.reverse = clamp(r, 0, 1);
+      if (fm.reverse <= 0 && !input.isDown('throttleDown')) this.revArmed = false;
+      thr = 0;
+    } else {
+      if (input.isDown('throttleUp')) thr += dt * 0.55;
+      if (input.isDown('throttleDown')) thr -= dt * 0.55;
+    }
     if (gp) thr += (gp.throttleUp - gp.throttleDown) * dt * 0.6;
-    if (v.throttle !== null && v.throttle !== undefined) thr = v.throttle;
+    // Touch lever: its reverse range (below the idle mark) is v.reverse.
+    if (v.throttle !== null && v.throttle !== undefined) { thr = v.throttle; fm.reverse = revOk ? clamp(v.reverse ?? 0, 0, 1) : 0; if (fm.reverse > 0) thr = 0; }
     fm.throttle = clamp(thr, 0, 1);
     // Flaps
     const notch = FLAP_NOTCHES.reduce((b, n) => (Math.abs(n - fm.flapsCmd) < Math.abs(b - fm.flapsCmd) ? n : b), 0);
@@ -594,7 +618,7 @@ export class Aircraft {
     m.stick.rotation.z = fm.aileron * 0.25;
     m.pedals[0].position.z = an.pedalZ - fm.rudder * 0.05;
     m.pedals[1].position.z = an.pedalZ + fm.rudder * 0.05;
-    m.throttle.rotation.x = -0.5 + fm.throttle * 0.95;
+    m.throttle.rotation.x = -0.5 + fm.throttle * 0.95 - (fm.reverse ?? 0) * 0.35; // behind the gate in reverse
     const spraying = this.game.sprayer?.on;
     this._pilotHead(dt, spraying);
     m.valve.rotation.x = spraying || this.water?.dropping ? 0.6 : -0.3;
@@ -617,7 +641,7 @@ export class Aircraft {
       ias, altFt: (fm.pos.y + UNITS.altOffsetM) * FT, rpm: fm.rpm,
       fuel: fm.fuel, fuelCap: this.A.fuelCapacity, hopper: fm.hopper, hopperCap: this.A.hopperCapacity,
       ...this.type.vspeeds,
-      ng: fm.ng, itt: fm.itt, torque: fm.torque, fuelFlow: fm.fuelFlow, throttle: fm.throttle, beta: fm.beta,
+      ng: fm.ng, itt: fm.itt, torque: fm.torque, fuelFlow: fm.fuelFlow, throttle: fm.throttle, beta: fm.beta, reverse: fm.reverse,
       mp: fm.mp, cht: fm.cht, oilT: fm.oilT, oilP: fm.oilP,
       gLoad: o.gLoad, slip: o.beta, yawRate: -fm.omega.y, onGround: o.onGround, reg: this.type.reg,
       stall: o.stall, spray: !!this.game.sprayer?.on, brake: fm.brake > 0.3 || fm.parkBrake,
@@ -689,7 +713,7 @@ export class Aircraft {
     return {
       ias: o.airspeed * KT * Math.sqrt(o.density / 1.225), gs: o.groundSpeed * KT,
       hgt: this.workHeight(), agl: o.agl, altFt: (fm.pos.y + UNITS.altOffsetM) * FT,
-      power: fm.throttle, rpm: fm.rpm, fuel: fm.fuel, hopper: fm.hopper, engine: fm.engine,
+      power: fm.throttle, reverse: fm.reverse, reverseOk: !!this.reverseOk, rpm: fm.rpm, fuel: fm.fuel, hopper: fm.hopper, engine: fm.engine,
       fuelCap: this.A.fuelCapacity, hopperCap: this.A.hopperCapacity, ng: fm.ng, itt: fm.itt, torque: fm.torque, mp: fm.mp,
       stall: o.stall, onGround: o.onGround, flaps: fm.flaps, brake: fm.brake, parkBrake: fm.parkBrake,
       vs: o.vs, damage: this.damage, mass: fm.mass, hdg: this.headingDeg(), state: this.state, g: o.gLoad,

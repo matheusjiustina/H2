@@ -1231,7 +1231,7 @@ export class Game {
       onGround: o.onGround, surface: o.surface, stall: this.playing ? Math.max(o.stall, o.stallWarn) : 0, spraying: this.sprayer.on && this.sprayer.flowNow > 0,
       inside: this.cameraMode === 'cockpit' && this.playing, attached: this.cameraMode !== 'orbit', listenerDist: this.cameraMode === 'cockpit' ? 0 : Math.max(0, camD - 12),
       rough: ac.damage > 55, pumpOn: this.service.pumpOn, serviceAtt: 1 / (1 + svcD / 15),
-      profile: ac.type.audio.profile, blades: ac.type.audio.blades, propGear: ac.type.audio.propGear ?? 1, ng: fm.ng, power: ac.A.turbine || ac.A.radial ? fm.shaftPower / ac.A.maxPower : fm.throttle, itt: fm.itt,
+      profile: ac.type.audio.profile, blades: ac.type.audio.blades, propGear: ac.type.audio.propGear ?? 1, ng: fm.ng, power: ac.A.turbine || ac.A.radial ? fm.shaftPower / ac.A.maxPower : fm.throttle, reverse: fm.reverse ?? 0, itt: fm.itt,
       rotorPct: fm.out.rotorPct ?? 0, rotorRpm: fm.rotorRpm ?? 0, tailGear: ac.A.tailRotor?.gear ?? 0, vs: o.vs, collective: fm.collective ?? 0, vrs: o.vrs ?? 0,
       ambience: (1 - smoothstep(150, 700, baseD)) * (this.camera.position.y < 80 ? 1 : 0.3),
       weather: this.world.atmo.audioLevels(),

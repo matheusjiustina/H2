@@ -147,7 +147,7 @@ export class Input {
       }
       if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace', 'PageUp', 'PageDown'].includes(e.code) || e.code.startsWith('Numpad')) e.preventDefault();
-      if (!this.down.has(e.code)) this.pressed.add(e.code);
+      if (!this.down.has(e.code)) { this.pressed.add(e.code); this.pressCount = (this.pressCount ?? 0) + 1; (this.pressAt ??= {})[e.code] = [performance.now(), this.pressAt?.[e.code]?.[0] ?? -1e9, this.pressCount]; }
       this.down.add(e.code);
     });
     window.addEventListener('keyup', (e) => {
@@ -276,6 +276,13 @@ export class Input {
 
   isDown(a) { return this.enabled && this.keysOf(a).some((c) => keyHeld(c, this.down, this.chords)); }
   wasPressed(a) { return this.enabled && this.keysOf(a).some((c) => keyPressed(c, this.pressed, this.down, this.chords)); }
+  // The last two press times (ms) of an action's keys and a running press id,
+  // taken from the key events themselves (a tap shorter than one frame counts).
+  lastPresses(a) {
+    let best = null;
+    for (const c of this.keysOf(a)) { const p = this.pressAt?.[c]; if (p && (!best || p[0] > best[0])) best = p; }
+    return best;
+  }
   wasReleased(a) { return this.keysOf(a).some((c) => this.released.has(c)); }
   press(code) { if (!this.down.has(code)) this.pressed.add(code); this.down.add(code); }
   release(code) { this.down.delete(code); this.released.add(code); }

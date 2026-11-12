@@ -225,6 +225,8 @@ export default {
   'Climb': 'Subida',
   'Rotor': 'Rotor',
   'Power': 'Potência',
+  'Reverse': 'Reverso',
+  'REV': 'REV',
   'Power · hover {0}': 'Potência · pairar {0}',
   'Skip tutorial': 'Pular tutorial',
   'GPS guidance shows passes once a job is active.': 'A orientação GPS mostra os tiros quando há um serviço ativo.',

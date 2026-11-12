@@ -136,6 +136,22 @@ export class GameAudio {
     this.tRoarBP = ctx.createBiquadFilter(); this.tRoarBP.type = 'bandpass'; this.tRoarBP.Q.value = 0.6;
     this.tRoarGain = ctx.createGain(); this.tRoarGain.gain.value = 0;
     this.tRoar.connect(this.tRoarBP).connect(this.tRoarGain).connect(this.acBus);
+    // Turboprop reverse: the blades at negative pitch churn the air against
+    // the slipstream — a deep, rough roar that swells far above the forward
+    // sound at the same power, beating at the blade-pass rate (the "growl"
+    // heard on the ground behind a reversing PT6), with a raspy upper band.
+    this.revRoar = this._noise(this.brown);
+    this.revLP = ctx.createBiquadFilter(); this.revLP.type = 'bandpass'; this.revLP.frequency.value = 220; this.revLP.Q.value = 0.45;
+    this.revAM = ctx.createGain(); this.revAM.gain.value = 0.7;
+    this.revGain = ctx.createGain(); this.revGain.gain.value = 0;
+    this.revRoar.connect(this.revLP).connect(this.revAM).connect(this.revGain).connect(this.acBus);
+    this.revRasp = this._noise(this.pink);
+    this.revRaspBP = ctx.createBiquadFilter(); this.revRaspBP.type = 'bandpass'; this.revRaspBP.frequency.value = 900; this.revRaspBP.Q.value = 0.7;
+    this.revRaspGain = ctx.createGain(); this.revRaspGain.gain.value = 0;
+    this.revRasp.connect(this.revRaspBP).connect(this.revRaspGain).connect(this.acBus);
+    this.revBeat = ctx.createOscillator(); this.revBeat.type = 'sine'; this.revBeat.frequency.value = 60;
+    this.revBeatDepth = ctx.createGain(); this.revBeatDepth.gain.value = 0;
+    this.revBeat.connect(this.revBeatDepth).connect(this.revAM.gain);
     // Helicopter rotor: one pulse-train modulator at the main-rotor blade
     // passage frequency drives a mid band (blade "chop"/slap) and a low band
     // ("whop"); tail rotor buzz; gearbox whine.
@@ -259,7 +275,7 @@ export class GameAudio {
     // The Ipanema's own layered engine (src/audio/ipanemaEngine.js), on the
     // same context; silent unless the Ipanema is flown.
     this.ipa = new IpanemaEngineSound(ctx, this.master, { white: this.white, pink: this.pink, brown: this.brown });
-    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum, this.truckOsc, this.truckSub, this.tracOsc, this.hMod, this.hTail, this.hWhine, this.lope, this.lope2]) o.start();
+    for (const o of [this.eng, this.engSub, this.clatMod, this.prop, this.starter, this.horn, this.pump, cicMod, this.tWhine, this.tWhine2, this.tHum, this.truckOsc, this.truckSub, this.tracOsc, this.hMod, this.hTail, this.hWhine, this.lope, this.lope2, this.revBeat]) o.start();
     this.birdT = 2;
     this.cicT = 0;
     this.cicOn = false;
@@ -338,12 +354,21 @@ export class GameAudio {
     this.tHumGain.gain.setTargetAtTime(turbo ? on * (0.05 + 0.04 * load) * att * (s.rough ? 0.8 + Math.random() * 0.4 : 1) : 0, t, k);
     this.tRoarBP.frequency.setTargetAtTime((h80 ? 460 : 380) + load * (h80 ? 1050 : 900), t, 0.1);
     this.tRoarGain.gain.setTargetAtTime(turbo ? on * (0.03 + 0.2 * load) * att * (c20 ? 0.55 : 1) : 0, t, k);
+    // Reverse (turboprop airplanes on the ground): the prop roar takes over.
+    const rv = turbo && !heli ? clamp(s.reverse ?? 0, 0, 1) : 0;
+    const rvL = rv > 0 ? smoothstep(0, 0.35, rv) * (0.45 + 0.55 * load) : 0;
+    this.revLP.frequency.setTargetAtTime(170 + 260 * rv + 120 * load, t, 0.1);
+    this.revGain.gain.setTargetAtTime(on * rvL * (s.inside ? 0.32 : 0.55) * att, t, 0.12);
+    this.revRaspBP.frequency.setTargetAtTime(700 + 600 * rv, t, 0.1);
+    this.revRaspGain.gain.setTargetAtTime(on * rvL * (s.inside ? 0.05 : 0.11) * att, t, 0.12);
     const bpf = Math.max(1, ((rpm * (s.propGear ?? 1)) / 60) * (turbo || radial ? s.blades ?? 3 : 2));
     this.prop.frequency.setTargetAtTime(bpf, t, 0.04);
     this.propBP.frequency.setTargetAtTime(bpf * 3, t, 0.05);
     const pr = turbo ? smoothstep(250, 2200, rpm) : smoothstep(300, 2700, rpm);
     // A turboprop's prop gets much louder as the governor loads the blades.
-    const pl = turbo ? 0.35 + 1.1 * load : 0.6 + 0.6 * load;
+    const pl = (turbo ? 0.35 + 1.1 * load : 0.6 + 0.6 * load) * (1 + 1.4 * rv); // the blades in reverse are far louder
+    this.revBeat.frequency.setTargetAtTime(Math.max(5, ((rpm * (s.propGear ?? 1)) / 60) * (s.blades ?? 3)), t, 0.05);
+    this.revBeatDepth.gain.setTargetAtTime(rv > 0 ? 0.35 : 0, t, 0.1);
     this.propGain.gain.setTargetAtTime(heli || ipa ? 0 : pr * (s.inside ? 0.04 : 0.12) * att * pl, t, k);
     this.propNBP.frequency.setTargetAtTime(150 + rpm * 0.25, t, 0.1);
     this.propNGain.gain.setTargetAtTime(heli || ipa ? 0 : pr * pr * (s.inside ? 0.08 : 0.2) * att * (turbo ? 0.6 + 0.8 * load : 1), t, k);

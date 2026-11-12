@@ -152,9 +152,11 @@ export class HUD {
       $.gl.querySelector('.v').firstChild.nodeValue = tm.onGround ? '1.0' : this.gs.toFixed(1);
       $.gl.className = 'ro r-g' + (tm.onGround || Math.abs(this.gs - 1) < 0.25 ? ' dim' : this.gs > 3.3 ? ' bad' : this.gs > 2.2 ? ' warn' : '');
     }
-    $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.power * 100));
+    const rev = tm.reverse > 0;
+    $.pwr.querySelector('.v').firstChild.nodeValue = String(Math.round((rev ? tm.reverse : tm.power) * 100));
+    $.pwr.classList.toggle('rev', rev);
     // Power model: the power that hovers here, next to the label.
-    const pl = pm && tm.engine === 'running' ? t('Power · hover {0}', Math.round(tm.hoverPower * 100)) : t('Power');
+    const pl = rev ? t('Reverse') : pm && tm.engine === 'running' ? t('Power · hover {0}', Math.round(tm.hoverPower * 100)) : t('Power');
     if (pl !== this._pwrL) { $.pwr.querySelector('.l').textContent = pl; this._pwrL = pl; }
     $.fuel.querySelector('.v').firstChild.nodeValue = String(Math.round(tm.fuel));
     $.fuel.querySelector('.bar span').style.width = `${(tm.fuel / tm.fuelCap) * 100}%`;
