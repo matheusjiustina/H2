@@ -5,7 +5,7 @@
 // (HeliAssist), events and visuals. The fixed-wing Aircraft and FlightModel
 // are not used or modified by it.
 import * as THREE from 'three';
-import { buildCabinProxy } from './cabinProxy.js';
+import { updateCabin } from './cockpitView.js';
 import { HeliModel, hoverPowerFrac } from '../flight/heliModel.js';
 import { HeliAssist } from '../flight/heliAssist.js';
 import { heliAid } from '../flight/pilotAid.js';
@@ -431,9 +431,7 @@ export class Helicopter {
 
   _animate(dt) {
     const m = this.model, fm = this.fm;
-    // Cabin stand-in (cabinProxy.js): shown whenever the detailed cockpit is not.
-    if (m.cabinProxy === undefined && m.cockpit?.children.length) m.cabinProxy = buildCabinProxy(m.root, m.cockpit, m.pilot) ?? null; // (per model: a rebuilt model gets its own)
-    if (m.cabinProxy) m.cabinProxy.visible = !m.cockpit.visible;
+    updateCabin(this); // interior drawn near / from the cockpit only (cockpitView.js)
     if (this.state === 'crashed') {
       this.crashT = (this.crashT ?? 0) + dt;
       const k = Math.exp(-this.crashT * 1.5);

@@ -2,7 +2,7 @@
 // ahead and ride smoothly through turns), cockpit with engine/terrain
 // vibration and head look, and a free external orbit camera.
 import * as THREE from 'three';
-import { cabinFull } from './cabinProxy.js';
+import { cabinFull } from './cockpitView.js';
 import { clamp, damp, smoothstep } from '../core/math.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
@@ -52,7 +52,7 @@ export class CameraRig {
     const vib = ac.type?.anim.vib ?? [1500, 2700];
     ac.model.pilot.visible = this.mode !== 'cockpit';
     // The detailed cockpit only from the cockpit view or close by (the
-    // cabin proxy stands in beyond — see cabinProxy.js).
+    // interior is not drawn beyond — see cockpitView.js).
     ac._ckFull = cabinFull(this.mode === 'cockpit', cam.position.distanceTo(pos), ac._ckFull);
     ac.model.cockpit.visible = ac._ckFull;
     const dragLook = mouse.buttons & 1;

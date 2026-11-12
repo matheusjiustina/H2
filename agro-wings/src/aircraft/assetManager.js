@@ -16,7 +16,6 @@
 // Nothing here changes a model, a physics value or an access rule: premium /
 // locked aircraft stay visible exactly as they were. Sources stay in memory.
 import * as THREE from 'three';
-import { buildCabinProxy } from './cabinProxy.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { memoryTier, PARKED_PAINT, aircraftTextures, releaseCanvas, shrinkCanvas, rebuildModel } from './aircraftMemory.js';
 
@@ -85,8 +84,6 @@ export class AircraftAssets {
     if (scale >= 1) this.releaseAfterUpload(id);
     // Cockpit and pilot meshes: hidden while parked, built again with the
     // whole aircraft when it is selected — their geometry is let go now.
-    // The cabin stand-in outlives the cockpit it is measured from.
-    if (ac.model.cabinProxy === undefined && ac.model.cockpit?.children.length) ac.model.cabinProxy = buildCabinProxy(ac.model.root, ac.model.cockpit, ac.model.pilot) ?? null;
     for (const sub of [ac.model.cockpit, ac.model.pilot]) {
       if (!sub?.isObject3D || !sub.children.length) continue;
       sub.traverse((o) => o.geometry?.dispose());

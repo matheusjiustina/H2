@@ -1285,7 +1285,7 @@ export function createAT802Model(panel, opts = {}) {
   const update = (dt, fm, ac) => {
     t += dt;
     // The interior is drawn only from the cockpit or a close camera: the camera
-    // rig switches the wrapper (cabinProxy.js stands in beyond).
+    // rig switches the wrapper (cockpitView.js).
     if (cockpitWrap.visible) ck.update(dt, fm, ac);
     const o = fm.out;
     let target;
