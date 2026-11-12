@@ -3,7 +3,10 @@
 // farms, strips, talhões, the destination), DESTINO (bearing, distance, ETE,
 // a course arrow), MISSÃO (the job: farm, crop, area, coverage, passes,
 // liquid, fuel) and COBERTURA (the talhão with the passes and the coverage
-// the game has recorded). It draws the game's own guidance and job data
+// the game has recorded). The unit follows the work like a real one: it
+// opens on COBERTURA when the aircraft is on the job (passes, coverage, track,
+// cross-track) and on MAPA when ferrying, free flying or returning; a key
+// press keeps its page until the situation changes. It draws the game's own guidance and job data
 // (game.guidance, the active job); nothing is loaded from outside and it
 // keeps no state of its own beyond the page shown. Each cockpit mounts the
 // screen texture in its own housing.
@@ -49,7 +52,7 @@ function drawGpsDest(g, d) {
   const ete = dist / gsMs;
   const etes = d.gs > 5 ? `${Math.floor(ete / 60)}:${String(Math.floor(ete % 60)).padStart(2, '0')}` : '--:--';
   text(g, nav.name, W / 2, 52, 22, '#ffd23a');
-  text(g, nav.kind === 'strip' ? 'PISTA DA FAZENDA' : nav.kind === 'field' ? 'TALHÕES DO CONTRATO' : nav.label ?? 'BASE (SEM CONTRATO)', W / 2, 74, 11, '#6f90a8');
+  text(g, nav.label ?? (nav.kind === 'strip' ? 'PISTA DA FAZENDA' : nav.kind === 'field' ? 'TALHÕES DO CONTRATO' : nav.kind === 'fire' ? 'FOCO DE INCÊNDIO MAIS PRÓXIMO' : 'BASE (SEM CONTRATO)'), W / 2, 74, 11, '#6f90a8');
   box(14, 92, 150, 64, 'DIST', `${(dist / NM).toFixed(1)} NM`);
   box(14, 166, 150, 64, 'RUMO (BRG)', `${String(Math.round(brg) % 360).padStart(3, '0')}°`);
   box(14, 240, 150, 64, 'ETE', etes);
@@ -70,9 +73,34 @@ function drawGpsDest(g, d) {
   g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(cx, cy - 12); g.lineTo(cx - 9, cy + 10); g.lineTo(cx + 9, cy + 10); g.closePath(); g.fill();
   text(g, `PROA ${String(Math.round(d.hdg) % 360).padStart(3, '0')}°   GS ${Math.round(d.gs ?? 0)} KT`, cx, H - 16, 12, '#a9c4d8');
 }
+// Fire Boss: the accepted fire order — spots out, the nearest one, the load.
+function drawGpsFire(g, d) {
+  const { W, H } = NAV, f = d.fire;
+  text(g, f.title, W / 2, 50, 17, '#ffb35c');
+  text(g, 'ORDEM DE COMBATE A INCÊNDIO', W / 2, 72, 12, '#6f90a8');
+  const near = f.near;
+  const mm = Math.floor(f.mins), ss = Math.floor((f.mins - mm) * 60);
+  const rows = [
+    ['FOCOS APAGADOS', `${f.out} / ${f.total}`], ['TEMPO', `${mm}:${String(ss).padStart(2, '0')}`],
+    ['MAIS PRÓXIMO', near ? `F${near.fire.id} · ${(near.dist / 1000).toFixed(1)} km` : '—'], ['RUMO', near ? `${String(Math.round(near.bearing) % 360).padStart(3, '0')}°` : '—'],
+    ['ÁGUA', `${Math.round(d.hopper)} L`], ['COMBUSTÍVEL', `${Math.round(d.fuel)} L`],
+  ];
+  rows.forEach(([k, v], i) => {
+    const x = 20 + (i % 2) * 245, y = 96 + Math.floor(i / 2) * 50;
+    g.fillStyle = '#0d1d2e'; roundRect(g, x, y, 228, 42, 6); g.fill();
+    text(g, k, x + 14, y + 21, 11, '#6f90a8', true, 'left');
+    text(g, v, x + 214, y + 21, 17, '#eef6ff', true, 'right');
+  });
+  const y = 258, x0 = 20, w = W - 40, k = f.total ? f.out / f.total : 0;
+  text(g, `FOCOS APAGADOS ${Math.round(k * 100)} %  ·  BÔNUS ATÉ ${f.bonusMin} MIN`, W / 2, y, 13, '#a9c4d8');
+  g.fillStyle = '#0d1d2e'; roundRect(g, x0, y + 14, w, 22, 5); g.fill();
+  g.fillStyle = k >= 1 ? '#6cf5a0' : '#ff9a3a'; roundRect(g, x0, y + 14, Math.max(6, w * clamp(k, 0, 1)), 22, 5); g.fill();
+  text(g, k >= 1 ? 'INCÊNDIO CONTROLADO' : f.mins > f.bonusMin ? 'BÔNUS DE TEMPO ESGOTADO' : 'ACOMPANHE O FOCO PELO MAPA / DESTINO', W / 2, H - 16, 12, k >= 1 ? '#6cf5a0' : '#6f90a8');
+}
 function drawGpsMission(g, d) {
   const { W, H } = NAV;
   const m = d.mission;
+  if (!m && d.fire) return drawGpsFire(g, d);
   if (!m) {
     text(g, 'SEM MISSÃO ATIVA', W / 2, H / 2 - 10, 20, '#a9c4d8');
     text(g, 'Voo livre — sem contrato aceito.', W / 2, H / 2 + 20, 13, '#6f90a8');
@@ -104,7 +132,7 @@ function drawGpsMission(g, d) {
 export function createAgroNav({ home }) {
   const c = canvas(NAV.W, NAV.H);
   const nav = { c, g: c.getContext('2d'), tex: canvasTexture(c, { aniso: 4 }), key: '', page: 'map' };
-  let t = 0, missionT = 0, mission = null;
+  let t = 0, missionT = 0, mission = null, lastSit = null;
   nav.setPage = (p) => { if (NAV_PAGES.includes(p)) { nav.page = p; nav.key = ''; t = 0; } };
   nav.nextPage = () => nav.setPage(NAV_PAGES[(NAV_PAGES.indexOf(nav.page) + 1) % NAV_PAGES.length]);
   // d: the aircraft's instruments() (d.gps = the game's Guidance); at most
@@ -126,14 +154,28 @@ export function createAgroNav({ home }) {
     } else if (!job) mission = null;
     const pos = d.pos;
     // Destination: the ferry target, else the job's talhões, else home.
-    let dest = guide?.navTarget?.() ?? null;
+    const ferryT = guide?.navTarget?.() ?? null; // the game's own target: ferry, way home, fire
+    let dest = ferryT;
     if (!dest && job) {
       const fs = job.fields;
       dest = { x: (Math.min(...fs.map((f) => f.x0)) + Math.max(...fs.map((f) => f.x1))) / 2, z: (Math.min(...fs.map((f) => f.z0)) + Math.max(...fs.map((f) => f.z1))) / 2, name: fs.map((f) => f.name).join('+'), kind: 'field' };
     } else if (!dest) dest = { ...home, kind: 'base' };
+    // The unit follows the work: on the job -> COBERTURA; ferrying (a target
+    // far off, a farm strip, the way home, a fire) or free flight -> MAPA.
+    // Sticky near the 1.6 km ferry limit so the page does not flap.
+    const fj = d.gps?.game?.fireJobs;
+    const fireOrder = !job && fj?.active && fj.job ? fj : null;
+    const toField = ferryT?.kind === 'field' ? Math.hypot(ferryT.x - pos.x, ferryT.z - pos.z) : 0;
+    const sit = job ? (ferryT?.kind === 'strip' || (ferryT?.kind === 'field' && !(lastSit === 'work' && toField < 2200)) ? 'ferry' : 'work') : fireOrder ? 'fire' : 'free';
+    if (sit !== lastSit) { lastSit = sit; nav.page = sit === 'work' ? 'cov' : nav.page === 'cov' ? 'map' : nav.page; nav.key = ''; if (sit === 'fire') nav.page = 'map'; }
+    let fire = null;
+    if (fireOrder) {
+      const sp = fireOrder.spots();
+      fire = { title: fireOrder.job.def.title, total: sp.length, out: sp.filter((x) => x.state === 'out').length, near: fireOrder.nearest(pos), mins: Math.max(0, (d.gps.game.time - fireOrder.job.t0) / 60), bonusMin: fireOrder.job.def.bonusMin };
+    }
     const page = nav.page;
     const key = !master ? 'off'
-      : page === 'mission' ? `m|${mission ? `${mission.passesDone}|${Math.round(mission.coverage * 1000)}|${mission.sorties}` : '-'}|${Math.round(d.hopper)}|${Math.round(d.fuel)}|${d.spray}`
+      : page === 'mission' ? `m|${mission ? `${mission.passesDone}|${Math.round(mission.coverage * 1000)}|${mission.sorties}` : '-'}|${fire ? `${fire.out}|${Math.round((fire.near?.dist ?? 0) / 25)}|${Math.floor(fire.mins * 6)}` : '-'}|${Math.round(d.hopper)}|${Math.round(d.fuel)}|${d.spray}`
         : page === 'dest' ? `d|${dest.name}|${Math.round(dest.x)}|${Math.round(dest.z)}|${Math.round(pos.x / 5)}|${Math.round(pos.z / 5)}|${Math.round(d.hdg)}|${Math.round(d.gs ?? 0)}`
           : `${page}|${Math.round(pos.x)}|${Math.round(pos.z)}|${Math.round(d.hdg)}|${guide?.trackHead}|${guide?.next?.k ?? '-'}|${Math.round((guide?.xte ?? 0) * 2)}|${Math.round(d.fuel)}|${Math.round(d.hopper)}|${d.spray}`;
     if (key === nav.key) return;
@@ -145,7 +187,7 @@ export function createAgroNav({ home }) {
     g.translate(0, 30);
     if (page === 'map' || page === 'cov') guide?.draw(g, 0, 0, W, H - 30, { page: page === 'map' ? 'map' : 'cov' });
     else if (page === 'dest') drawGpsDest(g, { ...d, nav: dest, pos });
-    else drawGpsMission(g, { ...d, mission });
+    else drawGpsMission(g, { ...d, mission, fire });
     g.restore();
     if (page === 'cov' && !job) text(g, 'SEM TALHÃO ATIVO — MAPA', W / 2, H - 14, 12, '#6f90a8');
     nav.tex.needsUpdate = true;

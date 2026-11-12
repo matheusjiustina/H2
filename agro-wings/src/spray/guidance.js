@@ -57,7 +57,17 @@ export class Guidance {
     const sp = (a1 - a0) / n;
     for (let k = 0; k < n; k++) {
       const c = a0 + sp * (k + 0.5);
-      this.passes.push({ k, c, c0: c - sp / 2, c1: c + sp / 2, done: 0 });
+      const c0 = c - sp / 2, c1 = c + sp / 2;
+      // The pass runs where the talhões are: the stepped bands of an
+      // irregular plot do not all reach as far as the union's extent.
+      let e0 = 1e9, e1 = -1e9;
+      for (const f of fs) {
+        const lo = axis === 'x' ? f.z0 : f.x0, hi = axis === 'x' ? f.z1 : f.x1;
+        if (Math.min(hi, c1) - Math.max(lo, c0) < 1) continue;
+        e0 = Math.min(e0, axis === 'x' ? f.x0 : f.z0); e1 = Math.max(e1, axis === 'x' ? f.x1 : f.z1);
+      }
+      if (e0 > e1) { e0 = l0; e1 = l1; }
+      this.passes.push({ k, c, c0, c1, done: 0, e0, e1 });
     }
     // Terrain under the job (real heights): shading for the GPS page and the
     // elevation range of the talhões.
@@ -143,7 +153,18 @@ export class Guidance {
   // job's farm strip (ferry), the job's talhões, or nothing.
   navTarget() {
     const ac = this.game.aircraft, p = ac.fm.pos;
-    if (!this.job) return null;
+    // Fire Boss with an accepted fire order: the nearest burning spot.
+    if (!this.job) {
+      const fj = this.game.fireJobs;
+      const n = fj?.active && ac.water ? fj.nearest(p) : null;
+      return n ? { x: n.fire.x, z: n.fire.z, name: `FOGO ${n.fire.id}`, kind: 'fire' } : null;
+    }
+    // Job done: back to the strip it was flown from (the farm's, else the base).
+    if ((this.game.jobStats ?? this.job.stats()).coverage >= this.job.target) {
+      const farm = this.job.c.farm ? siteById(this.job.c.farm) : null;
+      const st = farm ?? SITES.find((x) => x.main);
+      if (st) return { x: st.runway.x0 + 60, z: st.runway.z, name: farm ? farm.farm.short.toUpperCase() : 'BASE', kind: 'strip', label: 'RETORNO À PISTA · JOB CONCLUÍDO' };
+    }
     const fs = this.job.fields;
     const cx = (Math.min(...fs.map((f) => f.x0)) + Math.max(...fs.map((f) => f.x1))) / 2;
     const cz = (Math.min(...fs.map((f) => f.z0)) + Math.max(...fs.map((f) => f.z1))) / 2;
@@ -163,7 +184,7 @@ export class Guidance {
   // opts.big: HUD version (larger text).
   draw(g, x, y, w, h, opts = {}) {
     const ac = this.game.aircraft;
-    const P = THEMES[ac.type.id] ?? THEMES.ipanema;
+    const P = THEMES[ac.type.id] ?? (ac.type.id === 'at802f' ? THEMES.at802 : THEMES.ipanema);
     const fs = opts.big ? 1.35 : 1;
     const nav = this.navTarget();
     g.fillStyle = P.bg;
@@ -290,8 +311,8 @@ export class Guidance {
       g.strokeStyle = nxt ? P.next : p.done > 0.85 ? 'rgba(120,200,120,0.35)' : 'rgba(200,230,200,0.35)';
       g.lineWidth = (nxt ? 3 : 1) / scale;
       g.beginPath();
-      if (this.axis === 'x') { g.moveTo(this.l0 - 200, p.c); g.lineTo(this.l1 + 200, p.c); }
-      else { g.moveTo(p.c, this.l0 - 200); g.lineTo(p.c, this.l1 + 200); }
+      if (this.axis === 'x') { g.moveTo(p.e0 - 200, p.c); g.lineTo(p.e1 + 200, p.c); }
+      else { g.moveTo(p.c, p.e0 - 200); g.lineTo(p.c, p.e1 + 200); }
       g.stroke();
     }
     g.restore();
@@ -360,6 +381,12 @@ export class Guidance {
       g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
     }
     g.globalAlpha = 1;
+    // Fire order (Fire Boss): the spots, burning or out.
+    const fireSpots = this.game.fireJobs?.active ? this.game.fireJobs.spots() : [];
+    for (const sp of fireSpots) {
+      g.fillStyle = sp.state === 'burning' ? 'rgba(255,106,42,0.85)' : 'rgba(120,200,120,0.55)';
+      g.beginPath(); g.arc(sp.x, sp.z, Math.max(18, 9 / scale), 0, Math.PI * 2); g.fill();
+    }
     // Strips: main base and farm strips.
     for (const st of SITES) {
       const r = st.runway;
@@ -388,6 +415,12 @@ export class Guidance {
       if (sx < x || sx > x + w || sy < y || sy > y + h) continue;
       g.fillStyle = st === this.game.site ? P.main : P.text;
       g.fillText(st.main ? 'BASE' : st.farm.short.toUpperCase(), sx, sy - 7);
+    }
+    for (const sp of fireSpots) {
+      const [sx, sy] = toScr(sp.x, sp.z);
+      if (sx < x || sx > x + w || sy < y || sy > y + h) continue;
+      g.fillStyle = sp.state === 'burning' ? '#ffb35c' : P.good;
+      g.fillText(`F${sp.id}`, sx, sy - 10);
     }
     aircraftSymbol(g, cx, cy, ac.kind === 'heli');
     northArrow(g, x + w - 14 * fs, y + 30 * fs, hdg, fs, P);
@@ -430,6 +463,7 @@ const THEMES = {
   agcat: { bg: '#060a07', strip: 'rgba(6,10,7,0.85)', main: '#9cf7b4', text: '#e8f6ec', dim: '#5f7666', edge: '#d8f4e0', next: '#ffd640', good: '#86ff9a', warn: '#ff7a5a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#cadcb8', fuel: '#ffc85a', load: '#7fd8ff', track: 'rgba(220,245,230,0.14)' },
   at401: { bg: '#060a07', strip: 'rgba(6,10,7,0.85)', main: '#9cf7b4', text: '#e8f6ec', dim: '#5f7666', edge: '#d8f4e0', next: '#ffd640', good: '#86ff9a', warn: '#ff7a5a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#cadcb8', fuel: '#ffc85a', load: '#7fd8ff', track: 'rgba(220,245,230,0.14)' },
   e201: { bg: '#060a07', strip: 'rgba(6,10,7,0.85)', main: '#9cf7b4', text: '#e8f6ec', dim: '#5f7666', edge: '#d8f4e0', next: '#ffd640', good: '#86ff9a', warn: '#ff7a5a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#cadcb8', fuel: '#ffc85a', load: '#7fd8ff', track: 'rgba(220,245,230,0.14)' },
+  at802: { bg: '#060a0d', strip: 'rgba(5,10,14,0.86)', main: '#7fe0ff', text: '#e6f4ff', dim: '#587083', edge: '#d6f1ff', next: '#ffd23a', good: '#6cf5a0', warn: '#ff6f5e', spray: '#ffd23a', trackOn: 'rgba(255,210,58,0.9)', terrain: '#a9c9a4', fuel: '#ffc85a', load: '#52d8ff', track: 'rgba(200,235,255,0.14)' },
   r44: { bg: '#050a10', strip: 'rgba(4,8,14,0.85)', main: '#8fe3ff', text: '#dff3ff', dim: '#56707e', edge: '#cfeeff', next: '#ffe14a', good: '#86ffb0', warn: '#ff7a6a', spray: '#ffd640', trackOn: 'rgba(255,214,64,0.9)', terrain: '#b9d6e6', fuel: '#ffd36a', load: '#8fe3ff', track: 'rgba(200,235,255,0.14)' },
 };
 

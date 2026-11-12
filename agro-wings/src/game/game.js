@@ -611,6 +611,7 @@ export class Game {
       this.toast(t('Spray kit fitted for the contract.'));
     }
     this.job = job;
+    this.jobStats = null; // the stats cache belongs to one job
     this.replay.begin(job);
     this.world.activity?.setExcluded(job ? job.fields.map((f) => f.name) : []);
     this.guidance.setJob(job);

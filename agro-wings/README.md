@@ -4761,3 +4761,28 @@ See `docs/RELEASE_REPORT.md` (before/after, device matrix, known issues), `docs/
 (mandatory procedure for new aircraft / farms / crops) and `docs/DEPLOY.md` (hosting). New continuous protection:
 `test/golden.test.mjs` (in `npm test`) fails if any recorded flight, helicopter or spray trace changes, or if a registered
 aircraft has no physics scenarios. Probes added: `test/p8startup.mjs` (start-up timing).
+
+## GPS of every aircraft on an active contract (audit and fixes)
+
+Audited on the 14 aircraft with an active contract, after sprayed passes:
+the legacy units (EMB-202A, AT-502B, M-18, R44, Thrush AG-NAV) draw the game's
+guidance and were coherent; the AGROWINGS NAV family (Bell 206B, EMB-203/201,
+AgTruck, Pawnee, Ag-Cat, AT-401B, AT-802 / Fire Boss) opened on MAPA even on
+the talhão, so the passes and coverage were one soft key away.
+
+Fixes (all in `src/spray/guidance.js` and `src/aircraft/agroNav.js`; physics,
+payments and progression untouched):
+- **The AgroNav unit follows the work**: COBERTURA on the talhão, MAPA when
+  ferrying, free flying or returning (sticky near the ferry limit); a key press
+  keeps its page until the situation changes.
+- **Job done → the target is the strip it was flown from** (the base, or the
+  farm's), for every unit, instead of staying on the talhão.
+- **Pass lines run where the talhões are** (per-pass extents): the stepped
+  bands of an irregular plot (Serra das Bananeiras) no longer show lines through
+  gaps; the autopilots and the map screen keep the union extent.
+- **Fire Boss**: an accepted fire order is the GPS target (nearest burning
+  spot, bearing, distance), the spots are on the map, and MISSÃO shows spots
+  out, time against the bonus limit, water and fuel; the AT-802 unit has its
+  own theme.
+- Test: `node test/gpsflow.mjs <out>` (browser; 13 aircraft × situations +
+  the Fire Boss order, 114 checks).
