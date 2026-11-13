@@ -676,8 +676,12 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     // pilot otherwise sees as a yellow strip under the side windows).
     for (const sx of [1, -1]) {
       const pos = [], idx = [], N = 12;
+      // (From the A-post's foot aft: forward of it the windshield's corner
+      // pane sweeps back, and a trim from further forward stuck out through
+      // the glass over the nose.)
+      const zPost = -0.92 - (canW(SILL) - 0.22) - 0.03;
       for (let i = 0; i <= N; i++) {
-        const z = lerp(-0.98, Z1, i / N);
+        const z = lerp(zPost, Z1, i / N);
         pos.push(sx * (wallX(z, SILL - 0.01) - 0.005), SILL - 0.012, z, sx * (canW(SILL) - 0.035), SILL + 0.036, z);
       }
       for (let i = 0; i < N; i++) { const a = i * 2; if (sx > 0) idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); else idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
