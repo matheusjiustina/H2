@@ -11,8 +11,9 @@ import PT_FARMS from '../src/i18n/pt-farms.js';
 import PT_STRIPS from '../src/i18n/pt-strips.js';
 import PT_SERRA from '../src/i18n/pt-serra.js';
 import PT_SHOWROOM from '../src/i18n/pt-showroom.js';
+import PT_FRONTIER from '../src/i18n/pt-frontier.js';
 
-const PT = { ...PT_UI, ...PT_GAME, ...PT_JOBS, ...PT_CREW, ...PT_FARMS, ...PT_STRIPS, ...PT_SERRA, ...PT_SHOWROOM };
+const PT = { ...PT_UI, ...PT_GAME, ...PT_JOBS, ...PT_CREW, ...PT_FARMS, ...PT_STRIPS, ...PT_SERRA, ...PT_SHOWROOM, ...PT_FRONTIER };
 
 export function literalKeys(dir = 'src') {
   const keys = new Set();

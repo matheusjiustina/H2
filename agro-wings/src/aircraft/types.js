@@ -32,7 +32,8 @@ import { E201_CK } from './e201Cockpit.js';
 import { createAT401Model, AT401_SHADOW, AT401_CABIN, at401WingY } from './at401Model.js';
 import { createAT401Panel } from './at401Panel.js';
 import { AT401_CK } from './at401Cockpit.js';
-import { FIREBOSS_EXPANSION } from '../game/expansions.js';
+import { FIREBOSS_EXPANSION, FRONTIER_EXPANSION } from '../game/expansions.js';
+import { FRONTIER } from '../world/activeMap.js';
 import { BASE } from '../world/layout.js';
 import { t } from '../i18n/index.js';
 
@@ -717,7 +718,25 @@ AIRCRAFT_TYPES.at401 = {
   createShadow: () => createContactShadow(AT401_SHADOW),
 };
 
-export const AIRCRAFT_ORDER = ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'agcat', 'e201', 'at401', 'at802', 'at802f'];
+// Fireboss Frontier (premium map 03): the AT-802 there is the fire service's
+// land aircraft — red and white, no spray booms, no water system: free
+// flight, repositioning, showcase; the suppression missions are the Fire
+// Boss's. Only these two fly on that map (no agricultural aircraft).
+if (FRONTIER) {
+  const T = AIRCRAFT_TYPES.at802;
+  Object.defineProperties(T, {
+    role: { get: () => t('Fire-service turboprop · Fireboss Frontier'), configurable: true, enumerable: true },
+    summary: { get: () => t('Fire-service land version · no water system · 18.04 m span · 7,257 kg MTOW'), configurable: true, enumerable: true },
+  });
+  Object.assign(T, {
+    reg: 'PR-BMF', label: 'AT-802 Bombeiros', name: 'Air Tractor AT-802 · Bombeiros', fireService: true, premium: FRONTIER_EXPANSION.id,
+    spray: { ...T.spray, flow: 0, none: true },
+    loads: { free: { fuel: 600, hopper: 0 }, boot: 450 },
+    createModel: (panel, opts) => createAT802Model(panel, { ...opts, variant: 'ag', fireService: true }),
+  });
+}
+export const AIRCRAFT_ORDER = FRONTIER ? ['at802f', 'at802']
+  : ['ipanema', 'at502', 'r44', 'm18', 'thrush', 'b206', 'e203', 'a188', 'pa36', 'agcat', 'e201', 'at401', 'at802', 'at802f'];
 export const aircraftType = (id) => AIRCRAFT_TYPES[id] ?? AIRCRAFT_TYPES.ipanema;
 
 // Registrations: each type keeps its factory marks as `reg0`; `reg` reads the

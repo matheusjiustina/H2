@@ -10,12 +10,13 @@
 // development and tests), the stored choice. A premium map that is not
 // unlocked falls back to the main map (src/game/expansions.js is the one
 // place that answers "unlocked?").
-import { isUnlocked, SERRA_EXPANSION } from '../game/expansions.js';
+import { isUnlocked, SERRA_EXPANSION, FRONTIER_EXPANSION, setMapPackage } from '../game/expansions.js';
 
 export const MAP_KEY = 'agrowings.map';
 export const MAPS = Object.freeze({
   main: { id: 'main', name: 'Fazenda Boa Esperança', premium: null },
   serra: { id: 'serra', name: 'Serra das Bananeiras', premium: SERRA_EXPANSION.id },
+  frontier: { id: 'frontier', name: 'Operation: Fireboss Frontier', premium: FRONTIER_EXPANSION.id },
 });
 
 function requested() {
@@ -30,6 +31,9 @@ function requested() {
 const want = MAPS[requested()] ?? MAPS.main;
 export const MAP_ID = want.premium && !isUnlocked(want.premium) ? 'main' : want.id;
 export const SERRA = MAP_ID === 'serra';
+// Premium map expansion 03: the fire-fighting theatre (src/world/frontier.js).
+export const FRONTIER = MAP_ID === 'frontier';
+if (FRONTIER) setMapPackage(FRONTIER_EXPANSION);
 
 // Store the choice for the next load (the caller reloads the page).
 export function storeMapChoice(id) {

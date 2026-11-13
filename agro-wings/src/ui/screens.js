@@ -14,8 +14,10 @@ import { drawMap, mapControls, mapPoint } from './maps.js';
 import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
 import { aircraftUnlocked, isUnlocked, premiumEnforced, EXPANSIONS } from '../game/expansions.js';
-import { MAPS, MAP_ID, storeMapChoice } from '../world/activeMap.js';
+import { MAPS, MAP_ID, storeMapChoice, FRONTIER } from '../world/activeMap.js';
 import { FIRE_JOBS } from '../game/fireJobs.js';
+import { MISSION_TYPES } from '../game/frontierMissions.js';
+import { FRONT_BASE_NAME } from '../world/frontier.js';
 
 // Paint schemes offered on the menu (the settings keys the models read).
 const PAINTS = {
@@ -164,7 +166,7 @@ export class Screens {
     }
     // Info panel of the aircraft on show (data of the type registry only).
     const ty = AIRCRAFT_TYPES[shown], S = g.settings, locked = !aircraftUnlocked(ty);
-    const P = PAINTS[shown];
+    const P = FRONTIER && shown === 'at802' ? null : PAINTS[shown]; // (Fireboss Frontier: the fire-service paint only)
     const paints = P ? `<div class="sr-paint"><span>${t('Paint')}</span>${P.names.map((n, i) => `<button class="ac-opt${(S[P.key] ?? 0) === i ? ' on' : ''}" data-lk="${P.key}" data-livery="${i}" title="${t(n)}">${P.tags[i]}</button>`).join('')}${shown === 'b206' ? `<button class="ac-opt kit${S.b206Kit !== false ? ' on' : ''}" data-kit="1">${t('Spray kit')}</button>` : ''}</div>` : '';
     const paintName = P ? t(P.names[S[P.key] ?? 0]) : '';
     this.title.querySelector('.sr-info').innerHTML = `
@@ -216,9 +218,9 @@ export class Screens {
     // memory together); a locked map cannot be chosen.
     const mapRows = Object.values(MAPS).map((m) => {
       const open = !m.premium || isUnlocked(m.premium), on = m.id === MAP_ID;
-      const desc = m.id === 'main' ? t('The original farm country: 12 × 12 km of fields, farms and strips.') : t('Premium map: a compact mountain valley of banana plantations, forested ridges and three rustic strips.');
+      const desc = m.id === 'main' ? t('The original farm country: 12 × 12 km of fields, farms and strips.') : m.id === 'frontier' ? t('Premium map: a wildfire theatre of dry cerrado, two large lakes, broken hills and a smoke basin — Fire Boss missions only, with the red fire-service AT-802.') : t('Premium map: a compact mountain valley of banana plantations, forested ridges and three rustic strips.');
       const state = on ? t('Active map') : !open ? t('Locked') : m.premium ? (premiumEnforced() ? t('Unlocked') : t('Open to everyone during the testing phase')) : '';
-      return `<div class="fl-row${on ? ' sel' : ''}"><span class="fl-img map-ico">${m.id === 'main' ? '🌾' : '🍌'}</span>
+      return `<div class="fl-row${on ? ' sel' : ''}"><span class="fl-img map-ico">${m.id === 'main' ? '🌾' : m.id === 'frontier' ? '🔥' : '🍌'}</span>
         <div class="fl-txt"><div class="name">${m.name}</div><div class="desc">${desc}</div><div class="meta"><span>${state}</span></div></div>
         ${on || !open ? '' : `<button class="btn primary small" data-map="${m.id}">${t('Fly this map')}</button>`}</div>`;
     }).join('');
@@ -325,12 +327,16 @@ export class Screens {
       </div>`;
     };
     // Fire Boss only: fire-fighting orders (src/game/fireJobs.js).
-    const fj = g.fireJobs, fireCards = g.aircraft?.water && fj ? `<h3 class="lvl">${t('Fire fighting')} <span>${t('Fire Boss only · scoop at the reservoir, drop on the spots')}</span></h3><div class="cards">${FIRE_JOBS.map((j) => {
-      const on = fj.job?.def.id === j.id;
-      return `<div class="card ${on ? 'sel' : ''}"><span class="tag lv3">${t('Fire Boss')}</span><div class="name">${j.title}</div><div class="desc">${j.brief}</div>
-        <div class="meta"><span>${t('{0} spots', j.spots.length)}</span><span>${money(j.pay)}</span><span>${t('bonus {0}', `+25 % < ${j.bonusMin} min`)}</span></div>
-        <div class="prog">${on ? t('In progress · {0} of {1} out', fj.spots().filter((f) => f.state === 'out').length, j.spots.length) : t('Not started')}</div>
-        <div class="btn-row" style="justify-content:flex-start">${on ? `<button class="btn small" data-fire-cancel="1">${t('Hand in current job')}</button>` : `<button class="btn primary small" data-fire="${j.id}">${t('Accept')}</button>`}</div></div>`;
+    // (Fireboss Frontier: the board is the map's fire missions; the
+    // fire-service AT-802 sees them but only the Fire Boss flies them.)
+    const fj = g.fireJobs, canFight = !!g.aircraft?.water;
+    const fireCards = (canFight || FRONTIER) && fj ? `<h3 class="lvl">${FRONTIER ? t('Fire missions · Fireboss Frontier') : t('Fire fighting')} <span>${FRONTIER ? (canFight ? t('Scoop at a lake, drop on the fire; the GPS leads to the nearest spot') : t('Fire Boss only — choose the Fire Boss in the hangar to fly them')) : t('Fire Boss only · scoop at the reservoir, drop on the spots')}</span></h3><div class="cards">${FIRE_JOBS.map((j) => {
+      const on = fj.job?.def.id === j.id, done = g.career.completed?.[j.id];
+      const dist = (() => { const sp = g.fires?.fires.find((f) => f.id === j.spots[0]); return sp ? Math.hypot(sp.x - BASE.pad.x, sp.z - BASE.pad.z) / 1000 : 0; })();
+      return `<div class="card ${on ? 'sel' : ''}"><span class="tag lv3">${j.type ? `${j.type} · ${MISSION_TYPES[j.type]()}` : t('Fire Boss')}</span><div class="name">${j.title}</div><div class="desc">${j.brief}</div>
+        <div class="meta"><span>${t('{0} spots', j.spots.length)}</span><span>${money(j.pay)}</span><span>${t('bonus {0}', `+25 % < ${j.bonusMin} min`)}</span>${dist ? `<span>${dist.toFixed(1)} km</span>` : ''}${j.lake ? `<span>${t('scoop: {0}', j.lake)}</span>` : ''}</div>
+        <div class="prog">${on ? t('In progress · {0} of {1} out', fj.spots().filter((f) => f.state === 'out').length, fj.spots().length) : done ? t('Completed {0} · can be flown again', '') : t('Not started')}</div>
+        <div class="btn-row" style="justify-content:flex-start">${on ? `<button class="btn small" data-fire-cancel="1">${t('Hand in current job')}</button>` : canFight ? `<button class="btn primary small" data-fire="${j.id}">${t('Accept')}</button>` : ''}</div></div>`;
     }).join('')}</div>` : '';
     const cards = fireCards + [0, 'b', 1, 2, 3].filter((lv) => CONTRACTS.some((c) => (lv === 'b' ? !!c.beginner : c.level === lv && !c.beginner))).map((lv) => `<h3 class="lvl${lv === 0 ? ' school' : lv === 'b' ? ' beg' : ''}">${LEVELS[lv].label} <span>${LEVELS[lv].blurb}</span></h3><div class="cards">${CONTRACTS.filter((c) => (lv === 'b' ? !!c.beginner : c.level === lv && !c.beginner)).map(card).join('')}</div>`).join('');
     const el = h(`<div class="panel"><h2>${t('Service orders')}</h2>
@@ -736,7 +742,7 @@ export class Screens {
     const deg = (r) => String(Math.round(((r * 180) / Math.PI + 360) % 360)).padStart(3, '0');
     const f = c.x != null ? fieldAt(c.x, c.z) : null;
     const ns = c.x != null ? nearestSite(c.x, c.z) : null;
-    const place = f ? `${f.name} · ${t(CROPS[f.crop]?.label ?? f.crop)}` : ns ? `${ns.site.main ? 'Faz. Boa Esperança' : ns.site.farm.name} · ${(ns.dist / 1000).toFixed(1)} km` : '—';
+    const place = f ? `${f.name} · ${t(CROPS[f.crop]?.label ?? f.crop)}` : ns ? `${ns.site.main ? (FRONTIER ? FRONT_BASE_NAME : 'Faz. Boa Esperança') : ns.site.farm.name} · ${(ns.dist / 1000).toFixed(1)} km` : '—';
     const heli = ac.kind === 'heli';
     const now = new Date();
     const occ = `OC-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;

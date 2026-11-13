@@ -11,7 +11,7 @@ import {
 } from './layout.js';
 import { biomeWeights } from './expansion.js';
 import { rawHeight, farRingVertex, FAR_STEP } from './terrainData.js';
-import { SERRA } from './activeMap.js';
+import { SERRA, FRONTIER } from './activeMap.js';
 import { makeGroundDetail } from '../core/textures.js';
 import { CUT_U, NCUT, CROP_U } from './cutState.js';
 
@@ -88,6 +88,16 @@ vec4 detailAt(vec2 p, out float near) {
 
 // Braquiária pasture: olive green, straw-dry patches, darker moist swales.
 vec3 grassColor(vec2 p, vec4 nA, vec4 nB, vec4 nC, vec4 nD) {
+#ifdef FRONT_MAP
+  // Fireboss Frontier: cerrado grass at the end of the dry season — straw,
+  // pale gold, olive tufts, a little green left in the hollows.
+  vec3 s1 = vec3(0.255, 0.205, 0.095), s2 = vec3(0.335, 0.27, 0.13), s3 = vec3(0.15, 0.15, 0.06);
+  vec3 cf = mix(s1, s2, smoothstep(0.3, 0.8, nA.r));
+  cf = mix(cf, s3, smoothstep(0.55, 0.85, nB.g) * 0.55);
+  cf = mix(cf, vec3(0.09, 0.12, 0.04), smoothstep(0.7, 0.92, nA.g) * 0.35);
+  cf *= 0.84 + 0.32 * nC.b;
+  return cf * (0.88 + 0.24 * nD.a);
+#endif
   vec3 g1 = vec3(0.100, 0.148, 0.040);
   vec3 g2 = vec3(0.150, 0.172, 0.052);
   vec3 g3 = vec3(0.066, 0.112, 0.030);
@@ -264,6 +274,13 @@ vec3 terrainColor(vec2 p, out float rough) {
 #ifdef SERRA_MAP
   // Serra das Bananeiras: forested mountains beyond the map.
   if (abs(p.x) > uWorldHalf - 2.0 || abs(p.y) > uWorldHalf - 2.0) return vec3(0.040, 0.085, 0.036) * (0.78 + 0.4 * nA.g) * (0.86 + 0.28 * nB.r);
+#elif defined(FRONT_MAP)
+  // Fireboss Frontier: dry cerrado to the horizon, darker scrub and old burns.
+  if (abs(p.x) > uWorldHalf - 2.0 || abs(p.y) > uWorldHalf - 2.0) {
+    vec3 c = mix(vec3(0.30, 0.25, 0.12), vec3(0.20, 0.18, 0.08), smoothstep(0.35, 0.7, nA.g));
+    c = mix(c, vec3(0.08, 0.10, 0.045), smoothstep(0.62, 0.8, nA.r) * 0.7);
+    return mix(c, vec3(0.07, 0.06, 0.05), smoothstep(0.78, 0.9, nA.b) * 0.6) * (0.86 + 0.28 * nB.r);
+  }
 #else
   if (abs(p.x) > uWorldHalf - 2.0 || abs(p.y) > uWorldHalf - 2.0) return farPatchwork(p, nA, nB, nC, nD, rough);
 #endif
@@ -293,12 +310,23 @@ vec3 terrainColor(vec2 p, out float rough) {
     col = mix(col, vec3(0.055, 0.14, 0.04) * (0.85 + 0.3 * nB.g), bio.g * 0.7);
     col = mix(col, vec3(0.06, 0.075, 0.035), bio.g * 0.35 * smoothstep(0.6, 0.85, nD.g));
     col = mix(col, vec3(0.045, 0.10, 0.035) * (0.9 + 0.25 * nA.g), bio.b * 0.5);
+#ifdef FRONT_MAP
+    // Fireboss Frontier: golden straw in the dry grass; the fourth weight is
+    // old burnt ground — char, ash, green regrowth in tufts (no rock here).
+    col = mix(col, vec3(0.42, 0.34, 0.16) * (0.85 + 0.3 * nD.r), bio.r * 0.38 * smoothstep(0.45, 0.75, nB.g + 0.2 * nC.r));
+    vec3 charC = mix(vec3(0.045, 0.04, 0.035), vec3(0.14, 0.12, 0.09), smoothstep(0.3, 0.8, nC.g) * 0.8 + nD.r * 0.2);
+    charC = mix(charC, vec3(0.36, 0.34, 0.31), smoothstep(0.7, 0.9, nC.b + nD.g * 0.3) * 0.35);
+    charC = mix(charC, vec3(0.15, 0.17, 0.07), smoothstep(0.6, 0.85, nB.g + nD.g * 0.3) * 0.45);
+    col = mix(col, charC, bio.a * 0.9);
+    rough = mix(rough, 0.98, bio.a);
+#else
     float cliff = clamp(bio.a * smoothstep(0.9, 0.62, vTN) * 1.3, 0.0, 1.0);
     float strata = 0.5 + 0.5 * sin(vWPos.y * 0.9 + nB.r * 5.0 + nC.r * 2.0);
     vec3 rockC = mix(vec3(0.36, 0.20, 0.12), vec3(0.58, 0.40, 0.27), strata * 0.45 + nB.b * 0.35 + nC.g * 0.2);
     col = mix(col, vec3(0.36, 0.30, 0.21) * (0.9 + 0.2 * nD.r), bio.a * 0.16 * smoothstep(0.58, 0.8, nC.g) * (1.0 - cliff));
     col = mix(col, rockC * (0.9 + 0.2 * nD.b), cliff);
     rough = mix(rough, 0.85, cliff);
+#endif
   }
 
   // Fields + carreadores. Regions: a pixel of the original 8 x 8 km map
@@ -444,7 +472,7 @@ function biomeTexture() {
     if (w[0] + w[1] + w[2] + w[3] <= 0) continue;
     let d = 1e9;
     for (const r of rects) d = Math.min(d, Math.hypot(Math.max(r[0] - x, 0, x - r[1]), Math.max(r[2] - z, 0, z - r[3])));
-    const k = SERRA ? 1 : Math.min(1, Math.max(0, (d - 250) / 300)); // (the Serra's own tints are placed by its own rules)
+    const k = SERRA || FRONTIER ? 1 : Math.min(1, Math.max(0, (d - 250) / 300)); // (the Serra's own tints are placed by its own rules)
     const o = (j * N + i) * 4;
     for (let c = 0; c < 4; c++) data[o + c] = Math.round(Math.min(1, w[c]) * k * 255);
   }
@@ -476,6 +504,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   const stp = WATER.streams[0].points;
   mat.defines = {
     ...(SERRA ? { SERRA_MAP: 1 } : {}),
+    ...(FRONTIER ? { FRONT_MAP: 1 } : {}),
     NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: PONDS0.length,
     RING_IN: RING_IN.toFixed(1), NF_IN1: inOnly.length + both.length, NF_RING0: inOnly.length, NS_IN: nsIn,
   };
@@ -526,7 +555,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : 'terrain-v7');
+  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : FRONTIER ? 'terrain-v7-frontier' : 'terrain-v7');
   return mat;
 }
 

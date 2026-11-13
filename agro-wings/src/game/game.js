@@ -38,7 +38,7 @@ import { windAt } from '../flight/env.js';
 import { FlightModel } from '../flight/flightModel.js';
 import { t } from '../i18n/index.js';
 import { aircraftUnlocked } from './expansions.js';
-import { mapAllowed, storeMapChoice } from '../world/activeMap.js';
+import { mapAllowed, storeMapChoice, FRONTIER } from '../world/activeMap.js';
 import { FireField } from '../world/fires.js';
 import { WaterFx } from '../world/waterFx.js';
 import { FireJobs } from './fireJobs.js';
@@ -303,7 +303,7 @@ export class Game {
     next.placeAtPad();
     next.stuck = false;
     this.perf?.hold(3); // loading a new aircraft is not a performance signal
-    this.fires?.setActive(!!next.water);
+    this.fires?.setActive(FRONTIER || !!next.water); // (Fireboss Frontier: the fires are part of the map)
     this._parked = Object.values(this.fleet).filter((ac) => ac !== next);
     this.world.extraObstacle = (x, y, z) => {
       for (const ac of Object.values(this.fleet)) if (ac !== this.aircraft && ac.hitTest(x, y, z)) return `parked ${ac.type.reg}`;
@@ -704,7 +704,7 @@ export class Game {
   requestService(fuel, liquid) {
     if (this.service.request(fuel, liquid)) {
       if (this.job) this.job.started = true;
-      if (this.mode === 'career' && !this.career.tutorialDone && !this.tutorial.active && !this.job?.c.school) this.tutorial.start();
+      if (this.mode === 'career' && !FRONTIER && !this.career.tutorialDone && !this.tutorial.active && !this.job?.c.school) this.tutorial.start();
     }
   }
 
@@ -931,7 +931,14 @@ export class Game {
       this.sprayer.emit(dt);
       this.mist.update(dt, ac.windVec, (x, z) => ac.env.top(x, z));
       this.dust.update(dt, ac.windVec, (x, z) => ac.env.ground(x, z));
-      this.fires?.update(dt, ac.windVec);
+      this.fires?.update(dt, ac.windVec, this.camera.position);
+      // Fireboss Frontier: the smoke the air holds where the camera is (the
+      // local loss of visibility) and the light on the distant columns.
+      if (FRONTIER && this.fires) {
+        const c = this.camera.position;
+        this.world.atmo.smokeTarget = this.fires.hazeAt(c.x, c.y, c.z, ac.windVec);
+        this.fires.columns?.u.uLight.value.setScalar(Math.max(0.22, Math.min(1, this.world.atmo.cur.light ?? 1)));
+      }
       this.waterFx?.update(dt, ac, this.camera.position);
       this.fireJobs?.update();
       this.guidance.update(dt);

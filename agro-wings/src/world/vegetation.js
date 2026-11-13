@@ -87,7 +87,8 @@ function termiteMound(seed) {
   return g;
 }
 
-import { SERRA } from './activeMap.js';
+import { SERRA, FRONTIER } from './activeMap.js';
+import { FRONT_VEG_REGIONS, frontierCleared } from './frontier.js';
 import { serraForestBoxes, SERRA_WORLD_HALF } from './serra.js';
 import { serraCanopy } from './serraScenery.js';
 
@@ -629,7 +630,8 @@ export function createVegetation(terrain, quality) {
   const inExpForest = (x, z, m = 0) => FOR_EXP.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
   const openE = (x, z, m) => !inForest(x, z, m) && !inExpForest(x, z, m) && !cleared(x, z, true, m) && !fieldNear(x, z, m) && !expCleared(x, z, true);
   const bw = [0, 0, 0, 0];
-  for (const reg of EXP_REGIONS) {
+  // (Fireboss Frontier: one region per biome over the whole map.)
+  for (const reg of FRONTIER ? FRONT_VEG_REGIONS : EXP_REGIONS) {
     const R = Math.max(reg.half[0], reg.half[1]) + reg.fall;
     for (let z = reg.c[1] - R; z < reg.c[1] + R; z += 34) {
       for (let x = reg.c[0] - R; x < reg.c[0] + R; x += 34) {
@@ -642,7 +644,7 @@ export function createVegetation(terrain, quality) {
         // (the others' loops skip it), so overlaps never double the density.
         const own = reg.biome === 'cerrado' ? cer : reg.biome === 'varzea' ? wet : reg.biome === 'mata' ? lush : reg.biome === 'serra' ? rock : Math.max(lush, cer * 0.9);
         if (own < Math.max(cer, wet, lush, rock) * 0.999 && reg.biome !== 'morros') continue;
-        if (!openE(px, pz, 8)) continue;
+        if (!openE(px, pz, 8) || (FRONTIER && frontierCleared(px, pz))) continue;
         const sl = slopeAt(px, pz);
         if (reg.biome === 'cerrado') {
           if (k < 0.075 * cer) {

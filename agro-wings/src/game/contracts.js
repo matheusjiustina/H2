@@ -5,7 +5,7 @@ import { GAME, SPRAY } from '../config.js';
 import { readSafe, writeSafe } from '../core/safeStore.js';
 import { t } from '../i18n/index.js';
 import { FARM_CONTRACTS } from './farmContracts.js';
-import { SERRA } from '../world/activeMap.js';
+import { SERRA, FRONTIER } from '../world/activeMap.js';
 import { SERRA_CONTRACTS } from './serraContracts.js';
 
 export { FARM_CONTRACTS };
@@ -250,6 +250,9 @@ if (SERRA) {
   CONTRACTS.length = 0; CONTRACTS.push(...SERRA_CONTRACTS);
   LEVELS[2] = { get label() { return t('Serra das Bananeiras · banana talhões'); }, get short() { return t('Banana'); }, get blurb() { return t('Small talhões laid along the hillsides: short passes that follow the terrain.'); } };
 }
+
+// Fireboss Frontier (premium map 03): fire missions only (src/game/fireJobs.js).
+if (FRONTIER) CONTRACTS.length = 0;
 
 const STORE = 'agrowings.save.v1';
 

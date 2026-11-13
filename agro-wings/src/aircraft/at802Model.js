@@ -65,6 +65,10 @@ export const AT802_LIVERIES = {
   ag: { id: 'ag', base: YELLOW, band: GREEN, line: NAVY, tail: GREEN, tailLine: NAVY, tip: GREEN, tipLine: NAVY, text: NAVY, model: 'AT-802A', blades: 0x17181a, bladeTip: 0xf4f0e6 },
   fireboss: { id: 'fireboss', fire: true, base: YELLOW, band: RED, line: BLACK, tail: RED, tailLine: BLACK, tip: RED, tipLine: BLACK, text: BLACK, float: RED, model: 'AT-802', blades: 0x8f959b, bladeTip: 0x8f959b },
   agBlue: { id: 'agBlue', base: YELLOW, band: BLUE, line: NAVY, tail: BLUE, tailLine: NAVY, tip: BLUE, tipLine: NAVY, text: NAVY, model: 'AT-802A', blades: 0x17181a, bladeTip: 0xf4f0e6 },
+  // Fire-service AT-802 (Fireboss Frontier, premium map 03): red with a
+  // broad white side band, BOMBEIROS on it, white fin with a red band and a
+  // generic fire-service badge, white wings with red tips. No spray booms.
+  bombeiros: { id: 'bombeiros', svc: true, base: '#b5161b', wingBase: WHITE, band: null, line: null, tail: WHITE, tailLine: '#8e0f12', tip: '#b5161b', tipLine: '#8e0f12', text: '#b5161b', model: 'AT-802', blades: 0x17181a, bladeTip: 0xf4f0e6 },
   firebossBlue: { id: 'firebossBlue', fire: true, base: YELLOW, band: BLUE, line: NAVY, tail: BLUE, tailLine: NAVY, tip: BLUE, tipLine: NAVY, text: NAVY, float: BLUE, model: 'AT-802', blades: 0x8f959b, bladeTip: 0x8f959b },
 };
 // Paint schemes offered per variant (index = the menu's A / B).
@@ -319,6 +323,7 @@ function liveryTextures(reg, L) {
     grd.addColorStop(1, 'rgba(90,70,30,0.22)');
     g.fillStyle = grd;
     g.fillRect(0, belly, LV.W, oy + LV.H / 2 - belly);
+    if (L.svc) { serviceLivery(g, P, poly, line, L, reg, oy); continue; }
     // Rudder and the fin's trailing area behind a diagonal from the fin root
     // to the top (the coloured tail of both schemes), edged with a line.
     const fr = FIN_ST[0], ft = FIN_ST[FIN_ST.length - 1];
@@ -398,12 +403,49 @@ function liveryTextures(reg, L) {
   return { map: canvasTexture(c, { aniso: 8 }), bump: canvasTexture(b, { srgb: false, aniso: 8 }) };
 }
 
+// The fire-service scheme on one side (see AT802_LIVERIES.bombeiros).
+function serviceLivery(g, P, poly, line, L, reg, oy) {
+  const RED_D = L.tailLine;
+  // Broad white band, cowl to tail, rising aft; thin dark-red edge lines.
+  const lo = [[3.55, -0.42], [2.6, -0.38], [1.4, -0.32], [0.2, -0.24], [-1.2, -0.1], [-2.8, 0.06], [-4.4, 0.22], [-5.8, 0.36], [-7.3, 0.46]];
+  const hi = [[3.55, 0.12], [2.6, 0.2], [1.4, 0.3], [0.2, 0.42], [-1.2, 0.56], [-2.8, 0.66], [-4.4, 0.74], [-5.8, 0.8], [-7.3, 0.84]];
+  poly([...lo, ...hi.slice().reverse()], WHITE);
+  line(g, lo, RED_D, 3); line(g, hi, RED_D, 3);
+  // Fin: white, a red band slanting up aft, the rudder's trailing edge red.
+  const fr = FIN_ST[0], ft = FIN_ST[FIN_ST.length - 1];
+  poly([[fr[1] + 0.25, 0.75], [ft[1] + 0.2, 3.0], [-7.4, 3.0], [-7.4, 0.75]], WHITE);
+  poly([[fr[1] + 0.2, 1.38], [-7.4, 1.72], [-7.4, 2.12], [fr[1] + 0.3, 1.8]], L.base);
+  line(g, [[fr[1] + 0.2, 1.38], [-7.4, 1.72]], RED_D, 2); line(g, [[fr[1] + 0.3, 1.8], [-7.4, 2.12]], RED_D, 2);
+  // Generic fire-service badge on the fin (a shield with a flame; no
+  // official arms): white disc, red ring, red shield, gold flame.
+  {
+    const [cx, cy] = P(-6.25, 2.42), R = 0.27 * LV.ky;
+    g.save(); g.translate(cx, cy); g.scale(LV.kx / LV.ky, 1);
+    g.fillStyle = WHITE; g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = L.base; g.lineWidth = R * 0.12; g.beginPath(); g.arc(0, 0, R * 0.9, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = L.base; g.beginPath(); g.moveTo(-R * 0.45, -R * 0.5); g.lineTo(R * 0.45, -R * 0.5); g.lineTo(R * 0.45, R * 0.05); g.quadraticCurveTo(R * 0.4, R * 0.45, 0, R * 0.62); g.quadraticCurveTo(-R * 0.4, R * 0.45, -R * 0.45, R * 0.05); g.closePath(); g.fill();
+    g.fillStyle = '#f2b318'; g.beginPath(); g.moveTo(0, R * 0.42); g.quadraticCurveTo(-R * 0.28, R * 0.1, -R * 0.06, -R * 0.36); g.quadraticCurveTo(0, -R * 0.1, R * 0.1, -R * 0.2); g.quadraticCurveTo(R * 0.3, R * 0.12, 0, R * 0.42); g.fill();
+    g.restore();
+  }
+  const text = (z, y, str, hM, col, font = 'bold') => {
+    const [px, py] = P(z, y);
+    g.save(); g.font = `${font} ${Math.round(hM * LV.ky * 1.25)}px Arial`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.setTransform(1, 0, 0, 1, px, py); g.scale(LV.kx / LV.ky, 1); g.fillStyle = col; g.fillText(str, 0, 0); g.restore();
+  };
+  text(1.15, -0.06, 'BOMBEIROS', 0.22, L.base);
+  text(1.15, -0.27, 'COMBATE A INCÊNDIO FLORESTAL', 0.05, '#2a2a2a');
+  text(-3.85, 0.36, reg, 0.25, '#141414');
+  text(-6.05, 1.12, L.model, 0.1, '#141414', 'italic bold');
+  text(1.6, -0.5, 'NO STEP', 0.035, 'rgba(255,255,255,0.75)', 'bold');
+  speckle(g, 0, oy, LV.W, LV.H / 2, 2600, oy ? 28 : 27, 0.1);
+}
+
 // Wing skin: u = span / SPAN_UV, v = chord fraction (0 = LE).
 function wingTextures(L) {
   const WD = 2048, H = 512;
   const c = canvas(WD, H), b = canvas(WD, H);
   const g = c.getContext('2d'), gb = b.getContext('2d');
-  g.fillStyle = L.base; g.fillRect(0, 0, WD, H);
+  g.fillStyle = L.wingBase ?? L.base; g.fillRect(0, 0, WD, H);
   gb.fillStyle = '#808080'; gb.fillRect(0, 0, WD, H);
   orangePeel(gb, WD, H, 63);
   const X = (m) => (m / SPAN_UV) * WD, Y = (f) => f * H;
@@ -573,7 +615,9 @@ export function createAT802Model(panel, opts = {}) {
   const variant = opts.variant === 'fireboss' ? 'fireboss' : 'ag';
   const FB = variant === 'fireboss';
   const A = FB ? FLIGHT_FIREBOSS : FLIGHT_AT802;
-  let paint = 0, L = AT802_LIVERIES[variant];
+  // (The fire-service AT-802 of Fireboss Frontier: its own paint, no booms.)
+  const SVC = !FB && !!opts.fireService;
+  let paint = 0, L = AT802_LIVERIES[SVC ? 'bombeiros' : variant];
   const root = new THREE.Group();
   root.name = FB ? 'at802-fireboss' : 'at802a';
   let REG = opts.reg ?? (FB ? 'PR-FBS' : 'PR-AWX');
@@ -1086,6 +1130,8 @@ export function createAT802Model(panel, opts = {}) {
       gearGroups.tail = { group: g, wheel, spin: wheel.children[0], fork, rest: wheel.position.clone(), sx: 0 };
     }
     // ---------------- spray system ----------------
+    // (The fire-service AT-802 carries no booms and no wind-driven pump.)
+    if (!SVC) {
     const hingeZ = W.le - 0.76 * W.chord;
     const boomZ = W.le - W.chord - 0.03, boomDrop = 0.33;
     for (const side of [1, -1]) {
@@ -1129,6 +1175,7 @@ export function createAT802Model(panel, opts = {}) {
     pump.add(pumpFan);
     root.add(pump);
     add('steel', rod([0, gy + 0.02, 0.95], [0, gy - 0.16, 0.95], 0.032, 10));
+    }
   } else {
     // ---------------- Wipline 10000 floats ----------------
     const hull = floatHullGeo();
@@ -1317,6 +1364,7 @@ export function createAT802Model(panel, opts = {}) {
     // Paint scheme A / B: only the paint (canvases and the accent colour)
     // changes — no geometry.
     setLivery(i) {
+      if (SVC) return;
       const list = AT802_PAINTS[variant], k = ((i % list.length) + list.length) % list.length;
       if (k === paint) return;
       paint = k; L = AT802_LIVERIES[list[k]];

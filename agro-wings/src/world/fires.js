@@ -23,8 +23,18 @@
 // ember / char patch under each spot (one more instanced draw); smoke is a
 // continuous wind-blown column of soft sprites from the burning flames,
 // steam where water hits them.
+//
+// Fireboss Frontier (premium map 03) uses the same field over its own fire
+// sectors (src/world/frontier.js): spots start unlit ('idle') and only a
+// mission lights them; a spot may be a fire LINE (a front `len` long); the
+// smoke follows the camera distance (full near, thinned far away) and every
+// burning spot, plus a few distant fires beyond the map, also shows a tall
+// impostor smoke column (one instanced draw for all of them); hazeAt() is
+// the smoke the air holds at a point (the local loss of visibility).
 import * as THREE from 'three';
 import { ParticlePool } from '../core/particles.js';
+import { FRONTIER } from './activeMap.js';
+import { FRONT_FIRE_SPOTS, DISTANT_FIRES, SMOKE_BASIN } from './frontier.js';
 
 export const FIRE_TEST_SPOTS = [
   { x: -750, z: -3800, r: 16 },
@@ -33,6 +43,15 @@ export const FIRE_TEST_SPOTS = [
   { x: -820, z: -4050, r: 18 },
   { x: -1150, z: -3600, r: 15 },
 ];
+// The active map's spots (the main map: the test zone above).
+export const FIRE_SPOTS = FRONTIER ? FRONT_FIRE_SPOTS : FIRE_TEST_SPOTS;
+// Is (x, z) on the burnt patch of a spot (no grass there)?
+export function inSpotPatch(f, x, z) {
+  if (f.kind !== 'line') return Math.abs(x - f.x) < f.r * 1.3 && Math.abs(z - f.z) < f.r * 1.3 && Math.hypot(x - f.x, z - f.z) < f.r * 1.25;
+  const dx = x - f.x, dz = z - f.z, c = Math.cos(f.ang), s = Math.sin(f.ang);
+  const u = (dx * c + dz * s) / (f.len / 2 + f.r * 1.2), v = (-dx * s + dz * c) / (f.r * 1.7);
+  return u * u + v * v < 0.9;
+}
 const L_PER_M2 = 1.6; // litres per m² of burning area to put a spot out
 const REIGNITE = 120; // s after the last spot is out
 const PER_FIRE = 26; // flames per spot (core + clumps + low creeping edge flames)
@@ -105,6 +124,7 @@ float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
 void main() {
+  if (vI < -0.5) discard; // an unlit spot: nothing on the ground
   vec2 c = vUv - 0.5;
   float r = length(c) * 2.0;
   float n = n2(vUv * 9.0) * 0.6 + n2(vUv * 23.0) * 0.4;
@@ -123,13 +143,19 @@ export class FireField {
     this.time = 0;
     this.allOutT = 0;
     this.qk = 1; // particle density (quality profile)
-    this.fires = FIRE_TEST_SPOTS.map((s, i) => ({ ...s, id: i + 1, intensity: 1, water: 0, state: 'burning', y: terrain.heightAt(s.x, s.z) }));
+    // Main map: the test spots burn from the start and relight by themselves;
+    // Fireboss Frontier: unlit until a mission lights them, no auto relight.
+    this.autoRelight = !FRONTIER;
+    this.cam = new THREE.Vector3(0, 1e5, 0); // camera position (smoke LOD)
+    this.fires = FIRE_SPOTS.map((s, i) => ({ ...s, id: i + 1, intensity: FRONTIER ? 0 : 1, water: 0, state: FRONTIER ? 'idle' : 'burning', y: terrain.heightAt(s.x, s.z) }));
     // The flames of every spot (logic and visuals): a core, three clumps
     // round it, a few strays; fixed seed (same layout every time).
     const R = rng(4242);
     this.cells = [];
     for (const f of this.fires) {
       f.cells = [];
+      f.area = Math.PI * f.r * f.r; f.br = f.r;
+      if (f.kind === 'line') { this._lineCells(f, R, terrain); continue; }
       const clumps = [0, 1, 2].map((j) => ({ a: R() * 6.28 + j * 2.1, d: f.r * (0.45 + R() * 0.35) }));
       for (let j = 0; j < PER_FIRE; j++) {
         let x, z, s;
@@ -147,12 +173,31 @@ export class FireField {
       }
       f.wsum = f.cells.reduce((a, c) => a + c.s, 0);
     }
+    for (const f of this.fires) if (f.state === 'idle') for (const c of f.cells) c.k = 0;
     this.packets = [];
     this._acc = null;
     this.impacts = [];
     this.totalOnTarget = 0;
     this.visual = !!scene; // headless (tests): the logic only
     if (this.visual) this._buildVisuals(scene, terrain);
+  }
+
+  // A fire LINE: a front `len` long — a row of tall flames along it, lower
+  // ones on the burnt (upwind) side, creeping flames at the ends.
+  _lineCells(f, R, terrain) {
+    const n = Math.round(Math.min(56, Math.max(22, f.len / 3.2))), c0 = Math.cos(f.ang), s0 = Math.sin(f.ang);
+    f.area = f.len * f.r * 2; f.br = f.len / 2 + f.r;
+    for (let j = 0; j < n; j++) {
+      const u = (j / (n - 1) - 0.5) * f.len + (R() - 0.5) * 3, side = j % 3;
+      const v = side === 0 ? (R() - 0.5) * f.r * 0.4 : side === 1 ? -f.r * (0.35 + R() * 0.45) : f.r * (0.2 + R() * 0.3);
+      const end = Math.abs(u) > f.len * 0.42;
+      const x = f.x + u * c0 - v * s0, z = f.z + u * s0 + v * c0;
+      const s = end ? 2.2 + R() * 2 : side === 0 ? 6 + R() * 4.5 : side === 1 ? 2.2 + R() * 2 : 3.4 + R() * 3;
+      const c = { f, x, z, y: terrain.heightAt(x, z) - 0.25, s, w: side === 0 ? 1.4 + R() * 0.7 : 1.9 + R() * 1.3, k: 1, ph: R() };
+      f.cells.push(c);
+      this.cells.push(c);
+    }
+    f.wsum = f.cells.reduce((a, c) => a + c.s, 0);
   }
 
   setQuality(particleBudget) { this.qk = Math.min(1, Math.max(0.3, particleBudget / 6000)); if (this.smoke) this.smoke.limit = Math.round(this.smoke.max * this.qk); }
@@ -183,13 +228,16 @@ export class FireField {
     const G = 10, pos = [], uvs = [], ints = [], idx = [];
     this.patchRange = [];
     for (const f of this.fires) {
-      const R = f.r * 1.35, o = pos.length / 3;
-      for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
-        const u = i / G, v = j / G, x = f.x + (u - 0.5) * 2 * R, z = f.z + (v - 0.5) * 2 * R;
+      // (A line's patch: a long ellipse round the front, its grid denser along it.)
+      const line = f.kind === 'line', RU = line ? f.len / 2 + f.r * 1.2 : f.r * 1.35, RV = line ? f.r * 1.7 : RU;
+      const GU = line ? Math.min(30, Math.max(G, Math.round(f.len / 10))) : G, ca = Math.cos(f.ang ?? 0), sa = Math.sin(f.ang ?? 0), o = pos.length / 3;
+      for (let j = 0; j <= G; j++) for (let i = 0; i <= GU; i++) {
+        const u = i / GU, v = j / G, lu = (u - 0.5) * 2 * RU, lv = (v - 0.5) * 2 * RV;
+        const x = f.x + lu * ca - lv * sa, z = f.z + lu * sa + lv * ca;
         pos.push(x, terrain.heightAt(x, z) + 0.12, z); uvs.push(u, v); ints.push(1);
       }
-      for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { const a = o + j * (G + 1) + i, b = a + 1, c = a + G + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
-      this.patchRange.push([o, (G + 1) * (G + 1)]);
+      for (let j = 0; j < G; j++) for (let i = 0; i < GU; i++) { const a = o + j * (GU + 1) + i, b = a + 1, c = a + GU + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+      this.patchRange.push([o, (GU + 1) * (G + 1)]);
     }
     const pg = new THREE.BufferGeometry();
     pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -208,6 +256,7 @@ export class FireField {
     this.smoke.limit = Math.round(this.smoke.max * this.qk);
     this.smoke.points.visible = this.water.points.visible = false;
     scene.add(this.flames, this.patches, this.smoke.points, this.water.points);
+    if (FRONTIER) { this.columns = new SmokeColumns(this.fires.length + DISTANT_FIRES.length); scene.add(this.columns.mesh); }
     this._writeFlames();
   }
 
@@ -216,10 +265,22 @@ export class FireField {
   setActive(on) {
     this.active = !!on;
     if (this.visual) this.flames.visible = this.patches.visible = this.smoke.points.visible = this.water.points.visible = this.active;
+    if (this.columns) this.columns.mesh.visible = this.active;
     if (!this.active) { this.packets.length = 0; this._acc = null; }
   }
 
   reset() { this.relight(this.fires.map((f) => f.id)); }
+
+  // Spots (by id) back to unlit, nothing left on the ground (a mission
+  // handed in before its fire was out).
+  extinguish(ids) {
+    for (const f of this.fires) {
+      if (!ids.includes(f.id)) continue;
+      f.intensity = 0; f.state = 'idle';
+      for (const c of f.cells) c.k = 0;
+    }
+    this._writeFlames();
+  }
 
   // Spots (by id) burning again from full.
   relight(ids) {
@@ -244,7 +305,7 @@ export class FireField {
     });
     this.inst.needsUpdate = true;
     const p = this.patchI.array;
-    this.fires.forEach((f, i) => { const [o, n] = this.patchRange[i]; p.fill(f.state === 'burning' ? f.intensity : 0, o, o + n); });
+    this.fires.forEach((f, i) => { const [o, n] = this.patchRange[i]; p.fill(f.state === 'burning' ? f.intensity : f.state === 'idle' ? -1 : 0, o, o + n); });
     this.patchI.needsUpdate = true;
   }
 
@@ -273,8 +334,8 @@ export class FireField {
     for (const f of this.fires) {
       if (f.state !== 'burning') continue;
       const d = Math.hypot(f.x - x, f.z - z);
-      if (d > radius + f.r) continue;
-      const cellA = (Math.PI * f.r * f.r) / f.cells.length;
+      if (d > radius + f.br) continue;
+      const cellA = f.area / f.cells.length;
       let L = 0;
       for (const c of f.cells) {
         const w = 1 - Math.max(0, Math.min(1, (Math.hypot(c.x - x, c.z - z) - radius * 0.8) / (radius * 0.35)));
@@ -303,8 +364,9 @@ export class FireField {
     return onTarget;
   }
 
-  update(dt, wind) {
+  update(dt, wind, cam = null) {
     if (!this.active) return;
+    if (cam) this.cam.copy(cam);
     this.time += dt;
     if (this.visual) this.uTime.value = this.time;
     const T = this.terrain;
@@ -340,10 +402,19 @@ export class FireField {
         for (const c of f.cells) if (c.k > 0.02 && c.k < 1) { c.k = Math.min(1, c.k + dt * 0.004); dirty = true; }
         f.intensity = this._spotIntensity(f);
         if (!this.visual) continue;
-        let n = dt * (5 + 22 * f.intensity) * this.qk + Math.random() * 0.999;
+        // Smoke LOD (Fireboss Frontier): full within 900 m of the camera,
+        // thinned to an eighth by 2.6 km (the impostor column carries it).
+        const lod = FRONTIER ? 1 - 0.88 * Math.min(1, Math.max(0, (Math.hypot(f.x - this.cam.x, f.z - this.cam.z) - 900) / 1700)) : 1;
+        const big = f.kind === 'line' ? Math.min(2.2, f.len / 80) : 1;
+        let n = dt * (5 + 22 * f.intensity) * this.qk * lod * big + Math.random() * 0.999;
         while (n-- >= 1) {
           const c = f.cells[Math.floor(Math.random() * f.cells.length)];
           if (c.k < 0.05) continue;
+          if (lod < 0.5) { // far: fewer, larger puffs
+            this.smoke.spawn(c.x, c.y + c.s, c.z, wind.x * 0.25, 4 + 3 * f.intensity, wind.z * 0.25,
+              { life: 14 + Math.random() * 6, size: 8 + c.s, grow: 13, alpha: 0.22 + 0.1 * f.intensity, drag: 0.16, gravity: -0.3, color: [0.18, 0.17, 0.16] });
+            continue;
+          }
           const g = 0.1 + 0.16 * Math.random(), up = 3 + 3.5 * f.intensity * c.k;
           this.smoke.spawn(c.x + (Math.random() - 0.5) * 2, c.y + c.s * 0.7, c.z + (Math.random() - 0.5) * 2, wind.x * 0.25, up, wind.z * 0.25,
             { life: 10 + Math.random() * 7, size: 3 + c.s * 0.5, grow: 9 + Math.random() * 4, alpha: (0.15 + 0.15 * f.intensity) * (0.7 + 0.6 * c.k), drag: 0.16, gravity: -0.25 - 0.2 * Math.random(), color: [g, g * 0.97, g * 0.93] });
@@ -354,7 +425,8 @@ export class FireField {
       }
     }
     if (dirty && this.visual && ((this._wt = (this._wt || 0) + dt) > 0.5)) { this._wt = 0; this._writeFlames(); }
-    if (this.fires.every((f) => f.state === 'out')) {
+    if (this.columns) this.columns.update(this, wind, dt);
+    if (this.autoRelight && this.fires.every((f) => f.state === 'out')) {
       this.allOutT += dt;
       if (this.allOutT > REIGNITE) this.reset();
     } else this.allOutT = 0;
@@ -362,6 +434,35 @@ export class FireField {
       this.smoke.update(dt, wind, null);
       this.water.update(dt, wind, (x, z) => T.heightAt(x, z));
     }
+  }
+
+  // Smoke the air holds at a point (0 clear … 1 thick): near a burning spot,
+  // and downwind of it in its plume (which rises and widens); a basin holds
+  // it (Fireboss Frontier's Baixada da Fumaça). Cheap: a few spots at most
+  // burn at once.
+  hazeAt(x, y, z, wind) {
+    if (!this.active) return 0;
+    const ws = Math.hypot(wind.x, wind.z), wx = ws > 0.3 ? wind.x / ws : 1, wz = ws > 0.3 ? wind.z / ws : 0;
+    let h = 0;
+    for (const f of this.fires) {
+      if (f.state !== 'burning' || f.intensity < 0.02) continue;
+      const dx = x - f.x, dz = z - f.z, ag = y - f.y;
+      const size = f.kind === 'line' ? 1.4 : 1;
+      // Around the fire, low: the smoke at the source.
+      h += f.intensity * size * 0.55 * Math.exp(-(dx * dx + dz * dz) / (420 * 420)) * Math.exp(-Math.max(0, ag - 120) / 260);
+      // The plume: along the wind, rising to 150–600 m and widening.
+      const along = dx * wx + dz * wz;
+      if (along > 0 && along < 3000) {
+        const lat = Math.abs(-dx * wz + dz * wx), wid = 90 + along * 0.22, mid = 80 + along * 0.18;
+        h += f.intensity * size * 0.5 * Math.exp(-(lat * lat) / (wid * wid)) * Math.exp(-((ag - mid) ** 2) / ((140 + along * 0.15) ** 2)) * (1 - along / 3000);
+      }
+    }
+    if (h > 0 && FRONTIER) {
+      const B = SMOKE_BASIN, ex = Math.max(0, Math.abs(x - B.c[0]) - B.half[0]), ez = Math.max(0, Math.abs(z - B.c[1]) - B.half[1]);
+      h *= 1 + (B.haze - 1) * Math.exp(-(ex * ex + ez * ez) / (300 * 300)) * Math.exp(-Math.max(0, y - 120) / 200);
+    }
+    // (Never thicker than 0.85: the player is challenged, not blinded.)
+    return Math.min(0.85, h * 0.65);
   }
 
   // Nearest burning spot from a position (for the HUD).
@@ -373,5 +474,102 @@ export class FireField {
       if (d < bd) { bd = d; best = f; }
     }
     return best ? { fire: best, dist: bd, bearing: ((Math.atan2(best.x - pos.x, -(best.z - pos.z)) * 180) / Math.PI + 360) % 360 } : null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Impostor smoke columns (Fireboss Frontier): one tall camera-facing quad per
+// burning spot and per distant fire, turned about the vertical only, leaning
+// downwind, its billows drawn by a scrolling noise in the shader — what the
+// particles cannot carry kilometres away. One instanced draw; near the camera
+// the column fades out (the particles take over).
+const COL_VS = /* glsl */ `
+attribute vec4 aBase; // x, y, z, height
+attribute vec4 aLook; // width, alpha, glow, seed
+uniform vec2 uLean;
+varying vec2 vUv;
+varying vec4 vLook;
+varying float vFade;
+#include <fog_pars_vertex>
+void main() {
+  vUv = uv;
+  vLook = aLook;
+  vec3 toCam = cameraPosition - aBase.xyz;
+  vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x) + vec3(1e-4, 0.0, 0.0));
+  float y = uv.y, H = aBase.w;
+  vec3 p = aBase.xyz + right * position.x * aLook.x * (0.3 + 1.1 * y) + vec3(0.0, y * H, 0.0) + vec3(uLean.x, 0.0, uLean.y) * y * y * H;
+  float d = length(toCam);
+  vFade = smoothstep(380.0, 900.0, d);
+  vec4 mvPosition = viewMatrix * vec4(p, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`;
+const COL_FS = /* glsl */ `
+uniform float uTime;
+uniform vec3 uLight;
+varying vec2 vUv;
+varying vec4 vLook;
+varying float vFade;
+#include <fog_pars_fragment>
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float n2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+void main() {
+  float y = vUv.y, x = vUv.x - 0.5;
+  vec2 q = vec2(vUv.x * 2.6 + vLook.w * 7.0, y * 4.0 - uTime * 0.05 - vLook.w * 3.0);
+  float n = n2(q) * 0.5 + n2(q * 2.1 + 3.3) * 0.3 + n2(q * 4.3 - 1.1) * 0.2;
+  float hw = 0.5 * (0.45 + 0.55 * smoothstep(0.0, 0.5, y)) * (0.75 + 0.5 * n);
+  float a = smoothstep(hw, hw * 0.25, abs(x + (n - 0.5) * 0.25 * y));
+  a *= smoothstep(0.0, 0.06, y) * (1.0 - smoothstep(0.55 + 0.35 * n, 1.0, y));
+  a *= vLook.y * vFade * (0.65 + 0.5 * n);
+  if (a < 0.01) discard;
+  vec3 dark = vec3(0.16, 0.15, 0.14), lite = vec3(0.6, 0.58, 0.55);
+  vec3 col = mix(dark, lite, smoothstep(0.05, 0.75, y) * (0.6 + 0.6 * n)) * uLight;
+  col = mix(col, vec3(1.0, 0.45, 0.12), vLook.z * (1.0 - smoothstep(0.0, 0.12, y)) * 0.8);
+  gl_FragColor = vec4(col, min(1.0, a));
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}`;
+class SmokeColumns {
+  constructor(max) {
+    const quad = new THREE.PlaneGeometry(1, 1, 1, 6).translate(0, 0.5, 0);
+    const geo = new THREE.InstancedBufferGeometry();
+    geo.index = quad.index;
+    geo.setAttribute('position', quad.attributes.position);
+    geo.setAttribute('uv', quad.attributes.uv);
+    this.base = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4).setUsage(THREE.DynamicDrawUsage);
+    this.look = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aBase', this.base);
+    geo.setAttribute('aLook', this.look);
+    geo.instanceCount = 0;
+    this.u = { uTime: { value: 0 }, uLean: { value: new THREE.Vector2() }, uLight: { value: new THREE.Color(1, 1, 1) } };
+    this.mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({
+      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {}]), vertexShader: COL_VS, fragmentShader: COL_FS,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true,
+    }));
+    Object.assign(this.mesh.material.uniforms, this.u);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 21;
+    this.lvl = new Float32Array(max); // eased strength per column
+    this.max = max;
+  }
+  update(field, wind, dt) {
+    this.u.uTime.value += dt;
+    const ws = Math.hypot(wind.x, wind.z);
+    this.u.uLean.value.set(ws > 0.2 ? (wind.x / ws) * Math.min(0.6, ws * 0.07) : 0, ws > 0.2 ? (wind.z / ws) * Math.min(0.6, ws * 0.07) : 0);
+    const B = this.base.array, L = this.look.array;
+    let n = 0;
+    const put = (k, x, y, z, H, W, A, glow, seed) => {
+      this.lvl[k] += (A - this.lvl[k]) * Math.min(1, dt * 0.35); // columns build and die slowly
+      if (this.lvl[k] < 0.01) return;
+      B.set([x, y, z, H], n * 4); L.set([W, this.lvl[k], glow, seed], n * 4); n++;
+    };
+    field.fires.forEach((f, i) => {
+      const on = f.state === 'burning' ? f.intensity : 0, big = f.kind === 'line' ? 1.5 : 1;
+      put(i, f.x, f.y, f.z, (260 + 220 * on) * big, (70 + 50 * on) * big, 0.55 * Math.sqrt(on), on, i * 0.37);
+    });
+    DISTANT_FIRES.forEach(([x, z, s], j) => put(field.fires.length + j, x, 0, z, 520 * s, 210 * s, 0.6, 0, 3.1 + j * 0.71));
+    this.base.needsUpdate = this.look.needsUpdate = true;
+    this.mesh.geometry.instanceCount = n;
   }
 }

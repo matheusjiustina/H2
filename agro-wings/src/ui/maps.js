@@ -2,6 +2,8 @@
 import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ, GRAIN_POINTS, WORLD_HALF, FARM_SITES, SITES, WATER, pondRadius } from '../world/layout.js';
 import { rawHeight } from '../world/terrainData.js';
 import { AUX_STRIPS } from '../world/expansion.js';
+import { FRONTIER } from '../world/activeMap.js';
+import { FRONT_BASE_NAME } from '../world/frontier.js';
 
 const EXT = WORLD_HALF - 100; // half extent of the base map (m)
 const CROP_COL = { soy: '#3f8f2c', corn: '#2f7224', cotton: '#5f8f4a', stubble: '#b79a5a', fallow: '#9a3a1c', pasture: '#6f9a3a', banana: '#2f7d32' };
@@ -250,7 +252,7 @@ export function drawMap(g, w, h, base, game, view) {
       g.font = `bold ${lp}px Arial`;
       g.textAlign = 'center';
       g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.fillStyle = col;
-      const txt = st.main ? 'Boa Esperança' : st.farm.short;
+      const txt = st.main ? (FRONTIER ? FRONT_BASE_NAME : 'Boa Esperança') : st.farm.short;
       g.strokeText(txt, 0, -pin - 5); g.fillText(txt, 0, -pin - 5);
       g.restore();
     }

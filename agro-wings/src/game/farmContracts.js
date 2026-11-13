@@ -7,7 +7,7 @@
 // penalised by the weather.
 import { t } from '../i18n/index.js';
 import { FARMS } from '../world/layout.js';
-import { SERRA } from '../world/activeMap.js';
+import { SERRA, FRONTIER } from '../world/activeMap.js';
 import { SERRA_FARM_CONTRACTS, SERRA_FARM_INFO } from './serraContracts.js';
 
 export const FARM_CONTRACTS = [
@@ -299,6 +299,7 @@ export const FARM_CONTRACTS = [
 
 // Serra das Bananeiras (a separate map): its own requests.
 if (SERRA) { FARM_CONTRACTS.length = 0; FARM_CONTRACTS.push(...SERRA_FARM_CONTRACTS); }
+if (FRONTIER) FARM_CONTRACTS.length = 0; // (Fireboss Frontier: no crop work)
 
 // Farm difficulty (1-5) of a request.
 export const contractStars = (c) => FARMS.find((f) => f.id === c.farm)?.difficulty ?? c.level;
@@ -382,3 +383,10 @@ export const FARM_INFO = {
   },
 };
 if (SERRA) Object.assign(FARM_INFO, SERRA_FARM_INFO);
+if (FRONTIER) {
+  FARM_INFO.retiro = {
+    get blurb() { return t('BASE 02 — a remote rural strip on the eastern plains, used as a forward base when the fire is out east.'); },
+    get strip() { return t('560 × 18 m compacted earth, level'); },
+    get weather() { return t('Dry, hot'); },
+  };
+}

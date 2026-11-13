@@ -29,6 +29,7 @@ export const ATMO_U = {
 // A Float32Array is passed by reference by UniformsUtils.cloneUniforms, so
 // every fogged material shares this one array.
 const MIST = new Float32Array([0, 20, 0, 0]);
+const _smokeCol = new THREE.Color(), _smokeSun = new THREE.Color(1.0, 0.55, 0.3);
 
 (function patchFog() {
   const C = THREE.ShaderChunk;
@@ -314,6 +315,7 @@ export class Atmosphere {
     this.cur = cloneParams(this.target);
     this.wet = 0;
     this.mistBase = 0;
+    this.smoke = 0; this.smokeTarget = 0; // wildfire smoke at the camera (0…1)
     this.deck = createDeck();
     sky.skyScene.add(this.deck);
     this.envDeck = new THREE.Mesh(this.deck.geometry, this.deck.material);
@@ -384,6 +386,7 @@ export class Atmosphere {
     // the camera, slowly, so valleys hold it and rises poke out.
     const gh = this.terrain.heightAt(camera.position.x, camera.position.z);
     this.mistBase = damp(this.mistBase, gh - 2, 0.2, dt);
+    this.smoke = damp(this.smoke, this.smokeTarget, 0.6, dt);
     // Eye velocity for the rain streaks (ignore camera cuts).
     const cv = this.rain.mat.uniforms.uCamVel.value;
     if (this._lastCam && dt > 0) {
@@ -406,12 +409,20 @@ export class Atmosphere {
     }
     sky.sun.color.setRGB(...c.sun);
     sky.sun.intensity = c.sunI;
+    if (this.smoke > 0.002) { sky.sun.color.lerp(_smokeSun, this.smoke * 0.45); sky.sun.intensity = c.sunI * (1 - 0.35 * this.smoke); }
     sky.sun.shadow.intensity = c.shadow;
     sky.hemi.color.setRGB(...c.hemiSky);
     sky.hemi.groundColor.setRGB(...c.hemiGnd);
     sky.hemi.intensity = c.hemiI;
     scene.fog.color.setRGB(...c.fog);
     scene.fog.density = c.fogD;
+    // Wildfire smoke where the camera is (Fireboss Frontier; 0 elsewhere):
+    // thicker haze, browner and warmer, the sun dimmed and reddened.
+    const sm = this.smoke;
+    if (sm > 0.002) {
+      scene.fog.density = c.fogD * (1 + 9 * sm) + 0.00045 * sm;
+      scene.fog.color.lerp(_smokeCol.setRGB(0.5 * Math.max(0.25, Math.min(1, c.light ?? 1)), 0.42 * Math.max(0.25, Math.min(1, c.light ?? 1)), 0.35 * Math.max(0.25, Math.min(1, c.light ?? 1))), Math.min(0.8, sm * 0.9));
+    }
     scene.environmentIntensity = c.env;
     this.renderer.toneMappingExposure = c.expo;
     sky.clouds.setLook(c.cloud, c.cTop, c.cBase, c.fog);

@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { rng, fbm } from '../core/math.js';
 import { grassTuft, TILES } from './foliage.js';
 import { BASE, FARM_SITES } from './layout.js';
-import { FIRE_TEST_SPOTS } from './fires.js';
+import { FIRE_SPOTS, inSpotPatch } from './fires.js';
+import { FRONTIER } from './activeMap.js';
 import { ATMO_U } from './atmosphere.js';
 import { lruGet, lruTrim } from './lru.js';
 
@@ -83,7 +84,7 @@ export function createGrass(terrain, quality, atlas) {
       if (Math.abs(x - sh.x) < 12 && Math.abs(z - sh.z) < 9) return true;
     }
     // Burnt ground of the fire spots (src/world/fires.js): no grass on it.
-    for (const f of FIRE_TEST_SPOTS) if (Math.abs(x - f.x) < f.r * 1.3 && Math.abs(z - f.z) < f.r * 1.3 && Math.hypot(x - f.x, z - f.z) < f.r * 1.25) return true;
+    for (const f of FIRE_SPOTS) if (inSpotPatch(f, x, z)) return true;
         if (terrain.surfaceAt(x, z) !== 'grass') return true;
     if (terrain.waterLevel(x, z) > -1e8) return true;
     return false;
@@ -102,7 +103,8 @@ export function createGrass(terrain, quality, atlas) {
       const s = 0.55 + r() * 0.8, rot = r() * Math.PI * 2, tint = 0.82 + r() * 0.34;
       if (blocked(x, z)) continue;
       // Dry capim in patches.
-      const dry = fbm(x / 70 + 3, z / 70, 2) + (r() - 0.5) * 0.6 > 0.25 ? 1 : 0;
+      // (Fireboss Frontier: the dry season — nearly all of it dry.)
+      const dry = fbm(x / 70 + 3, z / 70, 2) + (r() - 0.5) * 0.6 > (FRONTIER ? -0.55 : 0.25) ? 1 : 0;
       p.set(x, terrain.heightAt(x, z) - 0.03, z);
       q.setFromAxisAngle(UP, rot);
       sc.set(s, s * (0.8 + r() * 0.5), s);

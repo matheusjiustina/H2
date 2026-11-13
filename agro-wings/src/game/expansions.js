@@ -27,7 +27,17 @@ export const SERRA_EXPANSION = Object.freeze({
   name: 'Serra das Bananeiras',
 });
 
-export const EXPANSIONS = Object.freeze([FIREBOSS_EXPANSION, SERRA_EXPANSION]);
+// Premium map expansion 03: the fire-fighting theatre (src/world/frontier.js).
+// Its package carries the map, its fire missions and the red fire-service
+// AT-802; flying the Fire Boss there is part of it (`includes`).
+export const FRONTIER_EXPANSION = Object.freeze({
+  id: 'expansion.map-fireboss-frontier', // stable: do not rename
+  map: 'frontier',
+  name: 'Operation: Fireboss Frontier',
+  includes: Object.freeze(['at802f']),
+});
+
+export const EXPANSIONS = Object.freeze([FIREBOSS_EXPANSION, SERRA_EXPANSION, FRONTIER_EXPANSION]);
 
 // The platform's premium system may install its answer BEFORE the game
 // loads (a function on globalThis.AGROWINGS_ENTITLEMENTS), so that what is
@@ -57,4 +67,9 @@ export function isUnlocked(id) {
 }
 
 // Aircraft types carry `premium: <expansion id>` when they belong to one.
-export const aircraftUnlocked = (type) => !type?.premium || isUnlocked(type.premium);
+// An aircraft a map package includes is open with that package too (the
+// package is only ever asked about on its own map: activeMap's MAP_PACKAGE).
+let mapPackage = null;
+export function setMapPackage(exp) { mapPackage = exp ?? null; }
+export const aircraftUnlocked = (type) => !type?.premium || isUnlocked(type.premium)
+  || (!!mapPackage?.includes?.includes(type.id) && isUnlocked(mapPackage.id));

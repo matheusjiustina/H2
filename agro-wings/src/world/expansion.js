@@ -12,8 +12,9 @@
 //
 // Coordinates: x east, z south (north is −z), metres; strip headings are the
 // angle of the strip's axis from +x towards +z.
-import { SERRA } from './activeMap.js';
+import { SERRA, FRONTIER } from './activeMap.js';
 import * as SB from './serra.js';
+import * as FB from './frontier.js';
 import { smoothstep, lerp, clamp, valueNoise } from '../core/math.js';
 
 // ---------------------------------------------------------------------------
@@ -409,6 +410,7 @@ function regionW(r, x, z) {
 const REG = Object.fromEntries(EXP_REGIONS.map((r) => [r.id, r]));
 export function biomeWeights(x, z, out = [0, 0, 0, 0]) {
   if (SERRA) return SB.serraBiome(x, z, out);
+  if (FRONTIER) return FB.frontierBiome(x, z, out);
   out[0] = out[1] = out[2] = out[3] = 0;
   const cer = regionW(REG.cerrado, x, z), ser = regionW(REG.serra, x, z), mor = regionW(REG.morros, x, z), mat = regionW(REG.mata, x, z), var_ = regionW(REG.varzea, x, z);
   out[0] = Math.max(cer, ser * 0.55, mor * 0.25);
@@ -444,4 +446,11 @@ if (SERRA) {
   EXP_REGIONS.push(...SB.SERRA_REGIONS);
   EXP_PROPS.push(...SB.SERRA_PROPS);
   EXP_PASTURES.push(...SB.SERRA_PASTURES);
+}
+// Fireboss Frontier (a separate map): the same, from src/world/frontier.js.
+if (FRONTIER) {
+  for (const a of [EXP_REGIONS, MESAS, RIDGES, HILLS, BASINS, AUX_STRIPS, BOXES, EXP_FALLS, EXP_STREAMS, EXP_PONDS, EXP_ROADS, EXP_FORESTS, EXP_PROPS, EXP_PASTURES]) a.length = 0;
+  EXP_REGIONS.push(...FB.FRONT_REGIONS);
+  EXP_PROPS.push(...FB.FRONT_PROPS);
+  EXP_PASTURES.push(...FB.FRONT_PASTURES);
 }
