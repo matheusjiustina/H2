@@ -129,6 +129,11 @@ export class GroundService {
 
   request(fuelTarget, liquidTarget) {
     const ac = this.game.aircraft, fm = ac.fm;
+    // Still clearing the last one (ladder, hoses): no new service until then.
+    if (this.state === 'aborting') { this.game.toast(t('Ground crew is still clearing the aircraft.')); return false; }
+    // Nothing of an earlier service may stay out (a ladder left standing).
+    if (this.ladder.group.visible) { this.ladder.stow(); this.ladderPose = null; }
+    this.badeco.climb = 0;
     this.target.fuel = Math.min(ac.A.fuelCapacity, Math.max(fm.fuel, fuelTarget));
     this.target.liquid = fm.kitOn === false ? 0 : Math.min(ac.A.hopperCapacity, Math.max(fm.hopper, liquidTarget));
     if (!this.ready()) {

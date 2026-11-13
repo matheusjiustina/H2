@@ -27,16 +27,15 @@ function paint(g, hex) {
 }
 const lathe = (pts, seg = 14) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
 const capsule = (r, len, seg = 10) => new THREE.CapsuleGeometry(r, len, 3, seg);
-// A limb segment tapering from r0 (top) to r1 (bottom) over len, rounded ends.
+// A limb segment hanging from its joint: tapering from r0 (top) to r1
+// (bottom) over len, with rounded ends (a lathed, tapered capsule).
 function limb(r0, r1, len, seg = 10) {
-  const pts = [];
-  for (let i = 0; i <= 4; i++) { const a = (i / 4) * Math.PI / 2; pts.push([Math.sin(a) * r0, -Math.cos(a) * r0 * 0.6 + 0]); }
-  pts.reverse();
-  const top = pts.map(([r, y]) => [r, -y]);
-  const out = [[0, r0 * 0.6], ...top.slice(1)];
+  const out = [];
+  for (let i = 0; i <= 4; i++) { const a = (i / 4) * Math.PI / 2; out.push([Math.sin(a) * r0, Math.cos(a) * r0 * 0.6]); }
   out.push([r1, -len]);
   for (let i = 1; i <= 4; i++) { const a = (i / 4) * Math.PI / 2; out.push([Math.cos(a) * r1, -len - Math.sin(a) * r1 * 0.6]); }
-  return lathe(out.map(([r, y]) => [Math.max(0.0005, r), y]), seg);
+  // (Lathe wants the profile from bottom to top for outward normals.)
+  return lathe(out.reverse().map(([r, y]) => [Math.max(0.0005, r), y]), seg);
 }
 
 export class Badeco {
