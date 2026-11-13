@@ -15,7 +15,7 @@ import { SERRA, FRONTIER } from './activeMap.js';
 import { makeGroundDetail } from '../core/textures.js';
 import { CUT_U, NCUT, CROP_U } from './cutState.js';
 
-const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5, banana: 6, capim: 5 };
+const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5, banana: 6, capim: 7 };
 
 const GLSL_FUNCS = /* glsl */ `
 varying vec3 vWPos;
@@ -190,6 +190,16 @@ vec3 fieldColor(vec2 p, vec4 info, float edgeIn, vec4 nA, vec4 nB, vec4 nC, vec4
     c *= 0.82 + 0.3 * nC.b;
     c = mix(c, vec3(0.09, 0.13, 0.04), smoothstep(0.72, 0.9, nD.r) * 0.6);
     rough = 1.0;
+  } else if (type > 6.5) {
+    // Capim (brachiaria grown thick for desiccation, Mato Grosso Operations):
+    // lighter, yellower than pasture, combed by the wind into streaks,
+    // pale seed heads in patches — no cattle paths.
+    vec2 q = vec2(p.x * 0.9 + p.y * 0.35, p.y * 0.25 - p.x * 0.1);
+    float streak = texture2D(uNoise, q * 0.05).g * 0.6 + texture2D(uNoise, q * 0.16).b * 0.4;
+    c = mix(vec3(0.15, 0.20, 0.055), vec3(0.27, 0.29, 0.10), smoothstep(0.25, 0.8, streak));
+    c = mix(c, vec3(0.36, 0.33, 0.17), smoothstep(0.62, 0.86, nB.r * 0.6 + nD.g * 0.4) * 0.45);
+    c *= 0.86 + 0.28 * nC.b;
+    rough = 0.92;
   } else {
     c = grassColor(p * 1.7, nA, nB, nC, nD) * vec3(1.04, 1.1, 1.0);
     // Cattle paths.
