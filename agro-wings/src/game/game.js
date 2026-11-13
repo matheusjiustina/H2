@@ -926,7 +926,7 @@ export class Game {
       } else if (this.playing) {
         ac.update(dt, input, { mouse, ...this._controlLaw(ac), heliModel: this.settings.heliModel, windScale: this.settings.wind, cameraMode: this.cameraMode });
       } else {
-        ac.update(dt, { ...input, isDown: () => false, wasPressed: () => false, virtual: { active: false } }, { mouse: { buttons: 0, dx: 0, dy: 0, wheel: 0 }, assist: 'normal', windScale: this.settings.wind, cameraMode: 'orbit' });
+        ac.update(dt, { ...input, isDown: () => false, wasPressed: () => false, lastPresses: () => null, virtual: { active: false } }, { mouse: { buttons: 0, dx: 0, dy: 0, wheel: 0 }, assist: 'normal', windScale: this.settings.wind, cameraMode: 'orbit' });
       }
       this.sprayer.emit(dt);
       this.mist.update(dt, ac.windVec, (x, z) => ac.env.top(x, z));

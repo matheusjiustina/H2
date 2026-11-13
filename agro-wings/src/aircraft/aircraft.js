@@ -260,7 +260,7 @@ export class Aircraft {
     const revType = !!this.A.turbine;
     const revOk = revType && fm.engine === 'running' && (fm.out.wheelsOnGround > 0 || fm.out.onGround);
     this.reverseOk = revOk;
-    const lp = revType ? input.lastPresses('throttleDown') : null;
+    const lp = revType ? input.lastPresses?.('throttleDown') ?? null : null; // (input stand-ins without it: no reverse)
     if (lp && lp[2] !== this._ctrlSeen) {
       // A new press since the last frame: the second of two within 450 ms at idle arms reverse.
       if (this._ctrlSeen !== undefined && revOk && fm.throttle <= 0.01 && lp[0] - lp[1] < 450) this.revArmed = true;
