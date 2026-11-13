@@ -13,13 +13,14 @@ import { TIMES, WEATHER } from '../world/atmosphere.js';
 import { AIRCRAFT_TYPES, AIRCRAFT_ORDER } from '../aircraft/types.js';
 import { GAME } from '../config.js';
 import { t } from '../i18n/index.js';
-import { FRONTIER } from '../world/activeMap.js';
+import { FRONTIER, MATOGROSSO } from '../world/activeMap.js';
 import { FRONT_BASE_NAME } from '../world/frontier.js';
+import { MT_BASE_NAME } from '../world/matogrosso.js';
 
 const money = (v) => `${GAME.currency} ${Math.round(v).toLocaleString('en-US')}`;
 const pct = (v) => `${Math.round(v * 100)}%`;
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const farmName = (id) => (id === 'main' ? (FRONTIER ? FRONT_BASE_NAME : 'Fazenda Boa Esperança') : FARMS.find((f) => f.id === id)?.name ?? id);
+const farmName = (id) => (id === 'main' ? (FRONTIER ? FRONT_BASE_NAME : MATOGROSSO ? MT_BASE_NAME : 'Fazenda Boa Esperança') : FARMS.find((f) => f.id === id)?.name ?? id);
 const farmColor = (id) => FARMS.find((f) => f.id === id)?.color ?? '#e9ecef';
 
 const stars = (n) => '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n));
@@ -53,7 +54,7 @@ export function showOffice(screens, tab = 'inbox') {
   }).join('')}</div></div>`;
   else if (tab === 'aircraft') body = aircraftTab(g, atBase);
   else body = historyTab(g);
-  const where = office && !office.main ? t('Farm office · {0}', office.farm.name) : (FRONTIER ? `${t('Hangar office')} · ${FRONT_BASE_NAME}` : t('Hangar office · Fazenda Boa Esperança'));
+  const where = office && !office.main ? t('Farm office · {0}', office.farm.name) : (FRONTIER || MATOGROSSO ? `${t('Hangar office')} · ${FRONTIER ? FRONT_BASE_NAME : MT_BASE_NAME}` : t('Hangar office · Fazenda Boa Esperança'));
   const note = !office ? t('Remote access: requests can be accepted on the ground at any farm office (main base or a farm strip); aircraft are changed at the main base.')
     : !atBase && tab === 'aircraft' ? t('Aircraft are changed only at the main base.') : '';
   const el = h(`<div class="office"><div class="os-bezel"><div class="os-screen">

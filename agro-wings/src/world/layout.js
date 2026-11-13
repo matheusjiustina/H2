@@ -10,19 +10,21 @@ import { EXP_ROADS, EXP_FORESTS, EXP_STREAMS, EXP_PONDS } from './expansion.js';
 // (chosen at load, src/world/activeMap.js) the lists below are filled from
 // src/world/serra.js instead — same shapes, so every system reads them the
 // same way. With the main map active nothing here changes.
-import { SERRA, FRONTIER } from './activeMap.js';
+import { SERRA, FRONTIER, MATOGROSSO } from './activeMap.js';
 import * as SB from './serra.js';
 // Premium map expansion 03 (Fireboss Frontier): the same, from src/world/frontier.js.
 import * as FB from './frontier.js';
+// Premium map expansion 04 (Mato Grosso Operations): from src/world/matogrosso.js.
+import * as MT from './matogrosso.js';
 const swap = (list, items) => { list.length = 0; list.push(...items); };
 
-export const WORLD_HALF = SERRA ? SB.SERRA_WORLD_HALF : FRONTIER ? FB.FRONT_WORLD_HALF : 6000;
+export const WORLD_HALF = SERRA ? SB.SERRA_WORLD_HALF : FRONTIER ? FB.FRONT_WORLD_HALF : MATOGROSSO ? MT.MT_WORLD_HALF : 6000;
 // Half size of the area an aircraft may fly (the whole map on the main one).
-export const PLAY_HALF = SERRA ? SB.SERRA_PLAY_HALF : FRONTIER ? FB.FRONT_PLAY_HALF : WORLD_HALF;
+export const PLAY_HALF = SERRA ? SB.SERRA_PLAY_HALF : FRONTIER ? FB.FRONT_PLAY_HALF : MATOGROSSO ? MT.MT_PLAY_HALF : WORLD_HALF;
 export const FAR_HALF = 24000; // horizon ring
 export const EDGE_ROOM = 600; // m an aircraft may fly past the map edge before it is turned back (was -100)
 
-export const RUNWAY = SERRA ? { ...SB.SERRA_RUNWAY } : FRONTIER ? { ...FB.FRONT_RUNWAY } : { x0: -400, x1: 400, z: 0, width: 24, shoulder: 10 };
+export const RUNWAY = SERRA ? { ...SB.SERRA_RUNWAY } : FRONTIER ? { ...FB.FRONT_RUNWAY } : MATOGROSSO ? { ...MT.MT_RUNWAY } : { x0: -400, x1: 400, z: 0, width: 24, shoulder: 10 };
 
 // Service-area layout shared by the secondary farms (their apron and shed
 // sit where the main base's first ones did; FARM_SITES below).
@@ -103,7 +105,7 @@ export const BASE = {
   truck: { x: -331, z: -98, heading: -Math.PI / 2 },
   windsocks: [{ x: -330, z: 26 }, { x: 360, z: -26 }],
 };
-if (SERRA || FRONTIER) BASE.windsocks = [{ x: -330, z: 24 }, { x: RUNWAY.x1 - 40, z: -24 }];
+if (SERRA || FRONTIER || MATOGROSSO) BASE.windsocks = [{ x: -330, z: 24 }, { x: RUNWAY.x1 - 40, z: -24 }];
 
 // Crop presets: canopy height at full growth, row spacing, look.
 export const CROPS = {
@@ -115,6 +117,8 @@ export const CROPS = {
   pasture: { height: 0, rowSpacing: 0, label: 'Pasture' },
   // (Serra das Bananeiras: the canopy of a banana plantation.)
   banana: { height: 3.4, rowSpacing: 3, label: 'Banana' },
+  // (Mato Grosso Operations: brachiaria for desiccation before the soy.)
+  capim: { height: 0.6, rowSpacing: 0, label: 'Capim' },
 };
 
 let fid = 0;
@@ -251,6 +255,7 @@ FIELDS.push(
 );
 if (SERRA) { fid = 0; swap(FIELDS, SB.SERRA_FIELDS.map((f) => field(f.name, 'banana', f.x0, f.x1, f.z0, f.z1, f.growth ?? 1, f.rowAxis ?? 'x', f.extra ?? {}))); }
 // (Fireboss Frontier: no crops — only the sítios' pastures, rural clearings.)
+if (MATOGROSSO) { fid = 0; swap(FIELDS, MT.MT_FIELDS.map((f) => ({ ...field(f.name, f.crop, f.x0, f.x1, f.z0, f.z1, f.growth, f.rowAxis, f.extra), ...(f.circle ? { circle: f.circle } : {}) }))); }
 if (FRONTIER) { fid = 0; swap(FIELDS, FB.FRONT_PASTURES.map(([x0, x1, z0, z1], i) => field(`P-0${i + 1}`, 'pasture', x0, x1, z0, z1, 1, 'x'))); }
 for (const f of FIELDS) f.level ??= 1;
 
@@ -272,6 +277,7 @@ export const CREEK = {
 
 if (SERRA) Object.assign(CREEK, SB.SERRA_CREEK);
 if (FRONTIER) Object.assign(CREEK, FB.FRONT_CREEK);
+if (MATOGROSSO) Object.assign(CREEK, MT.MT_CREEK);
 
 // Other water: a tributary stream through the Vale do Rio valley into the
 // creek, and small farm reservoirs (açudes) / a valley lake. Pond outlines
@@ -317,6 +323,7 @@ export const WATER = {
 };
 if (SERRA) { swap(WATER.streams, SB.SERRA_STREAMS); swap(WATER.ponds, SB.SERRA_PONDS); }
 if (FRONTIER) { swap(WATER.streams, FB.FRONT_STREAMS); swap(WATER.ponds, FB.FRONT_PONDS); }
+if (MATOGROSSO) { swap(WATER.streams, MT.MT_STREAMS); swap(WATER.ponds, MT.MT_PONDS); }
 // Radius of a pond's shoreline towards angle a.
 // lobes [a2, a3, a5, a7]: the harmonics' amplitudes (default 0.16, 0.09, 0, 0,
 // the original shape); rmax: the largest radius (bounding checks).
@@ -370,6 +377,7 @@ export const FORESTS = [
 
 if (SERRA) swap(FORESTS, SB.SERRA_FORESTS);
 if (FRONTIER) swap(FORESTS, []);
+if (MATOGROSSO) swap(FORESTS, MT.MT_FORESTS);
 
 // Power line along the east side of the corn talhão: obstacle at the end of each pass.
 export const POWERLINE = {
@@ -378,7 +386,7 @@ export const POWERLINE = {
   sag: 1.4,
 };
 
-if (SERRA || FRONTIER) swap(POWERLINE.points, []);
+if (SERRA || FRONTIER || MATOGROSSO) swap(POWERLINE.points, []);
 
 // Main farm roads (centre polylines). Field perimeters get carreadores automatically.
 export const ROADS = [
@@ -452,6 +460,7 @@ ROADS.push(
 
 if (SERRA) swap(ROADS, SB.SERRA_ROADS);
 if (FRONTIER) swap(ROADS, FB.FRONT_ROADS);
+if (MATOGROSSO) swap(ROADS, MT.MT_ROADS);
 
 // Farm headquarters (sede) and grain storage.
 export const HQ = {
@@ -474,6 +483,7 @@ export const GRAIN_POINTS = [
 ];
 
 if (SERRA || FRONTIER) swap(GRAIN_POINTS, []);
+if (MATOGROSSO) swap(GRAIN_POINTS, MT.MT_GRAIN);
 
 // Fences with gates (porteiras) along the base and HQ approaches.
 export const FENCES = [
@@ -488,7 +498,7 @@ export const FENCES = [
   ...pasture(-4880, -4420, 5120, 5380, 'w', 0.5), // CV-02 (Chapada dos Ventos)
 ];
 
-if (SERRA || FRONTIER) swap(FENCES, []);
+if (SERRA || FRONTIER || MATOGROSSO) swap(FENCES, []);
 
 // Four fence sides 3 m inside a pasture, with the gate on one side.
 function pasture(x0, x1, z0, z1, gateSide, gateAt) {
@@ -497,9 +507,14 @@ function pasture(x0, x1, z0, z1, gateSide, gateAt) {
   return Object.entries(sides).map(([k, pts]) => (k === gateSide ? { pts, gateAt } : { pts }));
 }
 
+// Inside a field (m: margin). A centre-pivot field (`circle`, Mato Grosso
+// Operations) is the disc inside its square.
+export const inFieldShape = (f, x, z, m = 0) => x >= f.x0 - m && x <= f.x1 + m && z >= f.z0 - m && z <= f.z1 + m
+  && (!f.circle || Math.hypot(x - f.circle.x, z - f.circle.z) <= f.circle.r + m);
+
 export function fieldAt(x, z) {
   for (const f of FIELDS) {
-    if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1) return f;
+    if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && (!f.circle || Math.hypot(x - f.circle.x, z - f.circle.z) <= f.circle.r)) return f;
   }
   return null;
 }
@@ -601,6 +616,7 @@ export const FARMS = [
 
 if (SERRA) swap(FARMS, SB.SERRA_FARMS);
 if (FRONTIER) swap(FARMS, FB.FRONT_FARMS);
+if (MATOGROSSO) swap(FARMS, MT.MT_FARMS);
 
 const mv = (p, dx, dz) => ({ ...p, x: p.x + dx, z: p.z + dz });
 const mvr = (r, dx, dz) => ({ x0: r.x0 + dx, x1: r.x1 + dx, z0: r.z0 + dz, z1: r.z1 + dz });

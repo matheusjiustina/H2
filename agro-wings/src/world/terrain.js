@@ -15,7 +15,7 @@ import { SERRA, FRONTIER } from './activeMap.js';
 import { makeGroundDetail } from '../core/textures.js';
 import { CUT_U, NCUT, CROP_U } from './cutState.js';
 
-const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5, banana: 6 };
+const CROP_CODE = { soy: 0, corn: 1, cotton: 2, stubble: 3, fallow: 4, pasture: 5, banana: 6, capim: 5 };
 
 const GLSL_FUNCS = /* glsl */ `
 varying vec3 vWPos;
@@ -24,6 +24,9 @@ uniform sampler2D uNoise;
 uniform sampler2D uDetail;
 uniform vec4 uFieldRect[NF];
 uniform vec4 uFieldInfo[NF];
+#ifdef NPIV
+uniform vec4 uPivot[NPIV]; // centre-pivot fields: centre x, z, radius, field index
+#endif
 uniform vec4 uRoadSeg[NR];
 uniform float uRoadW[NR];
 uniform vec2 uCreek[NC];
@@ -340,6 +343,16 @@ vec3 terrainColor(vec2 p, out float rough) {
     float d = sdBox(p, uFieldRect[i]);
     if (d < dmin) { dmin = d; imin = i; }
   }
+#ifdef NPIV
+  // Centre-pivot fields: a disc (their square is kept out of the loop above).
+  float pivR = -1.0;
+  vec2 pivC = vec2(0.0);
+  for (int i = 0; i < NPIV; i++) {
+    vec4 pv = uPivot[i];
+    float d = length(p - pv.xy) - pv.z;
+    if (d < dmin) { dmin = d; imin = int(pv.w + 0.5); pivR = pv.z; pivC = pv.xy; }
+  }
+#endif
   if (dmin < 14.0) {
     vec4 info = uFieldInfo[imin];
     float inField = 1.0 - aaStep(-0.4, dmin);
@@ -352,6 +365,15 @@ vec3 terrainColor(vec2 p, out float rough) {
     }
     vec3 fc = fieldColor(p, info, -dmin, nA, nB, nC, nD, rough);
     if (worked > 1.5) fc *= vec3(0.7, 0.64, 0.6);
+#ifdef NPIV
+    // The pivot's wheel tracks: a ring of bare soil under every tower.
+    if (pivR > 0.0) {
+      float rr = length(p - pivC), sp = PIV_SPAN;
+      float q = abs(mod(rr + sp * 0.5, sp) - sp * 0.5);
+      float wt = (1.0 - smoothstep(0.7, 1.4, abs(q - 1.6))) * step(sp * 0.6, rr);
+      fc = mix(fc, dirtColor(nB, nC, nD) * 0.9, wt * 0.8);
+    }
+#endif
     // Soil grain, clods and straw relief close up (bump) on cropped ground.
     if (info.x < 2.5) fc = soilDetail(fc, det, near, 0.55, 0.25);
     float rough2 = rough;
@@ -496,6 +518,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   const touchesOut = (f) => !(f.x0 - M > -RING_IN && f.x1 + M < RING_IN && f.z0 - M > -RING_IN && f.z1 + M < RING_IN);
   const inOnly = FIELDS.filter((f) => touchesIn(f) && !touchesOut(f)), both = FIELDS.filter((f) => touchesIn(f) && touchesOut(f)), outOnly = FIELDS.filter((f) => !touchesIn(f));
   const SF = [...inOnly, ...both, ...outOnly];
+  const PIV = SF.filter((f) => f.circle);
   const nsIn = FARM_SITES.filter((st) => !st.farm.ring).length;
   const segs = [];
   for (const r of ROADS) if (!r.mesh) for (let i = 0; i < r.pts.length - 1; i++) segs.push({ a: r.pts[i], b: r.pts[i + 1], w: r.w });
@@ -505,6 +528,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   mat.defines = {
     ...(SERRA ? { SERRA_MAP: 1 } : {}),
     ...(FRONTIER ? { FRONT_MAP: 1 } : {}),
+    ...(PIV.length ? { NPIV: PIV.length, PIV_SPAN: '52.0' } : {}),
     NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: PONDS0.length,
     RING_IN: RING_IN.toFixed(1), NF_IN1: inOnly.length + both.length, NF_RING0: inOnly.length, NS_IN: nsIn,
   };
@@ -513,10 +537,11 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uDetail: { value: detailTex },
     uPad: { value: new THREE.Vector2(BASE.pad.x, BASE.pad.z) },
     uFuel: { value: new THREE.Vector2(BASE.fuelTank.x, BASE.fuelTank.z) },
-    uFieldRect: { value: SF.map((f) => new THREE.Vector4(f.x0, f.z0, f.x1, f.z1)) },
+    // (A centre-pivot field's square is moved out of reach: its disc is drawn from uPivot.)
+    uFieldRect: { value: SF.map((f) => (f.circle ? new THREE.Vector4(-1e7, -1e7, -1e7 + 1, -1e7 + 1) : new THREE.Vector4(f.x0, f.z0, f.x1, f.z1))) },
     uFieldInfo: {
       value: SF.map((f) => {
-        const sp = { soy: 0.5, corn: 0.8, cotton: 0.9, stubble: 0.5, fallow: 0.9, pasture: 0, banana: 3 }[f.crop];
+        const sp = { soy: 0.5, corn: 0.8, cotton: 0.9, stubble: 0.5, fallow: 0.9, pasture: 0, banana: 3, capim: 0 }[f.crop];
         return new THREE.Vector4(CROP_CODE[f.crop], f.rowAxis === 'x' ? 0 : 1, f.growth, sp);
       }),
     },
@@ -541,6 +566,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uCutKind: CUT_U.kinds,
     uWet: ATMO_U.wet,
     uBiome: { value: biomeTexture() },
+    ...(PIV.length ? { uPivot: { value: PIV.map((f) => new THREE.Vector4(f.circle.x, f.circle.z, f.circle.r, SF.indexOf(f))) } } : {}),
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -555,7 +581,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : FRONTIER ? 'terrain-v7-frontier' : 'terrain-v7');
+  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : FRONTIER ? 'terrain-v7-frontier' : PIV.length ? 'terrain-v7-pivot' : 'terrain-v7');
   return mat;
 }
 

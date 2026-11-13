@@ -18,6 +18,7 @@ const OBSTACLES = {
   office: 'no escritório',
   pickup: 'na caminhonete',
   'power pole': 'no poste',
+  'center pivot': 'no pivô central',
   reservoir: 'no reservatório',
   shed: 'no galpão',
   silo: 'no silo',

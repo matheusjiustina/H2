@@ -5,7 +5,8 @@ import { GAME, SPRAY } from '../config.js';
 import { readSafe, writeSafe } from '../core/safeStore.js';
 import { t } from '../i18n/index.js';
 import { FARM_CONTRACTS } from './farmContracts.js';
-import { SERRA, FRONTIER } from '../world/activeMap.js';
+import { SERRA, FRONTIER, MATOGROSSO } from '../world/activeMap.js';
+import { MT_CONTRACTS } from './mtContracts.js';
 import { SERRA_CONTRACTS } from './serraContracts.js';
 
 export { FARM_CONTRACTS };
@@ -253,6 +254,12 @@ if (SERRA) {
 
 // Fireboss Frontier (premium map 03): fire missions only (src/game/fireJobs.js).
 if (FRONTIER) CONTRACTS.length = 0;
+// Mato Grosso Operations (premium map 04): its own orders and board headings.
+if (MATOGROSSO) {
+  CONTRACTS.length = 0; CONTRACTS.push(...MT_CONTRACTS);
+  LEVELS[1] = { get label() { return t('Mato Grosso · soy, corn and capim'); }, get short() { return t('MT'); }, get blurb() { return t('Big blocks by the BR-163: long passes on gently rolling chapadão.'); } };
+  LEVELS[2] = { get label() { return t('Centre pivots'); }, get short() { return t('Pivot'); }, get blurb() { return t('Round fields: passes are chords, and the pivot arm crosses them.'); } };
+}
 
 const STORE = 'agrowings.save.v1';
 

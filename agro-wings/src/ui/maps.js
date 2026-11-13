@@ -2,7 +2,7 @@
 import { FIELDS, ROADS, FORESTS, CREEK, RUNWAY, BASE, POWERLINE, HQ, GRAIN_POINTS, WORLD_HALF, FARM_SITES, SITES, WATER, pondRadius } from '../world/layout.js';
 import { rawHeight } from '../world/terrainData.js';
 import { AUX_STRIPS } from '../world/expansion.js';
-import { FRONTIER } from '../world/activeMap.js';
+import { FRONTIER, MATOGROSSO } from '../world/activeMap.js';
 import { FRONT_BASE_NAME } from '../world/frontier.js';
 
 const EXT = WORLD_HALF - 100; // half extent of the base map (m)
@@ -81,13 +81,15 @@ export function buildBaseMap(size = 1024) {
     g.fillStyle = f.kind === 'eucalyptus' ? '#2c4a22' : '#1f3a18';
     g.fillRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
   }
+  // (A centre-pivot field is drawn as its disc.)
+  const fieldFill = (f, pad) => { if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r + pad, 0, Math.PI * 2); g.fill(); } else g.fillRect(f.x0 - pad, f.z0 - pad, f.x1 - f.x0 + pad * 2, f.z1 - f.z0 + pad * 2); };
   for (const f of FIELDS) {
     g.fillStyle = '#9a3a1c';
-    g.fillRect(f.x0 - 7, f.z0 - 7, f.x1 - f.x0 + 14, f.z1 - f.z0 + 14);
+    fieldFill(f, 7);
   }
   for (const f of FIELDS) {
-    g.fillStyle = CROP_COL[f.crop];
-    g.fillRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
+    g.fillStyle = CROP_COL[f.crop] ?? CROP_COL.pasture;
+    fieldFill(f, 0);
   }
   g.strokeStyle = '#a8401f';
   g.lineCap = 'round';
@@ -182,7 +184,7 @@ export function drawMap(g, w, h, base, game, view) {
       g.globalAlpha = 1;
       g.strokeStyle = '#ffe14a';
       g.lineWidth = 3 / scale;
-      g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
+      if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r, 0, Math.PI * 2); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
     }
     const gd = game.guidance;
     if (gd.next) {
@@ -252,7 +254,7 @@ export function drawMap(g, w, h, base, game, view) {
       g.font = `bold ${lp}px Arial`;
       g.textAlign = 'center';
       g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.fillStyle = col;
-      const txt = st.main ? (FRONTIER ? FRONT_BASE_NAME : 'Boa Esperança') : st.farm.short;
+      const txt = st.main ? (FRONTIER ? FRONT_BASE_NAME : MATOGROSSO ? 'Santa Fé' : 'Boa Esperança') : st.farm.short;
       g.strokeText(txt, 0, -pin - 5); g.fillText(txt, 0, -pin - 5);
       g.restore();
     }

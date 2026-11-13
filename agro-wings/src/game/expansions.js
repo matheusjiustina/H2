@@ -37,7 +37,14 @@ export const FRONTIER_EXPANSION = Object.freeze({
   includes: Object.freeze(['at802f']),
 });
 
-export const EXPANSIONS = Object.freeze([FIREBOSS_EXPANSION, SERRA_EXPANSION, FRONTIER_EXPANSION]);
+// Premium map expansion 04: the Mato Grosso agribusiness frontier (src/world/matogrosso.js).
+export const MATOGROSSO_EXPANSION = Object.freeze({
+  id: 'expansion.map-mato-grosso-operations', // stable: do not rename
+  map: 'matogrosso',
+  name: 'Mato Grosso Operations',
+});
+
+export const EXPANSIONS = Object.freeze([FIREBOSS_EXPANSION, SERRA_EXPANSION, FRONTIER_EXPANSION, MATOGROSSO_EXPANSION]);
 
 // The platform's premium system may install its answer BEFORE the game
 // loads (a function on globalThis.AGROWINGS_ENTITLEMENTS), so that what is

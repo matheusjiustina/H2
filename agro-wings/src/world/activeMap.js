@@ -10,13 +10,14 @@
 // development and tests), the stored choice. A premium map that is not
 // unlocked falls back to the main map (src/game/expansions.js is the one
 // place that answers "unlocked?").
-import { isUnlocked, SERRA_EXPANSION, FRONTIER_EXPANSION, setMapPackage } from '../game/expansions.js';
+import { isUnlocked, SERRA_EXPANSION, FRONTIER_EXPANSION, MATOGROSSO_EXPANSION, setMapPackage } from '../game/expansions.js';
 
 export const MAP_KEY = 'agrowings.map';
 export const MAPS = Object.freeze({
   main: { id: 'main', name: 'Fazenda Boa Esperança', premium: null },
   serra: { id: 'serra', name: 'Serra das Bananeiras', premium: SERRA_EXPANSION.id },
   frontier: { id: 'frontier', name: 'Operation: Fireboss Frontier', premium: FRONTIER_EXPANSION.id },
+  matogrosso: { id: 'matogrosso', name: 'Mato Grosso Operations', premium: MATOGROSSO_EXPANSION.id },
 });
 
 function requested() {
@@ -34,6 +35,10 @@ export const SERRA = MAP_ID === 'serra';
 // Premium map expansion 03: the fire-fighting theatre (src/world/frontier.js).
 export const FRONTIER = MAP_ID === 'frontier';
 if (FRONTIER) setMapPackage(FRONTIER_EXPANSION);
+// Premium map expansion 04: the Mato Grosso agribusiness frontier (src/world/matogrosso.js).
+export const MATOGROSSO = MAP_ID === 'matogrosso';
+// A premium map that replaces the main map's farm data (one of the above).
+export const ALT_MAP = SERRA || FRONTIER || MATOGROSSO;
 
 // Store the choice for the next load (the caller reloads the page).
 export function storeMapChoice(id) {

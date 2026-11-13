@@ -14,6 +14,20 @@ export class FieldCoverage {
     this.dose = new Float32Array(this.nx * this.nz);
     this.area = (field.x1 - field.x0) * (field.z1 - field.z0);
     this.cellArea = this.cell * this.cell;
+    // A centre-pivot field (Mato Grosso Operations): only the cells of the
+    // disc are the field (mask 1); the square's corners are outside it.
+    this.mask = null;
+    if (field.circle) {
+      const C = field.circle;
+      this.mask = new Uint8Array(this.nx * this.nz);
+      let n = 0;
+      for (let iz = 0; iz < this.nz; iz++) for (let ix = 0; ix < this.nx; ix++) {
+        const x = field.x0 + (ix + 0.5) * this.cell, z = field.z0 + (iz + 0.5) * this.cell;
+        if (Math.hypot(x - C.x, z - C.z) <= C.r) { this.mask[iz * this.nx + ix] = 1; n++; }
+      }
+      this.cells = n;
+      this.area = n * this.cellArea;
+    }
     this.targetPerM2 = SPRAY.targetRate / 10000; // L/m²
     this.version = 0;
     this.applied = 0; // L landed on this field
@@ -31,6 +45,7 @@ export class FieldCoverage {
     const ix = Math.floor((x - f.x0) / this.cell), iz = Math.floor((z - f.z0) / this.cell);
     if (ix < 0 || iz < 0 || ix >= this.nx || iz >= this.nz) return -1;
     const i = iz * this.nx + ix;
+    if (this.mask && !this.mask[i]) return -1; // (off the pivot's disc)
     const add = litres / (this.cellArea * this.targetPerM2);
     const before = this.dose[i];
     const after = before + add;
@@ -48,8 +63,9 @@ export class FieldCoverage {
   stats() {
     const [lo, hi] = SPRAY.doseGood;
     let good = 0, under = 0, over = 0, sum = 0, sum2 = 0, n = 0;
-    const N = this.dose.length;
-    for (let i = 0; i < N; i++) {
+    const N = this.mask ? this.cells : this.dose.length, M = this.mask;
+    for (let i = 0; i < this.dose.length; i++) {
+      if (M && !M[i]) continue;
       const d = this.dose[i];
       if (d >= lo) good++; else under++;
       if (d > hi) over++;
@@ -70,10 +86,10 @@ export class FieldCoverage {
     let good = 0, n = 0;
     if (axis === 'x') {
       const i0 = Math.max(0, Math.floor((c0 - f.z0) / this.cell)), i1 = Math.min(this.nz - 1, Math.floor((c1 - f.z0) / this.cell));
-      for (let iz = i0; iz <= i1; iz++) for (let ix = 0; ix < this.nx; ix += 2) { n++; if (this.dose[iz * this.nx + ix] >= lo) good++; }
+      for (let iz = i0; iz <= i1; iz++) for (let ix = 0; ix < this.nx; ix += 2) { if (this.mask && !this.mask[iz * this.nx + ix]) continue; n++; if (this.dose[iz * this.nx + ix] >= lo) good++; }
     } else {
       const i0 = Math.max(0, Math.floor((c0 - f.x0) / this.cell)), i1 = Math.min(this.nx - 1, Math.floor((c1 - f.x0) / this.cell));
-      for (let iz = 0; iz < this.nz; iz += 2) for (let ix = i0; ix <= i1; ix++) { n++; if (this.dose[iz * this.nx + ix] >= lo) good++; }
+      for (let iz = 0; iz < this.nz; iz += 2) for (let ix = i0; ix <= i1; ix++) { if (this.mask && !this.mask[iz * this.nx + ix]) continue; n++; if (this.dose[iz * this.nx + ix] >= lo) good++; }
     }
     return n ? good / n : 0;
   }

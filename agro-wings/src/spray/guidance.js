@@ -64,6 +64,14 @@ export class Guidance {
       for (const f of fs) {
         const lo = axis === 'x' ? f.z0 : f.x0, hi = axis === 'x' ? f.z1 : f.x1;
         if (Math.min(hi, c1) - Math.max(lo, c0) < 1) continue;
+        if (f.circle) {
+          // A centre pivot: the pass is the disc's chord (the widest within the pass).
+          const C = f.circle, off = Math.max(0, Math.abs(c - (axis === 'x' ? C.z : C.x)) - sp / 2), hh = C.r * C.r - off * off;
+          if (hh <= 0) continue;
+          const half = Math.sqrt(hh), mid = axis === 'x' ? C.x : C.z;
+          e0 = Math.min(e0, mid - half); e1 = Math.max(e1, mid + half);
+          continue;
+        }
         e0 = Math.min(e0, axis === 'x' ? f.x0 : f.z0); e1 = Math.max(e1, axis === 'x' ? f.x1 : f.z1);
       }
       if (e0 > e1) { e0 = l0; e1 = l1; }
@@ -278,7 +286,7 @@ export class Guidance {
       }
       g.strokeStyle = P.edge;
       g.lineWidth = 2 / scale;
-      g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
+      if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r, 0, Math.PI * 2); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
     }
     // Flight track: thin grey where the boom was off, bright where spraying.
     if (this.trackN > 1) {
@@ -378,7 +386,7 @@ export class Guidance {
       g.strokeStyle = mine ? P.next : f.contract ? P.edge : P.dim;
       g.globalAlpha = mine ? 1 : 0.6;
       g.lineWidth = (mine ? 2.2 : 1) / scale;
-      g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
+      if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r, 0, Math.PI * 2); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
     }
     g.globalAlpha = 1;
     // Fire order (Fire Boss): the spots, burning or out.

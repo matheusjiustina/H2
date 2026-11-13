@@ -14,7 +14,7 @@ import { drawMap, mapControls, mapPoint } from './maps.js';
 import { showOffice } from './office.js';
 import { t, getLang, setLang } from '../i18n/index.js';
 import { aircraftUnlocked, isUnlocked, premiumEnforced, EXPANSIONS } from '../game/expansions.js';
-import { MAPS, MAP_ID, storeMapChoice, FRONTIER } from '../world/activeMap.js';
+import { MAPS, MAP_ID, storeMapChoice, FRONTIER, MATOGROSSO } from '../world/activeMap.js';
 import { FIRE_JOBS } from '../game/fireJobs.js';
 import { MISSION_TYPES } from '../game/frontierMissions.js';
 import { FRONT_BASE_NAME } from '../world/frontier.js';
@@ -218,9 +218,9 @@ export class Screens {
     // memory together); a locked map cannot be chosen.
     const mapRows = Object.values(MAPS).map((m) => {
       const open = !m.premium || isUnlocked(m.premium), on = m.id === MAP_ID;
-      const desc = m.id === 'main' ? t('The original farm country: 12 × 12 km of fields, farms and strips.') : m.id === 'frontier' ? t('Premium map: a wildfire theatre of dry cerrado, two large lakes, broken hills and a smoke basin — Fire Boss missions only, with the red fire-service AT-802.') : t('Premium map: a compact mountain valley of banana plantations, forested ridges and three rustic strips.');
+      const desc = m.id === 'main' ? t('The original farm country: 12 × 12 km of fields, farms and strips.') : m.id === 'matogrosso' ? t('Premium map: the Mato Grosso agribusiness frontier — soy, corn and capim by the BR-163, three centre pivots, reserve edges and four short dirt strips.') : m.id === 'frontier' ? t('Premium map: a wildfire theatre of dry cerrado, two large lakes, broken hills and a smoke basin — Fire Boss missions only, with the red fire-service AT-802.') : t('Premium map: a compact mountain valley of banana plantations, forested ridges and three rustic strips.');
       const state = on ? t('Active map') : !open ? t('Locked') : m.premium ? (premiumEnforced() ? t('Unlocked') : t('Open to everyone during the testing phase')) : '';
-      return `<div class="fl-row${on ? ' sel' : ''}"><span class="fl-img map-ico">${m.id === 'main' ? '🌾' : m.id === 'frontier' ? '🔥' : '🍌'}</span>
+      return `<div class="fl-row${on ? ' sel' : ''}"><span class="fl-img map-ico">${m.id === 'main' ? '🌾' : m.id === 'frontier' ? '🔥' : m.id === 'matogrosso' ? '🚜' : '🍌'}</span>
         <div class="fl-txt"><div class="name">${m.name}</div><div class="desc">${desc}</div><div class="meta"><span>${state}</span></div></div>
         ${on || !open ? '' : `<button class="btn primary small" data-map="${m.id}">${t('Fly this map')}</button>`}</div>`;
     }).join('');
@@ -742,7 +742,7 @@ export class Screens {
     const deg = (r) => String(Math.round(((r * 180) / Math.PI + 360) % 360)).padStart(3, '0');
     const f = c.x != null ? fieldAt(c.x, c.z) : null;
     const ns = c.x != null ? nearestSite(c.x, c.z) : null;
-    const place = f ? `${f.name} · ${t(CROPS[f.crop]?.label ?? f.crop)}` : ns ? `${ns.site.main ? (FRONTIER ? FRONT_BASE_NAME : 'Faz. Boa Esperança') : ns.site.farm.name} · ${(ns.dist / 1000).toFixed(1)} km` : '—';
+    const place = f ? `${f.name} · ${t(CROPS[f.crop]?.label ?? f.crop)}` : ns ? `${ns.site.main ? (FRONTIER ? FRONT_BASE_NAME : MATOGROSSO ? 'Faz. Santa Fé' : 'Faz. Boa Esperança') : ns.site.farm.name} · ${(ns.dist / 1000).toFixed(1)} km` : '—';
     const heli = ac.kind === 'heli';
     const now = new Date();
     const occ = `OC-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;

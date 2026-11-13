@@ -18,7 +18,8 @@ import { createForestCrowns } from './forestCrowns.js';
 import { freezeStatic } from './staticFreeze.js';
 import { WorldStreaming } from './worldStreaming.js';
 import { createExpansionScenery, expansionColliders } from './expansionScenery.js';
-import { SERRA } from './activeMap.js';
+import { SERRA, MATOGROSSO } from './activeMap.js';
+import { createPivots } from './pivots.js';
 import { createBananas } from './serraScenery.js';
 
 export class World {
@@ -63,6 +64,8 @@ export class World {
     this.expColliders = expansionColliders(this.terrain);
     // Serra das Bananeiras: the banana plantations (instanced, streamed).
     if (SERRA) { this.bananas = createBananas(this.terrain, this.quality); this.scene.add(this.bananas.group); this.updaters.push(this.bananas); }
+    // Mato Grosso Operations: the centre-pivot machines (one merged mesh).
+    if (MATOGROSSO) { this.pivots = createPivots(this.terrain); this.scene.add(this.pivots.group); }
     this.treeHit = makeTreeCollider(this.vegetation);
     this.activity = createFieldActivity(this.scene, this.structures.M, this.terrain);
     // The harrowing tractor on T-08 (audio, older checks).
@@ -83,6 +86,7 @@ export class World {
       if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y < c.top && !(y < c.bottom)) return c.name;
     }
     for (const c of this.expColliders) if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && y < c.top) return c.name;
+    if (this.pivots) { const pv = this.pivots.hit(x, y, z, th); if (pv) return pv; }
     return this.extraObstacle?.(x, y, z) ?? null;
   }
 
@@ -96,6 +100,7 @@ export class World {
       top = Math.max(top, T.surfaceTop ? T.surfaceTop(x + dx, z + dz) : T.heightAt(x + dx, z + dz));
     }
     top = Math.max(top, this.treeTopNear(x, z, rad));
+    if (this.pivots) top = Math.max(top, this.pivots.topNear(x, z, rad, T.heightAt(x, z)));
     for (const c of this.structures.colliders) if (x > c.x0 - rad && x < c.x1 + rad && z > c.z0 - rad && z < c.z1 + rad) top = Math.max(top, c.top);
     for (const c of this.expColliders) if (x > c.x0 - rad && x < c.x1 + rad && z > c.z0 - rad && z < c.z1 + rad) top = Math.max(top, c.top);
     for (const w of this.structures.wires) {

@@ -280,9 +280,16 @@ function buildCanopy(f, h, terrain, mat) {
   const aF = new Float32Array(nx * nz * 4), aI = new Float32Array(nx * nz * 4);
   for (let j = 0; j < nz; j++) {
     for (let i = 0; i < nx; i++) {
-      const x = Math.min(f.x1, f.x0 + i * step), z = Math.min(f.z1, f.z0 + j * step);
+      let x = Math.min(f.x1, f.x0 + i * step), z = Math.min(f.z1, f.z0 + j * step);
       const k = j * nx + i;
-      const edge = Math.min(x - f.x0, f.x1 - x, z - f.z0, f.z1 - z);
+      let edge = Math.min(x - f.x0, f.x1 - x, z - f.z0, f.z1 - z);
+      // A centre-pivot field (Mato Grosso Operations): the grid's points
+      // outside the disc are pulled onto its rim (a round canopy).
+      if (f.circle) {
+        const C = f.circle, dx = x - C.x, dz = z - C.z, d = Math.hypot(dx, dz);
+        if (d > C.r) { x = C.x + (dx / d) * C.r; z = C.z + (dz / d) * C.r; }
+        edge = Math.max(0, C.r - d);
+      }
       // Slightly lower at the very edge (headlands are trodden by machines).
       const eh = 0.85 + 0.15 * Math.min(1, edge / 6);
       pos[k * 3] = x; pos[k * 3 + 1] = terrain.heightAt(x, z) + hc * eh; pos[k * 3 + 2] = z;
@@ -343,10 +350,19 @@ function buildEdges(f, h, terrain, mat) {
       idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
     }
   };
-  side(f.x0, f.z0, f.x1, f.z0);
-  side(f.x1, f.z0, f.x1, f.z1);
-  side(f.x1, f.z1, f.x0, f.z1);
-  side(f.x0, f.z1, f.x0, f.z0);
+  if (f.circle) {
+    // Round field: the wall follows the rim.
+    const C = f.circle, N = Math.max(24, Math.ceil((2 * Math.PI * C.r) / 24));
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2, b = ((i + 1) / N) * Math.PI * 2;
+      side(C.x + Math.cos(a) * C.r, C.z + Math.sin(a) * C.r, C.x + Math.cos(b) * C.r, C.z + Math.sin(b) * C.r);
+    }
+  } else {
+    side(f.x0, f.z0, f.x1, f.z0);
+    side(f.x1, f.z0, f.x1, f.z1);
+    side(f.x1, f.z1, f.x0, f.z1);
+    side(f.x0, f.z1, f.x0, f.z0);
+  }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
@@ -377,10 +393,19 @@ function buildFins(f, x0, x1, z0, z1, terrain) {
   const a0 = alongX ? z0 : x0, a1 = alongX ? z1 : x1; // across-row extent
   const l0 = alongX ? x0 : z0, l1 = alongX ? x1 : z1; // along-row extent
   const k0 = Math.ceil(a0 / sp - 0.5), k1 = Math.floor(a1 / sp - 0.5);
-  const n = Math.max(1, Math.ceil((l1 - l0) / seg));
   const tramPhase = (f.id * 7.3) % 27;
   for (let k = k0; k <= k1; k++) {
     const c = (k + 0.5) * sp;
+    // (A pivot field: the row runs only across the disc.)
+    let rl0 = l0, rl1 = l1;
+    if (f.circle) {
+      const C = f.circle, off = c - (alongX ? C.z : C.x), hh = C.r * C.r - off * off;
+      if (hh <= 0) continue;
+      const half = Math.sqrt(hh) - 0.5, mid = alongX ? C.x : C.z;
+      rl0 = Math.max(l0, mid - half); rl1 = Math.min(l1, mid + half);
+      if (rl1 - rl0 < 1) continue;
+    }
+    const n = Math.max(1, Math.ceil((rl1 - rl0) / seg));
     // Rows under the ground sprayer's wheel tracks are flattened (matches the
     // tramlines drawn on the canopy from the air).
     const tp = (((c - tramPhase) % 27) + 27) % 27 - 13.5;
@@ -394,7 +419,7 @@ function buildFins(f, x0, x1, z0, z1, terrain) {
     const hw = sp * (0.2 + 0.28 * f.growth);
     const across = alongX ? [0, 1] : [1, 0]; // unit vector across the rows (x, z)
     for (let i = 0; i <= n; i++) {
-      const l = l0 + ((l1 - l0) * i) / n;
+      const l = rl0 + ((rl1 - rl0) * i) / n;
       const x = alongX ? l : c, z = alongX ? c : l;
       const u = (l + uOff) / 4;
       for (const sd of [-1, 0, 1]) {

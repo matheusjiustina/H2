@@ -47,7 +47,7 @@ export class CoverageOverlay {
     const c = this._c;
     for (let i = 0; i < cov.dose.length; i++) {
       doseColor(cov.dose[i], c);
-      d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = c[3];
+      d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = cov.mask && !cov.mask[i] ? 0 : c[3]; // (a pivot: the disc only)
     }
     it.ctx.putImageData(it.img, 0, 0);
     it.version = cov.version;
