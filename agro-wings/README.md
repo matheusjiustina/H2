@@ -4909,3 +4909,58 @@ far plain, low over a fire line, the base, a high overview).**
 | Frontier · high (fire line burning) | 44.1 s | 186 MB | 742 | 70 | 349 / 304 / 511 / 1118 | 417 / 392 / 603 / 942 |
 
 (Times are SwiftShader CPU rendering, not a GPU: compare them only between rows.)
+
+## Premium Expansion 04 — Mato Grosso Operations (a separate map)
+The agribusiness frontier of Mato Grosso: broad soy and corn blocks by the
+BR-163, brachiaria (capim) for desiccation, three centre-pivot circles,
+legal-reserve edges, red-earth farm roads and four short dirt strips. The
+main map, the Serra, the Frontier and every aircraft are unchanged (`npm
+test` 247/247, `test:serra` 10/10, `test:frontier` 9/9); the whole
+agricultural fleet flies here.
+
+**Architecture.** One map per page as before (`activeMap.js`, id
+`matogrosso`); data in `src/world/matogrosso.js` (terrain, strips, fields,
+pivots, roads, forests, water, props, biome), orders in
+`src/game/mtContracts.js`, premium id `expansion.map-mato-grosso-operations`
+(same entitlement source and testing-phase setting; no purchase, payment or
+account code changed).
+
+**Size and terrain.** 8 × 8 km detailed (10.4 m grid), 6.8 × 6.8 km playable
+(46 km², a third of the main map). Gently rolling chapadão: −14 … +13 m,
+steepest 6.4 % off the creek banks, the land rising a little to the north,
+shallow creek valleys; the base and the sede on level ground.
+
+**Strips.** Fazenda Santa Fé (base, 700 × 20 m dirt); Pista do Pivô
+(540 × 16 m red clay, +1.5 % eastbound); Pista do Capim (470 × 14 m rough
+earth, +2.2 %); Pista da Reserva (500 × 15 m, −1.2 % with a cross slope, by
+the BR).
+
+**Land.** Zones A (BR front: big soy/corn blocks both sides of the highway),
+B (pivot district), C (capim sector, drawn as thick wind-combed brachiaria),
+D (reserve edge: straight forest edges against the crops), E (backlands:
+narrow crooked roads). Stubble, fallow and pasture complete the mosaic.
+
+**Centre pivots.** Fields may now be round (`circle` on the field): the disc
+is the field for `fieldAt`, coverage (a cell mask; P-01 = 55.4 ha exactly),
+the GPS passes (chords of the disc), the canopy (grid pulled onto the rim),
+the edge walls, the row fins, the 3D plants, the terrain shader (disc + soil
+rings under the towers) and the maps. The machines (`src/world/pivots.js`):
+centre tower, arched pipeline on A-frame towers with tyres, truss, drop hoses,
+overhang and end gun — all three pivots in two draw calls. The arm is an
+obstacle at the height of its pipe (≈ 4.1–4.9 m): at work height a pass
+must hop over it; 7.5 m up or beside it is clear.
+
+**BR-163.** A paved ribbon (asphalt, white edge lines, dashed yellow centre
+line, red gravel shoulder) draped on the terrain, its own material in the
+road system (other roads unchanged).
+
+**Orders.** 8 at the base (soy, corn, the long runs), pivot requests at the
+pivot strip (pivot discs + a corn block), desiccation at the capim strip,
+reserve-edge fields at the reserve strip; pt-BR and English.
+
+**Tests.** `npm run test:mt` (7: size, gentle relief, strips and grades, land
+use and clearances, pivots — round field, coverage, chords, arm at work
+height —, orders, premium); `node test/mte2e.mjs` (11 in the browser:
+selector, switch both ways with the career kept, board, the arm as an
+obstacle, a pivot sprayed to completion hopping the arm, a crash into the
+arm at work height, a capim desiccation to completion, no page errors).
