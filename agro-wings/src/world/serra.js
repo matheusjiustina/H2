@@ -19,6 +19,7 @@
 //      the creek, its pool and the grass strip.
 //   E  Serra de Cima — the rugged hills of the south-west, the hill strip.
 import { valueNoise, fbm, smoothstep, lerp, clamp, segDist } from '../core/math.js';
+import { SERRA } from './activeMap.js';
 
 export const SERRA_WORLD_HALF = 3000; // detailed terrain: 6 × 6 km (7.8 m grid)
 export const SERRA_PLAY_HALF = 2300; // playable: 4.6 × 4.6 km
@@ -234,7 +235,9 @@ function buildPlots() {
   }
   return plots;
 }
-export const SERRA_PLOTS = buildPlots();
+// (Grown only when the Serra is the active map: on any other map nothing of
+// it is built — no CPU spent on a map that is not loaded.)
+export const SERRA_PLOTS = SERRA ? buildPlots() : [];
 // Site of a plot (its contracts are flown from the nearest strip).
 const siteOf = (pl) => {
   const cx = pl.rects.reduce((a, r) => a + (r.x0 + r.x1) / 2, 0) / pl.rects.length, cz = pl.rects.reduce((a, r) => a + (r.z0 + r.z1) / 2, 0) / pl.rects.length;
@@ -277,7 +280,7 @@ const inField = (x, z, m = 0) => allRects.some((f) => x > f.x0 - m && x < f.x1 +
 export const SERRA_SITIOS = [];
 export const SERRA_PROPS = [];
 export const SERRA_PASTURES = [];
-{
+if (SERRA) {
   const ok = (x, z, m) => free(x, z) && !inField(x, z, m) && slopeAt(x, z, 16) < 0.13 && serraNatural(x, z) < 110;
   const KINDS = [['galpao', 'tower'], ['corral'], ['tower'], ['galpao'], ['corral', 'tower'], ['shack'], ['galpao']];
   for (const road of SERRA_ROADS.slice(1)) {
