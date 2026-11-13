@@ -34,7 +34,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { canvas, canvasTexture } from '../core/textures.js';
 import { clamp, lerp, rng } from '../core/math.js';
-import { E203_PANEL, E203_ANG, HOPPER_WALL, HOPPER_SLOT, KEY_POS, toGph, C2F } from './e203Panel.js';
+import { E203_PANEL, E203_ANG, HOPPER_WALL, HOPPER_SLOT, KEY_POS, toGph, C2F, E203_SIGHT_LIQUID } from './e203Panel.js';
+import { sightLiquid } from './hopperLiquid.js';
 import { NAV_PAGES } from './agroNav.js';
 
 const P = E203_PANEL;
@@ -752,6 +753,7 @@ export function buildE203Cockpit(ctx) {
   // Eye: the pilot figure's eyes on this seat (OFF + its head), leaning a
   // little forward as when flying.
   const eye = new THREE.Vector3(...o3(0, 0.98, -0.52));
-  return { cockpit, stick, pedals, throttle, valve, leds, panelMesh: pan, eye, THR, update, pick, pickables };
+  const hopperLiquid = [sightLiquid(CM.hopper, E203_SIGHT_LIQUID)];
+  return { cockpit, stick, pedals, throttle, valve, leds, panelMesh: pan, eye, THR, update, pick, pickables, hopperLiquid };
 }
 const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];

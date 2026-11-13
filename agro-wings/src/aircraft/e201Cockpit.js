@@ -25,7 +25,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { canvas, canvasTexture } from '../core/textures.js';
 import { clamp, rng, lerp } from '../core/math.js';
-import { E201_PANEL, E201_ANG, E201_ATLAS, E201_PLACARDS } from './e201Panel.js';
+import { E201_PANEL, E201_ANG, E201_ATLAS, E201_PLACARDS, E201_SIGHT_LIQUID } from './e201Panel.js';
+import { sightLiquid } from './hopperLiquid.js';
 import { NAV_PAGES } from './agroNav.js';
 
 const P = E201_PANEL;
@@ -597,5 +598,6 @@ export function buildE201Cockpit(ctx) {
   };
   pf.updateMatrix();
   const panelRef = new THREE.Vector3(0, 0, 0).applyMatrix4(pf.matrix);
-  return { cockpit, stick, pedals, throttle, valve, leds: [], THR, panelMesh: pf, update, pick, pickables, gps: gpsG, needles, refs: { panel: panelRef } };
+  const hopperLiquid = [sightLiquid(CM.hopper, E201_SIGHT_LIQUID)];
+  return { cockpit, stick, pedals, throttle, valve, leds: [], THR, panelMesh: pf, update, pick, pickables, gps: gpsG, needles, refs: { panel: panelRef }, hopperLiquid };
 }

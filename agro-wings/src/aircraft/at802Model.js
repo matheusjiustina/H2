@@ -1354,6 +1354,7 @@ export function createAT802Model(panel, opts = {}) {
   };
 
   return {
+    hopperLiquid: ck.hopperLiquid,
     variant,
     setReg(r) {
       REG = r;

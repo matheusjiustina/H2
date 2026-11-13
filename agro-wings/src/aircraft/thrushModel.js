@@ -932,6 +932,7 @@ export function createThrushModel(panel, opts = {}) {
   };
 
   return {
+    hopperLiquid: ck.hopperLiquid,
     // New registration marks: only the livery canvas is redrawn.
     setReg(r) {
       const n = liveryTextures(r);

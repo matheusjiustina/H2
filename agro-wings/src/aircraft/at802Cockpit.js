@@ -28,6 +28,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { clamp, lerp } from '../core/math.js';
 import { AT802_ANG, AT802_SCREENS, CONSOLE_KEYS } from './at802Panel.js';
 import { NAV_PAGES } from './agroNav.js';
+import { sightLiquid } from './hopperLiquid.js';
 
 const D2R = Math.PI / 180;
 const TILT = 12 * D2R; // facets lean back
@@ -530,10 +531,13 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     add('chrome', new THREE.BoxGeometry(sight.w + 0.012, 0.006, 0.01).translate(0, sight.y + sight.h / 2, ZH - 0.004));
     add('chrome', new THREE.BoxGeometry(sight.w + 0.012, 0.006, 0.01).translate(0, sight.y - sight.h / 2, ZH - 0.004));
     for (const sx of [-1, 1]) add('chrome', new THREE.BoxGeometry(0.006, sight.h, 0.01).translate(sx * (sight.w / 2 + 0.003), sight.y, ZH - 0.004));
-    var liquid = new THREE.Mesh(new THREE.PlaneGeometry(0.022, 1).translate(0, 0.5, 0).rotateY(Math.PI), C.liquid);
+    // The liquid column: full height; its surface is cut live by the
+    // material (hopperLiquid.js) — level, slosh and ripples.
+    var sightH = sight.h - 0.024;
+    var liquid = new THREE.Mesh(new THREE.PlaneGeometry(0.022, sightH).translate(0, sightH / 2, 0).rotateY(Math.PI), C.liquid);
     liquid.position.set(0.012, sight.y - sight.h / 2 + 0.01, ZH - 0.003);
     cockpit.add(liquid);
-    var sightH = sight.h - 0.024;
+    var hopperLiquid = [sightLiquid(C.liquid, { sheet: true, size: [22, sightH * 1000], windows: [{ box: [0, 22, 0, sightH * 1000], rows: [[sightH * 1000, 0], [0, 1]], men: [255, 255, 255, 0.45], menPx: 1.5 }] })];
   }
   // Floor (ribbed sheet) and the floor tunnel under the stick.
   {
@@ -765,7 +769,6 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     // Hopper sight level: the product (AT-802A, US gal scale) or the water
     // (Fire Boss, litres scale) the simulation carries.
     const max = FB ? 3000 : 800 * 3.785;
-    liquid.scale.y = Math.max(0.001, clamp(d.hopper / max, 0, 1) * sightH);
     const master = on;
     for (const p of pickables) if (p.userData.gpsPage) p.material.emissiveIntensity = master && p.userData.gpsPage === panel.page ? 0.7 : 0;
   };
@@ -783,5 +786,5 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     else if (a === 'spray' && (game ?? ac?.game)?.sprayer) (game ?? ac.game).sprayer.toggle();
     return a ?? null;
   };
-  return { cockpit, stick, pedals, throttle, valve, leds, update, pick, pickables, frames: { F_C, F_L, F_R }, THR };
+  return { cockpit, stick, pedals, throttle, valve, leds, update, pick, pickables, frames: { F_C, F_L, F_R }, THR, hopperLiquid };
 }

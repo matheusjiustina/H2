@@ -251,6 +251,12 @@ function drawPlacards() {
 // the product line behind it.
 export const AGCAT_HOPPER = { W: 256, H: 512, cap: 1136 };
 const HOP_WIN = { top: 70, bot: 470 };
+// The product through the translucent wall (hopperLiquid.js): empty at row
+// 470, 300 US gal (the hopper's 1,136 L) at row 70, the whole wall's width.
+export const AGCAT_SIGHT_LIQUID = {
+  size: [AGCAT_HOPPER.W, AGCAT_HOPPER.H],
+  windows: [{ box: [0, AGCAT_HOPPER.W, 0, AGCAT_HOPPER.H], rows: [[470, 0], [70, 1]], top: [60, 40, 15, 0.5], bot: [40, 25, 8, 0.62], men: [255, 235, 190, 0.55], menPx: 3 }],
+};
 function drawHopperBg() {
   const c = canvas(AGCAT_HOPPER.W, AGCAT_HOPPER.H), g = c.getContext('2d');
   const gr = g.createLinearGradient(0, 0, 0, AGCAT_HOPPER.H);
@@ -286,19 +292,10 @@ export function createAgCatPanel({ reg = 'PR-GAC' } = {}) {
   const gps = createAgroNav({ home: { x: BASE.pad.x, z: BASE.pad.z, name: 'BASE · PÁTIO', label: 'PÁTIO DA BASE (SEM CONTRATO)' } });
   const redraw = (s, key, fn) => { if (key === s.key) return; s.key = key; fn(s.g); s.tex.needsUpdate = true; };
   let lastNow = performance.now(), hours = 3412.6, lastLvl = -1, vKey = '';
-  // The product seen through the wall (redrawn only when it moved ≥ 1 %).
-  const drawLevel = (f) => {
-    hg.drawImage(hopBg, 0, 0);
-    if (f > 0.003) {
-      const y = HOP_WIN.bot - f * (HOP_WIN.bot - HOP_WIN.top);
-      const lg = hg.createLinearGradient(0, y, 0, AGCAT_HOPPER.H);
-      lg.addColorStop(0, 'rgba(60,40,15,0.5)'); lg.addColorStop(1, 'rgba(40,25,8,0.62)');
-      hg.fillStyle = lg; hg.fillRect(0, y, AGCAT_HOPPER.W, AGCAT_HOPPER.H - y);
-      hg.fillStyle = 'rgba(255,235,190,0.55)'; hg.fillRect(0, y - 2, AGCAT_HOPPER.W, 3);
-    }
-    hopper.needsUpdate = true;
-  };
-  drawLevel(0);
+  // The wall and its scales only: the product is drawn live by the wall's
+  // material (hopperLiquid.js, AGCAT_SIGHT_LIQUID).
+  hg.drawImage(hopBg, 0, 0);
+  hopper.needsUpdate = true;
   const api = {
     dials, card, bezel, placards, hopper, hobbs, gps,
     texture: null, // (no flat panel texture: the instruments are 3D)
@@ -327,8 +324,6 @@ export function createAgCatPanel({ reg = 'PR-GAC' } = {}) {
           text(g, ch, x + 15, 25, 30, i === 4 ? '#111' : '#eee', false);
         }
       });
-      const lvl = clamp((d.hopper ?? 0) / (d.hopperCap || 1), 0, 1);
-      if (Math.abs(lvl - lastLvl) > 0.01) { lastLvl = lvl; drawLevel(lvl); }
       gps.draw(d, dt, master);
     },
     setReg(r) { api.reg = r; },

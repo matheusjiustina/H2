@@ -134,7 +134,7 @@ export class PerfManager {
   // Back to the defaults of the graphics section.
   restoreDefaults() {
     const s = this.game.settings;
-    s.fpsLimit = 0; s.showFps = false; s.autoLast = null;
+    s.fpsLimit = 60; s.showFps = false; s.autoLast = null;
     this.setProfile('auto');
   }
 
@@ -143,10 +143,21 @@ export class PerfManager {
 
   // FPS cap: true when this animation callback should be skipped. The next
   // processed frame sees the whole elapsed time, so the game stays correct.
+  // Deadlines on a fixed grid (not "time since the last frame"), so the
+  // average rate is the limit on any display: 60 on a 144 / 165 Hz screen,
+  // not the 48 / 55 a since-last-frame test gives there. After a stall
+  // (> one interval late) the grid restarts from now. A callback up to half
+  // a display interval early counts as on time (timing jitter), so a limit
+  // at or above the display's rate never drops a frame.
   gate(now) {
     const lim = this.game.settings.fpsLimit;
-    if (!(lim > 0)) { this.lastFrame = now; return false; }
-    if (now - this.lastFrame < 1000 / lim - 2) return true;
+    const d = now - (this.lastCall ?? now);
+    this.lastCall = now;
+    if (d > 2 && d < 50) this.dispIv = this.dispIv ? this.dispIv + (d - this.dispIv) * 0.1 : d;
+    if (!(lim > 0)) { this.nextFrame = 0; this.lastFrame = now; return false; }
+    const iv = 1000 / lim;
+    if (this.nextFrame && now < this.nextFrame - Math.max(1, (this.dispIv || 0) / 2)) return true;
+    this.nextFrame = this.nextFrame && now - this.nextFrame < iv ? this.nextFrame + iv : now + iv;
     this.lastFrame = now;
     return false;
   }

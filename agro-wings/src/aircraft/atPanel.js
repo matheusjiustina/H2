@@ -40,6 +40,13 @@ export const AT_PANEL = {
 };
 const instAt = Object.fromEntries(AT_PANEL.inst.map(([id, x, y, r]) => [id, [x, y, r]]));
 
+// The product in the sight (hopperLiquid.js): the marks run 0…1900 L over
+// rows 424…24 of the 256 × 448 sight canvas; the hopper holds 1,893 L.
+export const AT_SIGHT_LIQUID = {
+  size: [256, 448],
+  windows: [{ box: [14, 242, 14, 424], rows: [[424, 0], [24, 1900 / 1893]], top: [95, 150, 120, 0.55], bot: [45, 90, 70, 0.7], men: [220, 240, 225, 0.75], menPx: 3 }],
+};
+
 export function createTurbinePanel({ reg = 'PR-AWT' } = {}) {
   const c = canvas(AT_PANEL.W, AT_PANEL.H);
   const tex = canvasTexture(c, { aniso: 8 });
@@ -52,25 +59,12 @@ export function createTurbinePanel({ reg = 'PR-AWT' } = {}) {
   const sg = sc.getContext('2d');
   const sightBg = canvas(256, 448);
   drawSightBackground(sightBg.getContext('2d'), 1900, 100);
-  let lastHopper = -1;
-  const drawSight = (hopper, cap) => {
-    sg.drawImage(sightBg, 0, 0);
-    const top = 24, bot = 424;
-    const y = bot - clamp(hopper / 1900, 0, cap / 1900) * (bot - top);
-    if (hopper > 0.5) {
-      const lg = sg.createLinearGradient(0, y, 0, bot);
-      lg.addColorStop(0, 'rgba(95,150,120,0.55)');
-      lg.addColorStop(1, 'rgba(45,90,70,0.7)');
-      sg.fillStyle = lg;
-      sg.fillRect(14, y, 228, bot - y);
-      sg.fillStyle = 'rgba(220,240,225,0.75)';
-      sg.fillRect(14, y - 1, 228, 3);
-    }
-    sg.strokeStyle = 'rgba(0,0,0,0.6)'; sg.lineWidth = 14;
-    sg.strokeRect(7, 7, 242, 434);
-    sightTex.needsUpdate = true;
-  };
-  drawSight(0, 1893);
+  // The wall and its marks only: the product is drawn live by the sight's
+  // material (hopperLiquid.js, AT_SIGHT_LIQUID).
+  sg.drawImage(sightBg, 0, 0);
+  sg.strokeStyle = 'rgba(0,0,0,0.6)'; sg.lineWidth = 14;
+  sg.strokeRect(7, 7, 242, 434);
+  sightTex.needsUpdate = true;
   const at = (id) => instAt[id];
   return {
     canvas: c, texture: tex, sightTexture: sightTex,
@@ -129,7 +123,6 @@ export function createTurbinePanel({ reg = 'PR-AWT' } = {}) {
       gps(g, G.x, G.y, G.w, G.h, d.gps);
       flowMonitor(g, AT_PANEL.MON, d);
       tex.needsUpdate = true;
-      if (Math.abs(d.hopper - lastHopper) > 1.5) { lastHopper = d.hopper; drawSight(d.hopper, d.hopperCap); }
     },
   };
 }

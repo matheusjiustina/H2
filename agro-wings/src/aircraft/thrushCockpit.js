@@ -31,6 +31,7 @@ import { clamp, lerp, smoothstep } from '../core/math.js';
 import { tagged, shade, tx, rod, tube, ball, rbox, grid, lathe } from './model.js';
 import { SILL, CAN, fusX, canW, canF, wsC, WS_K, COCKPIT_OFF, EYE } from './thrushGeom.js';
 import { TH_SCREENS, FACE, CONSOLE, DIAL } from './thrushPanel.js';
+import { sightLiquid } from './hopperLiquid.js';
 
 const o3 = (x, y, z) => [x + COCKPIT_OFF[0], y + COCKPIT_OFF[1], z + COCKPIT_OFF[2]];
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -312,6 +313,8 @@ export function buildThrushCockpit({ M, panel, posts, ringSurface, ringAt, roofY
   liquid.position.copy(pAt(S.u, S.v - S.h / 2, -0.05));
   liquid.quaternion.setFromRotationMatrix(new THREE.Matrix4().extractRotation(PMAT));
   cockpit.add(liquid);
+  // Full height: the surface is cut live by the material (hopperLiquid.js).
+  const hopperLiquid = [sightLiquid(CM.liquid, { sheet: true, size: [S.w * 1000, S.h * 1000], windows: [{ box: [0, S.w * 1000, 0, S.h * 1000], rows: [[S.h * 1000, 0], [0, 1]], men: [255, 255, 240, 0.45], menPx: 2 }] })];
   // Window bezel: a straight frame on the cut-out's edges (it was a diamond
   // drawn askew over the square window).
   for (const [w, h, du, dv] of [[S.w + 0.012, 0.006, 0, S.h / 2 + 0.003], [S.w + 0.012, 0.006, 0, -S.h / 2 - 0.003], [0.006, S.h, S.w / 2 + 0.003, 0], [0.006, S.h, -S.w / 2 - 0.003, 0]]) {
@@ -560,10 +563,7 @@ export function buildThrushCockpit({ M, panel, posts, ringSurface, ringAt, roofY
       CM.lampWarning.emissiveIntensity = (d.stall > 0.5 || d.itt > 805) ? (t % 0.5 < 0.25 ? 1.8 : 0.3) : 0;
       CM.lampCaution.emissiveIntensity = (lowFuel || d.engine === 'cranking') ? 1.4 : 0;
     }
-    const hf = clamp(fm.hopper / Math.max(1, ac?.A?.hopperCapacity ?? 1930), 0, 1);
-    liquid.scale.y = Math.max(0.001, hf);
-    liquid.visible = hf > 0.002;
   };
 
-  return { cockpit, stick, pedals, throttle, valve, leds, panelMesh, THR, update, wiper: null };
+  return { cockpit, stick, pedals, throttle, valve, leds, panelMesh, THR, update, wiper: null, hopperLiquid };
 }

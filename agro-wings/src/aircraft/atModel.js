@@ -29,7 +29,8 @@ import {
   sampleStations, loft, K, airfoil, wingPanel, flipWinding, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, grid,
   speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV, buildPilot,
 } from './model.js';
-import { AT_PANEL } from './atPanel.js';
+import { AT_PANEL, AT_SIGHT_LIQUID } from './atPanel.js';
+import { sightLiquid } from './hopperLiquid.js';
 
 const DIH = Math.tan((3.5 * Math.PI) / 180);
 export const AT_WING = { rootX: 0.66, tipX: 7.82, rootY: -0.35, le: 0.55, chord: 1.83 };
@@ -421,6 +422,7 @@ function bladeLoft(r0, r1, steps, R) {
 
 // ==========================================================================
 export function createAirTractorModel(panel, opts = {}) {
+  const hopperLiquid = []; // live product in the hopper sight (hopperLiquid.js)
   const A = FLIGHT_AT502;
   const root = new THREE.Group();
   root.name = 'airtractor';
@@ -1112,6 +1114,7 @@ export function createAirTractorModel(panel, opts = {}) {
     const sightMat = new THREE.MeshStandardMaterial({ map: panel.sightTexture, roughness: 0.4, emissive: 0xffffff, emissiveMap: panel.sightTexture, emissiveIntensity: 0.08 });
     const sight = new THREE.Mesh(new THREE.PlaneGeometry(sightR.u1 - sightR.u0, sightR.v1 - sightR.v0).translate((sightR.u0 + sightR.u1) / 2, (sightR.v0 + sightR.v1) / 2, -0.034).applyMatrix4(pMat), sightMat);
     cockpit.add(sight);
+    hopperLiquid.push(sightLiquid(sightMat, AT_SIGHT_LIQUID));
     // Toggle-switch bushings on the switch panels.
     for (const [x, y, w, , , labels] of P.switches) {
       const n = labels.length;
@@ -1330,6 +1333,7 @@ export function createAirTractorModel(panel, opts = {}) {
   };
 
   return {
+    hopperLiquid,
     // New registration marks: only the livery canvas is redrawn.
     setReg(r) {
       const n = liveryTextures(r);

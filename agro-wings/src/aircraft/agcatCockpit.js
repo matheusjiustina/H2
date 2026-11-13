@@ -35,7 +35,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { canvas, canvasTexture } from '../core/textures.js';
 import { clamp, rng } from '../core/math.js';
-import { AGCAT_PANEL, AGCAT_ANG, AGCAT_ATLAS, AGCAT_PLACARDS, BOOM_PSI } from './agcatPanel.js';
+import { AGCAT_PANEL, AGCAT_ANG, AGCAT_ATLAS, AGCAT_PLACARDS, BOOM_PSI, AGCAT_SIGHT_LIQUID } from './agcatPanel.js';
+import { sightLiquid } from './hopperLiquid.js';
 import { NAV_PAGES } from './agroNav.js';
 
 const P = AGCAT_PANEL;
@@ -600,5 +601,7 @@ export function buildAgCatCockpit(ctx) {
     panel.setPage(h.object.userData.gpsPage);
     return h.object.userData.gpsPage;
   };
-  return { cockpit, stick, pedals, throttle, valve, leds, panelMesh: pod, update, pick, pickables, gps: gpsG, needles, card };
+  // (the wall's u runs to the pilot's left: see its UV above)
+  const hopperLiquid = [sightLiquid(CM.hopper, { ...AGCAT_SIGHT_LIQUID, mirror: true })];
+  return { cockpit, stick, pedals, throttle, valve, leds, panelMesh: pod, update, pick, pickables, gps: gpsG, needles, card, hopperLiquid };
 }

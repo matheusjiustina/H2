@@ -83,26 +83,12 @@ export function createPanel({ reg: reg0 = 'PR-AGW' } = {}) {
   const sg = sc.getContext('2d');
   const sightBg = canvas(256, 448);
   drawSightBackground(sightBg.getContext('2d'), L.sight.cap, L.sight.step);
-  let lastHopper = -1;
-  const drawSight = (hopper, cap) => {
-    sg.drawImage(sightBg, 0, 0);
-    const top = 24, bot = 424;
-    const y = bot - (clamp(hopper / cap, 0, 1)) * (bot - top);
-    if (hopper > 0.5) {
-      const lg = sg.createLinearGradient(0, y, 0, bot);
-      lg.addColorStop(0, 'rgba(95,150,120,0.55)');
-      lg.addColorStop(1, 'rgba(45,90,70,0.7)');
-      sg.fillStyle = lg;
-      sg.fillRect(14, y, 228, bot - y);
-      sg.fillStyle = 'rgba(220,240,225,0.75)';
-      sg.fillRect(14, y - 1, 228, 3);
-    }
-    // Window frame shadow.
-    sg.strokeStyle = 'rgba(0,0,0,0.6)'; sg.lineWidth = 14;
-    sg.strokeRect(7, 7, 242, 434);
-    sightTex.needsUpdate = true;
-  };
-  drawSight(0, L.sight.cap);
+  // The wall and its marks only: the product is drawn live by the sight's
+  // material (src/aircraft/hopperLiquid.js, IPA_SIGHT_LIQUID).
+  sg.drawImage(sightBg, 0, 0);
+  sg.strokeStyle = 'rgba(0,0,0,0.6)'; sg.lineWidth = 14; // window frame shadow
+  sg.strokeRect(7, 7, 242, 434);
+  sightTex.needsUpdate = true;
   const DEF = { vs0: 48, vs1: 55, vfe: 95, vne: 140, fuelCap: 260 };
   const panel = {
     canvas: c, texture: tex, sightTexture: sightTex, layout: L,
@@ -114,7 +100,6 @@ export function createPanel({ reg: reg0 = 'PR-AGW' } = {}) {
       gpsUnit(g, d.gps);
       lcd(g, d);
       tex.needsUpdate = true;
-      if (Math.abs(d.hopper - lastHopper) > 0.8) { lastHopper = d.hopper; drawSight(d.hopper, d.hopperCap); }
     },
     readings,
     setReg(r) { reg = r; bgKey = ''; ensureBg(bgD); g.drawImage(bg, 0, 0); tex.needsUpdate = true; },
@@ -621,6 +606,13 @@ function roundRect(g, x, y, w, h, r) {
   g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
   g.closePath();
 }
+
+// The product in the sight (hopperLiquid.js): level 0 at row 424, full at
+// row 24 of the 256 × 448 sight canvas (the marks' scale), across x 14…242.
+export const IPA_SIGHT_LIQUID = {
+  size: [256, 448],
+  windows: [{ box: [14, 242, 14, 424], rows: [[424, 0], [24, 1]], top: [95, 150, 120, 0.55], bot: [45, 90, 70, 0.7], men: [220, 240, 225, 0.75], menPx: 3 }],
+};
 
 function drawSightBackground(g, cap = 900, step = 50) {
   // Translucent fibreglass hopper wall seen through the sight window, with

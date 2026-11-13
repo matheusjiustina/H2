@@ -31,7 +31,8 @@ import {
   sampleStations, ring, loft, K, airfoil, wingPanel, flipWinding, tagged, shade, tx, rod, tube, bar, ball, rbox, lathe, patch, patchEdge,
   speckle, orangePeel, treadTexture, propDiscTexture, ribTexture, feltTexture, WING_SPAN_UV, buildPilot,
 } from './model.js';
-import { M18_PANEL, M18_HOPPER } from './dromaderPanel.js';
+import { M18_PANEL, M18_HOPPER, M18_SIGHT_LIQUID } from './dromaderPanel.js';
+import { sightLiquid } from './hopperLiquid.js';
 
 // ---------------------------------------------------------------- geometry
 const DIH = Math.tan((5 * Math.PI) / 180); // outer panels (the centre section is flat)
@@ -1107,6 +1108,7 @@ export function createDromaderModel(panel, opts = {}) {
   hopperWall.position.set(0, 0.83, -0.9);
   hopperWall.rotation.y = Math.PI;
   cockpit.add(hopperWall);
+  const hopperLiquid = [sightLiquid(sightMat, M18_SIGHT_LIQUID)];
   addC('interior', tx(new THREE.BoxGeometry(1.1, 0.7, 0.03), 0, FLOOR + 0.35, -0.62)); // footwell bulkhead
   // Glareshield roll just inside the windshield base, following its curve.
   const glareCurve = new THREE.CatmullRomCurve3(wsBase.slice(2, NA - 1).map(([x, y, z]) => new THREE.Vector3(x * 0.94, y + 0.045, z - 0.09)));
@@ -1263,6 +1265,7 @@ export function createDromaderModel(panel, opts = {}) {
     mat.map = n.map; mat.bumpMap = n.bump; mat.needsUpdate = true;
   };
   return {
+    hopperLiquid,
     // New registration marks: only the livery canvas is redrawn.
     setReg(r) { REG = r; swap(M.livery, liveryTextures(REG, M18_LIVERIES[livery])); },
     // Paint scheme: the fuselage and wing canvases and the cabin frame colour.

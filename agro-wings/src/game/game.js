@@ -68,10 +68,14 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, agcatLivery: 0, e201Livery: 0, at401Livery: 0, at802Livery: 0, fbLivery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, lightbarHud: true, lightbarLevel: 'mid', dropSight: true, replayTrail: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, agcatLivery: 0, e201Livery: 0, at401Livery: 0, at802Livery: 0, fbLivery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, lightbarHud: true, lightbarLevel: 'mid', dropSight: true, replayTrail: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 60, fpsV: 1, autoLast: null };
     try { const r = readSafe(SETTINGS); if (r.data && typeof r.data === 'object') Object.assign(this.settings, r.data); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
+    // FPS limit 60 by default (an unlimited loop keeps the GPU at full load
+    // on 120-240 Hz screens, heating PCs and laptops for no visible gain).
+    // Saves from before had 0 as the untouched default: moved to 60 once.
+    if (this.settings.fpsV !== 1) Object.assign(this.settings, { fpsLimit: this.settings.fpsLimit || 60, fpsV: 1 });
     if (this.settings.assistV !== 2) Object.assign(this.settings, { assist: 'off', heliAssist: 'off', assistV: 2 });
     for (const k of ['assist', 'heliAssist']) if (this.settings[k] !== 'on') this.settings[k] = 'off';
     this.settings.aidPlane = { ...allAids(PLANE_AIDS), ...this.settings.aidPlane };

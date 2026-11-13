@@ -35,6 +35,7 @@ import { clamp, lerp, rng } from '../core/math.js';
 import { PA36_PANEL, PA36_ANG, PA36_ATLAS, C2F, toGph } from './pa36Panel.js';
 import { text } from './r44Panel.js';
 import { NAV_PAGES } from './agroNav.js';
+import { sightLiquid } from './hopperLiquid.js';
 
 const P = PA36_PANEL;
 const D2R = Math.PI / 180;
@@ -443,6 +444,7 @@ export function buildPA36Cockpit(ctx) {
   // the red bracket under it.
   const SW = P.sight;
   const level = new THREE.Group();
+  const hopperLiquid = []; // live product (hopperLiquid.js)
   {
     const top = LP.h - 0.016, h = SW.h, vC = top - h / 2, deep = 0.12;
     addL('frameGrey', at(ring(SW.w, h, 0.006, SW.win.w, SW.win.h, 0.004, 0.014), SW.u, vC, -0.004));
@@ -455,9 +457,9 @@ export function buildPA36Cockpit(ctx) {
     level.add(liq);
     level.position.set(SW.u, vC - SW.win.h / 2, -deep + 0.003);
     level.userData.h = SW.win.h;
-    // (A unit sheet: scaled from the start — empty until the first update —
-    // so it never stands a metre tall through the roof.)
-    level.scale.y = 0.0001;
+    // Full height: the surface is cut live by the material (hopperLiquid.js).
+    level.scale.y = SW.win.h;
+    hopperLiquid.push(sightLiquid(CM.liquid, { sheet: true, size: [SW.win.w * 980, SW.win.h * 1000], windows: [{ box: [0, SW.win.w * 980, 0, SW.win.h * 1000], rows: [[SW.win.h * 1000, 0], [0, 1]], men: [255, 250, 220, 0.5], menPx: 2 }] }));
     low.add(level);
     lowGlass.push(at(new THREE.PlaneGeometry(SW.win.w, SW.win.h), SW.u, vC, -deep + 0.006));
   }
@@ -795,7 +797,6 @@ export function buildPA36Cockpit(ctx) {
     setN(needles.clock[0], A.hour(hr)); setN(needles.clock[1], A.min(hr * 60)); setN(needles.clock[2], A.min((g.time ?? 0) % 60));
     // (The card's figures run right to left, as on a wet compass.)
     card.rotation.y = ((nd.hdg - 180) * Math.PI) / 180;
-    level.scale.y = Math.max(0.0001, nd.lvl * level.userData.h);
     lampMat.emissiveIntensity = panel.lit.press ? 2.2 : 0;
     startBtn.position.z = panel.lit.start ? 0.004 : 0.008;
     for (const p of pickables) p.material.emissiveIntensity = master && p.userData.gpsPage === panel.page ? 0.7 : 0;
@@ -806,5 +807,5 @@ export function buildPA36Cockpit(ctx) {
     panel.setPage(h.object.userData.gpsPage);
     return h.object.userData.gpsPage;
   };
-  return { cockpit, stick, pedals, throttle, valve, leds, panelMesh: pod, update, pick, pickables, gps: gpsG, needles, card, level };
+  return { cockpit, stick, pedals, throttle, valve, leds, panelMesh: pod, update, pick, pickables, gps: gpsG, needles, card, level, hopperLiquid };
 }

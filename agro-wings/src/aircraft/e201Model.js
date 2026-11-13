@@ -919,6 +919,7 @@ export function createE201Model(panel, opts = {}) {
 
   const swap = (mat, n) => { mat.map.dispose(); mat.bumpMap.dispose(); mat.map = n.map; mat.bumpMap = n.bump; mat.needsUpdate = true; };
   return {
+    hopperLiquid: ck.hopperLiquid,
     setReg(r) { REG = r; swap(M.livery, liveryTextures(REG, E201_LIVERIES[livery])); },
     // Paint scheme: the fuselage and wing canvases and the colours of the
     // roof, cabin frames, tailplane, tips and gear (same geometry and UVs).

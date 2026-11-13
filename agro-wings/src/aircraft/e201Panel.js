@@ -227,6 +227,12 @@ function drawPlacards() {
 // sight window (the product seen through it) and the stencilled gallon /
 // litre marks beside it.
 export const E201_HOPPER = { W: 512, H: 512, cap: 680, win: { x: 300, y: 250, r: 72 } };
+// The product in the round sight window (hopperLiquid.js): empty at the
+// window's bottom, full at its top.
+export const E201_SIGHT_LIQUID = {
+  size: [512, 512],
+  windows: [{ box: [228, 372, 178, 322], mask: { circle: [300, 250, 72] }, rows: [[322, 0], [178, 1]], top: [150, 170, 120, 0.9], bot: [70, 90, 60, 0.95], men: [235, 245, 220, 0.7], menPx: 3 }],
+};
 function drawHopperBg() {
   const H = E201_HOPPER, c = canvas(H.W, H.H), g = c.getContext('2d');
   g.fillStyle = '#c4b38f'; g.fillRect(0, 0, H.W, H.H);
@@ -256,27 +262,20 @@ export function createE201Panel({ reg = 'PR-IPC' } = {}) {
   const gps = createAgroNav({ home: { x: BASE.pad.x, z: BASE.pad.z, name: 'BASE · PÁTIO', label: 'PÁTIO DA BASE (SEM CONTRATO)' } });
   const redraw = (s, key, fn) => { if (key === s.key) return; s.key = key; fn(s.g); s.tex.needsUpdate = true; };
   let lastNow = performance.now(), hours = 2786.4, lastLvl = -1, vKey = '';
-  // The product in the sight window (redrawn only when it moved ≥ 1 %).
-  const drawLevel = (f) => {
+  // The sight window without the product (drawn live by the wall's
+  // material: hopperLiquid.js, E201_SIGHT_LIQUID): dark well, glint, bezel.
+  {
     hg.drawImage(hopBg, 0, 0);
     const { x, y, r } = H.win;
     hg.save();
     hg.beginPath(); hg.arc(x, y, r, 0, Math.PI * 2); hg.clip();
     hg.fillStyle = '#2b3236'; hg.fillRect(x - r, y - r, 2 * r, 2 * r);
-    if (f > 0.003) {
-      const ly = y + r - f * 2 * r;
-      const lg = hg.createLinearGradient(0, ly, 0, y + r);
-      lg.addColorStop(0, 'rgba(150,170,120,0.9)'); lg.addColorStop(1, 'rgba(70,90,60,0.95)');
-      hg.fillStyle = lg; hg.fillRect(x - r, ly, 2 * r, y + r - ly);
-      hg.fillStyle = 'rgba(235,245,220,0.7)'; hg.fillRect(x - r, ly - 2, 2 * r, 3);
-    }
     hg.fillStyle = 'rgba(255,255,255,0.08)'; hg.beginPath(); hg.ellipse(x - r * 0.3, y - r * 0.4, r * 0.5, r * 0.25, -0.5, 0, Math.PI * 2); hg.fill();
     hg.restore();
     hg.strokeStyle = '#3a3936'; hg.lineWidth = 12; hg.beginPath(); hg.arc(x, y, r + 6, 0, Math.PI * 2); hg.stroke();
     for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; hg.fillStyle = '#8a8d90'; hg.beginPath(); hg.arc(x + Math.cos(a) * (r + 6), y + Math.sin(a) * (r + 6), 4, 0, Math.PI * 2); hg.fill(); }
     hopper.needsUpdate = true;
-  };
-  drawLevel(0);
+  }
   const api = {
     dials, bezel, placards, hopper, hobbs, gps,
     texture: null, // (no flat panel texture: the instruments are 3D)
@@ -302,8 +301,6 @@ export function createE201Panel({ reg = 'PR-IPC' } = {}) {
         if (master) text(g, (hours % 100000).toFixed(1), 96, 49, 34, '#152015', true);
         text(g, 'HOURS', 96, 12, 14, '#c9d6ea', true);
       });
-      const lvl = clamp((d.hopper ?? 0) / (d.hopperCap || 1), 0, 1);
-      if (Math.abs(lvl - lastLvl) > 0.01) { lastLvl = lvl; drawLevel(lvl); }
       gps.draw(d, dt, master);
     },
     setReg(r) { api.reg = r; },

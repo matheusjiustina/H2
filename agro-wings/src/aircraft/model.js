@@ -18,7 +18,8 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { canvas, canvasTexture } from '../core/textures.js';
 import { rng, clamp, smoothstep, lerp } from '../core/math.js';
 import { FLIGHT } from '../config.js';
-import { IPA_PANEL } from './panel.js';
+import { IPA_PANEL, IPA_SIGHT_LIQUID } from './panel.js';
+import { sightLiquid } from './hopperLiquid.js';
 
 const DIH = Math.tan((6 * Math.PI) / 180);
 export const WING = { rootX: 0.55, tipX: 5.85, rootY: -0.33, le: 0.85, chord: 1.7 };
@@ -1633,6 +1634,7 @@ export function createAircraftModel(panel, opts = {}) {
   sight.position.set(-0.17, 0.0, 0.42);
   sight.rotation.y = Math.PI;
   near.add(sight);
+  const hopperLiquid = [sightLiquid(sightMat, IPA_SIGHT_LIQUID)];
   addP('gloss', tx(new THREE.BoxGeometry(0.2, 0.33, 0.012), -0.17, 0.0, 0.428));
   for (const [x, y] of [[-0.075, 0.155], [-0.265, 0.155], [-0.075, -0.155], [-0.265, -0.155]]) addP('steel', tx(new THREE.CylinderGeometry(0.004, 0.004, 0.004, 8), x, y, 0.42, Math.PI / 2));
   // Firewall under the panel.
@@ -1846,7 +1848,7 @@ export function createAircraftModel(panel, opts = {}) {
       M.livery.map.dispose(); M.livery.bumpMap.dispose();
       M.livery.map = n.map; M.livery.bumpMap = n.bump; M.livery.needsUpdate = true;
     },
-    root, M,
+    root, M, hopperLiquid,
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, flaps, elevator, rudder,
     gear: gearGroups,

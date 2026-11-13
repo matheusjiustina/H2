@@ -444,6 +444,24 @@ function wallRows(y) { // body y -> canvas row (upper region or tunnel face)
 export const HOPPER_SLOT = { x: 256, w: 36, y0: -0.3, y1: 0.1 };
 const SLOT = HOPPER_SLOT, SOLO_K = 1.4;
 const slotRows = () => [wallRows(SLOT.y1).row, wallRows(SLOT.y0).row];
+// The product (hopperLiquid.js). Heights are shares of the hopper's depth,
+// body y = yb + (yt − yb)·h, and h = (L / cap)^0.72 (hopperY: the hopper
+// narrows towards the bottom). Through the painted upper wall it only darkens
+// it, with a bright meniscus; on the lower face it tints the wall lightly and
+// shows plainly in the slot.
+const hOfY = (y) => (y - HW.yb) / (HW.yt - HW.yb);
+export const E203_SIGHT_LIQUID = (() => {
+  const [ra, rb] = slotRows();
+  return {
+    size: [HW.W, HW.H],
+    heightOf: (f) => f ** 0.72,
+    windows: [
+      { box: [0, HW.W, 0, HW.split], rows: [[0, hOfY(HW.top[1])], [HW.split, hOfY(HW.top[0])]], top: [70, 58, 18, 0.42], men: [255, 250, 215, 0.85], menPx: 4 },
+      { box: [0, HW.W, HW.split, HW.H], rows: [[HW.split, hOfY(HW.low[1])], [HW.H, hOfY(HW.low[0])]], top: [70, 58, 18, 0.16], men: [0, 0, 0, 0], menPx: 0 },
+      { box: [SLOT.x - SLOT.w / 2, SLOT.x + SLOT.w / 2, ra, rb], mask: { capsule: [SLOT.x, SLOT.w / 2] }, rows: [[HW.split, hOfY(HW.low[1])], [HW.H, hOfY(HW.low[0])]], top: [52, 40, 10, 0.62], men: [255, 248, 205, 0.9], menPx: 3 },
+    ],
+  };
+})();
 function drawHopperBase() {
   const c = canvas(HW.W, HW.H), g = c.getContext('2d');
   g.fillStyle = '#efc11e'; g.fillRect(0, 0, HW.W, HW.H);
@@ -506,33 +524,9 @@ export function createE203Panel({ reg: reg0 = 'PR-IPB' } = {}) {
   const gps = createAgroNav({ home: { x: BASE.pad.x, z: BASE.pad.z, name: 'BASE · PÁTIO', label: 'PÁTIO DA BASE (SEM CONTRATO)' } });
   const redraw = (s, key, fn) => { if (key === s.key) return; s.key = key; fn(s.g); s.tex.needsUpdate = true; };
   let lastNow = performance.now(), etT = 0, hours = 0, ampT = 0, gMax = 1, gMin = 1, vKey = '';
-  const drawHopper = (L) => redraw(hopper, String(Math.round(L / 2)), (g) => {
-    g.drawImage(hopperBg, 0, 0);
-    if (L < 1) return;
-    // Product: darker where the wall is wet behind, a bright meniscus.
-    const y = hopperY(L);
-    for (const region of ['top', 'low']) {
-      const rr = region === 'top' ? HW.top : HW.low;
-      const r0 = region === 'top' ? 0 : HW.split, r1 = region === 'top' ? HW.split : HW.H;
-      if (y < rr[0]) continue;
-      const row = y > rr[1] ? r0 : wallRows(y).row;
-      // Through the painted wall the product only darkens it; in the lower
-      // face's slot it shows plainly, with its meniscus.
-      const low = region === 'low';
-      g.fillStyle = `rgba(70,58,18,${low ? 0.16 : 0.42})`; g.fillRect(0, row, HW.W, r1 - row);
-      if (y <= rr[1] && !low) { g.fillStyle = 'rgba(255,250,215,0.85)'; g.fillRect(0, row - 3, HW.W, 4); g.fillStyle = 'rgba(40,32,8,0.5)'; g.fillRect(0, row + 1, HW.W, 3); }
-      if (low) {
-        const [ra, rb] = slotRows(), top = Math.max(row, ra);
-        if (top < rb) {
-          g.save(); roundRect(g, SLOT.x - SLOT.w / 2, ra, SLOT.w, rb - ra, SLOT.w / 2); g.clip();
-          g.fillStyle = 'rgba(52,40,10,0.62)'; g.fillRect(0, top, HW.W, rb - top);
-          if (row > ra) { g.fillStyle = 'rgba(255,248,205,0.9)'; g.fillRect(0, row - 2, HW.W, 3); }
-          g.restore();
-        }
-      }
-    }
-  });
-  drawHopper(0);
+  // The wall, its scales and the slot only: the product is drawn live by
+  // the wall's material (hopperLiquid.js, E203_SIGHT_LIQUID).
+  redraw(hopper, 'wall', (g) => g.drawImage(hopperBg, 0, 0));
   const api = {
     face, dials, trim, card, bezel, leather, chrono, fuel, hobbs, hopper, gps,
     // Kept for the cockpit's per-frame needles (the last instruments() set).
@@ -594,7 +588,6 @@ export function createE203Panel({ reg: reg0 = 'PR-IPB' } = {}) {
         text(g, `${Math.round(d.fuelFlow ?? 0)}`, 150, 76, 30, '#ff9a3c', false); text(g, 'L/H', 228, 78, 16, '#ff9a3c');
         text(g, 'FLX', 30, 76, 16, '#c07a3a');
       });
-      drawHopper(d.hopper);
       gps.draw(d, dt, master);
     },
     setReg(r) { reg = r; const c = drawFace(reg); faceC.getContext('2d').drawImage(c, 0, 0); face.needsUpdate = true; },

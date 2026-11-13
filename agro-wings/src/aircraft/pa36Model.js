@@ -1170,6 +1170,7 @@ export function createPA36Model(panel, opts = {}) {
   };
   const swap = (mat, n) => { mat.map.dispose(); mat.bumpMap.dispose(); mat.map = n.map; mat.bumpMap = n.bump; mat.needsUpdate = true; };
   return {
+    hopperLiquid: ck.hopperLiquid,
     setReg(r) { REG = r; swap(M.livery, liveryTextures(REG, PA36_LIVERIES[livery])); },
     setLivery(i) {
       const k = ((i % PA36_LIVERIES.length) + PA36_LIVERIES.length) % PA36_LIVERIES.length;

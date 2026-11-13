@@ -964,6 +964,7 @@ export function createAgCatModel(panel, opts = {}) {
   };
   const swap = (mat, n) => { mat.map.dispose(); mat.bumpMap.dispose(); mat.map = n.map; mat.bumpMap = n.bump; mat.needsUpdate = true; };
   return {
+    hopperLiquid: ck.hopperLiquid,
     setReg(r) { REG = r; swap(M.livery, liveryTextures(REG, AGCAT_LIVERIES[livery])); },
     setLivery(i) {
       const k = ((i % AGCAT_LIVERIES.length) + AGCAT_LIVERIES.length) % AGCAT_LIVERIES.length;

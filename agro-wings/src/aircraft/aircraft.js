@@ -9,6 +9,7 @@ import { planeAid } from '../flight/pilotAid.js';
 import { createFlightEnv, windAt, compassFromYaw } from '../flight/env.js';
 import { aircraftType } from './types.js';
 import { WaterSystem, FireBossFx } from './fireboss.js';
+import { HopperSlosh } from './hopperLiquid.js';
 import { t } from '../i18n/index.js';
 import { FLIGHT, UNITS } from '../config.js';
 import { POWERLINE, MAIN_SITE, padOf, PLAY_HALF, EDGE_ROOM } from '../world/layout.js';
@@ -626,6 +627,13 @@ export class Aircraft {
     m.pumpFan.rotation.z += (spraying ? fm.out.airspeed * 1.6 : fm.out.airspeed * 0.3) * dt;
     // Instrument panel at 15 Hz while visible.
     m.update?.(dt, fm, this);
+    // Hopper sight liquid: moves with the aircraft (cockpit shown only).
+    if (m.hopperLiquid?.length && this.game.cameraMode === 'cockpit' && this.game.aircraft === this) {
+      const sl = this.slosh ??= new HopperSlosh(this.A.hopperCapacity);
+      const fill = fm.hopper / Math.max(1, this.A.hopperCapacity);
+      sl.update(dt, fm.vel, this.rQuat, { fill, onGround: fm.out.onGround, gs: fm.out.groundSpeed, running: fm.engine === 'running', rpmFrac: fm.throttle });
+      for (const lq of m.hopperLiquid) lq.set(sl, fill);
+    } else if (this.slosh) this.slosh.ok = false; // settles again when the cockpit is back
     this.panelT -= dt;
     if (this.panelT <= 0 && this.game.cameraMode === 'cockpit' && this.game.aircraft === this) {
       this.panelT = 1 / 15;

@@ -59,12 +59,22 @@ test('FPS cap: frames are skipped to the limit, none when off', () => {
   let n = 0;
   for (let t = 0; t < 1000; t += 16.667) if (!p.gate(t)) n++;
   assert.ok(n >= 59);
-  g.settings.fpsLimit = 30; n = 0; p.lastFrame = 0;
-  for (let t = 0; t < 1000; t += 16.667) if (!p.gate(t)) n++;
-  assert.ok(n >= 29 && n <= 31, `got ${n}`);
-  g.settings.fpsLimit = 60; n = 0; p.lastFrame = 0;
-  for (let t = 0; t < 1000; t += 8.333) if (!p.gate(t)) n++; // a 120 Hz display
-  assert.ok(n >= 58 && n <= 61, `got ${n}`);
+  const rate = (lim, hz, jitter = 0) => {
+    g.settings.fpsLimit = lim; p.nextFrame = 0; p.lastFrame = 0; p.lastCall = undefined; p.dispIv = 0;
+    let k = 0, i = 0;
+    for (let t = 0; t < 10000; i++, t = (i * 1000) / hz + (i % 2 ? jitter : -jitter)) if (!p.gate(t)) k++;
+    return k / 10;
+  };
+  assert.ok(Math.abs(rate(30, 60) - 30) <= 1, `30 on 60 Hz: ${rate(30, 60)}`);
+  // Any display: the average is the limit (the old since-last-frame test
+  // gave 48 on 144 Hz and 55 on 165 Hz).
+  for (const hz of [60, 75, 120, 144, 165, 240]) assert.ok(Math.abs(rate(60, hz) - Math.min(60, hz)) <= 1.5, `60 on ${hz} Hz: ${rate(60, hz)}`);
+  assert.ok(Math.abs(rate(60, 144, 1.5) - 60) <= 1.5, `60 on 144 Hz with jitter: ${rate(60, 144, 1.5)}`);
+  assert.ok(Math.abs(rate(60, 60, 1.5) - 60) <= 1.5, `60 on 60 Hz with jitter: ${rate(60, 60, 1.5)}`);
+  // After a stall the grid restarts (no burst of catch-up frames).
+  g.settings.fpsLimit = 60; p.nextFrame = 0; p.lastCall = undefined; p.dispIv = 6.94; n = 0;
+  for (const t of [0, 16.7, 600, 606.9, 613.9, 620.8, 627.8]) if (!p.gate(t)) n++;
+  assert.equal(n, 4); // 0, 16.7, 600 (restart), 613.9 — no catch-up burst
 });
 
 test('a persistent drop in auto mode changes resolution without touching the world modules; a profile move does', () => {
@@ -82,11 +92,11 @@ test('a persistent drop in auto mode changes resolution without touching the wor
   assert.ok(p.stats().costUsPerFrame < 50);
 });
 
-test('restore defaults: auto, no cap, FPS overlay off, forgotten rung', () => {
+test('restore defaults: auto, 60 FPS cap, FPS overlay off, forgotten rung', () => {
   const { g } = stub({ profile: 'ultra', fpsLimit: 30, showFps: true, autoLast: 'alto' });
   const p = new PerfManager(g, '');
   p.restoreDefaults();
-  assert.equal(g.settings.profile, 'auto'); assert.equal(g.settings.fpsLimit, 0);
+  assert.equal(g.settings.profile, 'auto'); assert.equal(g.settings.fpsLimit, 60);
   assert.equal(g.settings.showFps, false); assert.equal(g.settings.autoLast, null);
   assert.equal(p.mode, 'auto');
 });

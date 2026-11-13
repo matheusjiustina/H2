@@ -39,24 +39,10 @@ export function createDromaderPanel({ reg = 'PR-DMD' } = {}) {
   const hg = hc.getContext('2d');
   const hBg = canvas(M18_HOPPER.W, M18_HOPPER.H);
   drawHopperWall(hBg.getContext('2d'));
-  let lastHopper = -1;
-  const drawSight = (hopper) => {
-    hg.drawImage(hBg, 0, 0);
-    // The liquid shows through the translucent wall as a darker band.
-    const { x0, x1, top, bot } = HOPPER_WIN;
-    const y = bot - clamp(hopper / M18_HOPPER.cap, 0, 1) * (bot - top);
-    if (hopper > 1) {
-      const lg = hg.createLinearGradient(0, y, 0, bot);
-      lg.addColorStop(0, 'rgba(70,95,60,0.55)');
-      lg.addColorStop(1, 'rgba(40,60,35,0.7)');
-      hg.fillStyle = lg;
-      hg.fillRect(x0, y, x1 - x0, bot - y);
-      hg.fillStyle = 'rgba(235,240,210,0.7)';
-      hg.fillRect(x0, y - 2, x1 - x0, 3);
-    }
-    sightTexture.needsUpdate = true;
-  };
-  drawSight(0);
+  // The wall only: the product is drawn live by the wall's material
+  // (hopperLiquid.js, M18_SIGHT_LIQUID).
+  hg.drawImage(hBg, 0, 0);
+  sightTexture.needsUpdate = true;
   return {
     canvas: c, texture: tex, gpsTexture, sightTexture,
     setReg(r) { bgg.clearRect(0, 0, bg.width, bg.height); drawBackground(bgg, r); g.drawImage(bg, 0, 0); tex.needsUpdate = true; },
@@ -123,7 +109,6 @@ export function createDromaderPanel({ reg = 'PR-DMD' } = {}) {
       tex.needsUpdate = true;
       gps(gg, 0, 0, 420, 300, d.gps);
       gpsTexture.needsUpdate = true;
-      if (Math.abs(d.hopper - lastHopper) > 2) { lastHopper = d.hopper; drawSight(d.hopper); }
     },
   };
 }
@@ -266,6 +251,12 @@ function flowBox(g, x, y, d) {
 // narrow vertical sight window (the liquid shows through as a darker band)
 // and the litre scale beside it.
 export const HOPPER_WIN = { x0: 196, x1: 266, top: 70, bot: 590 };
+// The product seen through the translucent wall (hopperLiquid.js): empty at
+// row 590, 2,500 L at row 70, across the window's columns.
+export const M18_SIGHT_LIQUID = {
+  size: [M18_HOPPER.W, M18_HOPPER.H],
+  windows: [{ box: [196, 266, 60, 590], rows: [[590, 0], [70, 1]], top: [70, 95, 60, 0.55], bot: [40, 60, 35, 0.7], men: [235, 240, 210, 0.7], menPx: 3 }],
+};
 function drawHopperWall(g) {
   const { W, H, cap } = M18_HOPPER, Wn = HOPPER_WIN;
   const grd = g.createLinearGradient(0, 0, W, 0);

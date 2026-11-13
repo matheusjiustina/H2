@@ -1129,6 +1129,7 @@ export function createE203Model(panel, opts = {}) {
     mat.map = n.map; mat.bumpMap = n.bump; mat.needsUpdate = true;
   };
   return {
+    hopperLiquid: ck.hopperLiquid,
     // New registration marks: only the livery canvas is redrawn.
     setReg(r) { REG = r; swap(M.livery, liveryTextures(REG, E203_LIVERIES[livery])); },
     // Paint scheme: the fuselage and wing canvases and the colours of the
