@@ -7,6 +7,11 @@ import { t } from '../i18n/index.js';
 import { lightbarKey, lightbarFill } from '../aircraft/lightbar.js';
 
 const LB_N = 25;
+// Crew card status (Badeco 2.0).
+const CREW_STATUS = {
+  enRoute: () => t('ON THE WAY'), preparing: () => t('PREPARING THE SERVICE'), servicing: () => t('SERVICE UNDER WAY'),
+  finishing: () => t('FINISHING'), done: () => t('SERVICE COMPLETE'), interrupted: () => t('SERVICE INTERRUPTED'),
+};
 const LB_CLS = ['', 'd', 'g', 'a', 'r'];
 
 const h = (html) => {
@@ -47,7 +52,7 @@ export class HUD {
     const q = (s) => this.el.querySelector(s);
     this.$ = {
       job: q('.jobcard'), jobT: q('.jobcard .t'), jobS1: q('.jobcard .s1'), jobS2: q('.jobcard .s2'), jobBar: q('.jobcard .bar span'),
-      crew: q('.crew'), crewMsg: q('.crew .msg'), lf: q('.crew .lf'), lh: q('.crew .lh'), bf: q('.crew .bf'), bh: q('.crew .bh'), crewHint: q('.crew .hint'),
+      crew: q('.crew'), crewHead: q('.crew .h'), crewMsg: q('.crew .msg'), lf: q('.crew .lf'), lh: q('.crew .lh'), bf: q('.crew .bf'), bh: q('.crew .bh'), crewHint: q('.crew .hint'),
       toasts: q('.toasts'), warnings: q('.warnings'), prompt: q('.prompt'), spray: q('.spraybadge'), trim: q('.trimbadge'),
       spd: q('.r-spd'), hgt: q('.r-hgt'), gl: q('.r-g'), pwr: q('.r-pwr'), fuel: q('.r-fuel'), hop: q('.r-hop'),
       mini: q('.minimap canvas'), tut: q('.tut'), tutStep: q('.tut .step'), tutTxt: q('.tut .txt'), tutDim: q('.tut .dim'),
@@ -102,6 +107,18 @@ export class HUD {
     requestAnimationFrame(() => el.classList.add('in'));
     setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 500); }, dur * 1000);
     while (this.$.toasts.children.length > 4) this.$.toasts.firstChild.remove();
+  }
+
+  // A remark from the badeco: a small caption with his name, like a toast.
+  say(name, line) {
+    const el = document.createElement('div');
+    el.className = 'toast say';
+    const b = document.createElement('b');
+    b.textContent = `${name}: `;
+    el.append(b, document.createTextNode(`“${line}”`));
+    this.$.toasts.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('in'));
+    setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 500); }, 6000);
   }
 
   setPrompt(html, action) {
@@ -196,12 +213,15 @@ export class HUD {
     const sv = g.service;
     if (sv.busy()) {
       $.crew.classList.add('show');
+      const st = CREW_STATUS[sv.status]?.() ?? '';
+      const head = st ? `${t('BADECO')} — ${st}` : t('Ground crew');
+      if (head !== this._crewHead) { this._crewHead = head; $.crewHead.textContent = head; }
       $.crewMsg.textContent = sv.message;
       $.lf.textContent = `${Math.round(ac.fm.fuel)} / ${Math.round(sv.target.fuel)} L`;
       $.lh.textContent = `${Math.round(ac.fm.hopper)} / ${Math.round(sv.target.liquid)} L`;
       $.bf.style.width = `${(ac.fm.fuel / ac.A.fuelCapacity) * 100}%`;
       $.bh.style.width = `${(ac.fm.hopper / ac.A.hopperCapacity) * 100}%`;
-      $.crewHint.innerHTML = t('Hold {0} to speed up · {1} free camera', '<span class="k">T</span>', this.key('orbit'));
+      $.crewHint.innerHTML = t('Hold {0} to speed up · {1} free camera', '<span class="k">T</span>', this.key('orbit')) + (sv.state === 'working' ? ` · ${t('{0} cancel', this.key('interact'))}` : '');
     } else $.crew.classList.remove('show');
     // Warnings (only when needed)
     const w = g.warnings();

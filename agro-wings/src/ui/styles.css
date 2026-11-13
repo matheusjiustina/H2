@@ -79,6 +79,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .lbar.low { opacity: .55; }
 .lbar.high { gap: 4px; padding: 5px 9px; background: rgba(8,10,12,.55); }
 .lbar.high i { width: 9px; height: 9px; }
+.toast.say { font-style: italic; }
+.toast.say b { font-style: normal; color: #f3d36b; }
 .toasts { position: absolute; top: 120px; left: max(16px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 6px; max-width: min(420px, 70vw); }
 .toast { font-size: 13px; line-height: 1.45; padding: 6px 10px; border-left: 2px solid var(--accent); background: rgba(0,0,0,.45); border-radius: 0 6px 6px 0; opacity: 0; transform: translateY(-4px); transition: opacity .4s, transform .4s; }
 .toast.in { opacity: 1; transform: none; }

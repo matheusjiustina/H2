@@ -17,6 +17,7 @@ import { CameraRig, EYE_RANGE } from '../aircraft/cameras.js';
 import { Sprayer } from '../spray/sprayer.js';
 import { Jettison } from '../spray/jettison.js';
 import { DropSight } from '../world/dropSight.js';
+import { CrewDialogue } from '../crew/dialogue.js';
 import { Guidance } from '../spray/guidance.js';
 import { CoverageOverlay } from '../spray/overlay.js';
 import { GroundService } from '../crew/service.js';
@@ -155,6 +156,7 @@ export class Game {
     this.settings.eyeHeight = this.rig.eyeHeight;
     this.sprayer = new Sprayer(this);
     this.jettison = new Jettison(this);
+    this.dialogue = new CrewDialogue(this);
     this.guidance = new Guidance(this);
     this.replay = new ReplayManager(this);
     this.overlay = new CoverageOverlay(this);
@@ -715,6 +717,7 @@ export class Game {
   onServiceStart() { this.sprayer.on = false; this.jettison?.reset(); }
   onServiceDone(loaded) {
     this.toast(t('Service complete: +{0} L fuel, +{1} L liquid. Aircraft released.', Math.round(loaded.fuel), Math.round(loaded.liquid)));
+    setTimeout(() => this.dialogue?.event('service', this.aircraft.type.id), 2500);
     if (this.job && loaded.liquid > 0) this.job.sorties++;
     this.audio.play('success');
     this.career.save();
@@ -723,6 +726,7 @@ export class Game {
   handIn() {
     const job = this.job;
     if (!job) return;
+    setTimeout(() => this.dialogue?.event('jobDone'), 4000);
     // Pull totals from the sprayer into the job before evaluating.
     const r = job.evaluate(this.aircraft.damage);
     this.career.money += r.total;
@@ -952,6 +956,11 @@ export class Game {
       if (this.playing && this.weatherCycle.update(dt)) this.world.atmo.set(this.weatherCycle.time, this.weatherCycle.weather);
       this.overlay.update(this.job ? this.job.coverages : []);
       this.service.update(dt);
+      // The badeco's rare remarks: only while playing near the crew.
+      if (this.playing && !this.screens.open) {
+        const b = this.service.badeco.pos, c = this.camera.position;
+        this.dialogue.update(dt, Math.hypot(b.x - c.x, b.z - c.z) < 90);
+      }
       this._followSite(dt);
       this.world.structures.update(dt, this.time, ac.windVec, { acPos: ac.fm.pos, light: this.world.atmo.cur.light ?? 1, cam: this.camera.position });
       if (this.job && !ac.fm.out.onGround) this.job.flightTime += dt;
@@ -1070,6 +1079,9 @@ export class Game {
   }
 
   _interact() {
+    // While the crew works the same key cancels the service (it is safe at
+    // any step: the hose comes off, the ladder comes down, all is put away).
+    if (this.service.state === 'working') { this.service.abort(t('Service cancelled by the pilot.')); return; }
     if (!this._atPadStopped() || this.service.busy()) return;
     if (this.mode === 'career') {
       // At a farm strip the local office lists that region's requests.
@@ -1110,6 +1122,7 @@ export class Game {
     if (this.screens.open) return this.hud.setPrompt(null);
     if (ac.state === 'crashed') return this.hud.setPrompt(t('{0} Recover the aircraft (runway / base)', k('reset')), () => this.screens.crash(crashText(ac.crashReason ?? 'Crashed'), this._crashInfo));
     if (ac.stuck) return this.hud.setPrompt(t('Aircraft stuck — {0} tow back to the pad', k('reset')), () => this.resetAircraft('pad'));
+    if (this.service.state === 'working') return this.hud.setPrompt(t('{0} Cancel the service', k('interact')), () => this._interact());
     if (this._atPadStopped() && !this.service.busy()) {
       if (this.mode === 'career') {
         if (!this.job) return this.hud.setPrompt(this.site.main ? t('{0} Service orders · {1} Office computer', k('interact'), k('office')) : t('{0} Farm office — requests', k('interact')), () => this._interact());

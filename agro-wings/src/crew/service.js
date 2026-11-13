@@ -10,6 +10,8 @@
 import * as THREE from 'three';
 import { Badeco } from './badeco.js';
 import { Hose } from './hose.js';
+import { ServiceLadder, LADDER } from './ladder.js';
+import { servicePlan } from './servicePoints.js';
 import { ServiceTruck, ParkedTruck } from './truck.js';
 import { MAIN_SITE, SITES, padOf } from '../world/layout.js';
 import { t } from '../i18n/index.js';
@@ -30,6 +32,17 @@ export class GroundService {
     this.fuelHose = new Hose(game.scene, 0x161616, 0.03);
     this.mixHose = new Hose(game.scene, 0x2a63b8, 0.035);
     this.truck = new ServiceTruck(game);
+    // Badeco 2.0: the step ladder for ports out of reach, and the filler cap
+    // he opens (one small hinged lid shown only while a port is open).
+    this.ladder = new ServiceLadder(game.scene);
+    this.lid = new THREE.Group();
+    const lidMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.014, 14).translate(0, 0, 0.055), new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.4, metalness: 0.6 }));
+    this.lid.add(lidMesh);
+    this.lidHinge = lidMesh;
+    this.lid.visible = false;
+    game.scene.add(this.lid);
+    this.lidOpen = 0; this.lidWant = 0; this.lidPort = null;
+    this.status = 'idle';
     // Every service area keeps its own truck in the bay; the one where the
     // crew works is the live truck.
     this.parkedTrucks = SITES.map((s) => new ParkedTruck(game, s));
@@ -64,6 +77,11 @@ export class GroundService {
     this.mixHose.reset(this.mixReel);
     this.badeco.setPosition(this.post.x, 0, this.post.z);
     this.badeco.heading = Math.PI;
+    this.badeco.climb = 0;
+    this.ladder?.stow();
+    this.ladderPose = null;
+    if (this.lid) { this.lid.visible = false; this.lidOpen = this.lidWant = 0; this.lidPort = null; }
+    this.status = 'idle';
     this.state = 'idle';
     this.queue = [];
     this.step = null;
@@ -119,6 +137,7 @@ export class GroundService {
     }
     this.parkRef = fm.pos.clone();
     this.side = this._side();
+    this.loadedAny = false;
     this.loaded.fuel = this.loaded.liquid = 0;
     const needFuel = this.target.fuel - fm.fuel > 1;
     const needLiq = this.target.liquid - fm.hopper > 1;
@@ -141,32 +160,8 @@ export class GroundService {
     if (ac.A.turbine && fm.rpm > 60) {
       this.queue.push({ a: 'wait', t: 40, until: () => this.game.aircraft.fm.rpm < 40, msg: t('Badeco waits for the propeller to stop.') });
     }
-    if (needFuel) {
-      this.queue.push(
-        { a: 'walk', to: () => this._walkTo(this._reelAccess('fuel')), speed: SERVICE.walk, msg: this.useTruck ? t('Badeco is heading to the truck (fuel reel).') : t('Badeco is heading to the fuel pump.') },
-        { a: 'pickup', hose: 'fuel', t: 1.0 },
-        { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), Lp('F')], speed: SERVICE.carry, pose: 'carry', msg: heli ? t('Carrying the fuel hose (around the boom).') : t('Carrying the fuel hose (behind the wing).') },
-        { a: 'face', at: () => this._world(this._port(this.game.aircraft.model.fuelFiller)) },
-        { a: 'connect', hose: 'fuel', t: 1.6, pose: 'reach', msg: heli ? t('Connecting to the main fuel tank.') : t('Connecting to the wing tank.') },
-        { a: 'transfer', kind: 'fuel', pose: 'hold' },
-        { a: 'disconnect', hose: 'fuel', t: 1.2, pose: 'reach' },
-        { a: 'walk', to: () => [Lp('B'), Lp('A'), ...this._walkTo(this._reelAccess('fuel'), Lp('A'))], speed: SERVICE.carry, pose: 'carry' },
-        { a: 'stow', hose: 'fuel', t: 1.4 },
-      );
-    }
-    if (needLiq) {
-      this.queue.push(
-        { a: 'walk', to: () => this._walkTo(this._reelAccess('mix')), speed: SERVICE.walk, msg: this.useTruck ? t('Badeco is heading to the truck (calda reel).') : t('Badeco is heading to the mixing station.') },
-        { a: 'pickup', hose: 'mix', t: 1.0 },
-        { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), Lp('P')], speed: SERVICE.carry, pose: 'carry', msg: t('Carrying the loading hose.') },
-        { a: 'face', at: () => this._world(this._port(this.game.aircraft.model.hopperPort)) },
-        { a: 'connect', hose: 'mix', t: 1.8, pose: 'reachLow', msg: heli ? t('Coupling the spray-tank quick-fill.') : t('Coupling the hopper quick-fill.') },
-        { a: 'transfer', kind: 'liquid', pose: 'crouch' },
-        { a: 'disconnect', hose: 'mix', t: 1.3, pose: 'reachLow' },
-        { a: 'walk', to: () => [Lp('B'), Lp('A'), ...this._walkTo(this._reelAccess('mix'), Lp('A'))], speed: SERVICE.carry, pose: 'carry' },
-        { a: 'stow', hose: 'mix', t: 1.4 },
-      );
-    }
+    if (needFuel) this.queue.push(...this._serviceSteps('fuel'));
+    if (needLiq) this.queue.push(...this._serviceSteps('liquid'));
     this.queue.push(
       { a: 'walk', to: () => this._walkTo(this.post.clone()), speed: SERVICE.walk },
       { a: 'face', at: () => this.game.aircraft.fm.pos.clone() },
@@ -179,6 +174,63 @@ export class GroundService {
     return true;
   }
 
+  // One service (fuel: the tank filler; liquid: the hopper quick-fill) as
+  // steps, from the type's own service points (servicePoints.js): to the
+  // reel, the hose out along a clear path behind the wing, a ladder where
+  // the port is out of reach (on the Fire Boss onto the wing walkway), the
+  // cap opened, the transfer, and everything back.
+  _serviceSteps(kind) {
+    const ac = this.game.aircraft, heli = ac.kind === 'heli';
+    const hose = kind === 'fuel' ? 'fuel' : 'mix';
+    const portOf = () => this._port(kind === 'fuel' ? this.game.aircraft.model.fuelFiller : this.game.aircraft.model.hopperPort);
+    const portW = this._world(portOf());
+    const plan = servicePlan(ac, kind, portW.y - this.game.world.terrain.heightAt(portW.x, portW.z));
+    const L = plan.ladder;
+    const Lp = (k) => this._local(k);
+    const standKey = kind === 'fuel' ? 'F' : 'P';
+    const seq = [
+      { a: 'walk', to: () => this._walkTo(this._reelAccess(hose)), speed: SERVICE.walk, msg: kind === 'fuel' ? (this.useTruck ? t('Badeco is heading to the truck (fuel reel).') : t('Badeco is heading to the fuel pump.')) : (this.useTruck ? t('Badeco is heading to the truck (calda reel).') : t('Badeco is heading to the mixing station.')) },
+      { a: 'pickup', hose, t: 1.0 },
+      { a: 'walk', to: () => [...this._walkTo(Lp('A')), Lp('B'), L ? this._lp(L.base) : Lp(standKey)], speed: SERVICE.carry, pose: 'carry', msg: kind === 'fuel' ? (heli ? t('Carrying the fuel hose (around the boom).') : t('Carrying the fuel hose (behind the wing).')) : t('Carrying the loading hose.') },
+    ];
+    if (L) {
+      seq.push(
+        { a: 'ladderSet', plan: L, portOf, t: 1.3, pose: 'reachLow', msg: t('Setting up the service ladder.') },
+        { a: 'climb', to: L.top, msg: t('Climbing the ladder.') },
+      );
+      if (L.onWing) seq.push({ a: 'walk', to: () => L.onWing.map((p) => this._lp(p)), speed: 0.7, pose: 'carry', lift: L.top, msg: t('On the wing walkway.') });
+    }
+    const reachPose = L?.onWing ? 'reachLow' : L ? 'reachUp' : kind === 'fuel' ? 'reach' : 'reachLow';
+    const holdPose = L?.onWing ? 'crouch' : L ? 'reachUp' : kind === 'fuel' ? 'hold' : 'crouch';
+    seq.push(
+      { a: 'face', at: () => this._world(portOf()) },
+      { a: 'lid', open: true, portOf, t: 0.5, pose: reachPose },
+      { a: 'connect', hose, t: 1.6, pose: reachPose, msg: kind === 'fuel' ? (heli ? t('Connecting to the main fuel tank.') : t('Connecting to the wing tank.')) : (heli ? t('Coupling the spray-tank quick-fill.') : t('Coupling the hopper quick-fill.')) },
+      { a: 'transfer', kind: kind === 'fuel' ? 'fuel' : 'liquid', pose: holdPose },
+      { a: 'disconnect', hose, t: 1.2, pose: reachPose },
+      { a: 'lid', open: false, t: 0.4, pose: reachPose },
+    );
+    if (L?.onWing) seq.push({ a: 'walk', to: () => [...L.onWing.slice(0, -1).reverse().map((p) => this._lp(p)), this._ladderTop()], speed: 0.7, pose: 'carry', lift: L.top });
+    if (L) seq.push({ a: 'climb', to: 0 }, { a: 'ladderStow', t: 1.0, pose: 'reachLow' });
+    seq.push(
+      { a: 'walk', to: () => [Lp('B'), Lp('A'), ...this._walkTo(this._reelAccess(hose), Lp('A'))], speed: SERVICE.carry, pose: 'carry' },
+      { a: 'stow', hose, t: 1.4 },
+    );
+    return seq;
+  }
+
+  // Aircraft-local ground point [x, z] (service side mirrored) -> world.
+  _lp([lx, z]) {
+    const ac = this.game.aircraft, x = lx * (this.side || 1), yaw = ac.fm.heading();
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    return new THREE.Vector3(ac.fm.pos.x + x * c + z * s, 0, ac.fm.pos.z - x * s + z * c);
+  }
+  // Where the badeco stands on the ladder's top step (world, ground plane).
+  _ladderTop() {
+    const P = this.ladderPose;
+    return new THREE.Vector3(P.x + Math.sin(P.yaw) * this.ladder.stepZ(P.top), 0, P.z + Math.cos(P.yaw) * this.ladder.stepZ(P.top));
+  }
+
   abort(reason) {
     if (this.state !== 'working') return;
     this.game.toast(reason || t('Ground crew: service interrupted.'));
@@ -187,6 +239,13 @@ export class GroundService {
     if (this.connected || this.carry) {
       this.queue.push({ a: 'disconnect', hose: this.connected || this.carry, t: 0.5, pose: 'reach', drop: true });
     }
+    // Up on the ladder or the wing: back down first, the ladder folded.
+    if (this.badeco.climb > 0.05 && this.ladderPose) {
+      if (this.badeco.pos.distanceTo(this._ladderTop()) > 0.3) this.queue.push({ a: 'walk', to: () => [this._ladderTop()], speed: 0.8, pose: 'carry', lift: this.badeco.climb });
+      this.queue.push({ a: 'climb', to: 0, fast: true });
+    }
+    if (this.lidWant) this.queue.push({ a: 'lid', open: false, t: 0.3 });
+    if (this.ladder.group.visible) this.queue.push({ a: 'ladderStow', t: 0.6, pose: 'reachLow' });
     const behind = this._isNearAircraft();
     const path = behind ? () => [this._local('A'), ...this._walkTo(this.post.clone(), this._local('A'))] : () => this._walkTo(this.post.clone());
     if (!this.truck.atHome) this.truck.recall();
@@ -281,13 +340,31 @@ export class GroundService {
     }
     b.animate(dt, (x, z) => game.world.terrain.heightAt(x, z));
     this._hoses(dt, sdt);
+    this._lid(dt);
   }
 
   _begin(st) {
     this.step = st;
     st.time = 0;
+    this.status = this._statusOf(st);
     if (st.msg) { this.message = st.msg; this.game.crewMessage?.(st.msg); }
     if (st.a === 'walk') { st.path = st.to(); st.i = 0; }
+  }
+
+  // What the crew card says (BADECO — …).
+  _statusOf(st) {
+    if (this.state === 'aborting') return 'interrupted';
+    switch (st.a) {
+      case 'truckIn': case 'wait': return 'enRoute';
+      case 'walk': return this.connected || this.loadedAny ? 'finishing' : 'enRoute';
+      case 'pickup': this.loadedAny = false; return 'preparing';
+      case 'ladderSet': case 'connect': return 'preparing';
+      case 'climb': return st.to > 0 ? 'preparing' : 'finishing';
+      case 'lid': return st.open ? 'preparing' : 'finishing';
+      case 'transfer': this.loadedAny = true; return 'servicing';
+      case 'signal': return 'done';
+      default: return 'finishing';
+    }
   }
 
   _run(st, dt) {
@@ -305,6 +382,7 @@ export class GroundService {
           if (st.i >= st.path.length) { b.speed = 0; this.step = null; }
           return;
         }
+        if (st.lift !== undefined) b.climb = st.lift;
         const want = Math.atan2(dx, dz);
         let dh = want - b.heading;
         dh = Math.atan2(Math.sin(dh), Math.cos(dh));
@@ -412,9 +490,67 @@ export class GroundService {
         if (this.truck.atHome || d > ac.type.service.veto + 12 || st.time >= st.t) this.step = null;
         break;
       }
+      case 'ladderSet': {
+        // Unfold the ladder at its base, facing the wing / the port.
+        b.speed = 0;
+        if (!st.placed) {
+          st.placed = true;
+          const base = b.pos.clone();
+          const aim = st.plan.onWing ? this._lp(st.plan.onWing[0]) : this._world(st.portOf());
+          const yaw = Math.atan2(aim.x - base.x, aim.z - base.z);
+          this.ladderPose = { x: base.x, z: base.z, yaw, top: st.plan.top };
+          this.ladder.build(st.plan.top);
+          this.ladder.place(base.x, this.game.world.terrain.heightAt(base.x, base.z), base.z, yaw);
+          b.heading = yaw;
+          this.game.audio?.play('clank');
+        }
+        if (st.time >= st.t) this.step = null;
+        break;
+      }
+      case 'climb': {
+        // Up / down the rungs: the feet follow the ladder's lean.
+        const P = this.ladderPose;
+        if (!P) { b.climb = 0; this.step = null; break; }
+        b.speed = 0;
+        b.pose = 'climb';
+        const rate = st.fast ? 0.9 : 0.45;
+        const d = st.to - b.climb;
+        b.climb += Math.sign(d) * Math.min(Math.abs(d), rate * dt);
+        b.climbPhase = (b.climbPhase || 0) + dt * 6.5;
+        const k = this.ladder.stepZ(b.climb);
+        b.pos.set(P.x + Math.sin(P.yaw) * k, 0, P.z + Math.cos(P.yaw) * k);
+        b.heading = P.yaw;
+        if (Math.abs(st.to - b.climb) < 0.005) { b.climb = st.to; if (st.to === 0) b.pos.set(P.x, 0, P.z); this.step = null; }
+        break;
+      }
+      case 'ladderStow':
+        b.speed = 0;
+        if (st.time >= st.t * 0.6 && this.ladder.group.visible) { this.ladder.stow(); this.ladderPose = null; this.game.audio?.play('clank'); }
+        if (st.time >= st.t) this.step = null;
+        break;
+      case 'lid':
+        // The filler cap swings open on its hinge (and shut again).
+        b.speed = 0;
+        if (st.open && !this.lidPort) this.lidPort = st.portOf();
+        this.lidWant = st.open ? 1 : 0;
+        if (st.time >= st.t) this.step = null;
+        break;
       default:
         this.step = null;
     }
+  }
+
+  // The opened filler cap: on the port's cap (0.12 under the hose point,
+  // in the aircraft's attitude), swinging up on its hinge.
+  _lid(dt) {
+    if (!this.lidPort && !this.lid.visible) return;
+    this.lidOpen += Math.sign(this.lidWant - this.lidOpen) * Math.min(Math.abs(this.lidWant - this.lidOpen), dt * 3);
+    if (!this.lidPort || (this.lidWant === 0 && this.lidOpen <= 0.001)) { this.lid.visible = false; this.lidPort = null; return; }
+    const ac = this.game.aircraft;
+    this.lid.position.copy(ac.toWorld(_l.copy(this.lidPort).add(_v.set(0, -0.12, 0)), _w));
+    this.lid.quaternion.copy(ac.rQuat ?? ac.fm.quat);
+    this.lidHinge.rotation.x = -this.lidOpen * 1.9;
+    this.lid.visible = true;
   }
 
   _hoses(dt, sdt) {
