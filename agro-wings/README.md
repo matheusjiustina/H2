@@ -5042,3 +5042,50 @@ real phones, Safari / Firefox or real GPUs. Unit tests: `test/lightbar.test.mjs`
 
 Not tested on real phones, Safari / Firefox or real GPUs; touch has no jettison button
 yet (PC first, as asked). Unit tests: `test/jettison.test.mjs`.
+
+## Badeco 2.0 — ground crew, service points, ladder, rare remarks
+
+An evolution of the existing service (truck with hybrid A*, walking planner around the
+aircraft rectangles, Verlet hoses with keep-out boxes — all reused), not a second system.
+
+- **Crew model** (`src/crew/badeco.js`): rounded, stylised farm worker — cap with a
+  neck flap, long-sleeved work shirt with reflective bands, work trousers, rubber
+  gloves, boots — from lathed and capsule shapes, one vertex-coloured mesh per body
+  segment on **one shared material: 14 meshes (was 31), no textures**. Procedural
+  poses: idle, walk, carry, reach, reach low / crouch, reach up, hold, climb, thumbs.
+- **Service point registry** (`src/crew/servicePoints.js`): per aircraft and per
+  service, the port is the model's own filler / coupler (`fuelFiller`, `hopperPort`),
+  the stand the type's `service.local` F / P, all aircraft-local (they follow the
+  parked aircraft). Heights measured on the pad (m above the ground):
+
+  | Type | Fuel filler | Hopper coupler | Ladder |
+  |---|---|---|---|
+  | Ipanema 202 / 203 / EMB-201 | 1.22 / 1.32 / 1.16 | 1.01 / 1.07 / 1.06 | — |
+  | AT-502 / AT-401 / AT-802 | 1.13 / 1.17 / 1.51 | 0.94 / 1.11 / 1.20 | — |
+  | Dromader / Thrush / AgTruck / Brave | 1.17 / 1.08 / 1.19 / 1.10 | 1.03 / 0.94 / 1.18 / 1.02 | — |
+  | Ag-Cat | **3.01** (upper wing centre) | 1.38 | fuel: beside the forward fuselage, top step 1.06 m, reaching up |
+  | Fire Boss | **2.81** | **2.74** | both: behind the wing trailing edge, outboard of the float; on the wing walkway to the filler / to the coupler by the root, top step 2.67 m |
+  | R44 / Bell 206 | 1.92 / 1.46 | 0.29 / 0.33 | — |
+
+  Anything else above 1.95 m gets a ladder at its stand point automatically.
+- **Ladder** (`src/crew/ladder.js`): light aluminium A-frame, one merged mesh, built for
+  the height needed, set up, climbed, folded and taken away; never left standing
+  (a new service is refused while the crew is still clearing).
+- **Cap**: the filler / coupler cap swings open on its hinge while connected and shuts
+  after (one small lid, shown only then).
+- **Status** on the crew card: BADECO — A CAMINHO / PREPARANDO ATENDIMENTO / SERVIÇO EM
+  ANDAMENTO / FINALIZANDO / SERVIÇO CONCLUÍDO / ATENDIMENTO INTERROMPIDO. The service
+  key (E, or the prompt on touch) **cancels** while he works: hose off, cap shut, down
+  from the wing / ladder, ladder folded, everything stowed.
+- **Remarks** (`src/crew/dialogue.js`): short captions in the voice of a Brazilian ag
+  ground hand, PT/EN, no audio — never two within 6 min, a spontaneous one only after
+  9 quiet minutes (20 % chance a minute), events (service done, job handed in) 35 %;
+  never in menus, far away or over a warning. Simulated 4 h near the crew: 20 remarks.
+
+Measured (Chromium + SwiftShader, main map, Ipanema at the pad; v62 `9fba9d3` → this
+build): draw calls with the crew in view 1 363 → 1 356, during a fuel service 1 413 →
+1 391; crew idle and the aircraft far away: service update 12 → 5 µs/frame (the crew is
+not animated far from the camera); heap after GC 589 → 594 MB (noise). Every aircraft
+(14) serviced to completion in the browser with no page error; cancel on the Fire Boss
+wing and an aircraft change mid-climb leave nothing behind. Not tested on real phones,
+Safari / Firefox or real GPUs. Unit tests: `test/badeco2.test.mjs`.

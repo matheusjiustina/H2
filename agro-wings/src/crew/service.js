@@ -343,6 +343,12 @@ export class GroundService {
       b.speed = 0;
       b.pose = 'idle';
     }
+    // Idle and far from the camera (flying away from the base): the crew is
+    // not animated at all (nothing changes on him there).
+    const cam = game.camera?.position;
+    const far = this.state === 'idle' && cam && Math.hypot(cam.x - b.pos.x, cam.z - b.pos.z) > 250;
+    if (far && this._farIdle) return;
+    this._farIdle = far;
     b.animate(dt, (x, z) => game.world.terrain.heightAt(x, z));
     this._hoses(dt, sdt);
     this._lid(dt);
