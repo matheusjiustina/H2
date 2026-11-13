@@ -113,8 +113,9 @@ r = await page.evaluate((r0) => {
   let passes = 1;
   // Further passes, as a pilot would, until the fire is out.
   while (f.state === 'burning' && passes < 5) {
-    const dir = passes % 2 ? 1 : -1;
-    ac.placeAirborne(f.x - dir * 170, f.z, dir * Math.PI / 2, 40, 48); fm.gearDown = 0; fm.gearCmd = false; fm.hopper = 3000; fm.updateMass();
+    // Side by side: a drop is narrower than the fire (lanes ±10 m).
+    const dir = passes % 2 ? 1 : -1, lane = [0, 10, -10, 5, -5][passes];
+    ac.placeAirborne(f.x - dir * 170, f.z + lane, dir * Math.PI / 2, 40, 48); fm.gearDown = 0; fm.gearCmd = false; fm.hopper = 3000; fm.updateMass();
     for (let i = 0; i < 40; i++) g.tick(1 / 60);
     ac.water.toggleDrop();
     for (let i = 0; i < 60 * 3; i++) g.tick(1 / 60);

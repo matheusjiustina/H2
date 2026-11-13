@@ -52,7 +52,10 @@ export function inSpotPatch(f, x, z) {
   const u = (dx * c + dz * s) / (f.len / 2 + f.r * 1.2), v = (-dx * s + dz * c) / (f.r * 1.7);
   return u * u + v * v < 0.9;
 }
-const L_PER_M2 = 1.6; // litres per m² of burning area to put a spot out
+// Litres per m² of burning area to put a spot out: the test zone's brush
+// 1.6 (≈ coverage level 4); Fireboss Frontier's cerrado grass 0.8 (≈ level 2,
+// what grass fires take).
+const L_PER_M2 = FRONTIER ? 0.8 : 1.6;
 const REIGNITE = 120; // s after the last spot is out
 const PER_FIRE = 26; // flames per spot (core + clumps + low creeping edge flames)
 const rng = (seed) => () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
