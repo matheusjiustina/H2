@@ -4895,3 +4895,17 @@ fires/missions/flare-up headless); `node test/frontiere2e.mjs` (14 in the
 browser: selector, switch both ways with the career kept, the AT-802
 Bombeiros, the board, scooping on Lagoa Grande, side-by-side drops putting a
 fire out and paying it, the smoke haze, hand-in, no page errors).
+
+**Measured (Chromium + SwiftShader, 1280 × 720; counts exact; four fixed views:
+far plain, low over a fire line, the base, a high overview).**
+
+| map · profile | load | JS heap | geometries | textures | calls (4 views) | k triangles (4 views) |
+|---|---|---|---|---|---|---|
+| main · low | 67.5 s | 616 MB | 1241 | 153 | 588 / 561 / 710 / 1707 | 1455 / 1358 / 1755 / 3006 |
+| main · high | 80.6 s | 621 MB | 1262 | 153 | 588 / 561 / 738 / 1757 | 1473 / 1375 / 1874 / 3283 |
+| Serra · low | 66.0 s | 536 MB | 1224 | 137 | 692 / 526 / 951 / 2460 | 1308 / 1010 / 1930 / 4237 |
+| Serra · high | 75.9 s | 548 MB | 1227 | 137 | 786 / 594 / 1082 / 2589 | 1970 / 1427 / 3333 / 6772 |
+| Frontier · low (fire line burning) | 37.5 s | 188 MB | 739 | 70 | 327 / 282 / 474 / 1051 | 371 / 346 / 527 / 803 |
+| Frontier · high (fire line burning) | 44.1 s | 186 MB | 742 | 70 | 349 / 304 / 511 / 1118 | 417 / 392 / 603 / 942 |
+
+(Times are SwiftShader CPU rendering, not a GPU: compare them only between rows.)
