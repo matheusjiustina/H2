@@ -52,11 +52,31 @@ export function inSpotPatch(f, x, z) {
   const u = (dx * c + dz * s) / (f.len / 2 + f.r * 1.2), v = (-dx * s + dz * c) / (f.r * 1.7);
   return u * u + v * v < 0.9;
 }
-// Litres per m² of burning area to put a spot out: the test zone's brush
-// 1.6 (≈ coverage level 4); Fireboss Frontier's cerrado grass 0.8 (≈ level 2,
-// what grass fires take).
-const L_PER_M2 = FRONTIER ? 0.8 : 1.6;
+// Litres per m² of burning area to put a flame out: the test zone's brush
+// 1.0 (≈ coverage level 2.5; a full Fire Boss load knocks a spot down);
+// Fireboss Frontier's cerrado grass 0.8 (≈ level 2, what grass fires take).
+const L_PER_M2 = FRONTIER ? 0.8 : 1.0;
 const REIGNITE = 120; // s after the last spot is out
+// A drop knocks the fire down: a flame left with under KNOCK of its fuel by
+// the water goes out, and a spot down to CONTROLLED of its fire is
+// controlled (the last embers are the ground crew's mop-up).
+const KNOCK = 0.3;
+// Footprint radius of a packet on the ground (m): it spreads as it falls
+// (a load dropped from 30 m lands ≈ 35–40 m wide, as the drop patterns do).
+export const FOOT0 = 7, FOOTK = 5;
+
+// One step of a falling water packet: it leaves with the aircraft's velocity,
+// the air slows it toward the wind and gravity pulls it down (the drop
+// lands ahead of where it was released, as fast as the aircraft was going).
+// Shared by the fire field and the drop sight (same physics).
+export function fallStep(p, wind, dt) {
+  p.age += dt;
+  const k = Math.min(1, 0.55 * dt);
+  p.vx += (wind.x - p.vx) * k; p.vz += (wind.z - p.vz) * k;
+  p.vy += (-9.81 - p.vy * 0.12) * dt;
+  p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+}
+const CONTROLLED = 0.1;
 const PER_FIRE = 26; // flames per spot (core + clumps + low creeping edge flames)
 const rng = (seed) => () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 
@@ -344,12 +364,17 @@ export class FireField {
         const w = 1 - Math.max(0, Math.min(1, (Math.hypot(c.x - x, c.z - z) - radius * 0.8) / (radius * 0.35)));
         if (w <= 0) continue;
         L += rho * w * cellA;
-        if (c.k > 0) { c.k = Math.max(0, c.k - (rho * w) / L_PER_M2); hit = true; }
+        if (c.k > 0) {
+          c.k = Math.max(0, c.k - (rho * w) / L_PER_M2); hit = true;
+          // Knock-down: a flame soaked to under KNOCK of its fuel cannot hold
+          // (wet fuel, steam) — it goes out instead of smouldering on.
+          if (c.k < KNOCK) c.k = 0;
+        }
       }
       f.water += L;
       onTarget += L;
       f.intensity = this._spotIntensity(f);
-      if (f.intensity <= 0.02) { f.state = 'out'; f.intensity = 0; f.outT = this.time; for (const c of f.cells) c.k = 0; }
+      if (f.intensity <= CONTROLLED) { f.state = 'out'; f.intensity = 0; f.outT = this.time; for (const c of f.cells) c.k = 0; }
       // Steam where it hit.
       if (this.visual && L > 0) {
         const n = Math.min(14, 3 + Math.round(L / 60));
@@ -377,11 +402,7 @@ export class FireField {
     for (let i = this.packets.length - 1; i >= 0; i--) {
       const p = this.packets[i];
       if (p === this._acc && this.time - p.t0 < 0.05) continue;
-      p.age += dt;
-      const k = Math.min(1, 0.55 * dt);
-      p.vx += (wind.x - p.vx) * k; p.vz += (wind.z - p.vz) * k;
-      p.vy += (-9.81 - p.vy * 0.12) * dt;
-      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      fallStep(p, wind, dt);
       const spread = 1.5 + p.age * 4.5;
       const n = this.visual ? Math.min(4, 1 + Math.round(p.litres / 30)) : 0;
       for (let j = 0; j < n; j++) {
@@ -390,7 +411,7 @@ export class FireField {
       }
       const gy = T.heightAt(p.x, p.z);
       if (p.y <= gy + 0.5 || p.age > 12) {
-        this.applyWater(p.x, p.z, p.litres, 5 + p.age * 4);
+        this.applyWater(p.x, p.z, p.litres, FOOT0 + p.age * FOOTK);
         if (this.visual) for (let j = 0; j < 4; j++) this.water.spawn(p.x + (Math.random() - 0.5) * spread, gy + 0.3, p.z + (Math.random() - 0.5) * spread, (Math.random() - 0.5) * 3, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 3, { life: 1.4, size: 2.5, grow: 2.5, alpha: 0.3, drag: 1.5, gravity: 1, color: [0.85, 0.88, 0.9] });
         this.packets.splice(i, 1);
         if (p === this._acc) this._acc = null;

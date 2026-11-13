@@ -15,6 +15,8 @@ import { Aircraft } from '../aircraft/aircraft.js';
 import { Helicopter } from '../aircraft/helicopter.js';
 import { CameraRig, EYE_RANGE } from '../aircraft/cameras.js';
 import { Sprayer } from '../spray/sprayer.js';
+import { Jettison } from '../spray/jettison.js';
+import { DropSight } from '../world/dropSight.js';
 import { Guidance } from '../spray/guidance.js';
 import { CoverageOverlay } from '../spray/overlay.js';
 import { GroundService } from '../crew/service.js';
@@ -65,7 +67,7 @@ export class Game {
     this.mode = 'title';
     this.job = null;
     this.cameraMode = 'chase';
-    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, agcatLivery: 0, e201Livery: 0, at401Livery: 0, at802Livery: 0, fbLivery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, lightbarHud: true, lightbarLevel: 'mid', replayTrail: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
+    this.settings = { quality: 'medium', assist: 'off', wind: 1, volume: 0.8, showFps: false, aircraft: 'ipanema', keyScheme: DEFAULT_KEY_SCHEME, heliAssist: 'off', heliModel: 'power', aidPlane: allAids(PLANE_AIDS), aidHeli: allAids(HELI_AIDS), assistV: 2, b206Livery: 0, b206Kit: true, m18Livery: 0, e203Livery: 0, a188Livery: 0, pa36Livery: 0, agcatLivery: 0, e201Livery: 0, at401Livery: 0, at802Livery: 0, fbLivery: 0, r44Livery: 1, eyeHeight: 0, touchMode: 'stick', tiltSens: 1, touchStrip: true, regs: {}, timeOfDay: 'morning', weather: 'partly', hudGps: false, lightbarHud: true, lightbarLevel: 'mid', dropSight: true, replayTrail: false, shake: 1, qualityAuto: true, autoChecked: false, profile: null, fpsLimit: 0, autoLast: null };
     try { const r = readSafe(SETTINGS); if (r.data && typeof r.data === 'object') Object.assign(this.settings, r.data); } catch { /* defaults */ }
     // Assistance is off or on (the old Normal / High control laws are gone
     // from the settings): older saves start without assistance.
@@ -152,6 +154,7 @@ export class Game {
     this.rig.eyeHeight = Math.max(-EYE_RANGE, Math.min(EYE_RANGE, +this.settings.eyeHeight || 0));
     this.settings.eyeHeight = this.rig.eyeHeight;
     this.sprayer = new Sprayer(this);
+    this.jettison = new Jettison(this);
     this.guidance = new Guidance(this);
     this.replay = new ReplayManager(this);
     this.overlay = new CoverageOverlay(this);
@@ -163,6 +166,7 @@ export class Game {
     this.world.mist = this.mist;
     // Fire-suppression test scenario (active while the Fire Boss is flown).
     this.fires = new FireField(this.scene, this.world.terrain);
+    this.dropSight = new DropSight(this);
     this.waterFx = new WaterFx(this.scene); // splash, spray and wake of the amphibians
     this.waterFx.setQuality(this.perf.profile.particles);
     this.fires.setQuality?.(this.perf.profile.particles);
@@ -298,7 +302,7 @@ export class Game {
     if (next.contactShadow) next.contactShadow.visible = true;
     // Its cockpit is prepared right after (shaders, own textures), not on the first cockpit frame.
     setTimeout(() => { if (this.aircraft === next) this.assets?.prepareCockpit(id); }, 0);
-    next.onSimStep = (h) => this.sprayer.step(h);
+    next.onSimStep = (h) => { this.sprayer.step(h); this.jettison.step(h); };
     next.onEvent = (e) => this._acEvent(e);
     next.placeAtPad();
     next.stuck = false;
@@ -341,7 +345,7 @@ export class Game {
         const on = this.settings.b206Kit !== false;
         ac.model.setKit?.(on);
         ac.fm.kitOn = on;
-        if (!on) { ac.fm.hopper = 0; if (this.aircraft === ac) this.sprayer.on = false; }
+        if (!on) { ac.fm.hopper = 0; if (this.aircraft === ac) this.sprayer.on = false; this.jettison?.reset(); }
         ac.fm.updateMass();
       }
       this.assets?.afterOptions(id); // new paint canvases: lightened (parked) or released once on the GPU (flown)
@@ -383,7 +387,7 @@ export class Game {
       return false;
     }
     if (this.service.busy()) this.service.abort(t('Aircraft change — service stopped.'));
-    this.sprayer.on = false;
+    this.sprayer.on = false; this.jettison?.reset();
     this._activate(id);
     this.setSetting('aircraft', id);
     if (this.job) this.guidance.setJob(this.job);
@@ -513,7 +517,7 @@ export class Game {
   // selected aircraft stands parked for the normal menu.
   _startOutro() {
     const ac = this.aircraft, fm = ac.fm;
-    this.sprayer.on = false;
+    this.sprayer.on = false; this.jettison?.reset();
     this.service.resetAll();
     const v = new THREE.Vector3(fm.vel.x, 0, fm.vel.z);
     if (ac.kind !== 'heli' && v.length() < 25) v.setLength(25);
@@ -547,7 +551,7 @@ export class Game {
     this._loadAtCrash = null;
     this._crashInfo = null;
     this._crashCam = null;
-    this.sprayer.on = false;
+    this.sprayer.on = false; this.jettison?.reset();
     this.service.resetAll();
     ac.repair();
     ac.placeAtPad();
@@ -659,7 +663,7 @@ export class Game {
     const ok = SITES.filter((s) => s.main || stripAllows(s.farm, this.aircraftId));
     let site = MAIN_SITE, best = Infinity;
     for (const s of ok) { const d = Math.hypot(s.pad.x - cx, s.pad.z - cz); if (d < best) { best = d; site = s; } }
-    this.sprayer.on = false;
+    this.sprayer.on = false; this.jettison?.reset();
     this.service.resetAll();
     this.service.setSite(site);
     const ac = this.aircraft;
@@ -708,7 +712,7 @@ export class Game {
     }
   }
 
-  onServiceStart() { this.sprayer.on = false; }
+  onServiceStart() { this.sprayer.on = false; this.jettison?.reset(); }
   onServiceDone(loaded) {
     this.toast(t('Service complete: +{0} L fuel, +{1} L liquid. Aircraft released.', Math.round(loaded.fuel), Math.round(loaded.liquid)));
     if (this.job && loaded.liquid > 0) this.job.sorties++;
@@ -741,7 +745,7 @@ export class Game {
     // A crashed (or written-off) aircraft comes back repaired: placed with
     // 100 % damage it would fail again at once.
     if (this.aircraft.state === 'crashed' || this.aircraft.damage >= 100) return this.recover(where);
-    this.sprayer.on = false;
+    this.sprayer.on = false; this.jettison?.reset();
     if (this.service.busy()) this.service.abort(t('Aircraft reset — service stopped.'));
     if (where === 'runway') this.aircraft.placeOnRunway('west');
     else this.aircraft.placeAtPad();
@@ -760,7 +764,7 @@ export class Game {
     const load = this._loadAtCrash ?? { fuel: ac.fm.fuel, hopper: ac.fm.hopper };
     this._loadAtCrash = null;
     this.screens.close();
-    this.sprayer.on = false;
+    this.sprayer.on = false; this.jettison?.reset();
     this.service.resetAll();
     ac.repair();
     const cp = where === 'here' ? this._crashInfo : null;
@@ -816,7 +820,7 @@ export class Game {
     }
     if (e.kind === 'crash') {
       this._loadAtCrash = { fuel: this.aircraft.fm.fuel, hopper: this.aircraft.fm.hopper };
-      this.sprayer.on = false;
+      this.sprayer.on = false; this.jettison?.reset();
       const ac = this.aircraft, fm = ac.fm, v = fm.vel, hs = Math.hypot(v.x, v.z);
       const cost = GAME.crashCost;
       this.career.money -= cost;
@@ -929,9 +933,11 @@ export class Game {
         ac.update(dt, { ...input, isDown: () => false, wasPressed: () => false, lastPresses: () => null, virtual: { active: false } }, { mouse: { buttons: 0, dx: 0, dy: 0, wheel: 0 }, assist: 'normal', windScale: this.settings.wind, cameraMode: 'orbit' });
       }
       this.sprayer.emit(dt);
+      this.jettison.emit(dt);
       this.mist.update(dt, ac.windVec, (x, z) => ac.env.top(x, z));
       this.dust.update(dt, ac.windVec, (x, z) => ac.env.ground(x, z));
       this.fires?.update(dt, ac.windVec, this.camera.position);
+      this.dropSight?.update(dt);
       // Fireboss Frontier: the smoke the air holds where the camera is (the
       // local loss of visibility) and the light on the distant columns.
       if (FRONTIER && this.fires) {
@@ -1020,6 +1026,8 @@ export class Game {
       // The Fire Boss has no booms: the key works its drop door.
       if (ac.state === 'ok') { if (ac.water) ac.water.toggleDrop(); else this.sprayer.toggle(); }
     }
+    // Jettison (dump gate / Fire Boss door fully open): PC key.
+    if (input.wasPressed('jettison') && ac.state === 'ok') this.jettison.toggle();
     if (ac.water && ac.state === 'ok') {
       if (input.wasPressed('gear')) ac.water.toggleGear();
       if (input.wasPressed('scoop')) ac.water.toggleProbes();
@@ -1164,6 +1172,7 @@ export class Game {
     const fm = ac.fm, o = fm.out;
     if (tm.stall > 0.5 && !o.onGround) out.push({ text: t('Stall'), cls: 'blink' });
     if (ac.water) out.push(...this._waterStatus(ac));
+    if (this.jettison.on) out.push({ text: t('JETTISON — {0} L left', Math.round(fm.hopper)), cls: 'blink' });
     if (this._controlLaw(ac).aid?.cues && !o.onGround && o.agl > 1.5) out.push(...this._aidCues(ac));
     if (ac.kind === 'heli') {
       if (o.lowRotor) out.push({ text: t('Low rotor RPM {0} % — lower collective', Math.round(o.rotorPct)), cls: 'blink' });

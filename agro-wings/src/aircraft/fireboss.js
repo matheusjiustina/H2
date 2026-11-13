@@ -29,6 +29,7 @@ export class WaterSystem {
     this.probesCmd = false;
     this.probes = 0; // 0 up … 1 down
     this.dropping = false;
+    this.dumping = false; // jettison: door held fully open to empty
     this.door = 0; // 0 shut … 1 open
     this.scooping = false;
     this.flowIn = 0; this.flowOut = 0; // L/s
@@ -60,8 +61,16 @@ export class WaterSystem {
   }
   toggleDrop() {
     if (!this.dropping && this.fm.hopper < 1) { this.msgs.push('empty'); return; }
+    if (this.dumping) return; // (a jettison keeps the door open to the last litre)
     this.dropping = !this.dropping;
     this.msgs.push(this.dropping ? 'dropOpen' : 'dropClose');
+  }
+
+  // Jettison: the door fully open until the tank is empty (cannot be closed).
+  jettison() {
+    if (this.fm.hopper < 1) return;
+    this.dumping = true;
+    this.dropping = true;
   }
 
   step(dt, dropWorld = null) {
@@ -105,7 +114,7 @@ export class WaterSystem {
       this.flowOut = L / dt;
       if (dropWorld) this.packets.push({ litres: L, x: dropWorld.x, y: dropWorld.y, z: dropWorld.z, vx: fm.vel.x, vy: fm.vel.y, vz: fm.vel.z });
     }
-    if (this.dropping && fm.hopper <= 0) { fm.hopper = 0; this.dropping = false; this.msgs.push('dropEmpty'); }
+    if (this.dropping && fm.hopper <= 0) { fm.hopper = 0; this.dropping = false; this.dumping = false; this.msgs.push('dropEmpty'); }
     fm.extForce = f.lengthSq() > 0 ? f : null;
   }
 }

@@ -37,6 +37,7 @@ export const ACTIONS = {
   spray: { get label() { return t('Spray on / off'); }, keys: ['KeyC', 'Enter'] },
   gear: { get label() { return t('Gear up / down (amphibian)'); }, keys: ['KeyU'] },
   scoop: { get label() { return t('Scoop probes up / down (Fire Boss)'); }, keys: ['KeyT'] },
+  jettison: { get label() { return t('Jettison the load (dump gate / Fire Boss door)'); }, keys: ['KeyY'] },
   engine: { get label() { return t('Engine (hold start / tap stop)'); }, keys: ['KeyF'] },
   camera: { get label() { return t('Cockpit / chase camera'); }, keys: ['KeyV'] },
   orbit: { get label() { return t('Free external camera'); }, keys: ['KeyO'] },
