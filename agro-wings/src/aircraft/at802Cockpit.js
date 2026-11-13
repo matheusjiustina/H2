@@ -417,7 +417,7 @@ export function buildAT802Cockpit({ variant, panel, M, cab, game = null }) {
     const N = 24;
     for (let i = 0; i <= N; i++) {
       const x = lerp(CON.x, -CON.x, i / N);
-      pos.push(x, CON.top, Math.min(zBack(x), CON.zFace + 0.01), x, CON.top, CON.zFace);
+      pos.push(x, CON.top, Math.max(zBack(x), CON.zFace + 0.01), x, CON.top, CON.zFace);
     }
     for (let i = 0; i < N; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
     const g = new THREE.BufferGeometry();
