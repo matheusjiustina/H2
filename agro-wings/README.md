@@ -4828,3 +4828,70 @@ pistons and radials unchanged.
   upper band and a louder, harsher prop buzz — the growl of a reversing PT6 —
   rising with reverse and power. HUD reads *Reverso n %*.
 - Tests: `test/reverse.test.mjs` (in `npm test`), `node test/reverseflow.mjs`.
+
+## Premium Expansion 03 — Operation: Fireboss Frontier (a separate map)
+A third map built only for aerial firefighting: dry cerrado at the end of the
+dry season, two large lakes to scoop from, broken hills, a ridge and a basin
+where smoke lies. No crop work exists on it. The main map, the Serra das
+Bananeiras and every aircraft elsewhere are unchanged (`npm test` 247/247,
+`npm run test:serra` 10/10).
+
+**Architecture.** Same one-map-per-page scheme as the Serra
+(`src/world/activeMap.js`, id `frontier`, `?map=frontier` /
+`AGRO_MAP=frontier`); all map data lives in `src/world/frontier.js` in the
+engine's own shapes (runway, farm site, creek, stream, ponds, roads, props,
+biome weights, vegetation regions), read by `layout.js`, `terrainData.js`,
+`expansion.js`, `vegetation.js` and the terrain shader (`FRONT_MAP`: straw-gold
+grass, old burn scars in the fourth biome channel, dry savanna beyond the map).
+
+**Size and terrain.** 7.2 × 7.2 km detailed (9.4 m grid), 6 × 6 km playable
+(36 km², 25 % of the main map). A Chapadão do Capim — rolling plains (13 m of
+relief); B Morro Queimado — hills cut by corridors (93 m); E Serra da Brasa —
+the western ridge with elongated crests and spurs (152 m); D Baixada da
+Fumaça — a basin ≈ 20 m down; C the lakes. Smooth distances only (no
+cut-offs), checked for steps by the map test.
+
+**Water.** Lagoa Grande (1.17 km of open water east–west, 1 km north of the
+base, the main scooping lake) and Lagoa das Garças (0.97 km, turned, deeper in
+the map); irregular outlines (pond harmonics), ground easing to a level floor
+round them. A creek through the basin, a stream down a hill corridor into
+Lagoa Grande, a small dam by the auxiliary strip.
+
+**Bases.** BASE 01 Base Lagoa Grande (840 × 22 m compacted earth, hangar,
+service, fuel, water tanks); BASE 02 Pista do Retiro (560 × 18 m earth,
+remote); BASE 03 water point on Lagoa das Garças (shed, tank, drums).
+
+**Fire.** 19 spots in 9 sectors (`FRONT_SECTORS`), unlit until a mission
+lights them. Spots burn as areas or as fire LINES (a front `len` long, up to
+56 flames). One instanced flame draw, one char/ember draw, pooled smoke whose
+spawn rate falls with camera distance (full within 900 m, an eighth by 2.6 km,
+larger puffs far away), and one instanced draw of impostor smoke columns (a
+column per burning spot plus five distant fires beyond the map). Burnt ground:
+static old scars plus the char each extinguished spot leaves. Grass fires go
+out at 0.8 L/m² (coverage level ≈ 2; the main map's test zone keeps 1.6).
+`hazeAt()` gives the smoke held at a point (near the fire, along the downwind
+plume, thicker in the basin, capped at 0.85); the atmosphere thickens and warms
+the fog and dims the sun from it — only where there is smoke.
+
+**Missions** (`src/game/frontierMissions.js`, fire only): A initial attack ×2,
+B fireline containment, C ridge fire, D low visibility, E multi-sector, F lake
+district; B and E flare up (more spots) if the fire is not under control in
+time; a mission handed in clears its spots, a completed one is paid (+25 %
+bonus inside its time) and recorded.
+
+**Aircraft.** Only the Fire Boss (missions) and the AT-802 Bombeiros (PR-BMF:
+red with a white side band, BOMBEIROS, white fin with a red band and a generic
+fire-service badge, white wings with red tips; no booms, no water system —
+free flight and showcase). Only these two are built on this map.
+
+**Premium.** `FRONTIER_EXPANSION` (`expansion.map-fireboss-frontier`) in
+`src/game/expansions.js`; its package includes the Fire Boss on this map
+(`includes`). Same entitlement source, same testing-phase setting; no
+purchase, payment, login or account code was added or changed.
+
+**Tests.** `npm run test:frontier` (9: size, strips, terrain zones and
+continuity, lakes, sectors and missions, no crop work, aircraft, premium,
+fires/missions/flare-up headless); `node test/frontiere2e.mjs` (14 in the
+browser: selector, switch both ways with the career kept, the AT-802
+Bombeiros, the board, scooping on Lagoa Grande, side-by-side drops putting a
+fire out and paying it, the smoke haze, hand-in, no page errors).
