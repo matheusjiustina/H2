@@ -4973,3 +4973,41 @@ arm at work height, a capim desiccation to completion, no page errors).
 | Mato Grosso · high | 71.8 s | 513 MB | 1249 | 155 | 623 / 586 / 731 / 1722 | 1316 / 1218 / 1553 / 2582 |
 
 (The main map in the same views: 616–621 MB, 561–1757 calls, 1358–3283 k triangles.)
+
+## Swath-guidance light bar (physical bar on the cowl + HUD bar)
+
+One LED pattern for every display (`src/aircraft/lightbar.js`): on the pass line the
+centre lights green; off it, a run of LEDs grows from the centre toward the side to
+steer to — amber near the line, red far off it (square-root scale: the first metres
+move the light most; one side is full at 15 m). Turning toward the next pass only the
+centre glows dimly; with no pass to fly the bar is dark. The pattern is reduced to an
+integer key and every display repaints only when the key changes.
+
+- **Physical bar** (`createLightbar`): dark housing with a short visor over the LED
+  window on two light steel brackets, 25 square LEDs facing the pilot, unlit material
+  (no bloom, no light, no shader). Two draw calls: housing + brackets merged with
+  vertex colours, LEDs in one `InstancedMesh` whose colours are written only on a
+  pattern change. Fitted on the **Ipanema 203** (cowl crown ahead of the windshield)
+  and the **Ipanema 202** (hopper deck aft of the lid), replacing their old cockpit
+  bars; it is exterior equipment, part of the airframe in every view. The other
+  aircraft keep their cockpit bars, now driven by the same pattern.
+- **HUD bar**: 25 small dots at the top centre while a job is flown (airborne, a pass
+  to fly). Settings → *Spray assistance*: *Light bar on the screen* on/off (default
+  on), *intensity* low / medium / high. DOM classes change only with the pattern.
+
+Measured (Chromium + SwiftShader, main map, beginner job, on a pass, before = v60
+`1bb2845`, after = this build; calls and triangles exact):
+
+| Aircraft | View | Calls before → after | Triangles before → after |
+|---|---|---|---|
+| Ipanema 202 | cockpit | 420 → 406 | 1 373 153 → 1 372 821 |
+| Ipanema 202 | chase | 446 → 432 | 1 321 964 → 1 321 632 |
+| Ipanema 203 | cockpit | 487 → 472 | 1 399 702 → 1 399 358 |
+| Ipanema 203 | chase | 555 → 540 | 1 344 594 → 1 344 250 |
+| AT-502B | both | unchanged | unchanged |
+
+Light bar logic per frame (Node micro-benchmark, 200 000 frames on a pass): 1.91 µs
+before (15 colour writes every frame) → 0.064 µs (key compare; 1 repaint). Heap within
+run-to-run noise (601–616 MB both builds). Frame times under SwiftShader varied by
+hundreds of ms between identical runs and are not a usable comparison. Not tested on
+real phones, Safari / Firefox or real GPUs. Unit tests: `test/lightbar.test.mjs`.
