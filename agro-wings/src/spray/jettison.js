@@ -83,7 +83,7 @@ export class Jettison {
     const L = g.world.atmo?.cur.light ?? 1, lk = 0.55 + 0.45 * Math.min(1, L);
     const col = [0.93 * lk, 0.95 * lk, 0.97 * lk];
     const k = Math.min(1, this.flow / (ac.A.hopperCapacity / DUMP_S));
-    this.acc += dt * 90 * (0.4 + 0.6 * k) * 1;
+    this.acc += dt * 150 * (0.4 + 0.6 * k);
     while (this.acc >= 1) {
       this.acc -= 1;
       const r = Math.random();
@@ -96,8 +96,8 @@ export class Jettison {
         fm.vel.y * 0.7 - 3 - Math.random() * 2.5,
         fm.vel.z * (0.75 + Math.random() * 0.15) + _d.z * 4 + (Math.random() - 0.5) * 1.5,
         core
-          ? { life: 1.4 + Math.random() * 0.8, size: 1.1 + Math.random() * 0.6, grow: 3.2, alpha: 0.6 * (0.6 + 0.4 * k), drag: 0.9, gravity: 7.5, color: col }
-          : { life: 2.4 + Math.random() * 1.4, size: 1.6 + Math.random(), grow: 5.5, alpha: 0.3 * (0.6 + 0.4 * k), drag: 1.6, gravity: 3.2, color: col },
+          ? { life: 1.5 + Math.random() * 0.8, size: 1.5 + Math.random() * 0.8, grow: 3.6, alpha: 0.72 * (0.6 + 0.4 * k), drag: 0.9, gravity: 7.5, color: col }
+          : { life: 2.6 + Math.random() * 1.4, size: 2.2 + Math.random() * 1.2, grow: 6, alpha: 0.34 * (0.6 + 0.4 * k), drag: 1.6, gravity: 3.2, color: col },
       );
     }
   }

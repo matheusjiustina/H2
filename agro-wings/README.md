@@ -5011,3 +5011,34 @@ before (15 colour writes every frame) → 0.064 µs (key compare; 1 repaint). He
 run-to-run noise (601–616 MB both builds). Frame times under SwiftShader varied by
 hundreds of ms between identical runs and are not a usable comparison. Not tested on
 real phones, Safari / Firefox or real GPUs. Unit tests: `test/lightbar.test.mjs`.
+
+## Jettison (alijamento) and the Fire Boss drop
+
+- **Jettison — key Y (PC; rebindable in Settings → Keys).** Agricultural aircraft:
+  the hopper's dump gate under the belly opens wide; the load goes in ≈ 5–7 s (the
+  flow falls with the head of liquid over the gate; Ipanema 203: 1 050 L in 6.7 s,
+  2 344 → 1 294 kg), the mass and CG follow every step, press Y again to close the
+  gate and keep the rest. The spray valve closes; nothing jettisoned counts as
+  application. A dense white curtain leaves the gate with the aircraft's speed and is
+  slowed by the air (shared dust particle pool, ≈ 150 particles/s only while the gate
+  is open). HUD: blinking *JETTISON — n L left*. Helicopters and the Frontier's
+  AT-802 Bombeiros (no hopper) have no gate. **Fire Boss:** Y opens the drop door
+  fully and holds it open to the last litre (3 000 L in 2.4 s).
+- **Drop physics kept:** the water leaves with the aircraft's velocity, the air slows
+  it toward the wind, gravity pulls it down (one shared step, `fallStep`): from 30 m
+  at 52 m/s it lands ≈ 71 m ahead after 2.6 s.
+- **Knock-down (easier, still physical):** a flame soaked to under 30 % of its fuel
+  goes out (wet fuel cannot hold); a spot down to 10 % of its fire is controlled; the
+  footprint of the falling water is 7 m + 5 m per second of fall; the main map's
+  brush needs 1.0 L/m² (was 1.6), the Frontier's grass 0.8 L/m². Headless, one full
+  load centred on an 18 m spot: before 11–13 % left burning, now out; a 200 m fire
+  line takes about two loads (≈ 30 % left after one).
+- **Drop sight** (Settings → Spray assistance, on by default): an outline on the
+  ground of where the load would land if the door opened now — from the first
+  impact along the ground track for the load's length, as wide as the footprint;
+  green when a burning spot is in its middle. One unlit ribbon, predicted 10× a
+  second, only with water on board near a burning spot. Opening the door on green
+  put the test spot out with one load (577 L on target).
+
+Not tested on real phones, Safari / Firefox or real GPUs; touch has no jettison button
+yet (PC first, as asked). Unit tests: `test/jettison.test.mjs`.
