@@ -554,6 +554,10 @@ export class Screens {
       <div class="field"><label>${t('Flight keys')}</label>${seg('keyScheme', [['numpad', t('Numpad + Q/E')], ['classic', 'W/S/A/D + Z/X']])}<span></span></div>
       ${g.touch?.active ? `<div class="field"><label>${t('Touch controls')}</label>${seg('touchMode', [['stick', t('Virtual stick')], ['tilt', t('Phone tilt')], ['buttons', t('Buttons')]])}<span></span></div>` : ''}
       ${g.touch?.active ? `<div class="field"><label>${t('Tilt sensitivity')}</label>${seg('tiltSens', [[0.7, t('Low')], [1, t('Normal')], [1.5, t('High')]])}<span></span></div>` : ''}
+      <h3>${t('Spray assistance')}</h3>
+      <div class="field"><label>${t('Light bar on the screen')}</label>${seg('lightbarHud', [[false, t('Off')], [true, t('On')]])}<span></span></div>
+      <div class="field"><label>${t('Light bar intensity')}</label>${seg('lightbarLevel', [['low', t('Low')], ['mid', t('Medium')], ['high', t('High')]])}<span></span></div>
+      <div class="note">${t('The light bar shows the pass line: green in the centre when on it; off it, amber then red LEDs grow toward the side to steer to. The bar on the cowl is part of the aircraft; this option adds a small copy at the top of the screen while a job is flown.')}</div>
       <h3>${t('Assistance')} <span style="color:var(--ink-faint);letter-spacing:0;text-transform:none">${t('— the physics is the same with it on or off')}</span></h3>
       <div class="field"><label>${t('Airplane')}</label>${seg('assist', [['off', t('Off')], ['on', t('On')]])}<span></span></div>
       <div class="aids${s.assist === 'on' ? '' : ' off'}" data-aids="aidPlane">${aidBtns('aidPlane', [['pedal', t('Soft pedal on the ground')], ['smooth', t('Smoothed controls')], ['coord', t('Light turn coordination')], ['cues', t('Speed × weight warnings')]])}</div>

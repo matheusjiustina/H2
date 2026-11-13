@@ -8,6 +8,10 @@ import { clamp, KT } from '../core/math.js';
 import { reliefPatch } from '../ui/maps.js';
 import { UNITS } from '../config.js';
 import { FIELDS, SITES, siteById } from '../world/layout.js';
+import { lightbarKey, lightbarFill } from '../aircraft/lightbar.js';
+
+// Cockpit LED colours by light bar state (lit meshes behind the panel glass).
+const LEGACY_COL = [0x1c1c1c, 0x223a28, 0x33ff66, 0xffaa22, 0xff3322];
 
 const TRACK_MAX = 2400; // points (~16 min at 0.4 s)
 
@@ -114,7 +118,7 @@ export class Guidance {
 
   update(dt) {
     this._record(dt);
-    if (!this.job) { this.next = null; return; }
+    if (!this.job) { this.next = null; this._lightbar(); return; }
     this.t -= dt;
     if (this.t <= 0) { this.t = 0.5; this.refresh(); }
     const ac = this.game.aircraft;
@@ -142,19 +146,23 @@ export class Guidance {
     this._lightbar();
   }
 
+  // Light bar state (lightbar.js): 0 dark (no pass to fly), 1 standby (a
+  // pass ahead, not lined up with the rows), 2 guiding. The displays — the
+  // cockpit LEDs, the bar on the cowl, the HUD bar — repaint only when the
+  // pattern changes.
   _lightbar() {
-    const leds = this.game.aircraft.model.leds;
-    const on = this.next && this.aligned;
-    const e = clamp(this.xte, -7, 7);
-    for (let i = 0; i < leds.length; i++) {
-      const pos = i - 7; // -7 (left) .. +7 (right)
-      let col = 0x1c1c1c;
-      if (on) {
-        if (pos === 0) col = Math.abs(e) < 0.75 ? 0x33ff66 : 0x225533;
-        else if (Math.sign(pos) === Math.sign(e) && Math.abs(pos) <= Math.ceil(Math.abs(e))) col = Math.abs(pos) > 4 ? 0xff3322 : 0xffaa22;
-      } else if (this.next && pos === 0) col = 0x223a28;
-      leds[i].material.color.setHex(col);
-    }
+    const mode = !this.next ? 0 : this.aligned ? 2 : 1;
+    this.lbMode = mode;
+    const model = this.game.aircraft.model;
+    model.lightbar?.set(mode, this.xte);
+    const leds = model.leds;
+    if (!leds.length) return;
+    const key = lightbarKey(leds.length, mode, this.xte);
+    if (key === this._ledKey && leds === this._leds) return;
+    this._ledKey = key; this._leds = leds;
+    const st = (this._ledSt ??= new Uint8Array(32));
+    lightbarFill(st, leds.length, mode, this.xte);
+    for (let i = 0; i < leds.length; i++) leds[i].material.color.setHex(LEGACY_COL[st[i]]); // (index 0 = pilot's left)
   }
 
   // Where the aircraft should be heading when not working the talhão: the

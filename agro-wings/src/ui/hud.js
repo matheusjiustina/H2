@@ -4,6 +4,10 @@ import { SPRAY } from '../config.js';
 import { buildBaseMap, drawMap } from './maps.js';
 import { keyLabel } from '../core/input.js';
 import { t } from '../i18n/index.js';
+import { lightbarKey, lightbarFill } from '../aircraft/lightbar.js';
+
+const LB_N = 25;
+const LB_CLS = ['', 'd', 'g', 'a', 'r'];
 
 const h = (html) => {
   const t = document.createElement('template');
@@ -21,6 +25,7 @@ export class HUD {
       <div class="crew"><div class="h">${t('Ground crew')}</div><div class="msg"></div>
         <div class="levels"><div>${t('Fuel')} <b class="lf"></b><div class="bar"><span class="bf"></span></div></div><div>${t('Hopper')} <b class="lh"></b><div class="bar blue"><span class="bh"></span></div></div></div>
         <div class="s hint" style="margin-top:6px;color:var(--ink-faint)"></div></div>
+      <div class="lbar" aria-hidden="true">${'<i></i>'.repeat(LB_N)}</div>
       <div class="toasts"></div>
       <div class="warnings"></div>
       <div class="prompt interactive"></div>
@@ -46,7 +51,7 @@ export class HUD {
       toasts: q('.toasts'), warnings: q('.warnings'), prompt: q('.prompt'), spray: q('.spraybadge'), trim: q('.trimbadge'),
       spd: q('.r-spd'), hgt: q('.r-hgt'), gl: q('.r-g'), pwr: q('.r-pwr'), fuel: q('.r-fuel'), hop: q('.r-hop'),
       mini: q('.minimap canvas'), tut: q('.tut'), tutStep: q('.tut .step'), tutTxt: q('.tut .txt'), tutDim: q('.tut .dim'),
-      fps: q('.fps'), vig: q('.vignette'),
+      fps: q('.fps'), vig: q('.vignette'), lbar: q('.lbar'),
     };
     this.$.tut.querySelector('.skip').addEventListener('click', () => game.tutorial?.skip());
     this.$.prompt.addEventListener('click', () => this.promptAction?.());
@@ -206,6 +211,7 @@ export class HUD {
       $.warnings.innerHTML = w.map((x) => `<div class="warning ${x.cls}">${x.text}</div>`).join('');
     }
     $.vig.classList.toggle('show', tm.stall > 0.5 && !tm.onGround);
+    this._lightbar(g, tm);
     // Minimap at 10 Hz
     this.miniT -= dt;
     if (this.miniT <= 0) {
@@ -234,6 +240,24 @@ export class HUD {
       gctx.restore();
     }
     this._fps(dt);
+  }
+
+  // Virtual light bar (Settings → Spray assistance): the same pattern as the
+  // bar on the cowl, small at the top of the screen, while a job is flown.
+  // Touches the page only when the pattern or the visibility changes.
+  _lightbar(g, tm) {
+    const $ = this.$, gd = g.guidance;
+    const show = !!(g.settings.lightbarHud && g.job && !tm.onGround && gd.lbMode);
+    const lvl = show ? g.settings.lightbarLevel || 'mid' : '';
+    if (lvl !== this._lbLvl) { this._lbLvl = lvl; $.lbar.className = show ? `lbar show ${lvl}` : 'lbar'; }
+    if (!show) return;
+    const key = lightbarKey(LB_N, gd.lbMode, gd.xte);
+    if (key === this._lbKey) return;
+    this._lbKey = key;
+    const st = (this._lbSt ??= new Uint8Array(LB_N));
+    lightbarFill(st, LB_N, gd.lbMode, gd.xte);
+    const dots = $.lbar.children;
+    for (let i = 0; i < LB_N; i++) dots[i].className = LB_CLS[st[i]];
   }
 
   _fps(dt) {

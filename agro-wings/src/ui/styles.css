@@ -69,6 +69,16 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0b; col
 .warning.amber { background: rgba(240,160,30,.9); color: #1d1404; }
 .warning.blink { animation: blink .7s steps(2, end) infinite; }
 @keyframes blink { 50% { opacity: .35; } }
+.lbar { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: none; gap: 3px; padding: 4px 7px; border-radius: 4px; background: rgba(8,10,12,.42); pointer-events: none; }
+.lbar.show { display: flex; }
+.lbar i { width: 6px; height: 6px; border-radius: 1px; background: rgba(255,255,255,.07); }
+.lbar i.d { background: #2f7a43; }
+.lbar i.g { background: #3fe57a; }
+.lbar i.a { background: #ffad33; }
+.lbar i.r { background: #ff4a33; }
+.lbar.low { opacity: .55; }
+.lbar.high { gap: 4px; padding: 5px 9px; background: rgba(8,10,12,.55); }
+.lbar.high i { width: 9px; height: 9px; }
 .toasts { position: absolute; top: 120px; left: max(16px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 6px; max-width: min(420px, 70vw); }
 .toast { font-size: 13px; line-height: 1.45; padding: 6px 10px; border-left: 2px solid var(--accent); background: rgba(0,0,0,.45); border-radius: 0 6px 6px 0; opacity: 0; transform: translateY(-4px); transition: opacity .4s, transform .4s; }
 .toast.in { opacity: 1; transform: none; }

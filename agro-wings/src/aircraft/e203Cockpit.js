@@ -662,22 +662,10 @@ export function buildE203Cockpit(ctx) {
     addB('black', at(new THREE.BoxGeometry(0.02, 0.2, 0.012), ex[0], ex[1], zb + 0.006));
   }
 
-  // ---------------- guidance lightbar (on the cowl, facing the pilot) ----
+  // (The guidance light bar is the exterior bar on the cowl, built with the
+  // airframe: lightbar.js.)
   const leds = [];
-  let lightbar = null;
-  {
-    const lb = (lightbar = new THREE.Group());
-    lb.position.set(0, ctx.cowlTopY(0.1) + 0.03, 0.1);
-    lb.add(new THREE.Mesh(new RoundedBoxGeometry(0.27, 0.035, 0.05, 2, 0.007), CM.black));
-    lb.add(new THREE.Mesh(at(new THREE.BoxGeometry(0.06, 0.02, 0.03), 0, -0.022, 0.0), CM.black));
-    for (let i = -7; i <= 7; i++) {
-      const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.016, 0.004), new THREE.MeshBasicMaterial({ color: 0x222222 }));
-      led.position.set(-i * 0.0165, 0.001, -0.026);
-      lb.add(led);
-      leds.push(led);
-    }
-    cockpit.add(lb);
-  }
+  const lightbar = null;
 
   // ---------------- merge ----------------
   const glass = new THREE.Mesh(mergeAll(glassParts), CM.glass);

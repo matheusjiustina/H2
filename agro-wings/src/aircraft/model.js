@@ -11,6 +11,7 @@
 // cockpit. Paint, stripes, registration and the flag are a side-projected
 // livery with a matching bump map (panel seams, rivets, doors, louvres).
 // Ambient occlusion is baked into vertex colours; fine detail sits in a LOD.
+import { createLightbar } from './lightbar.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -159,6 +160,7 @@ const deckTop = (z) => {
 // (moved back with the cabin and 2 cm up under its roof); the instrument
 // panel and glareshield stay on the airframe under the windshield.
 const COCKPIT_OFF = new THREE.Vector3(0, 0.02, -0.62);
+const LB_Z = 0.12; // light bar on the hopper deck, aft of the lid (body z)
 
 function sampleStations(keys, per) {
   const out = [];
@@ -1651,19 +1653,9 @@ export function createAircraftModel(panel, opts = {}) {
     addC('pad', grid((u, v) => { const x = arc(u); return [x, lerp(hoodTop(x, gsLip) - 0.034, plateTop(x) + 0.002, v), lerp(gsLip + 0.004, ZP - 0.001, v)]; }, 32, 2, [0, 0.95, 0.5]));
     addC('pad', tube(line((t) => { const x = arc(0.02 + 0.96 * t); return [x, hoodTop(x, gsLip) - 0.017, gsLip + 0.004]; }, 32)(0), 0.018, 48, 10));
   }
-  // Lightbar (swath guidance LEDs) on the glareshield's roll, clear of the
-  // raked glass.
-  const lightbar = new THREE.Group();
-  lightbar.position.set(0, hoodTop(0, gsLip) + 0.006, gsLip - 0.012);
+  // (The swath-guidance light bar is the exterior bar on the hopper deck,
+  // built with the airframe below: lightbar.js.)
   const leds = [];
-  for (let i = -7; i <= 7; i++) {
-    const led = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.008), new THREE.MeshBasicMaterial({ color: 0x222222 }));
-    led.position.set(-i * 0.0155, 0, -0.016); // pilot faces +Z: +X is left
-    lightbar.add(led);
-    leds.push(led);
-  }
-  lightbar.add(new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.032, 0.03, 2, 0.006), M.dark));
-  cockpit.add(lightbar);
   // Magnetic compass on the glareshield's roll, right of centre (the
   // one-piece windshield has no centre post): vertical card behind a domed
   // lens, lubber line, foot.
@@ -1840,6 +1832,12 @@ export function createAircraftModel(panel, opts = {}) {
   root.add(lod);
   root.add(glassMesh);
   root.traverse((o) => { if (o.isMesh && o.castShadow === undefined) o.castShadow = true; });
+  // Swath-guidance light bar on the hopper deck ahead of the windshield,
+  // LEDs facing the pilot (exterior equipment: part of the airframe in
+  // every view).
+  const lightbar = createLightbar({ n: 25, width: 0.3, stand: 0.03 });
+  lightbar.group.position.set(0, deckTop(LB_Z) + 0.002, LB_Z);
+  root.add(lightbar.group);
 
   return {
     // New registration marks: only the livery canvas is redrawn.
@@ -1852,7 +1850,7 @@ export function createAircraftModel(panel, opts = {}) {
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, flaps, elevator, rudder,
     gear: gearGroups,
-    stick, pedals, throttle, valve, leds, panelMesh,
+    stick, pedals, throttle, valve, leds, lightbar, panelMesh,
     pumpFan, nozzles, pilot, cockpit, glassMesh, update,
     eye: new THREE.Vector3(0, 1.0, -0.5).add(COCKPIT_OFF),
     // Service points (body frame) used by the badeco.

@@ -27,6 +27,7 @@
 // change); AO is baked into vertex colours; small parts sit in a LOD.
 // The cockpit is built inside this cabin by e203Cockpit.js (panel layout and
 // textures in e203Panel.js).
+import { createLightbar } from './lightbar.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -87,6 +88,7 @@ const RIM_A = Math.PI / 6;
 // Sill line: where the cabin loft is cut (its 30° point).
 const SILL = (() => { const st = CAB_KEYS[1]; return { x: st.hw * Math.cos(RIM_A) ** (2 / st.pU), y: st.ys + (st.yt - st.ys) * Math.sin(RIM_A) ** (2 / st.pU) }; })();
 const WS_Z = -0.5, WS_ZS = -0.62; // windshield base: centre / sides
+const LB_Z = 0.25; // light bar on the cowl crown (body z)
 
 // Structured sections for the cabin top and the rear fuselage
 // R(z, hw, ys, yb, pL, pU, yv, yr, yt, hwT, rT): below the rim yr the body
@@ -1069,6 +1071,14 @@ export function createE203Model(panel, opts = {}) {
   };
   root.add(cockpit);
 
+  // ---------------- light bar ----------------
+  // The swath-guidance light bar on the cowl crown ahead of the windshield,
+  // LEDs facing the pilot (as fitted to the 203s in service): exterior
+  // equipment, part of the airframe in every view.
+  const lightbar = createLightbar({ n: 25, width: 0.3, stand: 0.03 });
+  lightbar.group.position.set(0, topY(LB_Z) - 0.006, LB_Z);
+  root.add(lightbar.group);
+
   // ---------------- pilot ----------------
   const pilot = buildPilot(M, stick, throttle, { throttleAt: THR });
   pilot.position.copy(OFF);
@@ -1137,7 +1147,7 @@ export function createE203Model(panel, opts = {}) {
     prop, blades, bladeMats: [bladeMat, tipMat], disc,
     ailerons, flaps, elevator, rudder,
     gear: gearGroups,
-    stick, pedals, throttle, valve, leds, panelMesh: ck.panelMesh, inst: { pick: ck.pick, pickables: ck.pickables },
+    stick, pedals, throttle, valve, leds, lightbar, panelMesh: ck.panelMesh, inst: { pick: ck.pick, pickables: ck.pickables },
     pumpFan, nozzles, pilot, cockpit, glassMesh,
     eye: REF.eye.clone(),
     fuelFiller: new THREE.Vector3(2.3, leY(2.3) + 0.14, W.le - 0.35 * W.chord),
