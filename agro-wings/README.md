@@ -5089,3 +5089,76 @@ not animated far from the camera); heap after GC 589 → 594 MB (noise). Every a
 (14) serviced to completion in the browser with no page error; cancel on the Fire Boss
 wing and an aircraft change mid-climb leave nothing behind. Not tested on real phones,
 Safari / Firefox or real GPUs. Unit tests: `test/badeco2.test.mjs`.
+
+## Hopper sight liquid (moves with the aircraft)
+
+The product seen through each aircraft's hopper sight window is no longer a
+flat band redrawn when the level changed: it moves like a liquid in the tank.
+
+**Model** (`src/aircraft/hopperLiquid.js`, `HopperSlosh`): two damped
+oscillators, lateral and fore-aft tilt of the surface relative to the tank.
+Each is driven towards the equilibrium where the surface stands perpendicular
+to the specific force felt in the aircraft's frame: gravity plus
+accelerations from the velocity change, filtered at 80 ms because physics
+steps and frames are not in phase. Consequences:
+
+* A slip, a skid, a turn on the ground or a wing down on the ground tilts the
+  surface. In a coordinated turn the force stays along the seat, so the
+  surface settles level with the tank, as in a real hopper.
+* Nose up (on the tailwheel, climbing, slowing) runs the product aft, and the
+  rear-wall sight reads higher. Accelerating does the same; braking runs it
+  forward. This is the effect the Ag-Cat's and EMB-203's two scales (ground
+  and flight) already account for.
+* When the tank rolls or pitches quickly the liquid lags behind (70 % of the
+  rotation), then sloshes back.
+* Frequency is the first sloshing mode, ω² = (gπ/L)·tanh(πd/L), with tank
+  length L ≈ 1.05·∛(capacity) and depth d from the fill. Damping ζ = 0.07.
+* Ripples come from the engine (with throttle), rolling on the ground, the
+  slosh itself and bumps.
+
+The level falls as the hopper empties. An empty hopper shows nothing.
+
+**Drawing** (`sightLiquid`): the surface line, the gradient and the meniscus
+are added to the fragment shader of the sight's existing material. On canvas
+sights they are drawn over the window of the canvas texture, which now keeps
+only the wall and its marks, drawn once. On the AT-802 / Fire Boss, PA-36 and
+Thrush the liquid sheet stays at full height and is cut at the surface. Each
+frame only uniforms change: no canvas redraw, no texture upload (the old
+sights uploaded up to 1.3 MB per level change), and no extra mesh or draw
+call. The slosh runs only while the cockpit is shown.
+
+| Aircraft | Sight | Window |
+|---|---|---|
+| EMB-202 Ipanema | panel window, hopper wall with litre marks | `IPA_SIGHT_LIQUID` (panel.js) |
+| AT-502B | panel window | `AT_SIGHT_LIQUID` (atPanel.js) |
+| M-18 Dromader | hopper back wall | `M18_SIGHT_LIQUID` (dromaderPanel.js) |
+| Ag-Cat | translucent hopper wall, ground / flight scales | `AGCAT_SIGHT_LIQUID` (agcatPanel.js) |
+| EMB-201 | round window | `E201_SIGHT_LIQUID` (e201Panel.js) |
+| EMB-203 | painted upper wall + lower slot, non-linear scale (`h = (L/cap)^0.72`) | `E203_SIGHT_LIQUID` (e203Panel.js) |
+| PA-36, Thrush, AT-802 / Fire Boss | liquid sheet behind the window | in their cockpit files |
+
+The AT-401, AgTruck and helicopters have hopper gauges with needles only and
+no liquid window.
+
+Tests: `test/hopperLiquid.test.mjs` covers:
+
+* rest;
+* static bank;
+* nose up;
+* acceleration and braking;
+* roll-in slosh and settling;
+* ripples;
+* reset after a teleport.
+
+## FPS limit 60 by default
+
+An unlimited loop on a 120–240 Hz display keeps the GPU at full load all the
+time. Settings → FPS limit now defaults to **60**. Saves from before, which
+held the untouched 0, move to 60 once (`fpsV`). "Off" is still available.
+
+The limiter now keeps its deadlines on a grid. The old "time since the last
+frame" test gave 48 FPS on a 144 Hz display and 55 on 165 Hz. A callback up to
+half a display interval early counts as on time, so a limit at or above the
+display's rate never drops a frame. Tests (`test/perfmanager.test.mjs`): 60
+on 60/75/120/144/165/240 Hz, with ±1.5 ms jitter, and no catch-up burst after
+a stall.
