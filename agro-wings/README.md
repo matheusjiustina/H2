@@ -4964,3 +4964,12 @@ height —, orders, premium); `node test/mte2e.mjs` (11 in the browser:
 selector, switch both ways with the career kept, board, the arm as an
 obstacle, a pivot sprayed to completion hopping the arm, a crash into the
 arm at work height, a capim desiccation to completion, no page errors).
+
+**Measured (Chromium + SwiftShader, 1280 × 720; same four views as the Frontier table above).**
+
+| map · profile | load | JS heap | geometries | textures | calls (4 views) | k triangles (4 views) |
+|---|---|---|---|---|---|---|
+| Mato Grosso · low | 61.8 s | 511 MB | 1249 | 155 | 617 / 580 / 716 / 1686 | 1293 / 1195 / 1525 / 2539 |
+| Mato Grosso · high | 71.8 s | 513 MB | 1249 | 155 | 623 / 586 / 731 / 1722 | 1316 / 1218 / 1553 / 2582 |
+
+(The main map in the same views: 616–621 MB, 561–1757 calls, 1358–3283 k triangles.)
