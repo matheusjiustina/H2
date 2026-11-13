@@ -221,6 +221,18 @@ export function frontierStripD(x, z) {
   for (const r of stripRects()) d = Math.min(d, rectD({ x0: r.x0 - 420, x1: r.x1 + 420, z0: r.z - 90, z1: r.z + 90 }, x, z), rectD({ x0: r.x0 - 160, x1: r.x0 + 130, z0: r.z - 220, z1: r.z + 60 }, x, z));
   return d;
 }
+// Runway corridors (every strip of the map, BASE 01 included): the strip,
+// its shoulders and 300 m of approach past each end are kept free of
+// vegetation — trees, bushes and their colliders (the scatter covers the
+// whole map, so nothing else keeps them off the main runway).
+export function frontierRunwayClear(x, z) {
+  if (Math.abs(z - FRONT_RUNWAY.z) < 60 && x > FRONT_RUNWAY.x0 - 300 && x < FRONT_RUNWAY.x1 + 300) return true;
+  for (const f of FRONT_FARMS) {
+    const x0 = FRONT_RUNWAY.x0 + f.dx;
+    if (Math.abs(z - f.dz) < Math.max(f.clear ?? 60, f.width / 2 + 20) && x > x0 - 300 && x < x0 + f.len + 300) return true;
+  }
+  return false;
+}
 const waterD = (x, z) => {
   let d = polyD(FRONT_CREEK.points, x, z, 15);
   for (const st of FRONT_STREAMS) d = Math.min(d, polyD(st.points, x, z, 15));

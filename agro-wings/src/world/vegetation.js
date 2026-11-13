@@ -88,7 +88,7 @@ function termiteMound(seed) {
 }
 
 import { SERRA, FRONTIER } from './activeMap.js';
-import { FRONT_VEG_REGIONS, frontierCleared } from './frontier.js';
+import { FRONT_VEG_REGIONS, frontierCleared, frontierRunwayClear } from './frontier.js';
 import { serraForestBoxes, SERRA_WORLD_HALF } from './serra.js';
 import { serraCanopy } from './serraScenery.js';
 
@@ -714,13 +714,17 @@ export function createVegetation(terrain, quality) {
     || (Math.abs(x - HG.x) < HG.w / 2 + 12 && Math.abs(z - HG.z) < HG.d / 2 + 4);
   // ...but the big shade tree over the crew post stays (it is the badeco's shade).
   const crewTree = (x, z) => Math.hypot(x - BASE.crewPost.x - 8, z - BASE.crewPost.z + 14) < 0.5;
+  // Fireboss Frontier: the scatter covers the whole map, so the runway
+  // corridors (strip + approaches, frontier.js) are cleared here, for every
+  // generator above — trees, bushes and their colliders alike.
+  const onRunway = (x, z) => FRONTIER && frontierRunwayClear(x, z);
   for (let i = trees.length - 1; i >= 0; i--) {
     const t = trees[i];
-    if (cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || begCleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || expCleared(t.x, t.z, isTall(t.kind)) || inWater(t.x, t.z) || (!crewTree(t.x, t.z) && onMainApron(t.x, t.z, 1.5))) trees.splice(i, 1);
+    if (onRunway(t.x, t.z) || cleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || begCleared(t.x, t.z, isTall(t.kind), isTall(t.kind) ? 6 : 2) || expCleared(t.x, t.z, isTall(t.kind)) || inWater(t.x, t.z) || (!crewTree(t.x, t.z) && onMainApron(t.x, t.z, 1.5))) trees.splice(i, 1);
   }
   for (let i = colliders.length - 1; i >= 0; i--) {
     const c = colliders[i];
-    if (!c.box && (cleared(c.x, c.z, true, 6) || begCleared(c.x, c.z, true, 6) || expCleared(c.x, c.z, true) || inWater(c.x, c.z) || (!crewTree(c.x, c.z) && onMainApron(c.x, c.z, 1.5)))) colliders.splice(i, 1);
+    if (!c.box && (onRunway(c.x, c.z) || cleared(c.x, c.z, true, 6) || begCleared(c.x, c.z, true, 6) || expCleared(c.x, c.z, true) || inWater(c.x, c.z) || (!crewTree(c.x, c.z) && onMainApron(c.x, c.z, 1.5)))) colliders.splice(i, 1);
   }
 
   terrain.releaseBaseline?.();
