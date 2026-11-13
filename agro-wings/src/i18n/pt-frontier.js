@@ -9,7 +9,7 @@ export default {
   'Initial attack — Capim do Chapadão': 'Ataque inicial — Capim do Chapadão',
   'A grass fire just started 1.4 km east of the base. Scoop at Lagoa Grande and hit it before it becomes a line.': 'Um fogo no capim acabou de começar a 1,4 km a leste da base. Capte na Lagoa Grande e lance antes que vire uma linha.',
   'Initial attack — north of Lagoa Grande': 'Ataque inicial — ao norte da Lagoa Grande',
-  'A small fire in the cerrado just past the lake: one scoop, one drop, if you are quick.': 'Um foco pequeno no cerrado logo depois da lagoa: uma captação, um lançamento, se você for rápido.',
+  'A small fire in the cerrado just past the lake: a short scoop and drop loop, if you are quick.': 'Um foco pequeno no cerrado logo depois da lagoa: um circuito curto de captação e lançamento, se você for rápido.',
   'Fireline containment — Chapadão': 'Contenção de linha de fogo — Chapadão',
   'A 700 m fire front across the open plains. Lay the drops along the line, end to end; left too long, it jumps east.': 'Uma frente de fogo de 700 m no chapadão aberto. Lance ao longo da linha, de ponta a ponta; se demorar, ela salta para o leste.',
   'Ridge fire — Morro Queimado': 'Fogo em encosta — Morro Queimado',

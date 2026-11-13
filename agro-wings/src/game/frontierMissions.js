@@ -17,7 +17,7 @@ export const FRONT_MISSIONS = [
   { id: 'ff-capim', type: 'A', spots: sectorIds('capim'), pay: 16000, bonusMin: 8, lake: 'Lagoa Grande',
     get title() { return t('Initial attack — Capim do Chapadão'); }, get brief() { return t('A grass fire just started 1.4 km east of the base. Scoop at Lagoa Grande and hit it before it becomes a line.'); } },
   { id: 'ff-norte', type: 'A', spots: sectorIds('norte'), pay: 15000, bonusMin: 8, lake: 'Lagoa Grande',
-    get title() { return t('Initial attack — north of Lagoa Grande'); }, get brief() { return t('A small fire in the cerrado just past the lake: one scoop, one drop, if you are quick.'); } },
+    get title() { return t('Initial attack — north of Lagoa Grande'); }, get brief() { return t('A small fire in the cerrado just past the lake: a short scoop and drop loop, if you are quick.'); } },
   { id: 'ff-chapadao', type: 'B', spots: sectorIds('chapadao'), flare: { after: 9, spots: sectorIds('flare-chapadao') }, pay: 42000, bonusMin: 18, lake: 'Lagoa Grande',
     get title() { return t('Fireline containment — Chapadão'); }, get brief() { return t('A 700 m fire front across the open plains. Lay the drops along the line, end to end; left too long, it jumps east.'); } },
   { id: 'ff-morro', type: 'C', spots: sectorIds('morro'), pay: 40000, bonusMin: 18, lake: 'Lagoa Grande',

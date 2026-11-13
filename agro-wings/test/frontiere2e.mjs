@@ -90,10 +90,12 @@ await page.evaluate(() => { const g = window.__agro; g.cameraMode = 'chase'; g.r
 await shot('05_scooping_lagoa_grande');
 check('scooping on Lagoa Grande: the tank fills on the run', r.h1 > 1500 && r.wl, JSON.stringify(r));
 
-// Drop on the fire (key C) from ≈ 35 m, flying west over it.
+// Drop on the fire (key C first, then the door again): passes over the
+// spot at 40 m, the door opened ahead of it (the water carries forward);
+// after each release the aircraft is lifted clear (no pilot in the test).
 r = await page.evaluate(() => {
   const g = window.__agro, ac = g.aircraft, fm = ac.fm, f = g.fireJobs.spots()[0];
-  ac.placeAirborne(f.x + 150, f.z, -Math.PI / 2, 32, 48);
+  ac.placeAirborne(f.x + 170, f.z, -Math.PI / 2, 40, 48);
   fm.gearDown = 0; fm.gearCmd = false; fm.hopper = Math.max(fm.hopper, 2800); fm.updateMass();
   for (let i = 0; i < 20; i++) g.tick(1 / 60);
   return { i0: f.intensity };
@@ -102,19 +104,28 @@ await page.keyboard.press('KeyC');
 await page.evaluate(() => { const g = window.__agro; for (let i = 0; i < 60 * 1.4; i++) g.tick(1 / 60); g.cameraMode = 'orbit'; g.rig.setMode('orbit', g.aircraft); g.rig.orbit.dist = 70; g.rig.orbit.pitch = 0.3; for (let i = 0; i < 4; i++) g.tick(1 / 60); });
 await shot('06_drop');
 r = await page.evaluate((r0) => {
-  const g = window.__agro, f = g.fires.fires.find((s) => s.sector === 'capim');
-  for (let i = 0; i < 60 * 6; i++) g.tick(1 / 60);
-  // A second pass if one drop was not enough (as a pilot would).
-  if (f.state === 'burning') {
-    const ac = g.aircraft, fm = ac.fm;
-    ac.placeAirborne(f.x - 150, f.z, Math.PI / 2, 32, 48); fm.hopper = 3000; fm.updateMass();
-    for (let i = 0; i < 20; i++) g.tick(1 / 60);
+  const g = window.__agro, ac = g.aircraft, fm = ac.fm, f = g.fires.fires.find((s) => s.sector === 'capim');
+  const lift = () => { ac.placeAirborne(f.x, f.z - 900, Math.PI / 2, 300, 50); fm.gearDown = 0; fm.gearCmd = false; };
+  for (let i = 0; i < 60 * 1.5; i++) g.tick(1 / 60);
+  if (ac.water.dropping) ac.water.toggleDrop();
+  lift();
+  for (let i = 0; i < 60 * 5; i++) g.tick(1 / 60);
+  let passes = 1;
+  // Further passes, as a pilot would, until the fire is out.
+  while (f.state === 'burning' && passes < 5) {
+    const dir = passes % 2 ? 1 : -1;
+    ac.placeAirborne(f.x - dir * 170, f.z, dir * Math.PI / 2, 40, 48); fm.gearDown = 0; fm.gearCmd = false; fm.hopper = 3000; fm.updateMass();
+    for (let i = 0; i < 40; i++) g.tick(1 / 60);
     ac.water.toggleDrop();
-    for (let i = 0; i < 60 * 8; i++) g.tick(1 / 60);
+    for (let i = 0; i < 60 * 3; i++) g.tick(1 / 60);
+    if (ac.water.dropping) ac.water.toggleDrop();
+    lift();
+    for (let i = 0; i < 60 * 5; i++) g.tick(1 / 60);
+    passes++;
   }
-  return { ...r0, i1: f.intensity, state: f.state, job: g.fireJobs.job?.def.id ?? null, money: g.career.money, done: !!g.career.completed['ff-capim'] };
+  return { ...r0, passes, i1: f.intensity, state: f.state, job: g.fireJobs.job?.def.id ?? null, money: g.career.money, done: !!g.career.completed['ff-capim'], crashed: ac.state === 'crashed' };
 }, r);
-check('drops put the fire out; the mission is paid and recorded', r.state === 'out' && r.job === null && r.money >= 7777 + 16000 && r.done, JSON.stringify(r));
+check('drops put the fire out; the mission is paid and recorded', r.state === 'out' && r.job === null && r.money >= 7777 + 16000 && r.done && !r.crashed, JSON.stringify(r));
 await shot('07_fire_out');
 
 // Low-visibility mission: the haze thickens near the basin's fire.
