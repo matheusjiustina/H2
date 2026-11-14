@@ -5125,7 +5125,7 @@ only the wall and its marks, drawn once. On the AT-802 / Fire Boss, PA-36 and
 Thrush the liquid sheet stays at full height and is cut at the surface. Each
 frame only uniforms change: no canvas redraw, no texture upload (the old
 sights uploaded up to 1.3 MB per level change), and no extra mesh or draw
-call. The slosh runs only while the cockpit is shown.
+call. The slosh runs only while the cockpit is shown (measured: 0.43 µs a frame in Node).
 
 | Aircraft | Sight | Window |
 |---|---|---|
