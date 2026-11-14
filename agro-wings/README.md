@@ -1,0 +1,5164 @@
+# AGRO WINGS
+
+Agricultural aviation on a Mato Grosso farm (Fazenda Boa Esperança, fictional).
+Three.js + Vite, everything procedural (no external assets), built into a
+single self-contained `dist/index.html`.
+
+Three aircraft share the world and are chosen on the title screen:
+**AIRCRAFT 01 · Original** — the EMB-202A Ipanema (PR-AGW),
+**AIRCRAFT 02 · Air Tractor** — an AT-502B turboprop (PR-AWT), and
+**AIRCRAFT 03 · Robinson R44** — an R44 Raven II helicopter in an
+agricultural configuration (PR-AGH, "Rotary-Wing Agricultural Aircraft").
+The airplanes not selected wait parked on the west apron; the helicopter
+waits on its own pad at the east end of the apron.
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # dist/index.html (single file)
+npm test           # flight (all three aircraft) + spray validation (Node)
+```
+
+URL option: `?q=low|medium|high` forces a graphics preset (otherwise the
+first run measures the frame time on the title screen and steps the preset
+down or up once; a manual choice in Settings turns that off).
+
+Settings → Environment: time of day (dawn, morning, midday, golden hour,
+dusk) and weather (clear, partly cloudy, overcast, light rain, morning mist).
+Weather and time of day are visual and audio only — the flight model's wind
+is the Wind setting, as before. Settings → Cockpit shake: off / low / normal.
+
+## Gameplay loop
+
+Service orders (9 contracts on three terrain levels) → load sheet (fuel / application liquid) → the
+badeco services the aircraft on the pad → engine start → taxi → take-off →
+spray passes → return → landing → taxi to the pad → shut down → results and
+payment in Cr$ → next order. Partial work can be handed in; landing for a
+reload keeps the coverage (also saved in `localStorage`). Free flight mode
+starts on the pad or airborne.
+
+Contracts (`src/game/contracts.js`):
+
+| id | Talhão | Crop | Area | Challenge |
+| --- | --- | --- | --- | --- |
+| soy | T-07 | soybean 0.8 m | 18.4 ha | wide, flat, beside the strip — learn the circuit |
+| corn | T-12 | corn 2.4 m | 16.1 ha | tall canopy on a swell, tree line along the south edge, power line past the east end |
+| cotton | T-03A + T-03B | cotton 1.2 m | 13.8 ha | two fields split by the creek — valve off over the gap |
+| roll-soy | T-31A + T-31B | soybean 0.8 m | 19.5 ha | level 2: 25 m of relief in the south-east swells, stepped boundary |
+| roll-corn | T-32A + T-32B | corn 2.4 m | 19.8 ha | level 2: tall canopy over a swell, the longest ferry (4.2 km) |
+| roll-cotton | T-33A + T-33B | cotton 1.2 m | 19.1 ha | level 2: 30 m of relief on the north-west plateau edge |
+| ridge-soy | T-41A + T-41B | soybean 0.8 m | 16.1 ha | level 3: ridge flank, steepest field (mean 4.5°, max 7°) |
+| ridge-cotton | T-42A + T-42B | cotton 1.2 m | 16.1 ha | level 3: 37 m of relief across the talhão |
+| ridge-corn | T-43A + T-43B | corn 2.4 m | 15.8 ha | level 3: tall corn over a hill, forest along the south edge |
+
+The order board groups them by terrain level (Level 1 · Flat farmland,
+Level 2 · Rolling fields, Level 3 · Hilly agricultural fields); each card
+shows the distance from the base and, for levels 2–3, the relief and the
+steepest slope measured on the terrain itself. See *Terrain relief and
+advanced missions* below.
+
+Evaluation: useful coverage (dose ≥ 0.7 of target), uniformity (1 − CV of
+dose), gaps, overlap (dose > 1.5), waste (off-target + drift/evaporation +
+over-application) and aircraft condition (repairs).
+
+## Controls
+
+Flight keys come in two schemes for every aircraft — Settings → Flying →
+**Flight keys** picks one (the choice is saved; the default is the numpad
+scheme). Everything else is the same in both.
+
+| Action | Numpad scheme (default) | Classic scheme (Tidemark layout) |
+| --- | --- | --- |
+| Stick forward / back (R44: cyclic) | Num 8 / Num 5 | W / S (↑ ↓) |
+| Roll left / right (R44: cyclic) | Num 4 / Num 6 | A / D (← →) — also steer on the ground |
+| Rudder left / right (R44: pedals) | Q / E | Z / X |
+
+| Action | Keys (both schemes) |
+| --- | --- |
+| Engine | hold F to start, tap F to stop |
+| Power (R44: collective) | Shift / Ctrl (R raises too), mouse wheel |
+| Brakes (differential with rudder) | Space |
+| Flaps | G (up) / B (down) |
+| Trim (nose up / down) | ] / [ (Page Up / Page Down) — with the assist on it sets the climb or descent the aircraft holds hands-off |
+| Spray valve | C (Enter) |
+| Cockpit / chase | V |
+| Free external camera | O |
+| Pilot's eye higher / lower (taller or shorter pilot, cockpit view) | Shift + ↑ / Shift + ↓ |
+| Service / interact | E |
+| Map / coverage overlay / contracts | M / K / J |
+| Minimap: farm map ↔ GPS guidance page | N (or click the minimap) |
+| Reset aircraft | Backspace |
+| Speed up ground service | hold T |
+
+In the numpad scheme Q and E are the rudder; E is also the service key,
+which only acts at the pad with the engine off, where the rudder does
+nothing. The two schemes are separate sets of bindings, so rebinding a
+numpad key never takes a key away from the classic ones, and the other way
+round. (Bindings saved earlier with the engine on Q and power-down on F are
+moved to the new defaults.)
+
+All bindings are rebindable in Settings. Mouse: left-drag looks, right-drag
+is a virtual stick. Gamepad: left stick, triggers = power, bumpers = rudder,
+A = spray, B = brakes. Touch devices get a stick, a power slider and buttons.
+
+## Flight model
+
+`src/flight/flightModel.js` is a port of the Tidemark floatplane model: same
+lift/drag/stall blending, stability derivatives, prop wash on the tail,
+engine torque and p-factor, ground effect and gyroscopic terms, and the same
+assist control law (`src/flight/assist.js`, modes off / normal / high) and
+input shaping rates. Changes for an agricultural taildragger:
+
+- spring/damper main gear and steerable tailwheel, rolling resistance per
+  surface, brakes (differential with rudder), small ground irregularities;
+- engine: Lycoming IO-540 on ethanol as on the EMB-202A, 320 hp (the
+  alcohol engine gives ~7 % more than the 300 hp avgas one); fixed climb-pitch
+  prop: static thrust fades toward pitch speed, windmill drag at idle (gives
+  a real glide). Measured: ~990 ft/min at 1,800 kg and 70 kt (published
+  930 ft/min for the 300 hp engine), ~124 kt top speed (published 121 kt);
+- stall-warning vane: the horn sounds ~4° before the critical angle, so a
+  hard pull or an over-steep loaded turn is heard before the wing quits;
+- fuel burn and starvation; crop-canopy drag and crop strikes.
+
+- mass, inertia and CG change with fuel and hopper load; MTOW 1,800 kg as on
+  the EMB-202 (the load sheet warns above it and shows the steepest bank
+  the wing can hold level at 90 kt for that load);
+- stalled in a turn, the slower inner wing drops and roll damping is lost.
+
+The simulation runs at a fixed 120 Hz with an accumulator and render
+interpolation. All tuning values live in `src/config.js`.
+
+### Assist and the balão
+
+`src/flight/assist.js` (mode *normal*) is tuned for agricultural flying:
+
+- rate command with expo: fine control near centre, full stick rolls
+  ~75°/s and pitches ~26°/s; no bank limit below 80° while the stick is held.
+  The elevator gets a feed-forward of what the commanded pitch rate needs
+  (the pitch damping), the way a pilot's hand moves the stick at once: full
+  back stick reaches the commanded rate in ~0.3 s and ~1.9 g in 0.5 s at
+  90 kt (before, the loop only reached ~75 % of the rate and the g took over
+  a second, which made pull-outs from the balão feel heavy);
+- a hard pull (stick past half, the pull-out from the balão's dive) also
+  turns the nose with the flight path's own rotation, so the angle of
+  attack, and with it the g, keeps building up to the protected limit
+  instead of the path catching up with a fixed pitch rate. This applies
+  only while descending.
+- from level or climbing flight a full pull is now progressive: ~19°/s
+  (26°/s before, still available in a dive).
+  - Holding the key for 2 s at 100 kt with the Ipanema loaded now ends
+    32° nose up with the stall horn on for 0.6 s (before: 37° and 1.2 s).
+  - On the keyboard a pull reaches full travel in 0.4 s; pushes and
+    releases are unchanged.
+- turns: the pull leads the bank by ~0.3 s of roll rate, and a g error adds
+  pitch rate, so the load a steep turn needs arrives within ~0.5 s.
+  - Before, rolling into 60° at 15 m the aircraft sank ~4 m/s before the g
+    came, lost ~10 m, and the low wingtip went into the crop.
+  - Now a 180° turn back from 15 m with a load (`lowTurn` in the harness)
+    loses about this much height:
+
+    | Aircraft | 45° bank | 60° bank |
+    |---|---|---|
+    | Ipanema, 560 L | 0 m | 4.6 m |
+    | AT-502B, 1,180 L | 0.7 m | 4.3 m |
+
+  - A level 70° turn with a full AT is beyond its wing (2.9 g needed,
+    ~2.4 g available): it has to climb, as in the balão.
+  - Measured with the same input ramp before and after, in a 20° dive at
+    ~100 kt:
+
+    | Ipanema load | g after 0.6 s, before | Now |
+    |---|---|---|
+    | Empty | 2.4 g | 2.85 g |
+    | 450 L | 2.1 g | 2.2 g |
+
+    With the faster keyboard pull the empty aircraft reaches 3.3 g after
+    0.6 s.
+- the stall and g limits close in continuously as the margin shrinks, and
+  at the limit the nose turns with the path, holding the angle of attack or
+  the g. Before:
+  - at the angle-of-attack limit the nose was stopped outright, so the
+    alpha fell away and came back, and the elevator chattered between full
+    up and half down (11–24 jumps per pull-out with a load);
+  - the alpha prediction looked 0.3 s ahead, which slowed the last part of
+    every hard pull.
+
+  The protected angle is now 1.0° under the critical one (1.4° before).
+- stick released: flight-path hold. In a bank the assist asks for the load
+  factor n = cos γ / cos φ that keeps the climb or descent, but never more
+  than the wing can give at that speed and weight. Beyond that the nose
+  falls and the aircraft descends — the real energy trade of a steep turn.
+  A level turn settles at the bank the wing can sustain; a climbing aircraft
+  (top of the balão) keeps up to 75°; a held climb flattens as speed bleeds;
+- trim with the assist on moves that held flight path, about 3° per second
+  on the key (a fly-by-wire trim; an elevator offset alone was cancelled by
+  the hold loop within a second, so the trim barely did anything): two
+  seconds of nose-up trim at 90 kt give a 4.4 m/s climb that stays
+  hands-off, two seconds nose-down a 5.9 m/s descent. A HUD badge shows the
+  trimmed path while it is set. The stall, low-speed and near-ground
+  protections still apply. With the assist off (or on the ground) the trim
+  is the elevator tab as before;
+- stall protection anticipates the alpha trend (0.12 s ahead) and the path
+  rotation (α̇ = q − γ̇), g protection at +3.8 / −1 g.
+
+The balão at the end of each pass is flown as in the field: valve off, pull
+up (~2.2–2.5 g, +25–40 m), turn ~45° away, bank 60–75° back toward the next
+swath at the slow top, let the nose fall and dive back to 3 m. The HUD's
+LOAD readout shows the g. Measured with the test pilot (`npm test`): 60°
+bank in 1.1 s, 45° turns hold height within ~7 m, a balão with 560 L tops
+out ~29 m above the pass and ends above it, never stalling.
+
+**The whole balão near the ground.** `balaoDive` in `test/harness.mjs` flies
+the balão with keyboard-shaped inputs over the real terrain (the table was
+measured with the 0.2 s pull; with the final 0.4 s pull the Ipanema 560 L
+20°/18 m case touches again, the AT 1,000 L 20°/18 m one clears by 1.6 m):
+
+1. a pass at 3 m;
+2. a full pull to 25° nose up;
+3. a 65° bank and ~150° of turn;
+4. a dive back at 14° or 20°;
+5. a full pull once the wheels are 14–20 m up.
+
+Lowest wheel height after the pull-out:
+
+| Aircraft, load | Dive, pull height | Before | Now |
+|---|---|---|---|
+| Ipanema, 560 L (MTOW) | 14°, 14 m | 4.9 m | 6.0 m |
+| Ipanema, 560 L | 20°, 20 m | 1.2 m | 2.4 m |
+| Ipanema, 560 L | 20°, 18 m | hit | 0.4 m |
+| Ipanema, 300 L | 20°, 14 m | hit | 0.7 m |
+| AT-502B, 1,000 L | 14°, 14 m | 1.9 m | 3.5 m |
+| AT-502B, 1,000 L | 20°, 18 m | hit | 2.4 m |
+| AT-502B, 600 L | 20°, 14 m | hit | hit |
+
+The last row is the wing's limit: 20 m/s of sink at 124 kt, 14 m up. With
+the contracts' loads (Ipanema 560 L at its MTOW, AT 1,180 L at ~81 % of
+its MTOW), the AT recovers higher from a 20° dive than the Ipanema: 2.1 m
+against 0.4 m pulled at 18 m. Its power also takes it higher in the
+pull-up. In a 14° dive the slower Ipanema bottoms out higher (6.0 m against
+3.4 m).
+
+The wings were left as published. The Ipanema stalls at ~59 kt at its
+MTOW; the AT at 71 kt flaps up at 8,000 lb (82 mph on Air Tractor's sheet).
+So a loaded pull-out is limited by the wing:
+
+- Ipanema at its MTOW, 100 kt: ~2.7 g.
+- AT with 1,000 L, 120 kt: ~2.9 g.
+
+A stronger elevator on the AT was tried and changed nothing for that
+reason.
+
+### Crash recovery and the service truck
+
+- **After a crash the panel offers two choices:** back to the runway, or
+  back to the base (the R44 always goes to its pad). Either way the
+  aircraft comes back repaired as new, with the hopper empty. The truck
+  returns to its bay, and the badeco and the hoses are put back. The
+  recovery cost is charged at the crash.
+- **Esc no longer dismisses the crash panel.** If the panel is gone,
+  Backspace brings it back.
+- **The pause menu's reset after a crash also repairs.** Before, it put the
+  aircraft back with 100 % damage, so it failed again at once ("Structural
+  failure") and the engine would not start.
+- **The engine may start once the badeco has finished,** with the truck
+  still alongside or driving off.
+- **The truck's route planner now knows the small props.** These are the
+  pad's corner tyres, the drums by the mixing station and the
+  extinguisher stand at the fuel slab. It used to drive over them; it now
+  backs out and returns around them.
+  - Measured with `test/truck.mjs`, all three aircraft: the truck arrives,
+    services, and is back in its bay.
+  - Closest approach to the aircraft: ≥ 0.5 m.
+
+### Language
+
+The game starts in **Portuguese (Brazil)**; **English** is the second
+option.
+
+- **Choosing:** two small flags (Brazil / United States) at the top right
+  of the title screen switch the language. The page reloads in the chosen
+  one.
+- **Where the choice lives:** it is kept in `localStorage`
+  (`agrowings.lang`). `?lang=en` or `?lang=pt` on the URL overrides it.
+- **How it works** (`src/i18n/`):
+  - The English text in the code is the key, and `t(en, ...args)` returns
+    the Portuguese for it, with `{0}`, `{1}`… filled in.
+  - The dictionaries are split by area: `pt-ui.js` (screens, HUD, touch),
+    `pt-game.js` (game, aircraft, key actions, crash reasons), `pt-jobs.js`
+    (contracts, tutorial, crops) and `pt-crew.js` (badeco and truck
+    messages, time of day, weather).
+  - Module-level data with visible text (contract titles, aircraft labels,
+    key-action labels) uses getters, so it always shows in the current
+    language.
+  - Crash reasons stay in English inside the simulation and are translated
+    where they are shown.
+- **Missing translations:** any key asked for in Portuguese without an
+  entry is collected in `window.__i18nMisses`. A browser tour of the title,
+  settings, controls, contracts, load sheet, flight HUD, pause and crash
+  screens found none.
+- **Tests:** Node tests run in English (no `location`). `test/keys.mjs`
+  loads with `?lang=en` because it checks the English key labels. The other
+  browser runs use the Portuguese default.
+
+## Tests
+
+`npm test` runs `test/flight.test.mjs` (PR-AGW, incl. the trim),
+`test/at502.test.mjs` (AT-502B), `test/r44.test.mjs` (R44, detailed rotor
+model), `test/r44power.test.mjs` (R44, power model), `test/spray.test.mjs`,
+`test/terrain.test.mjs` (relief, flat core, zones, fields, roads) and
+`test/input.test.mjs` (key bindings) (Node).
+Browser checks (need `npm run build && npx vite preview --port 4173`):
+
+- `node test/e2e.mjs soy out/` — full contract flown by the test autopilot
+  (`src/game/autopilot.js`) through the normal player inputs only (any
+  contract id: `roll-soy`, `ridge-soy`, …);
+- `node test/terrainviews.mjs out/ '<views>'` — terrain look-dev renders
+  from the air and the ground (point AGRO_URL at two builds to compare);
+- `node test/keys.mjs out/` — the numpad and classic key schemes with real
+  key codes on all three aircraft (stick, roll, rudder, power, engine
+  hold/tap), the HUD / Controls / Settings screens and rebinding;
+- `node test/e2e_ui.mjs out/` — service interruption, crash + recovery,
+  stuck reset, key rebinding, tutorial, mobile layout;
+- `node test/perf.mjs` — per-view tick/render time, draw calls, triangles;
+- `node test/profile.mjs <low|medium|high> <ipanema|at502|r44>` — load time,
+  GPU object counts, JS heap, tick and frame avg/p95/p99 per view;
+- `node test/envviews.mjs out/ [times] [weathers] [views]` — renders per
+  time of day × weather; `node test/atmo_transition.mjs` — gradual blends;
+- `node test/truck.mjs out/ [dx dz headingDeg]` — service truck cycle with
+  timings, closest approach to the aircraft and loads;
+- `node test/gpsview.mjs out/` — HUD GPS page and the cockpit unit;
+- `AC=r44 node test/e2e.mjs soy out/` — the contract flown by the
+  helicopter test autopilot (`src/game/heliAutopilot.js`);
+  `node test/r44flight.mjs out/` — the R44 picked on the title screen and
+  flown with the keyboard (start, spool-up, lift-off, hover, pedal turn,
+  forward flight) with screenshots; `AC=r44 node test/truck.mjs out/ dx dz
+  hdg` — service at the helipad.
+
+### Measured in this container (Chromium + SwiftShader, 1280×720)
+
+The container has no GPU, so render times are only the CPU cost of handing
+frames to a software rasteriser and say nothing about real FPS. Game logic
+time and scene complexity carry over to real hardware:
+
+| preset | view | logic ms/frame | draw calls | triangles |
+| --- | --- | --- | --- | --- |
+| low | parked on the pad (chase) | 1.38 | 426 | 668k |
+| low | spraying soy at 4 m (chase) | 2.58 | 369 | 574k |
+| low | cockpit over corn | 2.60 | 361 | 931k |
+| low | 400 m AGL | 2.25 | 327 | 489k |
+| medium | spraying soy at 4 m | 4.01 | 379 | 582k |
+| medium | cockpit over corn | 3.38 | 378 | 1054k |
+| high | parked on the pad | 1.40 | 427 | 696k |
+| high | spraying soy at 4 m | 3.91 | 381 | 585k |
+| high | cockpit over corn | 3.81 | 378 | 1057k |
+
+The logic column averages only 8 frames and moves by ±1 ms between runs of
+the same build. Averaged over 600 frames while flying at spray speed over
+pasture and over the soy (grass streaming and crop rows included), a tick
+costs 0.6–0.7 ms on both low and high presets, the same as before the
+world upgrade (0.5–0.8 ms). The detailed aircraft and world together cost
+about 80 draw calls and 130k triangles more than the first build (parked on
+the pad: 343 → 426 calls, 541k → 668k triangles).
+
+SwiftShader stalls for 80–110 s on one frame when the spray mist first
+appears and once in the 400 m view (no new WebGL program is linked; the
+software rasteriser builds its pipelines then). The build before the
+aircraft overhaul stalls on the same frames, so they are not a cost of the
+new model.
+
+With two aircraft (this build): flying the PR-AGW with the parked AT in
+view on the pad costs 459 calls / 721k triangles (low; 435 / 655k before);
+views where the parked aircraft is not on screen are unchanged (369 calls
+spraying, 361 in the cockpit, 327 at 400 m). Flying the AT: 382 / 370 / 339
+calls in those views, +11 to +13 over the PR-AGW. Logic averaged over 600
+frames: PR-AGW 0.34–0.70 ms, AT 0.37–0.78 ms (it flies 28 % faster, so
+grass cells stream in more often). The parked aircraft is not simulated,
+its cockpit and pilot are hidden and it is not drawn beyond 1.2 km.
+
+FPS on a real GPU was not measured here; the in-game counter (Settings →
+Show FPS) reports fps, draw calls and triangles live.
+
+### Validation runs (final build)
+
+- `npm test`: 24/24 (flight model incl. braked pivot, aileron authority,
+  pitch response, loaded pull-out, steep turns and the balão; spray
+  deposition).
+- `node test/worldviews.mjs`: world look-dev from the apron, strip, crops,
+  forest, creek, HQ, the air, chase and cockpit (before/after compared).
+- `node test/e2e_ui.mjs`: 15/15 (badeco service, abort and veto, crash,
+  stuck reset, rebinding, tutorial, touch layout).
+- `node test/e2e.mjs soy`: full contract in the browser through the player
+  inputs — service, taxi, take-off, 12 passes, landing, taxi-in, second
+  service, second sortie, 90 % coverage, results and payment.
+- Look-dev renders (`test/planeviews.mjs`): livery, stripes, PR-AGW and the
+  flag unchanged from every angle; ailerons, flaps, elevator and rudder
+  deflect on their hinges; the propeller goes from blades to disc with rpm.
+- `REFILL=1 node test/apsim.mjs soy|corn|cotton 4500`: all three contracts in
+  Node with the farm-HQ and base colliders, one reload each (560/520/500 L
+  loads within MTOW), 90 % coverage, no hard landing, parked at the pad.
+
+Air Tractor expansion (this build):
+
+- `npm test`: 35/35 — the PR-AGW suite unchanged, 10 AT-502B checks
+  against published figures, and an AT spray pass (flat 0.88 dose plateau
+  over a 30 m swath).
+- `AC=at502 node test/e2e.mjs soy`: the whole contract in the browser with
+  the AT through the player inputs — crew service (+1,178 L), PT6 start,
+  taxi, take-off, passes, landing, taxi-in, park — 90 % in one sortie.
+  `node test/e2e.mjs soy` (PR-AGW): two sorties, 90 %, as before.
+- `node test/e2e_ui.mjs`: 15/15.
+- `AC=at502 REFILL=1 node test/apsim.mjs soy 2400`: 90 % in one load, parked
+  at the pad (the Node sim needed a no-op canvas since the world upgrade).
+- PR-AGW unchanged: seeded trajectory identical to the previous build;
+  model geometry and materials identical (117 meshes, 218,895 vertices).
+- Look-dev of the AT from the front, sides, rear, above, under, close-ups
+  and the cockpit (`LOOKDEV_VIEWS` + `selectAircraft('at502')`).
+
+## World
+
+The farm core — strip, base, HQ, the original fields, roads and colliders —
+is unchanged (`src/world/layout.js`, `terrainData.js`); the outer land got
+relief and new fields later (see *Terrain relief and advanced missions*).
+Everything below is how the world is drawn, built for perceived realism at
+low cost.
+
+- **Trees** (`foliage.js`, `vegetation.js`): every plant is a cloud of
+  alpha-tested leaf-cluster cards around a tapered trunk with branches, with
+  "spherized" normals so a crown lights as a volume. One procedural 4×4 atlas
+  (1024²) holds broadleaf and fine (leguminous) clusters, eucalyptus, ipê in
+  bloom, buriti fronds, mango, shrub, two barks and two grass tufts, so each
+  variant is one geometry, one material and one instanced draw per 500 m
+  cell (two LODs: ~400 tris near, ~50 far). Alpha is boosted with the mip
+  level so far crowns stay full. Species: mata/cerrado broadleaves, mango
+  shade trees, ipê-amarelo, eucalyptus windbreaks, buriti palms by the
+  creek, shrubby forest borders, scrub on road verges, cupinzeiros (termite
+  mounds) in the pasture. The original trees and their colliders keep their
+  exact positions; the extra detail uses its own random stream.
+- **Grass** (`grass.js`): instanced green and dry tufts in 16 m cells
+  streamed around the camera on pasture and verges only (2 draws), swaying
+  in the wind and shrinking into the ground at the edge of the radius (45 /
+  60 / 75 m by preset); off above 120 m.
+- **Crops** (`crops.js`): canopy textures with individual plants, closed
+  rows and straw in the inter-row; from the air the ground sprayer's
+  tramlines (two wheel tracks every 27 m) and the headlands, where rows run
+  across and the turning track shows; near the ground the rows under the
+  tramlines are missing, so the tracks are real gaps.
+- **Ground** (`terrain.js`): olive braquiária with dry patches instead of a
+  flat green, muted red latosol, carreadores with wheel tracks and a rank
+  verge, farm roads with ruts and grass between them; a tileable
+  micro-detail texture (pebbles, dry-soil cracks, grass clumps) adds colour
+  break-up and a ~2 cm bump close up and fades out with distance so nothing
+  tiles from the air. The strip is compacted laterite with two darker wheel
+  tracks, worn turn-arounds, tyre scuffs and grass creeping in at the edges;
+  the apron has taxi tracks, a worn pad and oil stains by the fuel tank.
+- **Base and farm** (`vehicles.js`, `structures.js`): double-cab support
+  pickup with a tank in the bed, cab-over tanker with walkway, rail, domes,
+  ladder and valve cabinet, IBC totes and drum pallets at the chemical
+  store, an office container, a fire point; at the farm HQ a tractor, a
+  combine with its platform and a self-propelled sprayer. Vehicles are
+  extruded side profiles, rounded boxes and lathed tyres merged into the
+  static per-material meshes, so they add no draw calls of their own.
+
+`node test/worldviews.mjs <dir> [view,...]` renders the world look-dev views
+(apron, service area, strip, low passes over each crop, forest, creek, HQ,
+aerial, chase while spraying, cockpit).
+
+## Aircraft
+
+Modelled on the EMB-202 Ipanema (own registration PR-AGW): orange with navy
+stripes and the Brazilian flag on the fin, dark anti-glare hopper deck,
+raised cabin, tall tubular main gear, 3-blade prop, booms with nozzles on
+drop tubes and a wind-driven pump. The cockpit follows a real Ipanema panel:
+light grey, warning lamps, round gauges, switch rows, a guidance GPS in a
+black bezel, lightbar at the centre post and a hopper sight window that
+shows the live liquid level.
+
+The model (`src/aircraft/model.js`) is purely visual: the flight model, gear
+contact points, colliders and mass in `src/config.js` do not read it (it only
+reads the gear points to place the wheels), so the look can change without
+changing how the aircraft flies.
+
+- **Fuselage**: stations interpolated along Catmull-Rom splines and lofted
+  as superellipse rings (separate upper/lower roundness), so the cowling,
+  cabin and tail cone are single smooth surfaces; the turtle deck is part of
+  the aft loft rather than a separate box.
+- **Livery**: side-projected 2048×1024 canvas with a matching bump map, so
+  panel seams, rivet rows, inspection doors, louvres and the orange-peel of
+  the paint are in relief; stripes, PR-AGW, AGRO WINGS and the flag are drawn
+  in the same places as before.
+- **Wings and tail**: real airfoil sections, Hoerner wingtips, ailerons,
+  flaps, elevator and rudder hinged at their spars (with trim tabs), panel
+  and rib lines in relief, walkway, fuel cap, hinge brackets, pitot,
+  navigation lights.
+- **Cabin**: curved windshield, tubular frame with joints, door handles and
+  hinges, headliner; inside, a tubular cage, rounded seat with harness,
+  gauge bezels with depth, pedals, stick with grip and trigger, throttle and
+  prop levers; the pilot wears a flight suit (collar, zip, chest pockets),
+  a four-point harness, a flight helmet with visor housing, tinted visor,
+  boom mic and the filtered-air hose ag pilots use, a kneeboard on the right
+  thigh, and has gloved hands on the stick and throttle (static parts merged
+  per material).
+- **Gear**: lathed tyres with sidewall and tread bump, hubs with bolts and
+  valve stems, brake discs and calipers, A-frame legs with fittings and
+  brake lines; leaf-spring tailwheel with fork.
+- **Propeller**: three twisted blades (pitch angle from radius) with yellow
+  tips, fading into a translucent disc with blade-shadow lobes as rpm rises,
+  driven by the engine rpm as before.
+- **Materials and light**: physical paint with a light clearcoat and its own
+  environment reflection, metal, rubber and glass; ambient occlusion baked
+  into vertex colours; a soft contact shadow under the aircraft near the
+  ground; shadow normal offset scaled to the shadow texel size so the
+  aircraft keeps its fine self-shadowing.
+- **Cost**: parts are merged per material; nozzles, bolts, hinge brackets
+  and other small fittings sit in a level-of-detail group dropped
+  beyond 80 m.
+
+`node test/planeviews.mjs <dir> [view,...]` renders the look-dev angles
+(exterior close-ups, low sun, against the sun, cockpit); `LOOKDEV_VIEWS`
+points it at a JSON list of custom views, each with an optional `post`
+snippet (e.g. deflect the control surfaces) run before the render.
+
+## Aircraft 02 — Air Tractor AT-502B (PR-AWT)
+
+A second, independent aircraft. The Ipanema keeps its paint, registration,
+configuration and flight model: its trajectory is bit-identical to the
+previous build (seeded comparison) and its model's 117 meshes have the same
+geometry, normals, UVs, vertex colours and materials (checksum in the
+browser).
+
+**Reference.** The uploaded video is game footage of a yellow Air Tractor
+(blue cheat line with white pinstripes, blue fin and rudder, blue wingtip
+bands, three-blade prop with a silver spinner, booms under the trailing edge,
+spring-steel gear with white hubs, framed canopy, dark panel with round
+gauges, stick with a red button); its features match the AT-502B. The
+YouTube link could not be opened from this environment. The reference's
+registration is not used.
+
+**Published figures used** (Air Tractor AT-502B spec sheet, dealer and
+operator data, Wikipedia AT-500 family):
+
+| | |
+| --- | --- |
+| Engine | P&WC PT6A-34AG, 750 shp flat-rated, prop 2,200 rpm |
+| Propeller | Hartzell 3-blade constant speed, 2.82 m |
+| Span / wing area | 15.85 m (52 ft) / 29.0 m² (312 ft²) |
+| Empty / max take-off | ≈ 2,073 kg (4,570 lb) / 4,264 kg (9,400 lb) |
+| Hopper / fuel | 1,893 L (500 US gal) / 643 L (170 US gal) |
+| Stall at 8,000 lb | 71 kt flaps up, 59 kt flaps down |
+| Climb at 9,400 lb | 870 ft/min |
+| Working speed | 120–145 mph |
+
+Derived here (not published): CLmax 1.50/2.18 from the stall speeds; CD0
+0.058 and Oswald 0.80 so the climb and a 75 %-power cruise of 134 kt at
+8,000 ft come out of one polar; inertias scaled from mass and size; static
+thrust ≈ 12.5 kN (figure of merit 0.64); fuel flow from ~0.6 lb/shp/h. No
+speed multipliers: every number above enters the same equations as the
+Ipanema's (`FLIGHT_AT502` in `src/config.js`).
+
+**PT6A model** (`FlightModel._turbine`, `_propThrust`): the power lever
+schedules gas-generator speed Ng, reached within the fuel control's
+acceleration limits (≈ 3.7 s from idle to 90 % torque, the turbine lag a
+pilot feels); shaft power follows Ng and is flat-rated; the constant-speed
+prop governs 2,200 rpm and sits on its fine stop at low power, where the
+windmilling disc makes drag; on the ground at idle the prop goes into beta.
+Thrust comes from actuator-disc momentum theory with losses. Start: starter
+to ~17 % Ng, light-off at 3.2 s (ITT peak, whoosh), ground idle 53 % Ng /
+1,150 rpm at ~12 s. Shutdown: the spools run down over ~15 s and the prop
+feathers. Torque (ft·lb), ITT, Ng, Np and fuel flow drive the cockpit gauges.
+
+**Measured** (`node --test test/at502.test.mjs`):
+
+| check | result | published |
+| --- | --- | --- |
+| climb, 9,400 lb, 95 kt | 847 ft/min | 870 ft/min |
+| 1 g stall, 8,000 lb, flaps up | 73 kt | 71 kt |
+| full power level, 8,000 lb | 139 kt IAS, 255 L/h | — |
+| 62 % power lever | 113 kt (working speed) | 104–126 kt |
+| ground roll 2,672 / 4,264 kg | 188 / 485 m | — |
+| spool-up idle → 90 % torque | 3.7 s | — |
+| roll to 60° (1,000 L) | 1.2 s | — |
+| balão with 1,200 L | no stall, +44 m | — |
+| landing with beta + brakes | 0.5 m/s touchdown, 261 m roll | — |
+
+Spray: a 14 m boom with 50 nozzles; swath 30 m (scaled from the real ~21 m
+the same way as the Ipanema's) and 6.4 L/s, the same 40 L/ha dose at a
+117 kt working speed. A full hopper covers the soybean contract in one
+sortie (Node autopilot: 90 % coverage, single load).
+
+**Model** (`src/aircraft/atModel.js`, shared helpers from `model.js`):
+lofted fuselage with the long PT6 cowling, matte anti-glare strip, chin
+intake with screen, oval exhaust stacks with soot, big hopper lid, open
+cabin under a framed canopy (curved windshield, doors, tinted roof),
+wire cutter and deflector cable to the fin; constant-chord cantilever wing
+with large flaps and long ailerons on their hinges, blue tip caps, nav and
+strobe lights, landing lights, walkway and tank caps; booms on streamlined
+hangers with check valves and nozzles; fan-driven pump; spring-steel main
+gear (flexes with the suspension), white hubs, brakes; steerable tailwheel;
+strut-braced tailplane, fin and slanted-hinge rudder, beacon. The polished
+spinner carries three twisted blades that feather when the engine is
+stopped, come out of feather in the start, and coarsen with speed. Cockpit:
+dark panel with airspeed, attitude, altimeter, turn coordinator, heading,
+VSI, torque, ITT, Ng, prop rpm, fuel, fuel flow, oil, hopper, flaps,
+annunciators (BETA, START, GEN, CHIP…), the guidance GPS, flow monitor,
+lightbar, hopper sight gauge; PT6 quadrant (power, prop and condition
+levers). The seated pilot is the same model as the Ipanema's, laid into
+this cockpit with the hands on the stick and power lever.
+
+**Architecture.** `src/aircraft/types.js` is the registry: each type
+carries its flight profile, model and panel factories, spray boom, crew
+service points, collision bounds, cameras, audio profile and loads. Every
+system reads the active aircraft (`game.aircraft`); the game keeps a fleet,
+parks the other aircraft (settled on its springs, pilot out, an obstacle for
+the flown one, not drawn beyond 1.2 km) and swaps on selection. Per-type:
+load sheet, HUD bars, crew service (rates and walking points), guidance
+swath spacing, chase/orbit cameras, cockpit vibration, overspeed and
+low-fuel warnings, and audio (`profile: 'turboprop'`: compressor whine and
+gas-generator hum from Ng, exhaust roar with power, prop buzz from Np,
+light-off whoosh). Key bindings are unchanged.
+
+## Realism 4.0 (atmosphere, farm operations, GPS)
+
+Added on top of the existing game without touching the flight model, the
+assist, the aircraft configurations, liveries, controls, save data,
+missions, map coordinates or runway (`git diff checkpoint-before-realism-4
+-- src/flight` is empty; `src/config.js` only gained `rainDrops` per preset).
+
+**Atmosphere** (`src/world/atmosphere.js`, `sky.js`). Five times of day
+(dawn, morning, midday, golden hour, dusk) × five weather presets (clear,
+partly cloudy, overcast, light rain, morning mist), chosen in Settings and
+saved. Each preset drives the Preetham sky, the sun's direction, colour,
+intensity and shadow strength, the hemisphere light, the haze colour and
+density, exposure, the cumulus cover (whole clouds fade in/out), an
+overcast deck with horizon haze (one sky-dome draw), exponential height
+mist that settles in the low ground (added to three's stock fog chunks
+once, so no extra shader programs), GPU rain streaks (one instanced draw,
+motion-blurred along the drop's speed relative to the eye, faded near the
+eye so no drops appear inside the cabin), wet ground (darker, glossier
+soil and roads; soaks in ~40 s, dries in ~2 min) and the ambience (rain,
+breeze, birds, insects). Changes blend over ~5 s; the sky lighting (PMREM)
+is re-baked once when the blend settles. Morning + partly cloudy reproduces
+the previous look (mean pixel difference 0.2–1.8/255 in the same views; the
+rest is the truck's new bay and the wind sway).
+
+Weather is visual and audio only. The *visual* wind is the flight model's
+own mean wind (`windAt`, same scale setting) mirrored into one shared
+uniform that sways grass, trees (crowns bend downwind with travelling
+gusts, leaves flutter), crop rows and canopy (wind waves), and slants the
+rain. No aerodynamic wind solver was added and the physics never reads it.
+
+**Service truck** (`src/crew/truck.js`, `planner.js`). The support tanker
+(calda + fuel, rear reels, pump, amber beacon, brake/reverse lights,
+headlights in low light, "BADECO · APOIO AGRÍCOLA") waits in a bay by the
+crew post. On a service request it drives to a stand off the service-side
+wingtip, facing aft with its reels level with the wing leading edge:
+hybrid A* over (x, z, heading) with forward and reverse arcs at a 9.2 m
+turning radius (the truck's lock is 0.6 rad on a 5.3 m wheelbase), around
+the static colliders and every aircraft's footprint (+0.8 m), the truck
+checked as a chain of circles. The search is spread over frames (3 ms each,
+no hitch). Driving: kinematic bicycle model, rate-limited steering, pure
+pursuit, accel/brake limits, corner and stop-distance speed limits, a
+straight lead-in to the stand, live look-ahead braking for aircraft and
+the badeco; wheels spin and steer, the body pitches and rolls. The badeco
+walks to its reels along grid-A* paths around the truck and the aircraft,
+runs the hoses as before, the truck backs out and returns to its bay
+(either heading), and the aircraft is released once it is clear. If no
+stand is reachable the station hoses are used, as before. The truck is an
+obstacle for the aircraft and vetoes engine start while beside it.
+Measured (`test/truck.mjs`): arrives in 24–32 s, parks within 0.25 m / 1°
+of the stand, closest approach to an aircraft 0.88–1.35 m, standard and
+off-centre parking (4 m, 60°; −5 m, 120° on the other side) for both
+aircraft.
+
+**Hangar.** Portal frames and purlins, corrugated inner lining, concrete
+floor that darkens with depth (sky light cut by the roof), safety lines,
+tool chest, wing trestles, spare hopper, parts pallet, ladder, drums on a
+spill tray; four corrugated sliding door leaves on two top tracks (one
+instanced draw) that close at dusk and open when an aircraft comes near;
+high-bay lamps with light pools on the floor (no real lights). Colliders
+are now the walls, roof and equipment, so an aircraft can taxi in when
+the doors are open. Grass no longer grows through the slab.
+
+**Water, lakes and fires (environment realism).** Visual only: physics,
+flotation, missions and economy unchanged (`test/golden.test.mjs` identical).
+* *Water* (`src/world/water.js`): six wind-steered wave trains (lengths
+  2–14 m, deep-water speeds) whose heights wander with large-scale noise, plus
+  two fine noise layers; gusty patches drift downwind; roughness from 0.035
+  (calm, mirror-like) to 0.17 (wind); whitecaps only above ≈ 8 m/s; short
+  waves fade with distance (no moiré). Wind from the weather's own visual wind
+  (`ATMO_U.wind`). Ripple rings and wake from a 16-entry uniform ring buffer
+  (`WATER_U.rip`): no render targets, no planar reflection. Pond meshes have
+  dense rings across the shore (soft edge), the bed under shallow water is
+  sediment (terrain shader), the wet bank low-contrast.
+* *Contact* (`src/world/waterFx.js`): first touch of a float → splash and ring
+  sized by speed and sink rate; while wet → spray sheets at the steps
+  (thinning as the hull planes and lifts), bow wave when taxiing, wake rings
+  from the sterns, spray at the scoop probes. Only on real float contact, one
+  pooled sprite set (700, scaled by the quality profile), nothing spawned more
+  than 650 m from the camera.
+* *Lakes* (`WATER.ponds`, shape `lobes` = harmonics of `pondRadius`, mirrored
+  in the terrain shader): Represa do Norte enlarged (r 430 → 500 m, bays and a
+  narrower neck, ≈ 1.2 km long, Fire Boss operations unchanged); Represa da
+  Lavoura (1100, 4100) among the south fields, long and sinuous; Lagoa do
+  Buritizal (−4000, 3850), small, asymmetric, trees in clumps and an open
+  bank. Sites picked by a scan against fields, roads, forests, strips, farm
+  sites, the power line and the fire zone, on low-relief ground; banks rise
+  from the bed without a step. Trees from the existing pond-margin placement.
+* *Fires* (`src/world/fires.js`): each spot is one burning area — a core of
+  large flames, three clumps, low wide flames along the edge (26 billboards,
+  one instanced draw), each with its own fuel; water puts out what it covers
+  (a drop on one side leaves the other burning), the spot's intensity is their
+  size-weighted mean (same mission logic); a burnt / ember patch laid on the
+  terrain (grass cleared); a continuous smoke column bent by the wind, lighter
+  as it rises, density by quality; steam where water hits.
+
+**Crash: occurrence report and the checkpoint.** On impact the screen
+flashes and jolts, the camera orbits the wreck, and ~2 s later an
+occurrence report comes up (aircraft, place, impact speed, heading, fuel,
+hopper, the bill counting up). Three ways back: the runway (load kept), the
+base (hopper empty for the badeco) or **continue from the crash point**: the
+aircraft is back in the air where it came down, heading where it was going,
+level and trimmed for ≈ 1.35 Vs1 (the trim is searched on its own flight
+model, `Aircraft.placeAirborneLevel`), 30 m above the highest ground, crop,
+tree, building or wire within its span + 12 m from 120 m behind to 900 m
+ahead (`World.clearTopAt`), never under 40 m. Costs were lowered: crash
+recovery Cr$ 2,500 (`GAME.crashCost`, was 6,000), damage repair Cr$ 60 per %
+(was 180), base fuel Cr$ 3.40/L (was 6.20).
+
+**Back to the title screen in flight.** The flight goes on behind the menu
+for 3.5 s as a cinematic shot (chase camera; the aircraft glides on its
+course kinematically, easing up over whatever is ahead — nothing can crash
+and no impact or report shows on the title screen), then the camera flies
+back to the base in 2.8 s, eyes on the selected aircraft parked at the pad,
+into the showroom framing. Any menu choice meanwhile goes straight to the
+base. A crash still in progress when the menu opens is cleared (the
+aircraft is back at the base, repaired, no report).
+
+**Main base (sede principal).** The apron reaches west to the eucalyptus
+windbreak and north to the hangar's front (`BASE.apron`), so every airplane
+parks on it, the AT-802s too; the roads end at its north and south edges
+and the old fence across it is gone. The secondary farms keep the original
+service-area layout (`APRON0`, `HANGAR0`). The hangar is 34 × 24 m and
+8.5 m to the eaves: front gable with the sign, block plinth, gutters and
+downpipes, translucent roof sheets, flood lights over the door, a 9 m
+concrete apron at the opening, a pallet rack inside and a lean-to pilots'
+room / operations office on the west side. Behind the crew post, the
+*base de apoio* (`BASE.crewBase`): changing room, PPE store and a locked
+pesticide store under one roof with a veranda (lockers, PPE rack with
+coveralls and boots, wash tank, emergency shower), a water tank on the roof
+and the cage for triple-rinsed empty containers. Light poles at the apron's
+corners and a portal on the road from the headquarters. The service truck's
+routes and timings are unchanged (`test/truck.mjs`), and so is the physics
+(`test/golden.test.mjs`: the base's flat platform was not touched).
+
+**Farm activity.** A tractor with a disc harrow works the fallow T-08 lane
+by lane with headland turns, raising dust; its pose is a function of time,
+so updates are throttled with distance (every frame < 500 m, 8 Hz to
+1.2 km, hidden beyond 800 m) and it costs nothing far away.
+
+**Vehicles.** Shared materials; wheels are two instanced meshes per
+vehicle; only the big parts cast shadows; small parts (lenses, reels,
+decals, beacon) are hidden beyond 220 m and the whole vehicle beyond
+800–900 m.
+
+**GPS and scoring.** The guidance unit records the flight track (where the
+boom was spraying in yellow) and shows heading, ground speed, cross-track
+error, spray state and flow, progress, remaining area and overlap, all from
+live state. The same page is available on the HUD minimap (N or a click).
+Results add flight time, sorties and work rate (ha/h) to coverage, gaps,
+overlap, uniformity and waste. The spray plume is finer and more
+translucent (smaller growth, lower opacity, lit by the scene light).
+
+**Cockpit and pilot.** Settings → Cockpit shake (off / low / normal) scales
+the engine/ground vibration and the g head-sink. The pilot's head (exterior
+views) looks into turns, along the boom on spray passes and out of the side
+while taxiing, and dips under g.
+
+**Audio.** Rain (muffled in the cabin), the truck's diesel with distance,
+the tractor drone near T-08, tools and ratchets near the hangar, gustier
+breeze, fewer birds in rain; aircraft audio unchanged.
+
+**Performance manager.** First run only: the title screen's frame time
+picks the preset (steps down under ~33 fps, up over ~80 fps); a manual
+choice turns it off; `?q=` forces a preset. Settings → Show FPS now shows
+frame-time average and p95, draw calls, triangles and the preset.
+
+**Measured** (`test/profile.mjs`, SwiftShader, 960×540; tick = game logic
+ms/frame over 120 ticks; "before" is the build tagged
+`checkpoint-before-realism-4`, default morning / partly cloudy):
+
+| preset · aircraft | view | tick avg (p95) before → after | draw calls | triangles |
+| --- | --- | --- | --- | --- |
+| low · PR-AGW | pad (chase) | 0.36 (0.5) → 0.57 (0.8) | 463 → 486 | 738k → 737k |
+| low · PR-AGW | spraying soy, 4 m | 1.22 (2.7) → 0.84 (1.6) | 370 → 378 | 550k → 545k |
+| low · PR-AGW | cockpit over corn | 0.82 (1.9) → 0.76 (1.5) | 362 → 362 | 912k → 912k |
+| low · PR-AGW | 400 m AGL | 0.50 (0.6) → 0.66 (1.1) | 323 → 329 | 478k → 478k |
+| high · PR-AGW | pad | 0.57 (0.7) → 0.52 (0.7) | 464 → 487 | 766k → 764k |
+| high · PR-AGW | spraying soy | 1.74 (5.8) → 1.17 (2.3) | 398 → 408 | 572k → 569k |
+| high · PR-AGW | cockpit over corn | 1.09 (2.0) → 1.49 (5.0) | 389 → 389 | 924k → 924k |
+| high · AT-502B | pad | 0.53 (0.9) → 0.86 (1.8) | 476 → 504 | 784k → 785k |
+| high · AT-502B | spraying soy | 1.99 (4.7) → 1.15 (1.9) | 400 → 410 | 568k → 573k |
+| high · AT-502B | cockpit over corn | 1.40 (3.9) → 1.08 (2.2) | 392 → 392 | 952k → 952k |
+
+Tick differences of a few tenths of a millisecond either way are run-to-run
+noise in this container. Load to first frame: 19.5 → 19.3 s (low),
+23.0 → 23.5 s (high), 22.2 → 21.7 s (AT). GPU objects: +17–28 geometries,
++1–2 textures, +6–8 shader programs (cloud deck, rain, hangar shading,
+instanced wheels, sprites); JS heap 124–145 → 138–156 MB. The extra draw
+calls on the pad are the truck and the hangar seen up close; in flight
+they are the far tractor and the hangar slab (+6 to +10); the cockpit view
+is unchanged. Sky-light re-bake on a weather/time change: ~40 ms in
+SwiftShader, once per change. Truck route search: ~120–370 ms of CPU in
+total in this container, spread at 3 ms per frame.
+
+**Validation (this build).** `npm test` 35/35. `node test/e2e.mjs soy`
+(PR-AGW): two sorties with the truck servicing, 90 %, 2★ (as before).
+`AC=at502 node test/e2e.mjs soy`: one sortie, 90 %, 1★ / Cr$ 5,093 (the
+pre-change build gave 2★ / Cr$ 4,993 on the same run: the AT sits at the
+2★ uniformity/waste threshold and the truck's drive shifts when the passes
+are flown, i.e. the gust phase; deposition, contracts and autopilot code
+are unchanged). `node test/e2e_ui.mjs` 16/16 (one check now waits for the
+truck to arrive; one new check: truck parked at its stand).
+`node test/atmo_transition.mjs`: rain, dusk and back to morning blend over
+~5–20 s, one sky re-bake each, no errors. Renders of all five times of day
+and five weathers from the apron, the air and the chase camera; the
+default look compared pixel-by-pixel with the previous build.
+
+**Known limits.** Time of day is a preset, not a running clock; there is
+no night (dusk is the darkest). Rain has no splashes or drops on the
+windscreen; puddles are not modelled (the ground just gets wet). The
+overcast deck is a sky-dome layer, not volumetric. The truck cannot reach
+every possible parking pose inside the pad circle; then the fixed station
+hoses are used as before. Only one farm vehicle works the fields. Real-GPU
+frame times were not measured (no GPU here); use Settings → Show FPS.
+
+## Aircraft 03 — Robinson R44 Raven II, agricultural (PR-AGH)
+
+The third aircraft and the first rotary-wing one, added as a separate
+aircraft: the airplanes keep their models, configurations and flight
+solver (`src/flight/flightModel.js`, `src/flight/assist.js` and
+`src/aircraft/aircraft.js` are not modified). The game creates a
+`Helicopter` (`src/aircraft/helicopter.js`) for types with `kind: 'heli'`
+and an `Aircraft` for the others; both expose the same interface, so the
+crew, truck, sprayer, GPS, HUD, cameras, missions and save data work with
+either. Title screen: AIRCRAFT 03 · ROBINSON R44 — "Rotary-Wing
+Agricultural Aircraft".
+
+**Tropical Island source.** The request was to reuse the Tropical Island
+helicopter simulation where its source is accessible. It is not: this
+environment can reach only the H2 repository, which has no Tropical Island
+code. Nothing was imported from it. The helicopter model below was written
+for this game from standard rotorcraft theory.
+
+**References.** The two uploaded videos are game footage of a red R44 mod
+on a gravel H pad (walk-around, start-up, hover, cockpit). They were used
+for the overall look (red paint, gravel pad with a painted H, pedestal
+console, T-bar cyclic). The mod's 800 L tank is not used.
+
+**Published figures used** (R44 Raven II): two-blade main rotor, 33 ft
+(10.06 m) diameter, turning counter-clockwise seen from above; two-blade
+58 in (1.47 m) tail rotor with the advancing blade at the bottom; 100 % =
+400 rotor rpm / 2,665 engine rpm, power-on limits 101–102 %, green 90–108 %,
+low-rpm horn at 97 %; MTOW 2,500 lb (1,134 kg), empty ~1,505 lb (683 kg);
+Lycoming IO-540-AE1A5 derated to 245 hp take-off (5 min) and 205 hp
+continuous; fuel 29.5 + 17.0 US gal usable (176 L); length 38 ft 3 in,
+height 10 ft 9 in; cruise 109–117 kt, Vne 130 kt; hover ceilings IGE /
+OGE ~8,950 / ~7,500 ft. Sources: Robinson's R44 Raven II page and POH
+(as quoted by POH study cards), Wikipedia, Vertipedia, AOPA, Aensa, Plane
+& Pilot. Robinson's own site and Wikipedia could not be fetched from this
+container; the figures were cross-checked in search results.
+**Estimates** (marked as such in `FLIGHT_R44`, chosen to reproduce the
+published performance): blade chord, rotor inertia, Lock number, airframe
+inertias and drag areas, tail-rotor arm, chord and pitch range, skid tread
+and spring rates, the ag kit's mass.
+
+**Agricultural kit.** No crewed R44 ag kit with a published capacity was
+found (the 110 US gal figure that turns up belongs to the unmanned R44
+Sprayhawk). The game uses a 250 L virtual tank — what fits under the MTOW
+with an 85 kg pilot, the ag kit (42 kg, estimate) and ~80 L of fuel; full
+fuel and a full tank is over the MTOW and the load sheet says so. Belly
+tank between the cross tubes, engine-driven pump (it works in the hover,
+unlike the airplanes' wind-driven pumps), 8 m boom under the nose (80 % of
+the rotor diameter, kept inside the rotor wake) with 28 nozzles on drops,
+13 m swath and 1.3 L/s (the contracts' 40 L/ha at ~50 kt). The rotor
+downwash pushes the droplets down at low speed (shorter fall time, less
+drift); at working speed the wake trails behind the boom.
+
+**Power model (the default handling).** Settings → Flying → Helicopter
+model chooses between **Power (one lever)**, the default, and **Detailed
+rotor**, the full simulation described below. The power model is the
+handling asked for, after the Tropical Island helicopter (its code was not
+available; the behaviour was rebuilt from the description). Disc tilt,
+airframe, skids, crash points, crop contact and servicing are shared by
+both models.
+
+- One power lever (Shift / Ctrl, the wheel, the triggers). Rotor and torque
+  act as one: once the engine runs, the rotor comes up to speed in about
+  6 s and stays there. There is no governor to watch, no rotor droop and no
+  low-rpm horn. The drive torque is balanced for the pilot, so a power
+  change never swings the nose, and the pedals only turn the aircraft.
+- The vertical part of the thrust follows the power. The power that holds a
+  hover depends only on the weight: ~55 % light and ~70 % at the MTOW out
+  of ground effect, ~49 % / ~62 % on the skids (the ground cushion of a
+  rotor at constant power, (1/k_GE)^(2/3)). More power climbs and less
+  sinks, at a rate that settles in proportion to the difference: ±10 % ≈
+  ±2 m/s, ±20 % ≈ ±4 m/s; full power at the MTOW ≈ 870–1,000 ft/min.
+- The power answers at once, and the aircraft holds where the power is
+  set.
+  - The lever moves at 0.9/s on the keys (0.55 before).
+  - The power follows it within 0.1 s (0.25 s before).
+  - A saturating extra damping of slow vertical motion (`holdDamp`,
+    `holdV`) stops the drift without cutting the full-power climb.
+  - Measured (`test/r44power.test.mjs`): a 2.5 m/s sink is stopped 1.2 s
+    after the power key goes down, losing 1.1 m, and then holds. Before it
+    took 1.8 s and 2.2 m, and 2.8 s to settle.
+  - ±10 % power now gives +1.2 / −2.1 m/s; full power at the MTOW gives
+    770 ft/min.
+  - To land, take the power ~8 % under the hover figure. At −5 % it now
+    sits on the ground cushion.
+- The thrust acts along the rotor axis, so the speed comes from the tilt
+  and the power together, as in the other game.
+  - Tilting the disc turns lift into push: a steep tilt sinks unless the
+    power comes up, and more power at the same tilt flies faster.
+  - Translational lift (+10 % thrust from ~8 to ~27 kt) means cruise at
+    ~20° needs about the hover power.
+  - Towards the Vne the thrust falls off (`vLoss`, the retreating blade and
+    profile power), which caps the top speed at ~125–130 kt.
+  - The rotor's damping of slow motion (`glideDamp`) saturates at ~16 kt
+    and fades out above ~60 kt, so the total drag rises smoothly with
+    speed. Before this there was a "wall": at 10° the aircraft stuck at
+    ~22 kt, then jumped to 80 kt with a little more power.
+  - Measured with a held tilt (`test/r44power.test.mjs`), at the hover
+    power:
+
+    | Tilt | Speed | Climb |
+    |---|---|---|
+    | 5° | 11 kt | — |
+    | 10° | 40 kt | — |
+    | 20° | 102 kt | +0.2 m/s |
+    | 30° | 121 kt | −2.7 m/s |
+
+    With 20 % more power: 57 kt at 10°, and 128 kt at 30° sinking only
+    1.4 m/s. Full power: 125 kt.
+  - Before this, a tilt compensation kept the lift whatever the tilt, so
+    power only moved the aircraft up and down, and the speed hit the
+    assist's 18° limit at 100–115 kt.
+- On the HUD, POWER shows the lever, with the hover figure for this weight
+  and height next to the label. The slot that showed the rotor % shows the
+  climb rate. The load sheet gives the hover power in %.
+- Assist: **high** (the default) handles like the other game's helicopter.
+  - The keys tilt the aircraft for as long as they are held: the tilt keeps
+    growing (~17°/s nose, ~29°/s bank), up to 45° nose down, 30° nose up
+    and 50° of bank. There is no fixed 18° stop any more, so the speed
+    follows the tilt and the power.
+  - Let go and it levels out from where it is (it runs on a few degrees at
+    most) and glides
+    on, slowing down by itself with no braking flare (`glideDamp`).
+  - Once it is almost stopped (under ~5 kt over the ground), it holds the
+    hover against the wind with a lean of at most ~2.5°.
+  - The power stays the pilot's, with the landing cushion: below ~15 m only
+    a gentle sink is let through.
+  - **Normal** holds attitude and heading; **off** is raw.
+  - Measured with the keyboard shaping (`test/r44power.test.mjs`):
+    - forward key: −7° after 1 s, −24° after 2 s, −41° after 3 s, held at
+      −45°;
+    - released: level in 3.2 s, at most 1° nose up;
+    - roll key: 12° after 1 s, peak 19° after release, no pitch change;
+    - glide: 38 → 18 kt in 10 s after release, stopped within 50 s;
+    - in a 2.5–2.9 m/s breeze the hover drifts 0.2–1.3 m in 20 s.
+- Attitude (both assists).
+  - The target attitude moves at a limited rate, and cascaded loops
+    (attitude → rate → cyclic, the integrator only near the target) put the
+    nose there without running past it.
+  - Before the cascaded loops, releasing the stick at ~25 kt threw the nose
+    up to +24° and held it 10–20° up for seconds.
+- Measured (`test/r44power.test.mjs`, `test/r44flight.mjs` in the browser):
+  - off the skids 1.3–1.9 s after raising the power;
+  - 20 s hands-off hover at the hover figure: 0.3 m drift, 0.75 m height
+    change;
+  - pedal turns ±67° in 2 s, then the heading holds;
+  - landing with the power a few % under the hover figure: touchdown
+    0.3–0.9 m/s, no damage;
+  - rotor run-down 10 s after shut-down;
+  - `AC=r44 node test/e2e.mjs soy`: the whole contract, 90 %, 2★, no
+    damage. The autopilot's obstacle probe now covers the rotor's width
+    plus a margin, and holds a find for 4 s. Before this, the probe
+    flickered on and off over the lone tree east of the pad, and the
+    descent target there dropped from 18 m to 12 m in one step.
+
+In the detailed rotor model the assists now feed the anti-torque pedal
+forward from the shaft torque (pedal ≈ 0.6 − 0.00034·Q, from the trimmed
+model), so a collective change no longer swings the nose first and waits
+for the heading hold. The largest swing through a full climb-and-descent
+sequence went from 4.6° to 3.4° with the high assist and from 6.0° to 1.7°
+with the normal one (`test/r44.test.mjs`).
+
+**Flight model** (detailed rotor, `src/flight/heliModel.js`, 120 Hz):
+- main rotor: blade-element thrust with momentum inflow solved each step
+  (translational lift, climb and descent), ground effect after Cheeseman
+  and Bennett (induced velocity × (1 − (R/4z)²), canopy counts half),
+  vortex-ring thrust loss with buffet when descending into the wake at low
+  speed, profile + induced power, H-force;
+- teetering rotor: no hub moment; the tip-path plane follows the cyclic
+  with a first-order flapping lag (τ = 16/(γΩ)), flaps back with speed
+  and lags the body rates (damping), so control is only the tilt of the
+  thrust vector;
+- rotor speed from the rotor inertia: a governed, density-limited piston
+  engine drives it through a belt clutch and a sprag clutch; over-pitching
+  droops it (LOW RPM horn below 97 %), with the collective down in a
+  descent it autorotates; the engine response has a lag;
+- start-up as on the R44 (compressed to ~13 s): crank, catch, clutch
+  engagement with the rotor spinning up from rest, warm-up, then the
+  governor brings the rotor to 101.5 % and holds it; the engine's power
+  response lag is 0.08 s; shut-down: the rotor runs down on its
+  own inertia, the rotor brake is applied below 40 %;
+- tail rotor on the gear train (6.065:1), its own inflow, thrust and
+  power; shaft-torque reaction on the cabin (hover needs left pedal, the
+  reaction reverses in autorotation);
+- fuselage drag per axis, fin and stabiliser terms, quadratic yaw damping
+  of the tail cone and fins;
+- four skid contacts with spring/damper and stick/slip friction (no wheels:
+  it does not roll), hard landing and skid collapse limits;
+- never-touch points: rotor tips (tilted disc, coning or droop), tail rotor,
+  stinger, nose, tank, boom ends; rotor tips against trees, buildings,
+  parked aircraft, the truck and the wires.
+
+**Controls.** Numpad 8 / 5 / 4 / 6 move the cyclic forward / aft / left /
+right, Q / E are the anti-torque pedals, Shift / Ctrl (or R to raise, the
+wheel, the gamepad triggers, the touch slider) raise and lower the
+collective — the power in the power model — and F starts (hold, lever down)
+and stops (tap) the engine; Settings → Flying
+→ Flight keys switches to the classic keys (W/S/A/D, Z/X). The governor
+replaces a twist-grip throttle. Settings → Assist: **off** — raw controls
+(unstable in the hover, as the real aircraft); **normal** — attitude
+command / hold, a landing cushion (below ~15 m the sink rate the height can
+still arrest is allowed, beyond that collective is added), heading hold (kept on the skids while the collective is
+up, so the anti-torque pedal isn't dropped at touchdown), turn
+coordination above ~35 kt; **high** — plus vertical-speed command / height
+hold on the collective (never drooping the rotor below the green, and
+easing the descent to ~0.5 m/s at touchdown), a hover hold with the stick
+centred below ~55 kt and a speed hold above. The assists only move the
+controls; the physics is the same. The helicopter has its own assist setting
+(Settings → Flying → Helicopter assist, default **high**); the airplanes keep
+theirs. With **high** the collective keys command the climb rate (a slewed
+demand and a quick velocity loop: no dead time, no overshoot) and a held
+lever-down lands at ~0.3 m/s; the law stays on down to the skids.
+
+**Checked against the published figures** (`test/r44.test.mjs`): hover at
+1,134 kg OGE 204 hp (≤ 245 hp take-off), IGE at a 2 ft skid height
+189 hp — the gap matches the published IGE/OGE ceilings; the load sheet's
+trimmed estimate matches both flown values; level flight 109 kt at 195 hp
+(published cruise 109–117 kt); climb at MTOW with 205 hp 1,153 ft/min
+(published max ~1,000 ft/min); autorotation with the rotor at 105–109 %;
+over-pitch at MTOW droops below 97 %; start to governed rpm with the skids
+still; pedal turns and heading hold; forward, backward and sideways
+translations; vertical lift-off, hover hold, landing on the skids.
+
+**Model** (`src/aircraft/r44Model.js`, visual only). One lofted cabin
+bubble cut exactly along the window outlines (two-piece windshield with a
+centre post and the compass, four door windows with the swept rear upper
+corner), rubber seals along every outline, a dark inner skin, door seams,
+hinges and handles, landing lights; mast fairing; aft body with the open
+engine bay (flat-six with finned cylinders, cooling scroll, exhaust,
+muffler and tailpipe, steel tube frame); riveted tail cone; swept upper
+fin, lower fin with the stinger, horizontal stabiliser, tail-rotor guard;
+skid tubes on arched cross tubes with wear shoes; side-projected livery
+(red, graphite belly, pinstripes, AGRO WINGS, PR-AGH, flag, placards) with
+a bump map. Main rotor: mast, swashplate, teetering hub, pitch links, two
+blades with twist and root doublers; coning at speed, droop at rest,
+collective pitch, tip-path-plane tilt from the simulation. Tail rotor on
+the left with red-tipped blades.
+
+**Rotor blur.** Each rotor has a ring in its tip-path plane drawn with the
+lit standard material, whose alpha is the blade coverage smeared over one
+frame's exposure behind each blade (rotor speed × exposure, in radians),
+plus a faint persistence of the swept disc. Stopped or slow, the solid
+blades carry the look; as the rotor speeds up they fade and the smeared
+sectors take over — never a permanently opaque disc. The tail rotor blurs
+to a light disc at its higher speed.
+
+**Cockpit** (`src/aircraft/r44Panel.js` faces, `src/aircraft/r44Cockpit.js`
+3D instruments), rebuilt after a frontal photo of a Raven II panel and three
+photos from the right seat:
+- **Pod**: the R44 outline traced on the frontal photo (`podOutline()`): a
+  broad, slightly domed top, large rounded ears at the upper corners, the
+  sides drawn in steeply to a bottom about two thirds as wide that sits on
+  the pedestal. It is a moulded shell 15 cm deep, a rounded rim standing
+  proud of the recessed face, a rolled hood lip from ear to ear and the
+  slim guidance lightbar on the hood. Matte black materials.
+- **Instruments**, in the photo's two rows:
+  - top: the blank position with the moulded R44 cap, altimeter (three
+    needles, Kollsman window), attitude, airspeed (green / yellow arcs,
+    red line) and the dual tachometer (engine and rotor);
+  - bottom: VSI, directional gyro, turn coordinator (the symbol rolls with
+    the rate of turn, the ball rides with the slip) and manifold pressure.
+  - Each one is a 3D case set into the face: black barrel, bezel ring,
+    dial set back inside it, 3D needles and glass with a soft reflection;
+    knobs on the altimeter, the attitude and the DG.
+- **Lamps**: the photo's row (CLUTCH, MR TEMP, MR CHIP, CARBON MONOXIDE |
+  STARTER ON, TR CHIP, LOW FUEL, LOW RPM) and FULL THROTTLE beside the
+  manifold pressure, small domed lenses in bezels. Only the ones the game
+  simulates ever light, and only from its state (clutch engaging, starter,
+  fuel below 10 %, low rotor rpm, power at the limit); the others stay
+  dark — there are no random failures.
+- **Placards**: "DO NOT EXCEED 110 KIAS EXCEPT IN SMOOTH AIR" and the
+  registration.
+- **Pedestal**: a deep sloped box with raised module plates:
+  - the lamp row (FUEL FILTER, AUX FUEL PUMP, ALT, ENG FIRE, OIL, GOV OFF);
+  - hour meter and clock; the engine cluster (oil temperature and
+    pressure, CHT, ammeter) and the ag tank and fuel gauges; "R44 Raven II";
+  - BRAKE and SPRAY lamps; the switch row (NAV LTS, STROBE, the CLUTCH
+    switch under its red guard, ALT, MASTER BATTERY, PUMP, VALVE) with
+    toggles that follow the aircraft's state; the magneto key;
+  - the avionics stack: audio panel, the guidance GPS, transponder and COM.
+- **Tablet**: a navigation tablet on an arm at the right ear of the pod,
+  turned toward the right seat, showing the same guidance screen as the GPS.
+- **Live parts**: needles, attitude ball, heading card, turn coordinator,
+  lamps and toggles are 3D and set every frame from the simulation in the
+  cockpit view. The faces are drawn once; only the GPS screen is redrawn,
+  at 15 Hz.
+- **Camera**: the pilot's eye in the right seat, looking 20° down with a
+  64° field of view, so the pod and the top of the pedestal fill the lower
+  part of the frame (`camera.cockpitPitch` / `cockpitFov` of the type).
+- **Cost**: two to four draw calls more than the previous pod in the
+  cockpit view (see the R44 cockpit validation below).
+- **Controls and cabin**:
+  - the Robinson T-bar cyclic in satin black, on a pivot housing with the
+    yellow "LOW-G PUSHOVERS PROHIBITED" placard;
+  - rubber grips with red triggers;
+  - grey carpet on the floor.
+- **Moving controls**: the cyclic, the collective with its twist grip, and
+  the pedals move with the simulation. The seated pilot (right seat, helmet) has the right hand on
+the cyclic grip and the left on the collective (the forearm turns at the
+elbow, the lever follows the hand), and looks down and out near the
+ground and along the boom when spraying. The exact R44 instrument
+arrangement varies between aircraft and is not claimed.
+
+**Cameras and sound.** The chase camera follows the nose (a helicopter
+flies sideways and backwards); the cockpit view adds a two-per-rev shake
+in phase with the rotor, strongest through translational lift, at high
+speed and in settling with power (Settings → Cockpit shake scales or
+removes it). Audio profile `heli`: piston engine from engine rpm, the
+starter and the engine catching, main-rotor blade passage as noise pulses
+at 2/rev (chop and a low "whop", blade slap in descents), tail-rotor buzz
+and main-gearbox whine — all from the rotor speed, so they spin up through
+the clutch and run down after shut-down — with the cabin muffling and the
+low-rpm horn.
+
+**Farm integration.** Helipad at the east end of the apron (gravel, H and
+touchdown circle; the runway, service pad and taxi route are unchanged).
+The helicopter is serviced there: the crew waits until the rotor has
+stopped; the truck parks ≥ 3 m clear of the stopped disc on either side
+(its route search now also covers the grass east and north of the apron,
+and tries both sides). When the helicopter is flown, both airplanes wait
+on the west apron. Warnings: low rotor rpm, rotor overspeed, engine out
+(autorotate), settling with power. HUD: rotor % in place of G (power model: the climb rate). The test
+autopilot (`src/game/heliAutopilot.js`) flies through the player's inputs
+with the high assist: service, start, lift-off, transit, passes with
+hover turnarounds at the field ends, return over obstacles, landing on
+the H, shut-down, rotor run-down and the next service.
+
+### R44 cockpit reconstruction (validation)
+
+Only the R44 cockpit changed (`r44Panel.js`, `r44Cockpit.js`, the pod /
+lightbar placement in `r44Model.js`, the R44's `cockpitPitch` / `cockpitFov`
+in `types.js`); the exterior, rotors, flight model, controls, the other
+aircraft and their cameras, the scenery, missions and sounds are untouched.
+
+| # | Test | Result |
+|---|------|--------|
+| 01 | front | pod outline, two instrument rows, lamp row and pedestal compared with the frontal Raven II photo (`node test/cockpitviews.mjs out r44 panel`) |
+| 02 | pilot view | `test/r44cockpit.mjs`: parked, running, hover, level, turn — pod and top of the pedestal in the lower part of the frame |
+| 03 | contour | traced outline: domed top, ears, sides drawn in to a bottom ~⅔ as wide |
+| 04 | pedestal | look-down view: lamp row, cluster, switches with the red clutch guard, key, avionics |
+| 05 | instruments | needles follow the flight model (26 → 86 kt: ASI −2.3 rad, altimeter −1.9 rad); lamps: cold → ALT only, flying → none, low rotor → LOW RPM, low fuel → LOW FUEL, same result on every update |
+| 06 | cyclic | T-bar unchanged, moves with the cyclic (look-down view) |
+| 07 | camera | 16:9, 4:3, 21:9; eye clearance 27.6 cm (dev server; nothing closer than 12 cm) |
+| 08 | side views | looking left / right from the seat |
+| 09 | exterior | `node test/acviews.mjs out r44 side,front34,front`: the pod stays inside the bubble; chase view unchanged |
+| 10 | performance | below |
+
+Performance (SwiftShader, 960×540, medium, R44 at 6 m over the corn, same
+scene before and after, two runs each):
+
+| | before | after |
+|---|---|---|
+| cockpit view, median frame (render) | 11.6 / 12.1 ms | 14.6 / 11.9 ms |
+| cockpit view draw calls | 482 | 465 (pitch 20° down, FOV 64°) |
+| same fixed camera (`cockpitviews` default / wide / panel) | 430 / 444 / 317 | 434 / 449 / 322 |
+| cockpit meshes / triangles | 108 / 23,052 | 113 / 45,179 |
+| geometries / textures in memory | 780 / 53 | 771 / 54 |
+| JS heap | 377–388 MB | 376–380 MB |
+
+### Validation (R44 build)
+
+All runs below are on the final build (`npm run build`, `vite preview`),
+Chromium + SwiftShader in this container.
+
+| # | check | evidence |
+| --- | --- | --- |
+| 1 | PR-AGW behaves exactly as before | seeded trajectory fingerprint (take-off, pull-up, turn, wind on) identical, byte for byte, to the commit before the R44 work; `flightModel.js`, `assist.js`, `aircraft.js` and `FLIGHT` untouched; `node test/e2e.mjs soy`: full contract, two sorties, 90 %, 2★, Cr$ 5,396 |
+| 2 | Air Tractor functional | same fingerprint test with `FLIGHT_AT`: identical; `AC=at502 node test/e2e.mjs soy`: 90 % in one sortie, 2★, Cr$ 4,967 |
+| 3 | R44 spawns correctly | `test/r44flight.mjs`: card 03 selects it; parked on the helipad at (-323, -48), heading 090, four skids on the ground, rotor STOPPED |
+| 4 | main and tail rotors | counter-clockwise main rotor seen from above, advancing tail blade at the bottom, measured in the browser; solid blades at rest, short blur at ~25 %, blur disc with the blades faded at 100 %, solid again after the run-down |
+| 5 | vertical take-off | off the skids 2.1 s after raising the collective, 3 m 0.9 s later, 0.5 m drift |
+| 6 | stable hover | 20 s hands-off hover (high assist): 0.6 m drift, height within 0.04 m, rotor 101.5 % |
+| 7 | translations | 10 m/s forward and backward, 14.6 / 11.0 m/s sideways left / right, climb +7 m and descent −7.6 m on the collective |
+| 8 | yaw | left pedal −75° in 2 s then heading held (0.0° in 6 s); right pedal +91° |
+| 9 | skids on the ground | landing from 52 kt: four skids, 0.82 m/s touchdown, no damage, skid heights −0.02 m; the test autopilot's seven landings in the contract run all ended on the H |
+| 10 | cameras | chase behind the nose, cockpit at the pilot's eye (pilot hidden), orbit around |
+| 11 | instruments read the simulation | panel data equals the model's rotor %, engine %, MAP, fuel, tank, altitude and heading; rotor state STOPPED / STARTING / NORMAL / SHUTDOWN shown on the pod |
+| 12 | virtual ag application | `AC=r44 node test/e2e.mjs soy`: the whole soybean contract flown through the player inputs with the high assist — seven sorties (service, start, spool-up, lift-off, passes with hover turnarounds, return, landing on the H, shut-down, run-down), 90 % coverage, 2★, Cr$ 5,293, no damage |
+| 13 | ag GPS with the helicopter | the same run: passes flown on the guidance lines, with the lightbar, the HUD and cockpit GPS and the coverage map driven by the helicopter's 13 m swath |
+| 14 | ground servicing | 7 services at the helipad in that run, all by the truck (no "could not reach the stand"); `AC=r44 node test/truck.mjs` at four headings: truck at the stand in ~35 s, 1.0–1.7 m clear of the stopped rotor disc, crew walks around the boom |
+| 15 | aircraft selection | title screen 01 / 02 / 03, choice saved; `node test/e2e_ui.mjs`: 16/16 |
+| 16 | no critical regressions | `npm test`: 44/44 (PR-AGW and AT suites unchanged, 9 R44 checks); no page errors in any browser run (the only console error is the preview server's missing favicon, also present before) |
+| 17 | browser performance | `test/profile.mjs` against the build before the R44 work, below |
+
+**Key schemes** (`node test/keys.mjs`, 22/22): on the PR-AGW, the AT-502B
+and the R44, the numpad scheme is the default and the classic keys are
+dead in it (and the other way round); Q does not start the engine and a
+tap on Q (rudder) does not stop it, F does both (bindings saved by older
+builds are cleaned up on load: Q is only the left rudder, F only the
+engine — `test/input.test.mjs`); Shift
+and Ctrl move the power in both; the HUD, Controls and Settings screens
+name the keys of the scheme in use; the choice is saved; rebinding a
+numpad key leaves the classic keys alone. `node test/r44flight.mjs` (22/22)
+and `node test/e2e_ui.mjs` (16/16) were run again with the numpad default.
+The flight solvers are untouched (the seeded trajectories above are still
+identical).
+
+**Performance** (`test/profile.mjs low`, 600 ticks per view; build before
+the R44 work → this build; SwiftShader, so render times are only the CPU
+cost of a software rasteriser):
+
+| flying | view | logic ms/tick (avg / p95) | draw calls | triangles |
+| --- | --- | --- | --- | --- |
+| PR-AGW | parked on the pad (R44 parked in view) | 0.39 / 0.6 → 0.39 / 0.7 | 486 → 540 | 737k → 835k |
+| PR-AGW | spraying soy at 4 m | 0.70 / 1.5 → 0.72 / 1.5 | 342 → 352 | 509k → 517k |
+| PR-AGW | cockpit over corn | 0.57 / 1.2 → 0.58 / 1.1 | 331 → 330 | 868k → 870k |
+| PR-AGW | 400 m AGL | 0.57 / 0.9 → 0.49 / 0.6 | 318 → 318 | 471k → 471k |
+| R44 | on the helipad | 0.37 / 0.7 | 473 | 865k |
+| R44 | spraying soy at 4 m | 0.54 / 1.2 | 340 | 670k |
+| R44 | cockpit over corn | 0.62 / 1.8 | 314 | 1047k |
+| R44 | 400 m AGL | 0.23 / 0.4 | 304 | 603k |
+
+On average the helicopter's simulation (120 Hz rotor, inflow, skids)
+costs no more per tick than the airplanes'. In the airplanes' views the
+additions are the parked R44 and the helipad: beyond 40 m the R44's cabin,
+glass and inner skin switch to a coarse version (same window cuts) and the
+fine detail is dropped, so it costs 51k triangles there (125k at full
+resolution). The rotor blur is one ring mesh per rotor (a standard
+material with a small shader patch), not a particle system. Sustained
+software-raster time per frame on the pad (once the frame queue has
+filled): 1.50–1.57 s before, 1.61–1.63 s flying the PR-AGW now,
+1.66–1.71 s flying the R44. Start-up in this container 18.7 → 21.1 s, JS
+heap 142 → 173 MB, GPU geometries 525 → 554, textures 37 → 41. FPS on a
+real GPU was not measured.
+
+**Known limits.** No mast bumping or dynamic rollover beyond what the
+four skid contacts produce; the governor is always on (no twist-grip
+throttle or governor-off flying); the rotor brake is applied automatically
+below 40 % during the run-down; the 250 L tank is a game figure (no crewed
+R44 ag kit with a published capacity was found); the instrument layout is
+representative, not a copy of a particular aircraft; the lone tree east of
+the helipad stands in the departure path — the test autopilot routes
+around it, players must too. Browser end-to-end runs are not bit-for-bit
+repeatable because the truck's route search has a per-frame time budget.
+FPS on a real GPU was not measured.
+
+## Terrain relief and advanced missions
+
+The outer farmland now has real relief: rolling country and a belt of hills
+around the original farm, which stays exactly as it was. It is real
+geometry, not a texture. One height function feeds the rendered ground,
+the aircraft's wheels and skids, the crash and obstacle tests, crops,
+trees, roads, fences, vehicles, cameras, the GPS and the maps.
+
+### How it is built
+
+- **One height source** (`src/world/terrainData.js`). `rawHeight(x, z)` is
+  the original farm terrain plus `reliefAt(x, z)` (`src/world/relief.js`),
+  sampled once at start-up into the 513 × 513 grid (15.6 m cells).
+  `TerrainData.heightAt` interpolates that grid on the same triangles the
+  renderer draws. The flight environment (`env.ground`, `env.top`,
+  `env.normal`), surface types, crops, vegetation, roads, fences, cameras,
+  the truck and the GPS all read `heightAt`, so what you see is what the
+  wheels touch.
+- **Protected core.** The relief weight is exactly zero inside the farm
+  core: the strip, base, hangar, HQ, every original field and their run-in
+  lines (`CORE`, x −1750…2850, z −1500…2050). It rises smoothly over 700 m
+  beyond that, and fades out again between 3.3 and 3.9 km from the centre
+  (the boundary where the game turns aircraft back). Heights in the
+  core are bit-for-bit those of the previous build (12,000 samples compared,
+  0 differ). The creek keeps a calm floodplain through the relief.
+- **Natural landforms, not noise blobs.** Relief is a sum of a few long,
+  smooth waves (wavelengths 560 m–2.6 km) sampled at a domain-warped point,
+  so swells and ridges meander. Because each wave's steepest slope is its
+  amplitude × wavenumber, slopes are bounded by construction: no spikes,
+  cliffs or isolated bumps. The zones are warped ellipses with soft edges;
+  the hills sit inside a wider rolling shoulder, so the land goes from flat
+  to rolling to hilly continuously. The south-west hill zone samples the
+  waves at an offset so it does not stack into one deep trough.
+- **Zones** (`ZONES` in `relief.js`):
+
+  | zone | class | where |
+  | --- | --- | --- |
+  | Serra do Norte | hilly (level 3) | north-east, ridges running SW–NE |
+  | Morro do Sudoeste | hilly (scenery) | south-west corner |
+  | Campos do Sul | rolling (level 2) | south and south-east |
+  | Chapada Oeste | rolling (level 2) | north-west |
+  | Vale do Oeste, Baixada Sul | rolling (scenery) | west side, south |
+
+- **Distribution** (terrain class from the zone weights, 50 m grid over the
+  whole map): **76.5 % flat, 18.0 % rolling, 5.5 % hilly** (target ~70 /
+  20 / 10). The hilly share is lower than the target on purpose. The
+  protected core plus its 700 m blend and the calm 600 m rim leave only a
+  1–1.5 km wide band for relief on the north and west sides, and much less
+  on the south and east. Packing 10 % hills into that band would push slopes
+  past the 12° limit and make walls against the flat core.
+- **Slopes** (8 m central differences, 25 m grid): flat land p95 2.0°
+  (unchanged; its steepest points are the original creek banks); rolling
+  land mean 2.5°, p95 5.5°; hilly land mean 3.5°, p95 6.5°, max 10.3°. The
+  relief spans about −45 m (west valley floor) to +27 m (north-east crest)
+  around the strip level.
+- **Rendering** (`src/world/terrain.js`). Same chunked terrain as before:
+  500 m chunks, `THREE.LOD` at 1/2/4/8× decimation with skirts, built once
+  at load and never regenerated in flight. Shading normals exaggerate the
+  slope ×1.9 so gentle relief reads from the air (`RELIEF_SHADE`; the
+  physical normal is untouched). Steeper flanks blend towards bare soil.
+  The far horizon ring keeps sampling `rawHeight`.
+- **Crops** follow the ground: canopy and row fins are sampled from
+  `heightAt` every 8 m / 12 m, with the same shading normals as the ground.
+- **Access roads** (`src/world/roads.js`): seven new dirt roads (north
+  trunk and branches, south, south-east, west, north-west) routed as
+  least-slope A* paths over the height field, smoothed, with grades up to 10.4 %.
+  Each is drawn as a ribbon draped on the terrain: every vertex, across the
+  whole width, takes `heightAt` + 7 cm, so a road on a slope lies on the
+  slope. Edges fade into the grass; ruts and a grass crown come from a small
+  canvas texture. They are ordinary roads for the surface code (`dirt`). The
+  core roads are still painted by the ground shader.
+- **Vegetation** (`src/world/vegetation.js`). The original trees and their
+  colliders keep their exact positions and random draws. Trees inside the
+  new fields, on their run-in corridors and on the new roads are removed
+  afterwards. A separate random stream adds vegetation that follows the
+  landforms: gallery woods (mata, buriti) on the valley floors, capoeira
+  scrub on steeper flanks, single shade trees and ipês on crests. Every
+  plant stands on `heightAt`.
+- **Fences** around the two outer pastures (T-36, T-44): every post stands
+  on the terrain, so the wires follow the swells.
+
+### Missions by level
+
+The order board (`src/ui/screens.js`) shows three sections. The original
+contracts are **Level 1 · Flat farmland**, unchanged. Each new contract is
+two talhões with a stepped, irregular outline flown as one job; the GPS
+builds its passes over both. Relief and slope on the cards are measured on
+the terrain the aircraft flies over (`src/world/terrainInfo.js`), not typed
+in.
+
+| contract | level | ha | relief | slope mean / max | distance | Cr$/ha + bonus |
+| --- | --- | --- | --- | --- | --- | --- |
+| soy | 1 | 18.4 | 5.7 m | 0.6° / 1.1° | 0.8 km | 260 + 2,500 |
+| corn | 1 | 16.1 | 5.1 m | 0.9° / 1.3° | 0.6 km | 330 + 3,500 |
+| cotton | 1 | 13.8 | 2.0 m | 0.5° / 2.8° | 2.0 km | 380 + 4,500 |
+| roll-soy | 2 | 19.5 | 25.0 m | 2.6° / 4.7° | 3.3 km | 330 + 3,800 |
+| roll-corn | 2 | 19.8 | 18.7 m | 2.0° / 5.0° | 4.2 km | 400 + 4,500 |
+| roll-cotton | 2 | 19.1 | 30.2 m | 2.8° / 5.3° | 3.0 km | 450 + 5,000 |
+| ridge-soy | 3 | 16.1 | 24.8 m | 4.5° / 7.2° | 4.1 km | 420 + 6,000 |
+| ridge-cotton | 3 | 16.1 | 36.5 m | 3.3° / 5.3° | 4.0 km | 560 + 7,000 |
+| ridge-corn | 3 | 15.8 | 29.5 m | 3.8° / 6.8° | 3.2 km | 500 + 8,000 |
+
+Harder levels pay more per hectare and a larger completion bonus, and need
+more fuel for the longer ferry. Scoring is the same as before (coverage,
+uniformity, waste, damage). The new fields sit where the procedure turn at
+each end stays inside the farm boundary (the game turns an aircraft back at
+3.9 km).
+
+**GPS and maps.** The full map and the minimap carry a hillshade and a
+light elevation tint computed from `rawHeight`. Flat land is drawn as
+before; the swells and hills read as relief. On the GPS page of a job with
+relief, the field area is shaded from the real heights under the coverage
+map, and two small lines give the ground elevation under the aircraft
+(`GND`) and the field's elevation range (`FLD`), both MSL. Flat jobs show
+nothing extra, so the HUD stays as it was.
+
+**Test autopilot.** `src/game/autopilot.js` is the validation tool that
+flies the contracts in the e2e runs. For terrain it now has:
+
+- a 1.3 km run-in;
+- a feed-forward of the ground's rate of change 2 s ahead, so it follows
+  falling ground fully and rising ground in part;
+- planning of its height over the highest tree top in the corridor ahead
+  on run-ins and turns. The north-east fields' run-ins cross the gallery
+  forest along the creek;
+- a run-in height referenced to the job's crop canopy, also over the gap
+  between stepped talhões, so a canopy edge never comes up under the
+  wheels.
+
+None of this touches the aircraft: the player flies exactly the same
+aircraft through the same inputs.
+
+### Validation (terrain build)
+
+All browser runs were on the final build (`npm run build`, `vite preview`),
+Chromium + SwiftShader in this container. "Before" is the build just
+before the terrain work, served alongside it.
+
+| # | check | evidence |
+| --- | --- | --- |
+| 1 | runway level | `terrain.test`: the strip is exactly 0 m along its length and width; relief is exactly zero over the whole farm core; 12,000 core heights compared with the build before: 0 differ |
+| 2 | buildings in place | base, hangar, HQ, sheds, helipad, spawns: relief 0, slope < 2° (`terrain.test`); fences, apron, windsocks and parked aircraft unchanged in the ground renders |
+| 3 | aircraft physics unchanged | `flightModel.js`, `heliModel.js` (detailed model), engine power, lift, drag and control gains untouched by the terrain work; seeded PR-AGW and AT-502B trajectories identical byte for byte (md5 `9e021182…` / `57deadcb…`) |
+| 4 | smooth hills | sum-of-waves relief with bounded slope: no rise of 4 m or more within 20 m anywhere; rolling ≤ 8°, hills ≤ 12° (measured: rolling p95 5.5°, hills p95 6.5°, max 10.3°) |
+| 5 | only selected regions elevated | 76.5 % flat / 18.0 % rolling / 5.5 % hilly, the core exactly flat as before; relief fades out 3.3–3.9 km from the centre |
+| 6 | crop rows follow the terrain | canopy and row fins sampled from `heightAt`; low and orbit renders over T-41 and T-31 show the rows and tramlines draped on the slopes |
+| 7 | trees and roads placed correctly | every plant stands on `heightAt`; the original trees keep their positions; roads are ribbons on the terrain (+7 cm) with grades ≤ 10.4 %; ground renders show the north road and the pasture fence following the ground |
+| 8 | collision and ground contact | one height source: `env.ground`, `env.top`, crop tops and surfaces equal `heightAt` (`terrain.test`); 9 contracts flown end to end over the relief with take-offs, passes at 3 m over the canopy and landings: no damage, no crop strike |
+| 9 | advanced missions work | `node test/e2e.mjs <id>` for all nine contracts (PR-AGW) — see the table below; `AC=at502 … soy` and `AC=r44 … soy` too |
+| 10 | game stays smooth | `test/profile.mjs low`, below: farm views unchanged, +0.2–0.3 ms logic per tick over the hills, +5–14 % triangles |
+| 11 | before/after from the ground and the air | `test/terrainviews.mjs` against both builds: five aerial views (NE hills, SE swells, NW plateau, SW, the core — identical) and nine low / ground views (ridge and rolling fields, roads, fence, the strip — identical) |
+
+End-to-end, the test autopilot flying through the player's inputs: service,
+start, taxi, take-off, the passes, reloads, landing, taxi-in and payment.
+
+| contract | coverage | ★ | sorties | Cr$ | damage |
+| --- | --- | --- | --- | --- | --- |
+| soy | 90 % | 2 | 2 | 5,576 | 0 |
+| corn | 90 % | 2 | 2 | 6,582 | 0 |
+| cotton | 90 % | 2 | 2 | 7,223 | 0 |
+| roll-soy | 90 % | 2 | 2 | 7,489 | 0 |
+| roll-corn | 90 % | 2 | 3 | 8,979 | 0 |
+| roll-cotton | 90 % | 2 | 3 | 9,884 | 0 |
+| ridge-soy | 90 % | 2 | 2 | 9,020 | 0 |
+| ridge-cotton | 90 % | 1 | 3 | 10,205 | 0 |
+| ridge-corn | 90 % | 1 | 2 | 10,012 | 0 |
+| soy, AT-502B | 90 % | 2 | 1 | 5,540 | 0 |
+| soy, R44 (power model) | 90 % | 2 | 6 | 5,804 | 0 |
+
+The autopilot's stars on the hilly fields reflect its uniformity on the
+slopes, not a scoring change.
+
+Problems these runs found, and fixed:
+
+- the creek's gallery forest on the ridge run-ins (tree-top planning);
+- the turn at the east end of the first ridge-soy layout leaving the farm
+  boundary (fields moved west);
+- a stepped field entered from the gap at ground-referenced height, so the
+  canopy edge came up under the wheels (canopy-referenced run-in);
+- a GPS pass that was never marked done (overlap-weighted coverage).
+
+**Performance** (`test/profile.mjs low ipanema`, 600 ticks per view, two
+runs per build; SwiftShader, so render time says nothing about a real GPU):
+
+| view | logic ms/tick before → after | draw calls | triangles |
+| --- | --- | --- | --- |
+| parked on the pad | 0.37–0.53 → 0.36–0.38 | 540 → 564 | 835k → 888k |
+| spraying soy at 4 m | 0.58–0.79 → 0.86–0.88 | 341 → 354 | 511k → 544k |
+| cockpit over corn | 0.64–0.81 → 0.56 | 330 → 351 | 870k → 925k |
+| 400 m AGL | 0.65–0.68 → 0.60–0.62 | 318 → 323 | 471k → 496k |
+| 5 m over the NE hills | 0.51–0.69 → 0.82–0.93 | 193 → 223 | 365k → 416k |
+| 200 m toward the hills | 0.49–0.69 → 0.70–0.84 | 285 → 322 | 929k → 982k |
+
+The terrain is still one grid sampled once at start-up and drawn as the same
+LOD chunks; nothing is regenerated in flight. The extra calls are the road
+ribbons (chunks of 64 sections, frustum-culled), the new fields' crops and
+the landform vegetation in its existing instanced cells. Start-up 18–19.5 s
+→ 19–21 s (the relief and the extra vegetation are built at load), GPU
+geometries 618 → 687, programs 40 → 42, JS heap 154 → 163–181 MB. Over
+the hills the logic costs ~0.3 ms more per tick (more trees around for the
+obstacle tests, grass cells on the slopes), well inside a 16.7 ms frame.
+
+**Known limits.**
+
+- The hilly share is ~6 %, not 10 % (see *Distribution*).
+- The relief is gentle on purpose: slopes stay workable for an ag
+  aircraft, so from 200 m it reads mainly through shading and the
+  horizon; it is clearest low and from the ground.
+- The far horizon ring outside the 8 km map is flat farmland.
+- Roads were routed once offline (`least-slope A*`) and are stored as
+  data; moving a field means re-routing its road.
+- The hilly contracts are harder for the test autopilot (1★ on two of
+  them); a pilot who anticipates the slopes does better.
+- FPS on a real GPU was not measured.
+
+## Expansion — secondary farms, office, dynamic world, replay
+
+Built into the existing game (aircraft, physics, the main farm and its
+missions, saves, controls and cameras untouched). Modules and where they live:
+
+| Module | File | What it does |
+| --- | --- | --- |
+| CockpitOperationsDisplay | `src/spray/guidance.js` | GPS unit with two pages chosen from the situation: **OPS** (track-up map of the talhão: boundaries, pass lines, coverage, flown track, cross-track, terrain shading, north pointer, scale bar, covered / total / remaining ha, progress bar) and **NAV** (ferry: strips and talhões around, course line, distance, bearing, ETE, WGS-84 position). Fuel and load columns, spray state, heading and ground speed on both. Colours per unit: green AgNav (PR-AGW), amber (AT-502B), cyan (R44). |
+| SecondaryFarmManager | `src/world/layout.js` (`FARMS`, `SITES`), `src/world/terrainData.js`, `src/world/structures.js`, `src/crew/*` | Three farms with their own strip, service area, shed, sign, windsocks and local truck: **Fazenda Santa Rita** (far west, 640 × 22 m red earth, big flat soy/cotton, easy), **Fazenda Vale do Rio** (south-east, 480 × 18 m mown grass climbing 1 % east, corn on swells, humid), **Sítio Serra Azul** (south-west, 430 × 15 m gravel, hills, hard). The strips sit on level platforms (graded for Vale do Rio) and are drawn by the ground shader; surface type affects rolling and dust. The ground crew (truck + badeco) works at the service area the aircraft arrives at; the other farms' trucks wait parked in their bays. |
+| Farm contracts | `src/game/farmContracts.js` | Six exclusive requests (two per farm) with a farmer's message and operating conditions: mornings only, postponed in rain, not in mist, before sunset. |
+| HangarOfficeMissionSystem | `src/ui/office.js` | The office computer at the main base (key **I**, or from the service orders): messages, requests (accept when the conditions allow and you are on the ground at the base), map of the farms with their profile, aircraft choice, and the **two histories kept apart** (main farm / secondary farms: number, date, job, farm, aircraft, coverage, uniformity, flight time, result, credit, replay). |
+| DistantFieldActivitySystem | `src/world/fieldActivity.js`, `src/world/cutState.js` | Tractor + disc harrow (T-08, VR-03), combines harvesting (T-16 soy, SR-03 corn), a self-propelled sprayer on its tramlines (T-13), a pickup on the sede road. Serpentine lanes with headland turns as analytic functions of time; distance-throttled updates and LOD, hidden beyond 1.5 km; never on the talhões of the player's job. The done lanes change the field: harvested ground loses its crop (canopy and row fins) and shows stubble, harrowed ground turns dark. |
+| WaterRegionSystem | `src/world/water.js`, `WATER` in `layout.js` | The creek, the Córrego do Vale (a tributary whose level only falls downstream), two açudes, a valley lake. One water material: colour and shore alpha from the real depth, sky reflection through the environment map, two drifting noise ripples. Timber bridges where the farm roads cross water, gallery forest and buritis along the stream, tree clumps around the ponds, wet banks in the ground shader. |
+| WeatherAndSkyManager | `src/world/weatherCycle.js` | Settings: weather **Dynamic** (clear spells, cloud building, brief light showers, clearing, morning mist that lifts) and time of day **Passing** (dawn → dusk and round, 6 min a stage). Farm tendencies near each farm. All changes use the atmosphere's smooth transitions; flight physics are not touched. Farm requests read the current state. |
+| ReplayManager | `src/game/replay.js` | Every job is recorded at 5 Hz (26 bytes a sample; the last four replays also in localStorage). After the hand-in (results screen), from the history, or with **L**: chase, side, orbit, cinematic (fly-by / wingtip / wide cuts), distant observer and free (mouse) cameras, 0.5–4×, seek bar, flown track (sprayed parts yellow) and talhão boundaries; the recorded aircraft's own model with prop / rotor and controls animated. |
+| GroundSurfaceEffectsManager | `src/world/groundMarks.js`, `aircraft.js`, `truck.js` | Tyre marks on bare earth from the aircraft wheels and the service truck (one instanced draw, ring buffer, fading over four minutes), dust puffs when the wheels bite (hard acceleration or braking on dirt), plus the existing taxi dust, prop wash, rotor downwash and contact shadows. |
+
+Tests: `npm test` adds `i18n.test.mjs` (every `t()` text has Portuguese) and
+`weather.test.mjs`; `terrain.test.mjs` checks the farm platforms. Browser:
+`node test/farmflow.mjs <out>` (office, conditions, accept, ferry, local
+truck service, work, separate history, replay with every camera) and
+`node test/expviews.mjs <out>` (water, machinery, farms from the air).
+
+### Validation (expansion build)
+
+- `npm test`: 80/80 (adds i18n coverage, weather cycle, farm platforms).
+- Browser: `e2e_ui` 22/22, `keys` 19/19, `farmflow` 15/15, `r44flight` 22/22.
+- Hands-off soy job (autopilot through the player inputs), unchanged from
+  before the expansion: Ipanema 2★, AT-502B 1★, R44 2★ (90 % coverage).
+- `perf.mjs` (SwiftShader, so render times are not GPU figures): game-logic
+  tick per frame unchanged (medium: base 1.8 ms, low soy pass 3.1 ms,
+  cockpit over corn 4.5 ms, high 2.3 ms vs 2.7 / 4.8 / 3.9 / 2.8 ms before);
+  draw calls about +5 % (water, gallery forest, machines when near; the
+  farms' service areas are not drawn beyond 2.2 km, machines beyond 1.5 km).
+
+## Crops, soil and forests — realism overhaul
+
+Same fields, crops (soy, corn, cotton; stubble, fallow, pasture), rows,
+growth, coverage, missions and flight model; only how they are drawn changed.
+
+| LOD | Distance (medium) | What draws the field |
+| --- | --- | --- |
+| 0 | < ~14 m | 3D plants (`src/world/cropPlants.js`): soy clumps of branching stems with folded trifoliate leaves, corn with a tapering stalk, 10 arching distichous blades and a tassel, cotton with a reddish stem, long-petioled palmate leaves, a flower and bolls. Leaves are cut-out cards / ribbons from a botanical atlas (veins, two-tone blades). |
+| 1 | ~11–24 m | The same rows with a simplified plant (fewer, wider leaves) at half density; the hand-over is a screen-space dissolve (no pop, no size dip). |
+| 2 | ~20–240 m | Row hedges (`crops.js`): each row a leafy tent as wide as the crop's cover, lit flank and shaded flank. |
+| 3 | beyond | The canopy surface: rows of trifoliate / palmate leaves (or corn blades) seen from above, tramlines, headlands, vigour patches. It dissolves (dithered) near the camera so the plants stand on the soil. |
+
+- Plants follow each field's rows (spacing, axis, tramlines) with a
+  deterministic jitter, yaw, height, width, tone and a few gaps; they stand
+  on the terrain height (relief fields included); harvested lanes have none.
+- One instanced draw per crop variant (two vec4 per plant), 4 m cells
+  generated once and cached, buffers refilled only after the camera moved
+  3–5 m (about 0.2 ms per frame on a 50 m/s pass); plants dissolved by the
+  hand-over collapse in the vertex shader; plant radius 14 / 24 / 34 m
+  (low / medium / high), off above ~90 m; crop shadows on high only.
+- Wind: plants bend downwind with gusts rolling across the field and the
+  leaves flutter (vertex shader, shared wind state). Leaves are translucent
+  against the sun.
+- Soil under the crops: red-brown latossolo with fine grain and clods
+  (bump), straw (palhada) between the rows of no-till soy and corn, clean
+  ridged rows under cotton, the soil shaded along each row and under a
+  closed canopy.
+- Trees: realistic leaf-mass atlas (lobes lit like small spheres), leaf
+  relief, translucency, per-tree tone; 3D crowns over the forests near the
+  camera (`src/world/forestCrowns.js`) instead of a flat block.
+- Validation (SwiftShader container, medium): the 3D plants cost
+  0.16–0.27 ms of CPU per frame on a 10 s, 47 m/s pass at 4 m (game tick
+  1.1–1.6 ms, as before); triangles on the low soy pass 0.75 M → 1.36 M,
+  draw calls +3 (one per crop variant), aerial and high views unchanged;
+  Ipanema soy and R44 cotton autopilot missions unchanged (90 %, 2★),
+  farm flow 15/15, UI 22/22, unit tests 80/80.
+- Look-dev: `node test/cropviews.mjs <out>` (same 12 views before / after;
+  `VIEWS='[["name",{"cam":[x,h,z],"target":[x,h,z]}]]'` for extra views).
+
+## Aircraft 04 — PZL M-18B Dromader (PR-DMD)
+
+A fourth aircraft built from scratch: the classic Polish radial-engined
+crop sprayer. The PR-AGW Ipanema, the AT-502B and the R44 keep their
+configurations (`test/m18.test.mjs` checks their engines and figures; their
+models, panels and service are untouched). The registration PR-DMD is
+fictional; the reference aircraft's registration is not used.
+
+**References.** The side photo of a yellow M-18B, the engine close-up
+(blue nose case, polished collector ring, four-blade prop with yellow tips)
+and the real cockpit photo (two toed-in boards either side of the hopper's
+litre scale, red-knob levers). The video was used only as a look reference
+(paint, cabin and panel); none of its physics, controls, missions or code.
+The fuselage was fitted to the side photo: a flat silhouette of the model,
+rendered from the side and aligned on the wheels, is drawn over the photo
+and the cowl, hopper top, cabin, rear fairing, tail cone, fin and rudder
+were moved until the outlines matched.
+
+**Published figures used** (Jane's via Wikipedia, flugzeuginfo, PZL data;
+the ASz-62IR from the engine's data sheet):
+
+| | |
+| --- | --- |
+| Engine | PZL-Kalisz ASz-62IR-M18, 9-cylinder supercharged radial, 980 hp (731 kW) at 2,200 rpm, 0.687 reduction |
+| Propeller | 4-blade constant speed |
+| Span / length / wing area | 17.70 m / 9.47 m / 40.0 m² |
+| Empty / max take-off | 2,710 kg / 5,300 kg (agricultural) |
+| Hopper / fuel | 2,500 L / 712 L avgas |
+| Stall, flaps down | 108 km/h (58 kt) |
+| Initial climb | ≈ 1,100 ft/min |
+| Working speed | 160–190 km/h |
+
+**Estimated for the game** (not published, or sources disagree; all in
+`FLIGHT_M18` in `src/config.js` with comments): prop diameter 3.3 m; CLmax
+1.49 / 2.06 from the stall speeds; CD0 0.075 and Oswald 0.76 so that the
+climb and a ≈ 122 kt full-power level speed come from one polar; inertias
+scaled from mass and size; static thrust from momentum theory (figure of
+merit 0.62); fuel flow from a radial's ≈ 0.6 lb/hp/h; the governor
+schedule, manifold pressure, CHT, oil temperature and pressure. Payload is
+not hopper volume: with full fuel and pilot the MTOW leaves ≈ 2,000 kg for
+the hopper, so a full 2,500 L of water is over weight (the load sheet says
+so).
+
+**Radial engine** (`FlightModel._radial`, sharing `_propThrust` with the
+PT6): the inertia starter turns the engine slowly; after ≈ 1.6 s and 2.5 s
+single cylinders fire (a cough, a bang and a puff of smoke from the stack)
+and at ≈ 3.2 s it catches in a cloud of smoke. Manifold pressure follows the
+throttle (13 inHg idle → 41.3 inHg take-off); on the fine stop the rpm
+follows power, above ≈ 32 % throttle the governor holds 2,200 rpm and the
+blades coarsen with speed. Power comes from manifold pressure and rpm;
+CHT and oil temperature rise with power and cool with airspeed; oil
+pressure follows rpm; fuel flow runs 24 L/h at idle to 330 L/h at take-off.
+After shutdown the engine runs down over ≈ 10 s. All of these drive the
+cockpit gauges.
+
+**Measured** (`node --test test/m18.test.mjs`):
+
+| check | result | published |
+| --- | --- | --- |
+| three-point attitude | 10.2° | ≈ 10° (photo) |
+| full throttle, static | 2,198 rpm (prop 1,510), 41.3 inHg, 979 hp, 330 L/h, 15.0 kN | 980 hp at 2,200 rpm |
+| ground roll 3,011 / 5,300 kg | 147 m / 460 m | — |
+| climb 4,200 kg at 78 kt | 1,160 ft/min (746 at 5,300 kg) | ≈ 1,100 ft/min |
+| 1 g stall, flaps down, 4,200 kg | 58 kt | 58 kt |
+| level, 4,200 kg | 122 kt full power; 96 kt at 62 % | working 86–103 kt |
+| roll to 60° (loaded, assist) | 1.57 s (heavier than the AT's 1.2 s) | — |
+| balão with 1,500 L | +36 m, no stall | — |
+| dive pull-out, 800 / 1,200 L | lowest 3.2 / 4.0 m, no stall | — |
+| landing | 0.87 m/s touchdown, 250 m roll, no prop strike | — |
+
+**Spray:** 28 nozzles a side on booms that follow the trailing edge (clear
+of the lowered flaps), fan-driven pump; swath 32 m and 5.6 L/s (the same
+dose as the others at its working speed).
+
+**Model** (`src/aircraft/dromaderModel.js`): the exposed nine-cylinder
+radial (finned barrels, heads, push-rod tubes, blue crankcase and nose
+case, governor, ignition ring, polished collector ring) ahead of a small
+cowl with gills, the big exhaust stack down the right side with soot, the
+oil-cooler scoop; the four-blade prop (black, yellow tips with a black
+band, brass clamps) with motion blur from the shared prop disc, geared
+0.687 to the crankshaft; the long hopper bay with its light-grey lid; the
+glazed cabin standing on the fuselage (raked windshield from the hopper
+top, door and triangular rear windows, painted roof band, red beacon, steep
+rear fairing), the slim tail cone, the strut-braced tailplane low on it,
+the tall fin with a big rudder; the long rectangular wing with flaps,
+ailerons, tip caps, lights, walkway and filler; raked oleo main gear and a
+steerable tailwheel. Yellow paint with a black cheat line, the camel badge
+and "PZL M-18B DROMADER" in red, AGRO WINGS lettering, PR-DMD on the tail
+cone, white-over-red tail band. Fine parts sit in a LOD that drops beyond
+95 m.
+
+**Cockpit** (`src/aircraft/dromaderPanel.js`): two toed-in boards with
+Polish labels and metric dials, as in the real aircraft — airspeed km/h,
+attitude, altimeter in metres, turn coordinator, heading, variometer m/s,
+g-meter, flaps, fuel; rpm, manifold pressure, CHT, oil temperature and
+pressure, fuel flow, hopper litres, voltage — every needle from the flight
+model; annunciators; between the boards the hopper's back wall with the
+stencilled litre scale and the live liquid level; the guidance GPS and
+lightbar on the coaming; stick, pedals, throttle and red-knob levers that
+move; the shared pilot seated in this cabin.
+
+**Integration.** `types.js` entry `m18` (slot 04): selection card, office
+list, parking (a third apron spot for when the R44 is flown), crew service
+points and rates for its filler and hopper coupler, collision and wire
+points, load sheet, guidance swath and an amber GPS theme, chase/orbit
+cameras, cockpit vibration, V-speeds and audio profile `radial` (nine
+cylinders, 4.5 firings per revolution, deep exhaust, uneven idle with
+pops, crackle on a closed throttle, inertia-starter whine, coughs and the
+catch on start, four-blade prop buzz from the geared prop rpm). The
+autopilot's taxi routes were moved a few metres so the 17.7 m span and the
+long tail clear the parked R44 and the mixing station.
+
+**Validation.** Unit tests 93/93 (`npm test`, 13 of them the Dromader's).
+Autopilot soybean contract (`AC=m18 node test/e2e.mjs soy`): service,
+start, taxi, take-off, spraying to 90 %, landing, taxi back to the pad,
+results, no damage; the Ipanema and the AT-502B complete the same mission
+with the adjusted taxi routes. Cost in the same scenes (medium, SwiftShader,
+1280×720), Ipanema / AT-502B / Dromader: chase 424 / 436 / 463 draw calls
+and 1.28 / 1.30 / 1.31 M triangles; cockpit 382 / 392 / 415 calls; at the
+pad 618 / 636 / 672 calls; simulation tick 1.4–1.5 ms for all three.
+
+**Limitations.** Supercharger, mixture and carburettor heat are not
+modelled (the throttle sets manifold pressure, the governor the rpm);
+engine temperatures are a simple first-order model; cylinder-by-cylinder
+firing is an audio effect only. The windshield is a single curved surface
+(the real one has more frames). The proportions were matched to one side
+photo; the plan view and wing section come from published dimensions. The
+cockpit labels are in Polish as on the real aircraft; the rest of the UI
+follows the game language.
+
+## Visual rebuilds — AT-502B exterior and Ipanema
+
+Visual only: flight models, paint, registrations, collision and service
+points and the model interfaces are unchanged (unit tests and the soybean
+autopilot mission pass for both).
+
+- **AT-502B (PR-AWT)** (`src/aircraft/atModel.js`): taller, narrower cabin
+  under a rounded painted roof, raked windshield with a centre post, framed
+  glazing (painted outside, grey inside) with door and rear posts, hinges
+  and handle; turtle deck straight off the roof with a dorsal fillet; deeper
+  belly with a flanged cast gatebox, dump handle and boarding step; slimmer
+  PT6 nose with a screened chin intake, cowl landing lights and a long
+  pointed spinner; thicker spring-steel gear legs with root fairings. Model
+  96.6 k → 107 k triangles, one mesh fewer; 1–2 fewer draw calls per view.
+  Look-dev: `node test/atviews.mjs`.
+- **Ipanema EMB-202A (PR-AGW)** (`src/aircraft/model.js`, `panel.js`):
+  one continuous canopy (raked one-piece windshield with centre post, door
+  and rear quarter windows, crowned roof into the turtle deck) with painted
+  frames, rubber seals, hinges and handle; wider flat-faced IO-540 cowl with
+  twin inlets; swept fin with a dorsal fillet; two-blade prop; softer
+  upturned wingtips. Cockpit: grey aluminium panel with recessed 3D
+  instruments behind bezels and glass whose needles follow the flight model
+  (airspeed, rpm, manifold pressure, three-hand altimeter, turn coordinator,
+  VSI, oil, fuel, boom pressure), switches, magneto key, mixture and prop
+  levers, the guidance GPS in an AGRONAV-style housing with a sun hood and a
+  flow/engine-data display, padded glareshield, magnetic compass. Shared
+  helpers keep their signatures (used by the AT-502B, R44 and Dromader).
+  Model 120 → 135 meshes, 78.8 k → 89.7 k triangles; small cockpit parts
+  drawn within 7 m only; +15–18 draw calls in close and cockpit views,
+  slightly fewer from farther away. Look-dev: `node test/ipaviews.mjs`.
+
+## Ipanema geometry from the real airframe
+
+The Ipanema's airframe was rebuilt from measurements instead of being
+reshaped by eye (`src/aircraft/model.js`). Reference: a true side photo of
+an EMB-203 (same fuselage, nose, belly and tail as the 202A), scaled by the
+7.43 m overall length and placed on the physics main-wheel point; a PR-AGW
+render, a cowl close-up and an in-flight photo for the nose, cabin and plan
+view. The aircraft stays an EMB-202A (two-blade prop, no 203 winglets, roof
+a little lower than the 203's).
+
+- **Fuselage**: every station is its own superellipse section (half-width,
+  shoulder, belly, top, upper/lower exponents), so the sides are flat and
+  the roof and belly turn at real corners instead of a tube. Hopper section
+  1.06 m wide × 1.17 m deep (was 1.14 × 1.34); spinner tip 2.0 m ahead of the
+  main wheels (was 2.6 m) and 2.77 m ahead of the origin (was 3.35); the
+  belly is flat at −0.40 m, ~1 m above the ground parked (it hung 0.35 m
+  lower); the rear fuselage stays deep and slab-sided to the rudder post.
+- **Nose**: IO-540 cowl barely larger than the spinner at its lip (0.60 ×
+  0.42 m), top line rising steadily to the windshield base, two round inlets
+  beside a polished conical spinner, oil-cooler scoop, exhaust stubs.
+- **Cabin**: the lower fuselage keeps the hopper's section and is cut at the
+  window sill; the canopy sections start exactly on that cut, so the glass,
+  frames and roof meet the skin without steps. Windshield from the hopper
+  top (z −0.29) to the roof rail (z −0.73), roof crown 1.12 m, one side
+  window per side bounded only by the real frames (A-pillar, window frame,
+  roof rail, C-pillar and the sill tube, which now sits on the sill instead
+  of crossing the glass 11 cm above it). Cockpit, pilot and eye point moved
+  with the cabin (eye at z −1.12, 0.92 m); its walls and cage stay inside
+  the skin.
+- **Tail and wing**: fin, rudder, stabiliser and elevators re-placed on the
+  photo (stabiliser LE z −3.42, rudder post z −3.96, fin top 1.38 m); wing
+  root raised 0.22 m to the measured low-wing position; dorsal fillet, wing
+  fillets and gear legs re-fitted to the new skin.
+- **Kept**: flight model, gear contact points (three wheels on the ground
+  as before), engine, controls, spray, servicing, weight/fuel, cameras,
+  HUD, instruments, paint and PR-AGW identity. The crash points, collision
+  boxes, boom height, service keep-outs and stub points that sit on the
+  skin follow the new surface (`FLIGHT.hard`, `types.js`).
+- **Validation**: the side silhouette overlaid on the reference photo
+  (`test/acviews.mjs` side/front/rear/top/3-4/cabin/ground views at
+  `SCALE`), 93 unit tests, the soybean autopilot mission. Model 135 meshes,
+  87.7 k triangles (was 89.7 k). Known gap: the tail wheel stays at the
+  physics point, ~0.35 m aft of the 203's in the photo.
+
+## Ipanema finalization — cabin, tail, stance and cockpit
+
+A second pass on the Ipanema against the confirmed reference airframe (true
+side photo of the EMB-203 and the orange 202 in flight, a ground photo of the
+203 for the tail wheel, two cockpit photos) (`src/aircraft/model.js`,
+`panel.js`, `src/config.js`).
+
+- **Cabin**: windshield top 1.10 m and roof crown 1.16 m (were 1.05 / 1.12),
+  so the roof line runs on from the windshield without a dip.
+- **Rear fuselage**: measured again on the clean true side view of the
+  203 (belly line as datum): the turtle deck falls off the cabin in a
+  concave sweep to ~0.37 m at the fin root (0.71 m at z −2.08, 0.48 m at
+  z −2.52) and runs on nearly level to the rudder post; the slab sides keep
+  more width to the tail (0.34 m half-width at z −3.0, 0.25 m at −3.5), so
+  the tail cone stays deep and boxy instead of tapering to a point. (A
+  first pass had lowered the deck to 0.21 m from a misread photo; that made
+  the tail thin and low and is undone.)
+- **Empennage**: the fin rises out of a longer dorsal fillet with a
+  straight leading edge swept ~35° (z −3.39 at 0.57 m, tip z −3.94 at
+  1.36 m), as on the photo; the rudder runs from below the cone (trailing
+  edge 4.48 m aft) to 1.43 m (4.66 m aft); tailplane at 0.10 m on the
+  cone. The navy band, flag and registration follow the tail.
+- **Plan view and cabin height** (third pass): the body was nearly
+  parallel-sided from the wing leading edge to well behind the cabin and
+  the canopy a box as wide as the fuselage, so from above it read wide and
+  blocky. Now the cabin is the widest station and the body tapers both
+  ways: forward over the hopper and cowl (half-width 0.475 m at z 0.8,
+  0.415 m at 1.4) and aft from the cabin's rear frame (0.49 m at z −1.78,
+  0.44 m at −2.08, 0.36 m at −2.52, 0.28 m at −3.0, 0.195 m at −3.5). The
+  canopy section is rounder (exponent 2.8 instead of 4.2): the side windows
+  lean in from the sill and the roof is ~12 cm narrower at the rails, with
+  the window top kept at 70 % of the cabin height. Roof crown 1.20 m,
+  windshield top 1.13 m, rear frame 1.14 m (were 1.16 / 1.10 / 1.10). The
+  cockpit, eye point, panel and pilot are unchanged; the crash point on
+  the roof follows the skin.
+- **Cabin, windshield and rear contour** (fourth pass, measured on a true
+  side photo of an EMB-203 with the model's silhouette overlaid, aligned on
+  the spinner tip and the rudder's top): roof crown 1.215 m and flat to
+  z −1.25 (was 1.20, falling from −0.99); windshield top 1.17 m at
+  z −0.70 (was 1.13 at −0.73) and its base on the hopper top 2.5 cm higher
+  (0.795 m), so the glass stands more upright (~44°) above the cowl line,
+  bowed out a little more. Behind the cabin the roof now ends in a short
+  shoulder at the rear frame (1.12 m) and the deck falls in a nearly
+  straight ramp (1.0 m at −1.62, 0.885 m at −1.78, 0.695 m at −2.08) easing
+  to 0.38 m at the fin root, instead of a broad rounded hump; the deck
+  keeps the cabin's rounder section there (no filling out behind the
+  cabin). The upper contour now matches the photo within ~2 cm from the
+  windshield to the fin; fin, rudder and tailplane already matched (rudder
+  trailing edge and height on the photo, fin leading edge within ~8 cm)
+  and are unchanged. The cockpit eye point (0.96 m) is unchanged; checked
+  from the seat ahead, wide, panel, left, right, up and behind: no frame or
+  roof in the way, no clipping. Roof crash point follows the skin.
+- **Windshield base, cabin volume, deep tail cone** (fifth pass, same
+  side-photo overlay plus close views matching the owner's screenshots):
+  the windshield glass used to wrap down the sides to the window sills,
+  ~25 cm below the cowl line; its lower edge now runs nearly level across
+  the hopper top (the corners 4.5 cm lower than the centre) and the patch
+  below the corners is painted skin (dark inside). The cabin section is
+  less rounded (side windows more upright, the roof wider) and the roof
+  crown is 1.25 m (windshield top 1.20 m). The rear fuselage was ~12 cm
+  shallower at the bottom than the photo and its lower section V-shaped,
+  so the tail cone looked pinched underneath: the belly now drops a little
+  behind the wing (−0.47/−0.485 m behind the cabin, rising to −0.385 m
+  at the fin) and the rear sections are flat-sided with a flat bottom
+  (wider keel, shoulder kept low) right to the rudder post; the bottom
+  matches the photo within ~2 cm from the fin forward to z −2.1. Tail
+  wheel bracket moved down onto the new skin; fin, rudder, tailplane,
+  wings, gear, physics and the cockpit eye point unchanged. Checked from
+  the seat (11 views): no frame or roof in the way, no clipping.
+- **Cabin height and the glareshield from the seat** (sixth pass): the
+  cabin now stands clearly above the photo's 203 (roof crown 1.32 m,
+  rear frame 1.22 m), with a long raked windshield (top at z −0.88, 1.28 m,
+  ~29° from the horizontal) and the side windows' top rail at 74 % of the
+  cabin height, so the canopy reads tall and angled when parked; the
+  turtle deck starts from the higher rear frame. From the seat the hood
+  over the panel used to stop ~4 cm short of the windshield's lower frame,
+  so the painted (orange) frame and hopper top showed between them: the
+  hood is now 10 cm deep, its top runs level just above the glass's lower
+  frame and drops under the raked glass to the windshield base (as on the
+  real 202), the inner side of the frame is dark, and the panel stays on
+  the airframe (top 0.70 m) while the seat, pilot and eye ride 6 cm higher
+  (eye 1.02 m) under the taller roof. Lightbar and compass on the hood's
+  roll. Checked from the seat in 11 views (no frame or roof in the way, no
+  clipping, nothing orange between the hood and the glass).
+- **Tail wheel and stance**: the physics tail point moved from behind the
+  rudder (z −4.55) to under it (z −4.30, y −0.82), on a leaf spring from a
+  bracket under the tail cone; the three-point attitude is 6.3° (was 10.8°),
+  so the fin top stands about level with the cabin roof parked, as in the
+  photos, and the tail sits higher off the ground. Main gear unchanged.
+- **Cockpit**: no centre post (the windshield is one piece) and no exterior
+  wire-cutter rod across the glass; the black padded glareshield follows the
+  windshield's lower frame from sill to sill and overhangs the panel by 5 cm;
+  the panel plate rose 10 cm with it and its top edge is level in the middle
+  and rounds down into the corners. Lightbar on the glareshield's roll,
+  magnetic compass moved there (right of centre). The guidance unit is
+  smaller and lower (clear of the rounded corner). The cockpit sits 4 cm
+  higher under the raised roof (eye 0.96 m at z −1.12); from the seat the
+  dark hopper deck and the spinner show over the glareshield.
+- **Kept**: flight model (apart from the tail contact point), main gear,
+  engine, controls, spray, HUD, servicing, paint and PR-AGW identity.
+- **Validation**: 93 unit tests (three-point attitude test now 5–10°), the
+  soybean autopilot mission with the Ipanema (2 stars, no damage), cockpit
+  views (`node test/cockpitviews.mjs <dir> ipanema`) and side / rear / 3-4
+  views against the photos.
+
+## Air Tractor structure and cockpit from the real aircraft
+
+The AT-502B (PR-AWT) airframe and cockpit were rebuilt from photos of the
+type (front, side and three-quarter views on the ground and spraying; three
+cockpit views) and its published figures (span 15.85 m, length ~10.1 m,
+height 3.12 m, 29×11.0-10 mains) (`src/aircraft/atModel.js`,
+`atPanel.js`).
+
+- **Fuselage**: its own cross-sections (keel superellipse narrowed toward
+  the bottom, a straight wall leaning in, a rounded top with tumblehome)
+  instead of round barrels: a long slab-sided PT6 cowling with a narrow
+  crown, a broad nose bowl with the chin inlet between the landing lights;
+  the hopper section deep but keystone-shaped; the turtle deck a straight
+  line from the canopy to the fin.
+- **Stance**: the wing and belly sit 0.25 m higher on the airframe (belly
+  on the wing's lower surface, ~0.5 m above the tyres instead of level with
+  them) and the long spring legs now run from fairings under the wing root,
+  splayed out to the unchanged wheels. The cowl top line rises ~7° to the
+  windshield, so sitting on its tailwheel the nose is about level, as on the
+  real aircraft; the cabin moved up 0.25 m with it (height in the three-point
+  attitude 3.12 m, the published figure).
+- **Behind the cabin** (second pass): the turtle deck was one straight ramp
+  from the roof (1.89 m at z −1.5) to the tail, which made the airframe
+  look short and wedge-shaped. It is now two regions of one skin, as on the
+  real aircraft: a curved cabin fairing that rolls off the roof and falls
+  steeply to about the window sill (1.08 m at z −2.55), then a long upper
+  deck running nearly level (~5° to the fuselage line, 1.0 m at z −3.3,
+  0.87 m at z −4.5) to the fin, the tail cone keeping its depth to the
+  rudder post. The dorsal fillet and the blue fin paint follow the new deck;
+  cabin, fin, tail position, wing, gear and physics are unchanged.
+- **Canopy**: a narrow glasshouse set in on a sill ledge (0.94 m at the
+  sill, leaning in to a rounded roof) with the three-piece windshield (flat
+  centre pane between two posts, angled side panes to the A-posts), door and
+  rear posts.
+- **Cockpit**: an arched black panel (shoulders clear of the side panes)
+  with the instruments set 16 mm into it behind bezels — PT6 block on the
+  left, flight instruments in the middle, hopper and flaps on the right,
+  annunciator row, two switch panels and the hopper sight window — under a
+  padded glareshield roll whose top runs forward to the windshield base; the
+  guidance screen and a flow monitor with LED readouts on their own mount
+  turned to the pilot (regions of the same panel canvas); power quadrant on
+  the left console, spray valve and dump handle on the right; yellow airframe
+  inside (walls, tube frame, floor, roof), red seat. Eye point 1.55 m; from
+  the seat the dark, rounded nose shows over the glareshield.
+- **Kept**: flight model, gear contact points, prop and spinner, controls,
+  spray system (the gameplay boom line and working points in `types.js` are
+  unchanged; only the visual booms rose with the wing), servicing, HUD,
+  paint and markings. Crash points, collision boxes and the service
+  keep-outs / stub points that sit on the moved skin follow it.
+- **Validation**: `node test/cockpitviews.mjs <dir> at502` (cockpit from the
+  seat: default, ahead, wide, panel, left/right, parked), `test/atviews.mjs`
+  for the exterior; 93 unit tests; the soybean autopilot mission (90 %
+  coverage, no damage, as before). Model 107.4 k → 116.0 k triangles,
+  129 → 138 meshes; +4 draw calls in the cockpit, +11 outside.
+
+## Wing surfaces: inward-facing faces fixed (all aircraft)
+
+The wings, wing tips, tailplanes, elevators, flaps and ailerons of every
+aircraft looked hollow from some angles: the top skin vanished, the inside
+of the lower skin showed through with odd sawtooth shading, and fittings on
+the wing seemed to float. Cause: the shared panel builder `wingPanel`
+(`src/aircraft/model.js`, also used by the AT-502B, M-18B and R44 models)
+wound every triangle clockwise seen from outside, end caps included, and
+these materials cull back faces, so the outward-facing skin was the one
+dropped. It now winds faces outward on both wings and closes the profile
+ring, which also closes the hinge face of each flap and aileron (it was
+open). The fins and rudders, built by mirroring a panel (x/y swap), get
+their winding flipped back (`flipWinding`, now exported). Checked with a
+diagnostic render (both sides drawn, front faces green, back faces red)
+from above, below, the sides, the tips and the root on the Ipanema,
+AT-502B, M-18B and R44: no back face is visible from outside apart from the
+deliberately double-sided prop disc, glass and headliner. Same draw calls;
+two more triangles per panel segment. 93 unit tests and the soybean
+autopilot mission on the Ipanema, AT-502B and M-18B pass (no damage).
+
+## Airstrips expansion — eight Brazilian farm strips
+
+The map grows from 8 × 8 km to 12 × 12 km (`WORLD_HALF` 6000; the terrain
+grid stays 15.6 m: 768 × 768 cells, 750 m chunks with the same LOD steps).
+The original 8 × 8 km country is untouched — heights, fields, trees, strips
+and missions are the same, checked point by point against the previous
+build. The new outer ring carries eight farms, each with its own strip,
+service area, local truck and badeco, requests in the office computer and
+its own land, all built on the existing systems (`FARMS` / `SITES` in
+`src/world/layout.js`, the farm contracts, the office, the crew follow).
+
+| Farm | Where | Strip | Land, surroundings | Difficulty | Aircraft |
+| --- | --- | --- | --- | --- | --- |
+| Fazenda Horizonte | north | 720 × 24 m red earth, level | flat cerrado farmland, big soy/corn blocks, silos, big shed | ★☆☆☆☆ | all |
+| Fazenda Dois Lagos | north-west | 560 × 16 m red earth, −1.2 % eastbound | gentle swells, two açudes (one off the east end), farmhouse, corral, pier | ★★★☆☆ | all |
+| Fazenda Serra do Cedro | north-east | 540 × 16 m gravel, +3.6 % eastbound, 1.2 % cross slope | the land climbs east into hills, stepped soy, corn on the ridge, boulders by the strip, stakes | ★★★★☆ | Ipanema, AT-502B, R44 |
+| Fazenda Mata Alta | far west | 440 × 14 m rough red earth, −1 % | cut through tall native forest (trees 34 m from the centreline); the talhões are clearings walled in along their passes, with 150–230 m at each end to drop in and pull up over the trees; threshold tyres only, rustic shed | ★★★★★ | Ipanema, R44 |
+| Sítio Ipê Amarelo | east | 400 × 13 m red earth, −2 % | small cerrado farm, yellow ipês round the house, whitewashed stones | ★★★☆☆ | Ipanema, R44 |
+| Fazenda Vale Verde | south-east | 500 × 16 m mown grass, +1 %, tilted 2 % to the creek | strip cut into the valley side above the Córrego Vale Verde, soy and corn on both slopes, a dam downstream | ★★★★☆ | Ipanema, AT-502B, R44 |
+| Fazenda Terra Vermelha | south | 580 × 20 m red earth, slight cross slope | big Mato Grosso farm: six silos, dryer, two big sheds, huge cotton/soy | ★★★☆☆ | all |
+| Fazenda Chapada dos Ventos | south-west | 520 × 18 m pale sand, cross slope | on a plateau 42 m above the plain with a 300 m escarpment, wind turbines, radio mast, gusty wind (×1.45 mean, ×2.2 gusts) | ★★★★★ | Ipanema, AT-502B, R44 |
+
+How it is built:
+
+- **Terrain** (`src/world/relief.js` `ringReliefAt`): zero inside the old
+  map, faded in over 400 m and out again at the map edge. Region zones set
+  the land: calm swells on the flat farms, rolling ground at Dois Lagos, a
+  21 m ramp plus hills at Serra do Cedro, a 24 m valley along the creek at
+  Vale Verde, the warped rounded plateau at Chapada. The strips are graded
+  platforms (`stripLevel(site, x, z)`: grade along, bank across, both only
+  past the first 100 m so the service area stays level); on the outer farms
+  the platform level is fitted along the grade, so a sloping strip follows
+  its hillside (cut/fill under 14 m) instead of standing on a fill. No
+  floating strips: the strip *is* the terrain the wheels and the renderer
+  read. The creek now runs to both map edges.
+- **Strips**: two new surfaces in the ground shader (rough red earth with
+  grass tufts, chapada sand), both rolling like grass; markers per farm
+  (tyres, white stakes, whitewashed stones, threshold rows only); a third
+  windsock on the windy plateau; threshold boards share their materials.
+- **Scenery** (`buildProp` in `src/world/structures.js`): silos, dryer, big
+  sheds with machines, farmhouses, water towers, corrals, a pier and boat on
+  the açude, boulders, a forest shack, fuel drums, a lattice radio mast and
+  wind turbines with turning rotors — all with colliders, all outside the
+  truck's planning yard, the strips, talhões and roads (unit-tested).
+- **Vegetation**: everything in the outer ring — its forest blocks, the
+  creek's new stretches, the new stream and açudes, isolated trees, cerrado
+  clumps, scrub, termite mounds, gallery woods in the valleys — draws from
+  its own random stream, after the original map's, so no original tree
+  moves (checked instance by instance against the previous build: 29,688
+  trees and 4,599 obstacles identical; one tree gives way to a new road and
+  the new roads get their verge scrub). Tall trees are cleared 60 m from a
+  strip's centreline (34 m at Mata Alta, whose talhões keep the forest up to
+  their edges). Adjoining ring blocks close their roofs without a seam (a
+  side against another block is not an edge), trees buried where blocks
+  overlap are dropped, and forest roofs are merged per 3 km region (culled
+  per region). Farm parked trucks are built when the camera first comes
+  within 2.5 km.
+- **Roads**: seven access roads (draped ribbons, grade under 10 %) from the
+  farm yards to the farm network or off the map — Chapada's comes down its
+  escarpment. Mata Alta is reached by air only.
+- **Requests** (`src/game/farmContracts.js`): fourteen new ones from the
+  farmers, with message, conditions and tips. Pay per hectare follows the
+  farm's difficulty (≈280 / 360 / 450 / 560 / 680 R$/ha for 1–5, +40 per
+  terrain level, a little more for corn and cotton) and the bonus rises
+  with it (4,000 → 9,500).
+- **Office** (`src/ui/office.js`): requests grouped by farm, easiest first,
+  each card with the farmer, distance and direction from the base and from
+  you, crop, area, terrain level, strip, difficulty stars, the aircraft the
+  strip takes and the expected credit. Every farm strip has its own office:
+  stopped on the ground at any site you can read and accept the next
+  request there (`officeSite()`), so jobs follow one another with no flight
+  back to the base; aircraft are still changed at the main base. A strip
+  refuses an aircraft it is not cleared for (`stripAllows`).
+- **Maps**: 12 km base map at 1536 px, farm pins in each farm's colour with
+  a ring round the farm of the accepted request; the full map frames the
+  aircraft with its job (or the base). Mouse wheel zooms about the cursor
+  (out to the whole 12 km map, in to ~500 m) and a drag moves the full map
+  (M) and the office map (`mapControls` in `src/ui/maps.js`; a plain click
+  still closes the full map); the wheel over the minimap zooms it from
+  ~500 m to ~6 km across.
+- **Wind**: `windFactorAt` raises the mean wind and the gusts within 2 km of
+  the Chapada strip (flight model wind, felt in the aircraft and windsocks);
+  a "windy" weather tendency there.
+
+### Validation (airstrips build)
+
+- `npm test`: 101/101 — adds `test/farms.test.mjs`: the eight strips and
+  their identities, no floating strip (strip = terrain, level service area,
+  cut/fill under 14 m), the old map's relief untouched, every farm's
+  requests and their talhões, pay rising with difficulty, aircraft
+  clearance, scenery clear of strips / talhões / roads / the truck yard,
+  the plateau wind, and a **take-off from every strip with each airplane it
+  takes**, at the heaviest recommended load, downhill where graded: lift-off
+  after 34–65 % of the strip (Ipanema 258–369 m, AT-502B 185–225 m,
+  M-18B 187–199 m).
+- Terrain: 331,776 samples over the original 8 × 8 km identical to the
+  previous build.
+- Browser, `node test/stripflow.mjs <out>` (all eight farms, Ipanema): crew
+  and office follow to the strip, the farm office lists its requests and
+  one is accepted on the spot, the local truck loads the recommended fuel
+  and liquid, the talhão is sprayed to completion (98–99 %), handed in at
+  that farm and paid (R$ 8.5–17.7 k), the save keeps money, completions
+  and the farm history; Mata Alta refuses the AT-502B. 52/52.
+- Regression: `farmflow` (the three earlier farms, office, replay) 15/15;
+  the hands-off soybean job on the main farm by the test autopilot: 2★ as
+  before.
+- `node test/stripviews.mjs <out> [ids]`: pad, wide and final-approach
+  views of each farm (no page errors).
+- Generation in Node: terrain grid 0.73 s (previous build 0.62 s for a
+  grid 2.25× smaller), vegetation 1.24 s (0.80 s) after exact quick rejects
+  (creek and stream bounding boxes, zone circumcircles, plateau bounds) and
+  a 200 m grid for the outer roads.
+- `perf.mjs` (SwiftShader, so render times are not GPU figures), low:
+  game-logic tick per frame unchanged within noise (base 0.96 / 0.79 ms,
+  low soy pass 3.1 / 4.2, cockpit over corn 1.8 / 1.9, high 1.4 / 1.05);
+  draw calls in the original map +3 % (626 / 608: forest roofs per region,
+  long road ribbons), triangles −5 % (750 m terrain chunks). At the farms:
+  Mata Alta 896 calls (forest all round), Chapada 721. Terrain fragments
+  of the original map test only its own talhões and strips (outer pixels
+  only the ring's). JS heap after load ~310 MB (250 MB before).
+- Open point (software renderer only): in one scripted `perf.mjs`
+  sequence, a single frame about ten frames after the airborne aircraft is
+  teleported over the Chapada takes minutes under SwiftShader. It needs the
+  aircraft model visible but none of the farm scenery, terrain, vegetation,
+  spray, wind or crew move, and compiles no new shader; the previous build
+  shows similar one-off stalls (~8 s) on its first airborne frame. Not seen
+  in the farm flows or the view renders; not checked on a GPU here.
+
+## Ipanema engine sound — layered IO-540
+
+The Ipanema (EMB-202A, Lycoming IO-540, six cylinders flat, two-blade
+fixed-pitch Hartzell) has its own engine sound, `src/audio/ipanemaEngine.js`,
+on the game's single AudioContext (audio profile `ipanema`). Every other
+aircraft keeps its sound unchanged. Everything is synthesized: no audio from
+the reference videos is embedded, and no loop is just re-pitched.
+
+**Reference analysis** (three recordings: start-up, take-off, landing/take-off
+pass; RMS, 1/1-octave bands, peak picking, envelope modulation). Start-up:
+starter whine ~850 Hz with compression pulses at 4–7 Hz, catch at +5 s with a
+level flare ~1.4× the settled idle, then idle with firing at ~33 Hz and
+harmonics at 67/100/199 Hz (≈650–670 rpm: firing = rpm/20). Take-off: firing
+order dominant (145–151 Hz in the recording, with Doppler), strong 4, 4.5, 5
+and 6 shaft orders, ½-order modulation (~24 Hz), and a 1–4 kHz band that rises
+with power. Pass: Doppler shift ~148 → 127 Hz. The dominant peaks are orders
+of the crank, so they are not read as rpm directly.
+
+**Layers.** A starter (a heavy starter-motor growl at ~85–120 Hz and a low
+thump per compression, as in the reference's 46–60 / 80–130 Hz weight, with
+the whine and gear rasp above it; three compressions per revolution of the
+simulated cranking rpm); B catch (individual firings
+scheduled from the rpm, level flare, misfires while it settles, last cough
+and the crank rocking back at shutdown, afterfire when the throttle is chopped
+at high rpm); C/D/E three harmonic spectra on the engine-cycle frequency
+(rpm/120 — so the ½ orders of a six are there), equal-power crossfaded by rpm
+and load: low idle, mid, high power; plus exhaust blat and the open-throttle
+rasp, both gated by the firing pulses, and the valve-train tick; F propeller
+(blade-pass tone rpm/30, blade-modulated whoosh ∝ rpm³, tip-Mach rasp as the
+2.2 m blades approach M 0.9 at 2700 rpm); G cabin path (low shelf, 95 Hz
+airframe resonance, two low-passes and a high shelf for firewall/canopy, a
+structural buzz at the firing order). Exterior path: high-pass, air-absorption
+low-pass with distance, PannerNode (inverse distance, emitter on the
+aircraft in camera space) and a mild Doppler (60 % of the physical shift,
+clamped ±10 %) from the aircraft and camera velocities. Inside/outside
+crossfade over ~0.3 s; the sources never restart.
+
+**State machine.** OFF → START_REQUESTED (until the crank turns) →
+STARTER_ACTIVE (while the flight model cranks) → CATCH (flight model
+running, until the rpm nears idle) → IDLE_STABILIZATION (until the rpm stops
+moving) → RUNNING; SHUTDOWN → OFF on cut-off. All transitions are read from
+the flight model's engine state and rpm, which also spin the propeller.
+Inputs (`ipanemaAudioState`): engine state, rpm, throttle, power fraction,
+camera, emitter position in listener space, distance, closing speed —
+never airspeed as rpm.
+
+**Tests.** `node test/ipanema_audio.mjs [outDir]` renders the engine offline
+(OfflineAudioContext, 30 Hz control steps driven by a copy of the piston
+engine dynamics) for off/start/idle/throttle up/full/throttle down/shutdown
+(outside and cockpit), a 50 m/s flyby and an aircraft switch; writes WAVs and
+checks silence when off, after shutdown and after switching, the state
+order, no clipping, bounded one-shots and no node growth.
+`AGRO_URL=http://localhost:4173/ node test/ipanema_audio_game.mjs` checks the
+same in the game (start sequence, cockpit crossfade without restart, high
+layer at full throttle, silence on switching aircraft, nothing duplicated on
+coming back, shutdown).
+
+Rendered vs reference (bands relative to the loudest, 31 Hz…8 kHz):
+idle 31/63/125/250/500/1k/2k/4k = −6/0/−2/−11/−10/−11/−12/−16 dB against
+−20/0/−3/−11/−8/−10/−19/−19 dB; full power centroid ~1.05 kHz against
+~0.96 kHz. The phone recordings lose everything below ~60 Hz, the game keeps
+more of it.
+
+**Limits.** The simulation cranks for 1.3 s toward 260 rpm (the real start
+takes ~5 s at ~100–150 rpm), so the starter phase is shorter and its
+compression chug faster than in the video; the sound follows the simulation
+rather than a fixed recording. The simulated rpm does not overshoot on the
+catch; the flare is a level effect only. A match with the recordings is
+spectral and statistical, not sample-exact; real IO-540 samples (start, idle,
+run-up, take-off, flyby, cabin) would allow a hybrid sample + synthesis
+version.
+
+## Aircraft 05 — Thrush 510G (PR-TSH)
+
+A fifth aircraft with its own geometry, physics, cockpit and sound
+profile; the other four keep theirs (`test/thrush.test.mjs` checks their
+engines and figures). PR-TSH is a fictional registration.
+
+**References.** Six exterior photographs of 510Gs (white with the red
+swoosh, the parked side view, two in flight, a spray pass, a top-quarter
+view) and three cockpit photographs (in flight over a field, the whole
+panel from the front, the interior from the seat). Where the photos show
+other 510 versions, the 510G figures were used.
+
+**Figures used** (as given for the game; Thrush data): length 9.85 m,
+span 14.48 m, height 2.84 m; GE H80 turboprop, 800 shp, prop governed at
+2,080 rpm; Hartzell four-blade, 2.62 m; empty 2,132 kg, max take-off
+4,763 kg; hopper 1,930 L; fuel 863 L; working speed 145–241 km/h; cruise
+≈ 256 km/h at 55 %; stall ≈ 89 km/h; VNE 303 km/h.
+
+**Estimated** (all in `FLIGHT_T510G`, `src/config.js`, with comments):
+wing area 34.4 m² (the 510's 370 ft²); CLmax 1.57 clean / 2.3 flaps so the
+89 km/h stall falls at ≈ 3,000 kg flaps down; CD0 0.045 — the 256 km/h
+cruise is a clean-airframe figure; with booms, nozzles and wire cutter the
+model flies 215 km/h at 61 % power; inertias scaled from the AT-502B by
+mass and span; the H80's quicker spool (Ng 19 %/s up vs 14 for the
+PT6A-34), fuel flow from ≈ 0.6 lb/shp/h. Geometry fitted to the parked side
+photograph (outline points converted to the body frame at the 10.5°
+three-point attitude) and to the published dimensions.
+
+**Measured** (`node --test test/thrush.test.mjs`):
+
+| check | result | reference |
+| --- | --- | --- |
+| three-point attitude | 10.5° | ≈ 10° (photo) |
+| start | light-off 2.6 s, idle 11.6 s | — |
+| full power, static | 801 shp, 2,080 rpm, 272 L/h | 800 shp |
+| 90 % torque after full lever | 2.8 s (AT-502B ≈ 4 s) | quicker than the PT6 |
+| take-off roll 2,617 / 4,763 kg | 148 m / 488 m | — |
+| climb at 4,200 kg, 97 kt | 932 ft/min (AT-502B 861) | — |
+| stall 3,000 kg flaps down / 4,763 kg clean | 48 kt / 75 kt | 48 kt |
+| level at 3,800 kg | 145 kt (268 km/h) full power, 116 kt (215 km/h) at 61 % | below VNE; working band |
+| roll to 60° (assist, loaded) | 1.07 s | — |
+| balão 1,200 L / dive pull-outs / landing / low turns | no stall, lowest 2.7 m, 0.34 m/s touchdown, 2.5 m lost at 60° | — |
+
+Payload is not hopper volume: with full fuel and pilot the MTOW leaves
+≈ 1,850 kg, less than a full 1,930 L hopper of water (the load sheet says
+so). Against the AT-502B: lighter, 50 shp more, a quicker engine and a
+crisper roll, a slightly shorter span; heavier on the stall at MTOW.
+
+**Exterior** (`src/aircraft/thrushModel.js`, shared sections in
+`thrushGeom.js`): its own cross-sections — the slim H80 cowl falling to a
+long polished spinner, round bronze exhaust stubs, chin inlet, dark
+anti-glare top, the tan fibreglass hopper lid with the yellow vent cap,
+the tall glasshouse (windshield base 1.2 m, roof 1.86 m above the CG) with
+a three-piece windshield, door and quarter windows, white roof with the
+vent hatch, wire cutter and deflector cable, the parked wiper; a steep
+cabin fairing into the upswept tail cone; tall square-topped fin with a big
+rudder and trim tab, strut-braced tailplane with red tips; constant-chord
+wing (upper and lower surfaces closed, separate flaps and ailerons on
+their hinge lines, red rounded tips with 510G, nav lights and strobes,
+walkway, filler); tubular main legs with drag braces on 29×11 tyres, a
+long tailwheel spring; booms with 48 nozzles on hangers ahead of the flap
+hinge, fan pump, gatebox; four-blade Hartzell feathering on the ground,
+blade fade into the shared disc. Livery: white with the five-band red
+swoosh, GE roundel and THRUSH badges, registration, small AGRO WINGS.
+Fine parts in a LOD beyond 90 m.
+
+**Cockpit** (`thrushCockpit.js`, instruments in `thrushPanel.js`): a 3D
+black panel tilted 12° under a padded hood with rounded corners; MVP-50T-
+style engine monitor (Ng, ITT, Np, torque %, fuel flow, fuel, run timer,
+alerts — oil, fuel pressure, volts and OAT are not simulated and read
+"--- N/S"), master caution / warning lamps, airspeed (MPH, knots) and
+altimeter with 3D needles, a G5-style attitude unit (attitude, tapes,
+heading, slip), the hopper sight window with the live level, the AG-NAV-
+style monitor in an olive bezel showing the game's guidance (talhão, pass
+lines, coverage, track, cross-track, job progress, boom state; soft keys
+are labels only), the glareshield guidance display with the LED lightbar;
+sloped consoles (toggles, dimmers, low-fuel lamp; breaker matrix, start /
+battery, tailwheel placard), the hopper wall with its litre scale, stick
+with red buttons, two pedal sets with master cylinders, power and
+condition levers on the left wall, the boom valve on the right, a black
+mesh seat with harness, white walls and tube frame, window seals, roof
+lining. Screens redraw only when their values change (G5 at 15 Hz, the
+others at ≤ 5 Hz), each on its own small canvas. Eye 1.57 m above the CG,
+0.44 m behind it, its own look-down (−11.5°) and 68° field of view.
+
+**Integration:** registry entry `thrush` (slot 05): selection card,
+office list, a fourth apron spot (used when the R44 is flown), farm strips
+(cleared wherever the AT-502B is; not at Mata Alta and Ipê Amarelo), crew
+service points and rates, collision / wire points, load sheet, guidance
+theme, cameras, audio profile `h80` (the turboprop layers with a higher
+compressor whine, brighter roar and the four-blade blade-pass — synthesized,
+not a recording of an H80).
+
+**Validation.** Unit tests 114/114 (`npm test`, 13 of them the Thrush's); `test/thrushcockpit.mjs`: the
+game's cockpit camera parked, taxiing, level, turning, pulling up, looking
+left / right / down / up, back to chase, in 16:9, 4:3 and 21:9; nearest
+surface 27 cm from the eye; instruments follow the flight model.
+Autopilot soybean contract (`AC=thrush node test/e2e.mjs soy`): done, 90 %
+coverage, no damage (AT-502B: same score, 10 % longer flight). Draw calls
+in the same scenes (medium, SwiftShader): chase 510 (AT-502B 468,
+Dromader 486), cockpit 632 (619 / 641), side 635 (596 / 622).
+
+**Limitations.** No oil, fuel-pressure, electrical or outside-air model,
+so those indications read N/S. The wiper is static. The swoosh, the
+windshield and the fin were matched to photographs, not drawings. The
+cockpit switches are visual except where a simulated system exists
+(spray valve, power and condition levers through the existing controls).
+
+## Fix — aircraft missing after a change from the menu
+
+Parked aircraft are not drawn beyond 1.2 km from the camera. When one of
+them was hidden that way (the flown aircraft had gone far from the base)
+and was then chosen from the menu, nothing showed it again: it flew
+invisible until it was re-selected near the base. The aircraft made active
+is now shown when it is activated, and the flown aircraft is never culled
+(each frame). `test/fleetswitch.mjs` flies each aircraft far away, goes
+back to the menu, picks every other one and starts it in the air and on
+the ground (40 changes): 40 hidden before the fix, none after.
+
+## Aircraft 06 — Bell 206B-3 JetRanger III, agricultural (PR-AGJ)
+
+The second helicopter, with its own geometry, figures, engine branch,
+cockpit and sound profile; the R44 and the four airplanes are unchanged
+(their tests and the R44's end-to-end contract give the same results).
+Title screen: AIRCRAFT 06 · Bell 206B — "Bell 206B JetRanger —
+Agricultural". PR-AGJ is a fictional registration.
+
+**References.** Five photographs of agricultural 206s (the dark-blue one
+spraying over a canal, the white/maroon one with the belly tank, the green
+one from the front, the green one in flight from the side, the red one in
+three-quarter view) and five of the 206B-3 cabin (the whole cabin through
+the left door, the classic analog panel from the front — the main panel
+reference —, a simulator view, a cockpit with extra avionics and one with a
+portable GPS on the glareshield). Operators' changes in the photos were
+not copied; the build is one configuration: a 206B-3 with the classic
+analog panel, the 250-C20J and the DART/Simplex Model 4900 spray kit.
+
+**Figures used.** Bell 206B-3: rotor 33 ft 4 in (10.16 m), two blades,
+13 in chord, 394 rpm at 100 % N2; tail rotor 5 ft 5 in (1.65 m); MTOW
+3,200 lb (1,451 kg); 91 US gal (344 L) of Jet-A; Rolls-Royce (Allison)
+250-C20J, 420 shp, limited by the transmission to 317 shp (torque 100 %,
+5 min) and 270 shp continuous (85 %); N1 ground idle 62–64 %. Simplex 4900
+(DART product page): belly tank 530 L (140 US gal), mid-ship booms 35 ft
+(11 m) at 95 % of the rotor diameter, 84 kg, approved on the 206A/B;
+swath 15–21 m, 100 mph placard with booms (manual).
+
+**Estimated** (in `FLIGHT_B206`, `src/config.js`, with comments): empty
+weight 771 kg, inertias, rotor inertia, drag areas, tail-rotor arm and
+height, skid geometry, the power-model constants. Full of fuel the 530 L
+tank is over the MTOW (as in service: the load sheet shows how much the
+day allows — 415 L with 120 L of fuel).
+
+**Physics** (`src/flight/heliModel.js`, shared with the R44 through its
+figures; the R44's own behaviour is unchanged — its tests pass as before):
+- turboshaft branch (`engine.turbine`): no belt clutch; the starter takes
+  N1 up, light-off part-way through, the rotor comes up with N2 at ground
+  idle, then the throttle opens to 100 %; N1, TOT (peak at light-off),
+  torque (% of the 317 shp limit) and the transmission oil come from the
+  simulated power and speeds;
+- heavier per unit of power than the R44: hover at the MTOW at 82 % out of
+  ground effect (R44: 70 %), ~920 ft/min at full power there, the power
+  answering later (turbine), the nose turning slower on the pedals, level
+  top speed ~123 kt;
+- the spray kit is part of the state: its mass and drag, the tank and boom
+  hard points; without the kit none of them (and no spraying);
+- `test/b206.test.mjs` (8 tests, in `npm test`).
+
+**Exterior** (`src/aircraft/b206Model.js`, visual only): the JetRanger's
+round nose and wrap-round two-piece windshield, front and rear door
+windows, green-tinted roof windows, the transmission/engine fairing with
+the air inlets and the two upturned exhaust stacks, the long tapered boom
+with the drive-shaft cover, the horizontal stabiliser with the B-3's
+end-plate fins, swept upper and lower fins, tail skid, the tail rotor on
+the left of the fin, low skids on arched cross tubes with steps. Main rotor:
+two-blade underslung teetering hub, white tips, coning with rotor speed,
+tilting with the simulated tip-path plane, the R44's speed-dependent motion
+blur (never a solid disc). Spray kit: the carbon-glass belly tank between
+the cross tubes (its hangers go to the cross-tube saddles; it does not
+touch the tubes), its pump and manifold, the 10.7 m boom as a light truss
+with 44 nozzles 0.3 m over the ground (≈ 3° of roll before a tip
+touches), clamped to the skid tubes and braced to the fuselage. Three paint
+schemes on one geometry (only the livery map and three colours change):
+A Agricultural Classic (white, green and blue stripes), B Dark Green
+Agricultural (dark green over cream, light tank), C Red Utility. Paint and
+kit are chosen on the aircraft's card on the title screen; accepting a
+contract refits the kit.
+
+**Integration.** Second helipad (H2) on the grass east of the apron, 23 m
+from the R44's (both rotor discs and the truck's stands clear), drawn at
+the base and at every farm strip; the truck services the Bell there.
+Parking, selection, contracts, the farm strips that take the R44, office,
+history, save, map, HUD, the AGROWINGS NAV colour scheme of the guidance,
+audio profile `c20` (the 250's sharper compressor whine and a softer roar
+under the rotor layers), turbine start toast, the test autopilot (the
+spool-up now waits for the type's governed rotor speed).
+
+### Bell 206B-3 cockpit
+
+`src/aircraft/b206Panel.js` (faces, screens), `src/aircraft/b206Cockpit.js`
+(3D), placed in `b206Model.js`:
+- **Panel** after the frontal photo: black housing with the photo's
+  outline (wide, upper corners on a large radius, sides drawn in to the
+  bottom), a moulded hood over the caution row, the light-grey face plate
+  set into its rim, the panel tilted back 12°.
+- **Instruments** in the photo's columns: ENG OIL (pressure / temperature),
+  TORQUE, AIRSPEED, ATTITUDE, ALTIMETER; the digital clock, XMSN OIL, TURB
+  OUT TEMP, the dual tachometer (rotor and power turbine), the directional
+  gyro, the VSI; FUEL QTY, GAS PRODUCER (N1), two blanked optional
+  positions, the turn coordinator; LOAD, FUEL PRESS; the guarded FUEL
+  VALVE switch, LV knob, BAT TEMP and N2 placards. Every instrument: case,
+  bezel, recessed dial, 3D needles, glass, four screws. All read the
+  simulation (N1, TOT, torque, N2, rotor, oil, transmission oil, fuel,
+  load, airspeed, altitude, vertical speed, attitude, heading, rate of turn
+  and slip); fuel pressure is the boost pumps' with the master on.
+- **Caution row**: 10 × 2 framed lenses (ENGINE OUT, ROTOR LOW RPM, XMSN
+  OIL PRESS/TEMP, CHIP lights, FUEL PUMP/LOW/FILTER, GEN FAIL, BATTERY
+  HOT/TEMP, START, BAGGAGE DOOR, AUTO REIGN, SPRAY ON). Only those the game
+  simulates light, from its state (cold: dark; start: ENGINE OUT, ROTOR LOW
+  RPM, XMSN OIL PRESS, GEN FAIL, START; flying: none; low fuel: FUEL LOW);
+  redrawn only when a lamp changes.
+- **Pedestal**: a sloping box from under the panel to the floor between
+  the seats, raised modules (audio, COM 1, NAV 1, transponder, the Simplex
+  controller, a switch row) with knobs and toggles, the two VENT pulls.
+- **Controls and cabin**: Bell conventional cyclic from the floor (boot,
+  grip with trim hat and trigger, the right hand on it), the collective
+  with its throttle grip on the left of the seat, pedals on arms to their
+  floor pivots, beige leather seats with belts, the rear bench.
+- **AGROWINGS NAV**: a 7-inch colour unit on a short arm on the left of the
+  hood (≈ 18° below the horizon, left of the pilot's forward view), live
+  screen and anti-glare glass, four soft keys — MAPA (moving map: farms,
+  strips, talhões, destination), DESTINO (name, distance, bearing, ETE,
+  course arrow; the ferry target, else the job's talhões, else the base),
+  MISSÃO (contract, crop, area, passes, liquid, fuel, sorties, coverage
+  against the 90 % target), COBERTURA (the talhão with the passes and the
+  coverage the game recorded). Click a key in the cockpit view, or press N
+  there to step through the pages. Drawn from the game's guidance and job
+  (nothing external), at most 4 Hz and only when its content changes; the
+  mission figures once a second.
+- **Camera**: the pilot's eye in the right seat, 0.78 m from the panel,
+  17° down, 66° field of view.
+
+### Validation (Bell 206 build)
+
+| Check | Result |
+|---|---|
+| Node | `npm test` 122/122 (8 new Bell tests; R44 and airplanes unchanged) |
+| Contract (`AC=b206 node test/e2e.mjs soy`) | flown through the player's inputs: three sorties, 90 %, 2★, no damage |
+| R44 regression (`AC=r44 node test/e2e.mjs soy`) | 90 %, 2★, no damage |
+| Views (`node test/b206views.mjs`) | left, right, front, rear, top, underside, front ¾, in flight, with and without the kit, cockpit, parked, the three schemes; four skids on the ground, boom tips 0.26 m and tank 0.16 m above it |
+| Cockpit (`node test/b206cockpit.mjs`) | parked, start, hover, level, turn, left, right, pedestal, chase; 16:9, 4:3, 21:9; eye clearance 22.7 cm (dev server); GPS keys clicked through the game for every page with and without a contract; cyclic follows the cyclic; lamps follow the state; cockpit / chase / orbit switching |
+| Fleet switch (`node test/fleetswitch.mjs`) | 60 changes, none with the flown aircraft hidden |
+
+Performance (SwiftShader, 960×540, medium; the build before the Bell and
+this one, two runs each; frame times on the software renderer are noisy):
+
+| | before | after |
+|---|---|---|
+| load to the title screen | 63.7 / 46.1 s | 39.2 / 39.4 s |
+| Ipanema at the pad (chase): draw calls / frame | 679 / 15.8, 12.0 ms | 745 / 14.2, 15.0 ms (the Bell parked on H2 in view) |
+| R44 cockpit over the corn: calls / frame | 465 / 12.1, 14.4 ms | 465 / 11.3, 12.4 ms |
+| Bell cockpit over the corn: calls / frame | — | 481 / 12.3, 15.1 ms |
+| Bell chase: calls / triangles | — | 556 / 1.85 M |
+| geometries / textures in memory | 753 / 54 | 923 / 70 |
+| JS heap | 373–374 MB | 413–445 MB |
+| parked meshes drawn (R44 / Bell / Thrush) | | 32 / 39 / 77 |
+
+## Registrations chosen by the player
+
+Settings → **Prefixos** (Registrations) has one row per aircraft: the
+nationality prefix (PP, PR, PS, PT or PU) and three letters. Only marks in the
+Brazilian civil format are accepted — letters only, not starting with Q (the
+Q code), none of SOS / XXX / PAN / TTT / VFR / IFR / VMC / IMC, and no two
+aircraft of the fleet with the same marks; the button beside each row puts
+back the factory marks (PR-AGW, PR-AWT, PR-DMD, PR-TSH, PR-AGH, PR-AGJ). The
+choice is saved with the settings and applied before the fleet is built.
+
+Changing the marks only redraws the letters: the livery canvas (the fuselage
+or tail-boom registration — on the Bell, for the scheme in use) and the panel
+placard (Ipanema, AT-502B, Dromader, Thrush, R44). Geometry, colours, scheme,
+kit, fuel, hopper and damage stay as they are. Every text that names the
+aircraft (title card, load sheet, office, histories, replays, messages) reads
+the current marks. `test/registration.test.mjs` checks the format rules and
+the per-aircraft storage.
+
+## Assistance: off or on, the physics unchanged
+
+The old Normal / High assistance (control laws that held attitude, limited
+bank, pitch and g, levelled the helicopter and held the hover) is gone from
+the settings. Settings → **Assistência** has one switch per kind of aircraft,
+**off by default**; older saves start off too (`assistV: 2`). With it off the
+keys move the control surfaces, cyclic and pedals directly.
+
+On, `src/flight/pilotAid.js` adds small helps after the raw mapping, each one
+can be unticked:
+
+| Airplane | |
+|---|---|
+| Soft pedal on the ground | expo on the pedal and less travel as the ground speed builds (full at a walk, half from ~45 m/s), light yaw damper — a 0.5 s 60 % jab at 15 m/s on the take-off roll swings the loaded Ipanema 142° raw, 5° with it (AT-502B: 61° / 4°) |
+| Smoothed controls | expo on stick and roll — finer near the centre, full travel at the stop |
+| Light turn coordination | a little rudder against the sideslip |
+| Speed × weight warnings | "slow for the weight — N kt minimum" from the wing's CLmax, the mass, the flaps and the bank (1 / cos φ), and "speed running out in the climb" |
+
+| Helicopter | |
+|---|---|
+| Torque compensation | detailed rotor model: the hover trim measured on each model (pedal = a + b·Q, left cyclic against the tail rotor's drift, `aidTrim` in the config) under the centred keys — hands-off yaw in a hover 188°/s → 2°/s (Bell 203 → 2) |
+| Light stabiliser | rate damper on pitch, roll and yaw; no attitude hold: after a 0.7 s full forward jab the nose still goes on down, at about half the rate (R44 power model −47° → −21° 1.5 s later) |
+| Smoothed controls | expo on the cyclic |
+| Hover warnings | drift over the ground in the pilot's frame, ground effect |
+
+The helicopter flight model stays as it was (Power — one lever — by default,
+Detailed rotor as the option). `Assist` / `HeliAssist` keep their control laws
+only for the test autopilot (`'normal'`, `'auto'`) and the handling tests.
+`test/aids.test.mjs` checks the numbers above.
+
+## Dromader cockpit — layout after the real cabin
+
+The pilot's view is rebuilt after the reference photos (interior only — the
+exterior is unchanged; outside views compared pixel by pixel, only the
+interior seen through the glass differs):
+
+- **Glareshield hood**: an arched black shell with a rolled lip, kept inside
+  the windshield base, the lightbar on its crown. The flight panel sits
+  recessed under it, low enough that the windshield is clear over the cowl
+  (hood lip ≈ 15° below the eye line, at the windshield base; the camera
+  looks 11° down instead of 17°, `cockpitPitch: -0.2`), the nose straight
+  ahead in the centre.
+- **Three boards on one canvas** (`M18_PANEL.up / left / right`): the wide
+  flight panel (ASI km/h, attitude, metric altimeter, DG, variometer, turn
+  coordinator); the lower left board with the eight warning lamps (built
+  into the board — nothing floats above it any more), the switch row, RPM,
+  manifold pressure, fuel, g-meter and flaps; the lower right board with
+  CHT, oil temperature and pressure, fuel flow, hopper, voltage and the
+  spray readout.
+- **Hopper wall** between the lower boards: riveted tan plate with a narrow
+  sight window, the liquid level shown in it, and the litre scale.
+- **GPS**: a tablet on an arm at the right end of the hood, turned toward the
+  pilot; the case sits behind the screen (the old bezel box stood in front of
+  it and covered half the display).
+
+`node test/m18cockpit.mjs <outDir>` renders the parked, level-flight and GPS
+views at 16:9 and 4:3.
+
+## Dromader paint schemes
+
+Title card → Dromader → **Paint A / B** (saved as `m18Livery`):
+
+- **A — Agro Wings yellow** (unchanged).
+- **B — Hellenic fire-fighter**, after the Greek Air Force PZL M-18B:
+  - white fuselage and cabin frame;
+  - yellow cowl, wings, tailplane and elevators, with a black anti-glare
+    panel on the cowl top and a black belly under the wing root and cabin;
+  - black diagonal bands on the wings and black tips;
+  - blue-white-blue roundels on the wings (upper and lower) and on the aft
+    fuselage;
+  - two blue bars on the fin;
+  - ΠΑ, the red camel and DROMADER PZL M18 B on the sides;
+  - the registration chosen in Settings on the fin.
+
+Only the fuselage and wing canvases and the colour of the frame and tip
+materials change between schemes; the geometry stays the same.
+`node test/m18livery.mjs <outDir>` renders both schemes from the side, the
+front and rear three-quarters, and the top.
+
+## Aircraft 07 — Embraer Ipanema 203 (PR-IPB), phase 01: exterior
+
+A seventh aircraft, separate from the EMB-202A: its own geometry
+(`src/aircraft/e203Model.js`), its own flight figures (`FLIGHT_E203` and
+`SPRAY_E203` in `src/config.js`) and its own entry in the registry
+(`AIRCRAFT_TYPES.e203`, `src/aircraft/types.js`). It shares only the game's
+infrastructure with the other aircraft: the mesh helpers in `model.js`, the
+piston engine with constant-speed prop branch of the flight model, the
+IO-540 sound, the panel and the pilot. Nothing in the 202A's model or
+figures was changed (`test/e203.test.mjs` checks the 202A's engine and
+numbers). PR-IPB is a fictional registration. Phase 01 covers the exterior;
+the detailed cockpit comes later.
+
+**References.** The photos and figures sent with the brief: PS-DIR
+(green/blue/gold) parked, from the front while spraying and close up with
+IPANEMA 203 on the cowl; PP-ZPK (white with the green swoosh) from three
+angles and spraying from the front quarter; three untextured renders of a
+203 used only to check proportions; the spec table.
+
+**Figures used.** Lycoming IO-540-K1J5 on ethanol, 320 hp at 2,700 rpm;
+Hartzell three-blade constant-speed prop, 86 in (2.18 m); span 13.30 m with
+winglets; length 8.00 m; height 2.43 m; max take-off 1,900 kg; 292 L of
+ethanol; hopper 1,050 L.
+
+**Estimated** (all in `FLIGHT_E203`, with comments):
+- empty mass 1,090 kg;
+- wing area 22.2 m² and mean chord 1.71 m;
+- dihedral 6.5°;
+- CD0 0.054 with booms, nozzles and wire cutter;
+- inertias scaled from the 202A by mass and span;
+- ethanol flow 115 L/h at full power;
+- VFE 95 kt and VNE 140 kt (indicator marks only).
+
+**Volume is not payload.** The hopper holds 1,050 L, but the 1,900 kg
+MTOW sets the product mass. `productLimit(A, fuelL)` in `types.js` gives
+the litres the MTOW allows at a given fuel load: ≈ 494 kg of water with a
+full 292 L of ethanol and the pilot. The 203 sets `loadByWeight`, so the
+load sheet's recommended load and the autopilot's service request cap the
+product at that figure. The load sheet shows the limit next to the hopper volume
+and turns red when the load is over it.
+
+**Measured** (`node --test test/e203.test.mjs`, run in this container):
+
+| check | result | target |
+| --- | --- | --- |
+| model span / length | 13.299 m / 8.00 m | 13.30 / 8.00 |
+| parked height / three-point attitude | 2.43 m / 7.4°, three wheels down (was 3.1° before the PS-SAR pass) | 2.43 m |
+| start | catches after 1.4 s, idle 650 rpm, 12 L/h | — |
+| full throttle, static | 2,700 rpm, 28.3 inHg, 320 hp, 115 L/h, 6.09 kN thrust | 320 hp at 2,700 rpm |
+| take-off roll 1,270 / 1,900 kg | 196 m / 485 m | inside the 800 m strip |
+| climb at 70 kt, 1,450 / 1,900 kg | 1,335 / 889 ft/min | positive at MTOW |
+| clean stall at 1,900 kg | 58 kt (polar 56) | — |
+| level at 1,700 kg | 116 kt at full power; 93 kt at 62 % (68 L/h) | below VNE |
+
+**Exterior** (`createE203Model`):
+- **Fuselage.** Its own superellipse sections:
+  - the long cowl with the side inlet, landing light, chin inlet, louvres,
+    camlocs and exhausts;
+  - the hopper lid with the loading box and coupler;
+  - the taller cabin with deck, roof, windshield, side glass, rear panels,
+    the door with its lower window, and the frames;
+  - the tail cone running into the dorsal fillet and fin.
+- **Wing.** 13.30 m with real taper seen from above:
+  - upper and lower surfaces closed and wound outwards, so neither face
+    disappears from any angle;
+  - flaps (0.6–3.62 m) and ailerons (3.7–6.2 m) on their hinge lines;
+  - nav lights, strobes, root fillet, walkway, filler cap, hinge brackets
+    and pitot.
+- **Winglets.** Shark-fin shaped, grown from the tip:
+  - one continuous surface: the path bends from the wing's dihedral up to
+    78° through a knee;
+  - the chord narrows from the wing's 1.71 m to 0.16 m along a concave
+    leading edge, with the trailing edge held on the wing's;
+  - 0.46 m tall, canted 12° out;
+  - mirrored for the right side.
+- **Tail.** Fin with the rudder on a vertical hinge, beacon, tailplane with
+  elevators, painted tips.
+- **Wire cutter.** A thin cable from the roof mast to the fin, plus the
+  windshield deflector and the whip antenna.
+- **Gear.**
+  - Conventional: V legs to the main axles, a leaf-spring tailwheel and its
+    fork.
+  - Contact points match the mesh: three wheels on the ground; the prop tip
+    clears by 0.66 m and the boom tip by 1.21 m; winglet tops at 2.24 m and
+    fin at 2.36 m.
+- **Ag kit.**
+  - Booms on five hangers per side, 20 yellow nozzles each, and the cross
+    pipe.
+  - The wind-driven pump with seven orange fan blades.
+- **Prop.**
+  - Polished spinner and three blades with white tips.
+  - Blade pitch follows the governor.
+  - The blades give way to a blurred disc between 380 and 900 rpm.
+
+Small parts sit in a level of detail dropped beyond 95 m. AO is baked into
+the vertex colours.
+
+**Paint schemes.** Title card → Ipanema 203 → **Pintura 01 / 02**, saved
+as `e203Livery`. Both use the same geometry and UVs; only the fuselage and
+wing canvases and a few material colours (frame, tips, gear) change.
+- **01 — green, blue and gold** (after PS-DIR / PS-BYA): green cowl and
+  cabin; a gold band from the cowl back along the fuselage; blue aft and
+  under; blue wings; green fin cap with the gold stripe and white arrow.
+- **02 — white, green and blue** (after PP-ZPK): white airframe; green
+  swoosh with a gold line along the side; blue belly, rudder, wing tips,
+  winglets and tailplane tips; blue arrow on the fin.
+- Both carry the IPANEMA 203 marks and speed lines on the cowl, ETANOL low
+  on the cowl, NÃO PISE by the tailplane and RESTRITA/EXPERIMENTAL by the
+  door.
+  The registration chosen in Settings goes on the side.
+
+**Integration.**
+- **Fleet.**
+  - Slot 07. The apron gains a fifth airplane spot, `BASE.parking5`, at its
+    west edge, so all six airplanes can wait parked while a helicopter
+    flies (every farm site gets the same spot).
+  - Listed on the five farms that take the 202A.
+  - Has its own HUD/GPS theme and office entry.
+- **Fuel and service.**
+  - Ethanol from the ethanol tank, 4.5 L/s.
+  - Product at 15 L/s.
+  - Service points and keep-out boxes fitted to the 13.30 m wing and the
+    longer fuselage.
+- **Sound.** The IO-540 profile with a three-blade, 2.18 m configuration;
+  power read from the shaft.
+- **Cockpit (provisional).**
+  - Reference points for eye, seat, panel, stick, throttle, pedals, roof,
+    door and floor.
+  - The shared Ipanema panel, a glareshield, stick, pedals, throttle,
+    levers and interior skins.
+  - The internal camera at 70° FOV: the nose and the deflector stay in
+    view and nothing clips.
+  - No detailed panel yet.
+
+**Validation run in this container** (Chromium with SwiftShader):
+- `node test/e203views.mjs <outDir>`: side, other side, top, front, rear,
+  underside, two three-quarters, in flight, winglet close-ups and parked,
+  for both schemes, plus the cockpit. No page errors.
+- `AC=e203 node test/e2e.mjs soy`: the full soy contract flown by the test
+  autopilot through the player inputs — 90 % coverage, 2 stars, 2
+  sorties, no damage. The only console error is a 404 for a resource the
+  preview server does not serve.
+- `node test/fleetswitch.mjs`: 84 switches across the seven aircraft, none
+  hidden.
+- `npm test`: 136 tests, all passing.
+
+**Pending for the next phases.**
+- The detailed 203 cockpit; the panel is still the 202A's.
+- Opening animations for the door and the hopper lid.
+- The estimated figures above, to check against the manual.
+
+### EMB-203 geometry correction — cabin, planform, rear fuselage
+
+The first 203 model read as low and bulky: the turtle deck behind the cabin
+started at roof height and fell slowly, a hump that buried the cabin; the
+windshield was raked to 32°; the body kept a parallel planform from the
+hopper to well behind the cabin; the cabin section was one rounded
+superellipse. Compared with the photographs of PS-BYA (side), PS-DIR (high
+front quarter), PS-WBM (rear quarter) and a 203 taxiing (front quarter),
+using near-orthographic renders and cameras placed where the photos were
+taken (`test/e203ortho.mjs`, `test/e203photo.mjs`).
+
+**What changed** (`src/aircraft/e203Model.js`; wings, winglets, tail
+surfaces, gear contact points, ag kit, physics and paint layout kept):
+
+- **Structured sections.** The cabin and rear fuselage are lofted from
+  sections of their own (`AFT_KEYS`, `aftRing`):
+  - the lower fuselage keeps its superellipse up to the window sill;
+  - above the sill, straight sides lean in to a flat top with rounded
+    corners (7 cm radius at the roof).
+  The cabin's rear frame is the first of these sections, so the roof flows
+  into the fairing with no seam.
+- **Cabin.**
+  - Roof top 1.025 → 1.04 m (body frame); flat, 0.69 m wide (was a crowned
+    0.84 m).
+  - Side windows flat, leaning in 12° from the sill to the roof rails.
+  - Windshield raked 43° from the hopper's top to the roof's front edge,
+    which moved forward from z −1.12/−1.17 to −0.93/−0.97 m.
+  - Roof rear frame at −1.78 m, B-posts at −1.58 m.
+  - The lower door window is shorter and sits under the side window's front
+    half.
+  - Frames are slimmer: tubes of 1.1–1.7 cm radius instead of 1.8–2.6 cm,
+    and no corner balls.
+- **Behind the cabin.** The fairing drops from the roof's rear edge (convex
+  at the edge, about 45° in the middle, concave into the dorsal) to a low,
+  rounded dorsal near the sill height.
+  - The fin root reaches down to it; the fin top is where it was.
+  - A concave dorsal fillet runs into the fin's leading edge.
+- **Planform.** About 8 % narrower from the cowl to the cabin, and the taper
+  starts right behind the cabin (no parallel run).
+- **Fits.**
+  - The wing root goes 8 cm further into the narrower body (no gap).
+  - The root fillet follows the body's surface.
+  - The main gear legs and the hopper coupler sit on the new lower sides.
+  - The provisional interior skins follow the cabin's leaning sides and
+    roof.
+
+| z (m) | half width before → after (m) | top before → after (m) |
+| --- | --- | --- |
+| 1.2 (cowl) | 0.43 → 0.395 | 0.52 (same) |
+| 0.0 (hopper) | 0.51 → 0.465 | 0.62 (same) |
+| −1.2 (cabin) | 0.53 → 0.485 | roof 1.025 → 1.04 |
+| −2.3 | 0.49 → 0.449 | 0.86 → 0.70 |
+| −2.8 | 0.44 → 0.405 | 0.71 → 0.47 |
+| −3.3 | 0.38 → 0.352 | 0.60 → 0.41 |
+| −3.9 | 0.30 → 0.278 | 0.52 → 0.37 |
+| −4.5 | 0.21 → 0.185 | 0.47 → 0.335 |
+
+**Paint.** Both schemes keep the same layout on the new surfaces:
+- the gold band (01) now passes under the B-post and climbs the fairing to
+  the dorsal, as on PS-BYA;
+- the green swoosh (02) follows the lower dorsal into the fin;
+- panel seams and the RESTRITA marking moved with the frames.
+
+**Measured** (this container):
+- span 13.299 m, length 8.00 m, height 2.44 m parked (roof top);
+- three wheels on the ground, 3.1° three-point attitude;
+- 71,542 triangles in 129 meshes (was 72,172 in 130);
+- `npm test`: 136 tests passing.
+
+**Still different from the photographs.**
+- On PS-BYA the fin top looks level with the roof or slightly above it; on
+  the model it is 8 cm below. It was left as it was rather than raised to
+  balance the cabin.
+- The real spinner looks larger in the front-quarter photo.
+- The windshield's lower side corners look lower on the real aircraft.
+- The photo comparisons use estimated camera positions, not surveyed ones.
+
+### EMB-203 cockpit (phase 02)
+
+`src/aircraft/e203Panel.js` (layout, dial faces, live screens),
+`src/aircraft/e203Cockpit.js` (3D), placed in the corrected cabin by
+`e203Model.js`. No document with the 203's panel was found, so the fit
+follows one aircraft: the 203 PS-SBF in its start-and-taxi video (panel,
+glareshield, hopper window, lower hopper face, the lightbar on the cowl).
+The four cabin photographs (Ipanemas 202) gave the shapes, materials,
+the yellow grab handles and the lower hopper sight.
+
+- **Glareshield.** A black leather bullnose lofted along the windshield's
+  base across the cabin: from under the glass aft over the top, round the
+  nose and back under to the panel's top edge, 6 cm deep in the middle and
+  thinning into trim strips down the side walls. One piece; its shape alone
+  reads as the Ipanema's hood.
+- **Panel.** Light-grey 3 mm plate tilted back 8°, cut to the cabin walls
+  and the glareshield's underside, with real holes for every instrument,
+  lamp, window and unit; sub-plates with dark seams and screws, a return
+  flange under it.
+- **Instruments** (all from `Aircraft.instruments()`, nothing invented):
+  accelerometer with the max / min memory needles (reset on the ground with
+  the engine off), airspeed (MPH, knots inside, the type's V-speed arcs),
+  altimeter (100 / 1000 / 10 000 ft needles, Kollsman window, low-altitude
+  flag); manifold pressure / fuel flow, CYL / OIL temperatures, tachometer
+  with its live hour meter; ammeter (starter draw, recharge after the start,
+  the running load); quartz chronometer (time since the start); the
+  panel-mounted wet compass (a 3D card drum behind its window, lubber line);
+  the elevator trim indicator (its pointer follows the trim); the fuel
+  totalizer (quantity and flow). Each round instrument: can, recessed face
+  (512 px per dial), thin 3D needles, hub, glass, bezel ring, four flange
+  screws.
+- **Lamps and switches.** PARTIDA, ALTERN., PRESS. ÓLEO, COMB. BAIXO,
+  ESTOL, APLIC. light from the aircraft's state (starter engaged, alternator
+  not charging, oil pressure under 15 psi, fuel under 15 %, stall warning,
+  spray valve open); the magneto key turns with the engine (off / both /
+  start); the master, alternator, boost pump and the NAV / STROBE / BEACON
+  toggles follow the engine's state. Breakers, push buttons, eyeball vents,
+  blank plates.
+- **Hopper.** The big window shows the yellow fibreglass wall with the
+  hopper's own large figures (as on PS-SBF), the narrow lower window its
+  middle; below the panel, between the pilot's legs, the hopper's lower face
+  with the U sight slot in its aluminium frame and the two scales of the
+  photographs, VÔO (in flight) and SOLO (parked: about 1 : 1.4, read off
+  the photograph). The product level comes from the aircraft's load.
+- **GPS.** The game's own AGROWINGS NAV (`agroNav.js`, shared with the
+  Bell 206; not a copy) set into the panel's right side: housing, bezel,
+  recessed screen behind glass, the four page keys MAPA / DESTINO / MISSÃO /
+  COBERTURA, clicked in the cockpit view through the same ray as the game's
+  other cockpit buttons. Redrawn at most 4 Hz, only when its content changes.
+- **Controls.** White stick column on the torque-tube box (rubber boot,
+  black grip with trigger, trim hat and the red spray button; pivot at the
+  box, moved by aircraft.js); pedals with toe brakes; the power quadrant
+  against the left wall from the panel's lower corner aft (throttle,
+  propeller, mixture, friction lock); the spray valve lever and the fuel
+  shut-off on the right.
+- **Cabin.** Inner skins of the walls, the door (with its lower window,
+  handle and latch), the panels behind the B-posts, the headliner and the
+  rear bulkhead (harness anchor bar, fire extinguisher); dark A- and B-post
+  covers with rubber seals; kick strips; floor-side consoles over the wing's
+  centre section; tread-plate floor; the high-backed leather seat with its
+  four-point harness; the guidance lightbar on the cowl. No wiper: PS-SBF
+  has none. The wire-cutter and its cable stay outside the glass.
+- **Camera and free look.** The eye where the pilot figure's eyes are
+  (0.68 m behind the panel's base), 8.6° down, 68° vertical field of view.
+  Mouse drag or the keys Num 7 / Num 9 (left / right), Num ÷ / Num 2
+  (up / down), Num + / Num − (zoom) and Num 0 or Home (back to the default
+  view). Only the head turns and the lens zooms: the eye does not move, so
+  the view never passes through the panel. The same keys swing the chase
+  camera. On a touch screen (every aircraft): one finger dragged on the
+  view looks around, a double tap brings the default view back; the GPS
+  keys take a tap.
+- **Cost.** Static parts are merged per material; the small hardware sits
+  in a level of detail (shown within 24 m). Needles, lamps, switches, the
+  key, the compass card and the GPS keys are updated only in the cockpit
+  view or with the camera within 9 m; the live textures only when what
+  they show changes.
+
+### EMB-203 final geometry pass (measured on PS-SAR)
+
+Measured on the side photograph of PS-SAR on the grass, scaled by the
+type's 2.43 m height (`src/aircraft/e203Model.js`, `src/config.js`; wings,
+winglets, flaps, ailerons, propeller, ag kit, cockpit and paints kept):
+- **Tail on the ground.** The real 203 sits with its tail low, the
+  tailwheel just under the rudder on a short spring: the tailwheel contact
+  point moved up 0.42 m (`FLIGHT_E203.gear.tail`, −1.27 → −0.85), so the
+  three-point attitude is 7.4° (was 3.1°). The take-off, climb and speed
+  tests still pass. No extra structure: the earlier ventral keel is gone.
+- **Fin and rudder.** Big and nearly square, as on the photograph: the
+  chord at the top 0.9 of the root's (was a narrow point), the leading
+  edge swept 26°, a flat top 1.16 m above the dorsal with a small radius at
+  its front corner, the rudder of constant chord with a square trailing-edge
+  corner. Green cap and gold stripe in the photograph's proportions.
+- **Cabin.** Sill to roof 0.8 m as measured (was 0.6 m): roof 1.04 →
+  1.20 m, the fairing behind it rebuilt to drop to a dorsal a little under
+  the sill line. With the tail low, the parked height is 2.43 m (test).
+- **Rear fuselage.** Narrower in plan from behind the cabin; its depth kept
+  to about 0.74 m at the rudder post with a nearly straight underside, as
+  on the photograph.
+- **Tailplane.** High on the rear fuselage, just under the dorsal at the
+  fin (y −0.28 → 0.22).
+- **Nose.** Slimmer toward the spinner (lip 0.58 → 0.54 m wide) and its top
+  line falling more steeply to it — the cowl rising at an angle from the
+  spinner to the windshield; inlets and the landing light sized to fit.
+
+### EMB-203 cockpit fixes — hopper sight, door window, eye height
+
+- **Hopper sight on its wall.** The yellow lower face of the hopper with
+  the VÔO / SOLO scales and the sight slot stood 34 cm aft of the footwell
+  (z −0.84, a board in front of the pilot's legs, with yellow sides). It is
+  now flush in the footwell's front wall, between the grey closures
+  (z −0.501), up to the panel's lower edge; its side panels are gone and
+  the slot's aluminium frame moved with it.
+- **Door's lower window.** The real 203's door is glazed low down (it shows
+  on PS-WBM with the door open), but from inside the cut-out had no frame,
+  so it read as a hole in the wall with the ground behind it. It now has a
+  dark trim frame round it on the inner skin, a rubber reveal out to the
+  glass and a rubber seal, and it sits lower (y 0.10–0.32, was 0.20–0.38)
+  so the power quadrant no longer covers its top edge (inside and outside
+  move together).
+- **Pilot's eye height (every aircraft).** Shift + ↑ raises the cockpit eye
+  and Shift + ↓ lowers it — a taller or a shorter pilot — 15 cm/s, up to
+  ±15 cm from the type's eye point. It is kept in the settings when the
+  keys are let go (a short message gives the height); the default view
+  (Num 0 / Home) resets the look and the zoom, not the eye height. While
+  Shift + ↑ / ↓ is held, Shift does not add power and ↑ / ↓ do not move the
+  stick (classic scheme); either key alone works as before. Bindings can be
+  chords now: in Settings, hold Shift (or Ctrl / Alt) and press the key; a
+  modifier alone is taken when it is released.
+
+### Touch interface — three control layouts
+
+Only the touch controls and the touch HUD changed (no physics, aircraft,
+camera base or game logic): Settings → Flying → **Touch controls** (shown
+on touch devices) picks the layout, kept in the settings.
+- **Virtual stick** — stick bottom left, rudder beside it.
+- **Phone tilt** — no stick: the phone's orientation (relative to its pose
+  when chosen; tap the badge to recentre) gives roll and pitch; a badge
+  shows the mode is on. iOS asks for permission on the tap. Written from
+  the sensor's axes, not tried on a real phone here.
+- **Buttons** — four arrow buttons in a cross, no stick, no tilt.
+All three share: minimap top left (116 px); power slider vertical on the
+right edge, mid-screen; spray, brakes, engine, camera, flaps in a 2-column
+block bottom right; free / fixed camera pill (a finger dragged on the view
+looks around or not), service (E), map and pause top right; and a thin
+strip of the six readouts (speed, height, load, power, fuel, hopper)
+along the bottom. Checked at 844×390 with touch emulation in Chromium:
+the three layouts, arrow / tilt / free-fixed input, no page errors.
+
+**Touch follow-up.** On phones the title screen is its own scroller and the
+seven aircraft are one row to swipe (snap, the chosen one centred), so the
+list is no longer stuck under the overlay (checked with a real swipe and a
+tap at 844×390). Phone tilt is zeroed to the pose held when the flight
+starts and, if the sensor never answers (some embedded pages and browsers
+block it), the badge says "sem sensor".
+
+**Touch camera.** The pill is now FIXA (default) / LIVRE. Fixed is the
+chase / cockpit view with what free used to do: a finger dragged on the
+view looks around (double tap: default view). Free is the orbit camera of
+the O key on a PC: drag to place it round the aircraft, pinch to zoom
+(spread = in). Pinch also zooms the fixed views. Checked with real
+multi-touch events at 844×390: drag, free, orbit drag, pinch both ways,
+back to fixed, no page errors.
+
+**Course on the map (PC and phone).** Click / tap on the full map (M, or the
+MAPA button) sets a course: a cyan marker with its distance and a dashed
+line from the aircraft, drawn on the full map and on the minimap while
+flying; it clears itself within 80 m of the marker or with "Limpar rumo".
+The map has + / − zoom buttons and a close button (the wheel and drag still
+work); the map no longer closes on a click. On a phone, tapping the minimap
+folds it small and back (a long press switches farm map ↔ GPS page).
+
+**Touch HUD extras.** A small button right of the readout strip hides it
+and brings it back (kept in the settings); the virtual stick goes more
+transparent after the thumb has been on it for a moment. On short
+landscape screens the map shows only its four buttons over the chart (the
+legend and hint are hidden).
+
+**Touch layout, final arrangement.** Top right: free / fixed pill, camera,
+MAPA, pause (service is the on-screen prompt, tap it). Right edge: the
+power slider with the rudder pair (L / R) under it; left of the slider, APLIC /
+MOTOR / FREIO stacked; flaps bottom right. Left: the stick (or arrows, or
+the tilt badge) with TRIM+ / TRIM− beside it (held, as the keys). While
+airborne all the buttons turn more transparent (they stay); on the ground
+they are normal. Checked at 844×390 on the ground and in flight, with no
+overlap between any two controls.
+
+**Smaller messages on touch screens.** Only with touch controls: the
+action prompt, toasts, warnings, tutorial card, job card, ground-crew card,
+spray / trim badges and key caps are about 60–70 % of their size, so they
+cover less of the view (the cockpit above all). The PC sizes are unchanged.
+
+**Grain stores (`src/world/grain.js`).** The old silos (cylinders with a
+floating pole and loose rods) are replaced by one coherent model: each silo
+stands on a concrete slab that reaches below the terrain, with corrugated
+walls and ribs, a cone roof with hatch and vent cap, a ladder and a door, and
+painted lettering (name and "SILO 01…") on a curved panel; the elevator
+tower (concrete shaft, ladder, head house with roof, intake pit) feeds a
+gallery that rests on each silo's hatch and, sloping, on the tower head and
+a trestle; the dryer (body, burner house, flue, chimney) joins the tower by a
+duct. The HQ store has three silos in a line; five more stores
+(`GRAIN_POINTS` in `layout.js`) stand beside roads, picked by a script to be
+clear of fields, forests, farm strips, the runway, the power line and roads;
+they are on the full map. The farm sites' silo and dryer props use the same
+parts. Everything is merged per material (one extra material per lettering),
+with one collider per structure.
+
+## Robinson R44 — exterior reconstruction and paint B
+
+Visual only (`src/aircraft/r44Model.js`): the physics (`FLIGHT_R44`), rotor
+pivots and animation, skid contact points, cockpit (pod, pedestal,
+instruments, GPS, cyclic, collective, pedals, seats), sprayer, missions and
+sound are unchanged. Compared with the five reference photographs (black
+agricultural R44s, a grey one in flight and from below, a red one parked)
+in near-orthographic and three-quarter views (`test/r44ortho.mjs`).
+
+- **Cabin.** 1.28 m wide at the doors (R44 data; the model was 1.39 m),
+  with a fuller lower nose so the pedals stay inside the bubble. The
+  windshield's lower edge now runs from the A-pillar's foot down and
+  forward into the nose: the deep two-piece glass of the R44, a short
+  painted chin under it; the centre post follows the nose underneath.
+- **Nose and windows (second pass, after a side photo of a black R44 II).**
+  The pointed nose tip is gone: the nose is a blunt three-dimensional
+  bubble, its foremost point low and its underside rounding up into it,
+  4 cm longer; the front door window's lower edge falls toward the A-pillar
+  and both door windows have generous corner radii.
+- **Mast fairing.** The low hump became the R44's tall tapered tower:
+  front edge raked back, rear edge raked forward, teardrop in plan, its top
+  just under the swashplate (raised with it; the hub and the rotor pivots
+  stay where they were). The pitot sits on its front.
+- **Engine compartment.** Closed cowling (it was an open bay showing the
+  engine and frame on both sides); its top continues the cabin roof line
+  to the tail cone; the cooling-air outlet is the open lower rear, with the
+  engine, muffler and the turned-down tailpipe seen through it; cowl seams
+  and an access door in the paint.
+- **Ag kit.** The boxy tank became the cylindrical belly tank of the
+  photographs (0.38 m × 1.5 m) on two straps between the cross tubes; the
+  fill coupler (where the service hose attaches) and the pump moved with
+  it. Boom, nozzles, flow and capacity unchanged.
+- **Interior fit.** Rear bench 1.0 m wide and the pedals 3 cm further in
+  and 8 cm aft, so nothing passes through the narrower hull.
+- **Paints** (same meshes; only the livery canvas and four colours change):
+  - **A — Original**: the red and graphite scheme, as before.
+  - **B — Black Agricultural**: deep black with a little more gloss so the
+    shapes still read, a gold band from the nose along the lower cabin
+    rising along the cowling with a fine line above it, gold marks on the
+    tail cone, R44 / RAVEN II on the cowling, black fins, stabiliser,
+    cross tubes and skids.
+  Chosen on the title card (Paint A / B) and kept with the other settings.
+
+**Not changed, and why.** The overall height is 3.05 m to the hub against
+the R44's 3.28 m: the hub height is part of the flight model
+(`FLIGHT_R44.rotor.hubHeight`) and was left alone.
+
+## Aircraft 08 — Cessna A188B AgTruck (PR-AGT)
+
+An eighth aircraft with its own geometry (`src/aircraft/a188Model.js`),
+cockpit (`a188Cockpit.js`, `a188Panel.js`), flight figures (`FLIGHT_A188`,
+`SPRAY_A188` in `src/config.js`) and registry entry (`AIRCRAFT_TYPES.a188`).
+No global system was changed: it uses the existing piston /
+constant-speed-prop branch of the flight model, spray, service, GPS, camera
+and sound code. PR-AGT is a fictional registration.
+
+**References.** Only the images sent with the brief: PR-LEO (orange, side
+view, measured at 154.4 px/m for the profile), red AgTrucks spraying and
+close up, the yellow N5324B from the front and rear quarter, the blue
+N6324R, the orange N87622 from above and below, and simulator renders used
+for proportions and the cockpit. No local Flight Simulator files were
+accessible, so none were used.
+
+**Figures.** Continental IO-520-D, 300 hp at 2,850 rpm, three-blade McCauley
+constant-speed prop of 2.13 m; span 12.70 m; length 7.95 m; wing 19.05 m²;
+MTOW 1,905 kg; 204 L of avgas; hopper 1,060 L; flaps to 20°; single seat.
+Estimated: empty mass 1,000 kg, CD0 0.058 with booms, fuel flow 100 L/h at
+full power. Like the 203, the hopper volume is not payload: with full fuel
+the MTOW allows about 673 kg of product (`loadByWeight`).
+
+**Stance.** The geometry is built in the frame of the PR-LEO photo (the
+three-point attitude) and the whole model sits in a `stance` group pitched
+7° (`A188_STANCE`); `a188ToBody()` maps photo-frame points to body axes,
+and the gear contact points, hard points, boom, spray, collision and
+servicing points go through the same rotation. In level flight the
+fuselage is therefore close to level and the wing has the incidence of the
+real aircraft.
+
+**Exterior parts** (`createA188Model`):
+- tall flat-topped cowl with the chrome spinner, two landing lights and
+  the chin inlet in the nose, cooling inlets beside the spinner, exhaust
+  stacks, FUEL INJECTION lettering;
+- tall angular cabin: two-pane windshield with centre post, quarter panes
+  above the A-post, side glass to the B-post, rear quarter glass, door with
+  frame and handle, frames painted in the top colour;
+- hopper lid and filler in front of the windshield;
+- deep fuselage fairing behind the cabin running into the tail cone;
+- strut-braced low wing (12.70 m, 5.5° dihedral) with jury strut, drooped
+  tips, flaps and ailerons;
+- tall swept fin with a rounded top and rudder, low tailplane with
+  elevators;
+- spring-steel main legs and a long tail spring with the tailwheel;
+- spray booms on four hangers, 18 nozzles per side, the wind-driven pump
+  under the belly, wire cutter, beacon and antennas.
+
+**Paints** (same meshes; only the livery and wing canvases and a few
+colours change; chosen on the title card, Paint A / B, and saved):
+- **A — Red** (simulator scheme): silver-white base, red top and cowl, navy
+  band along the fuselage, white flashes, red wing leading-edge band and
+  tips.
+- **B — Orange** (after PR-LEO): white lower fuselage, orange top, cabin and
+  wings, black band widening into the black rear fuselage, red pinstripe,
+  three red stripes behind the door, white tail, registration in white on
+  black, RESTRICTED placard.
+
+**Cockpit** (`buildA188Cockpit`):
+- black doghouse on the glareshield with six engine gauges (fuel pressure,
+  oil temperature, manifold pressure, rpm, oil pressure, CHT);
+- crash roll with the placards (manoeuvring speed, flap speed, etc.);
+- grey lower panel: ASI, altimeter, turn coordinator, DG, two fuel gauges,
+  warning lamps, rocker switches, knobs, circuit breakers, master and
+  magneto switches, starter, fuel valve;
+- the game's AgroWings GPS on a bracket, kept small;
+- magnetic compass on the windshield centre post and the guidance light
+  bar on the cowl;
+- stick, pedals with treads, throttle quadrant (throttle, prop, mixture) on
+  the left wall, flap lever, red spray valve handle;
+- tubular frame, firewall, floor, seat with harness, cream inner walls,
+  headliner, rear bulkhead, extinguisher, door frame and glass.
+The needles follow the flight model (fuel pressure is derived from rpm).
+The eye point sits so the pilot sees over the cowl and between the posts.
+
+**Optimisation.** One merged mesh per material (paint, frame, glass,
+metal, rubber, gear…); the livery is one canvas projected from the side
+with a bump map; ambient occlusion is baked into vertex colours; the dials
+share one 4×3 atlas, and the GPS screen redraws only when its page
+changes. Frame time was not measured for this build.
+
+**Measured** (`node --test test/a188.test.mjs`, run in this container):
+
+| check | result |
+| --- | --- |
+| span / length | 12.700 m / 7.95 m |
+| parked | three wheels down, pitch 7.2°, height 2.42 m |
+| start | catches after 1.3 s, idle 650 rpm |
+| full throttle, static | 2,850 rpm, 300 hp, 100 L/h, 5.66 kN |
+| take-off roll 1,157 / 1,905 kg | 147 m @ 59 kt / 429 m @ 72 kt |
+| climb at 68 kt, 1,350 / 1,905 kg | 1,347 / 771 ft/min |
+| level at 1,600 kg, full power | 116 kt |
+
+Also run: `test/a188cockpit.mjs` (cockpit views, GPS keys, lamps, needles,
+stick, look keys, eye height), `test/a188ortho.mjs` (side, top, front,
+rear and cabin views against the photos), `test/fleetswitch.mjs` (112
+switches with the six aeroplanes parked; a sixth parking spot was added).
+
+**Not done.**
+- The 285 hp continuous limit is not modelled: full power is 300 hp
+  for as long as it is held.
+- The sound reuses the Ipanema IO-540 profile, set to a 2.13 m
+  three-blade prop.
+- The GPS is the game's AgroWings unit, not a specific Satloc model.
+- No end-to-end mission run or frame-time measurement for this build.
+
+## On foot at the bases (PilotFreeRoamSystem)
+
+Land at a base, stop, shut the engine down and a small **DESCER** button
+appears; the view moves to the pilot's eyes (first person, no character
+model) beside the aircraft and he walks round the base.
+By the aircraft he came from, **EMBARCAR** (or E) puts him back in.
+
+**Files:** `src/game/freeRoam.js` (system, zones, collisions, camera),
+hooks in `src/game/game.js`, the
+walking joystick in `src/ui/touch.js`, styles in `src/ui/styles.css`,
+strings in `src/i18n/pt-game.js`, test `test/freeroam.mjs`.
+
+**Integration.** States `PILOT_IN_AIRCRAFT → PILOT_EXITING → PILOT_ON_FOOT
+→ PILOT_BOARDING`. In the aircraft the system only checks, 4 times a
+second, whether the button may show. On foot: the aircraft is not
+stepped (it stays exactly where it stopped; fuel, load, damage, engine
+and flaps untouched), the flight inputs are not read, the camera rig is
+not run (the system drives the camera), the flight readouts and the touch
+flight controls are hidden. The world, crew, streaming and rendering keep
+running in the game's single loop; nothing is loaded or duplicated.
+
+- **Zones:** one oriented rectangle per base (`buildZones()` from `SITES`):
+  runway with shoulders, apron, hangar, crew area, helipad and parking
+  spots, +40 m. Every farm strip has its own. The pilot may walk 120 m
+  beyond it, not across the map.
+- **Exit button:** the flown aircraft on the ground inside a zone, below
+  0.3 m/s, engine off and rotor stopped, no menu, replay, autopilot or
+  camera move, and a clear spot found. With the engine running a hint says
+  to shut it down.
+- **Exit spot:** beside the cockpit on the left, then the right, further
+  back, then rings 4–10 m round the aircraft; each candidate is checked
+  against the aircraft's hit boxes, the structures, trees, parked aircraft
+  and the truck. No clear spot, no exit.
+- **Walking:** W/S/A/D, the arrows, the numpad (8/5/2, 4/6) and the bound
+  stick keys; mouse drag looks round; on a phone the stick becomes the
+  walking joystick and a drag on the view looks round. 2.6 m/s walking,
+  8 m/s running with Shift held (joystick pushed to the edge on a
+  phone; Shift is still power in the aircraft), with a
+  short acceleration; the eye (1.65 m) follows the terrain with light
+  smoothing (and the main hangar's floor slab); no head bob.
+- **Collisions:** the structures' existing box colliders (hangar walls —
+  the main hangar's open front lets him in —, sheds, tanks, office…),
+  the tree collider, parked aircraft and the service truck
+  (`world.extraObstacle`), the flown aircraft's hit boxes. Colliders within
+  40 m are listed every 15 m walked; the pilot's 0.3 m radius keeps the
+  eye off walls and fuselages.
+- **Boarding:** only within 3.2 m of the own aircraft's cockpit door point;
+  parked aircraft never offer it. Boarding restores the camera mode the
+  player had and the flight controls; the engine is not restarted.
+- **Safety:** changing aircraft, the main menu, a new flight, a reset, a
+  crash recovery, the test autopilot and a replay all put the pilot back in
+  first (`forceBoard`). An error in a transition falls back to "in the
+  aircraft". The walk is not saved; after a reload the game starts in the
+  aircraft as before.
+
+**Measured in this container** (software renderer, `node test/freeroam.mjs`,
+31/31 checks):
+
+| | before (HEAD) | after, in the aircraft | after, on foot |
+| --- | --- | --- | --- |
+| draw calls / triangles at the pad | 729 / 1,627,589 | 729 / 1,627,589 | nothing added (no model) |
+| geometries / textures | 896 / 110 | 896 / 110 | 30 exit/board cycles: no growth |
+| game tick, CPU (ms, 120 ticks, no render) | 0.59–0.72 | 0.58–0.79 | 0.28 walking |
+| free-roam cost per frame | — | exit check 0.04–0.06 ms, 4×/s | 0.013 ms |
+
+Frame time with the software GPU (750–5,600 ms per frame here) is noise,
+not a measurement of a real device; FPS on real PCs and phones was not
+measured.
+
+Checked: exit at the pad, at three points along the strip, by the R44 on
+the helipad and at Serra do Cedro (sloping strip); hidden in flight, low
+over the apron, while rolling and with the engine running; walking with
+W, Numpad 8 and the arrows; stopped by the hangar wall and a parked
+aircraft; no board button there; explore limit; mission coverage, fuel
+and hopper kept; take-off after boarding; phone layout (44 px button,
+joystick walks, flight controls hidden); first-person eye at 1.65 m; 30
+cycles.
+
+**Known limits:** the farm sheds are one solid collider (not walked into);
+small props without colliders (drums, tyres) can be walked through; no
+real-device FPS measurement.
+
+**Rollback:** remove the `freeRoam` lines in `game.js` (import, the
+constructor line, `onFoot` in `tick`, the `forceBoard()` calls and the
+camera / prompt / `cameraInside` conditions) and the `walk` / `on-foot` lines
+in `touch.js`; delete `freeRoam.js` and the `.foot-btn` /
+`.on-foot` CSS. Nothing else depends on it.
+
+### One helipad; the spare helicopter in the hangar
+
+- **Main base:** one helipad (the gravel pad with the H at the east end of
+  the apron); the second pad east of it is gone. Both helicopters use it.
+- **Parking:** while an airplane is flown, the R44 waits on the helipad
+  (its default paint is now B, black agricultural; a saved choice is kept)
+  and the Bell 206 is kept in the hangar, on the floor's parking T, nose to
+  the opening (`BASE.heliHangar`, standing on the floor slab). Fly the
+  Bell and the R44 goes into the hangar instead, and the other way round.
+- **Secondary farms:** a single helipad that is a cleared patch of packed
+  red earth, with whitewashed stones round the edge and a tyre on a stake,
+  not a copy of the base's pad (`buildDirtHelipad`).
+
+Checked in this container: `npm test`; views of the base, the hangar
+inside with either helicopter stored (no overlap with the benches, racks
+or ladder) and a farm's earth pad; a Bell 206 contract by the test
+autopilot (two services on the single pad, spraying, no damage).
+
+### Flight school (Escola de aviação agrícola)
+
+Two tiny talhões between the strip and the south road open the service
+orders, in their own section above Level 1:
+- **Escola 1 — E-01** (soybean, 340 × 80 m, 2.7 ha, east–west rows): load,
+  take-off, find the talhão, work height, spray on/off with the lightbar,
+  a few passes, hand in. 7 steps.
+- **Escola 2 — E-02** (cotton, 420 × 80 m, 3.4 ha, beside the strip): the
+  balão, spray off at the edges, closing the gaps (the power line starts
+  110 m past the east end). 5 steps.
+
+The guide box starts with the job every time it is flown, also after
+*Continuar de onde parou*. It names the PC key, or the touch button on
+mobile (SPRAY, segure ENG, FLP+, manche para trás…). The jobs complete at
+85 % (`complete` on the contract: the edges weigh more on a tiny talhão;
+the others stay at 90 %). The fields are appended to `FIELDS`, so the ids
+and trees of the original farm do not move; their run-in corridors (250 m)
+are cleared of trees. The golden physics is unchanged.
+
+Checked in-browser with the test autopilot (`test/e2e.mjs` flow), Ipanema:
+School 1 went through all 7 steps to the report (85.1 %, no damage) and
+School 2 through all 5 (85.1 %). Board and guide box captured at
+1280 × 720 and at phone landscape with touch. Not checked: a real phone,
+or a human beginner flying it.
+
+### Beginner talhões (Talhões de iniciante)
+
+Between the school and the full-size Level 1 orders, a group of five small
+talhões has its own section on the service board (green tag *Iniciante*).
+Each is 460 × 190 m (8.7 ha: about three school talhões, half of T-07),
+east–west rows, level 1, on flat open ground that was empty (relief
+0.5–2.2 m across the field, slope ≤ 1°), 1.9–3.7 km from the base:
+
+| Talhão | Crop | Where | R$/ha | Bonus |
+|---|---|---|---|---|
+| I-01 | soybean | north, 3.7 km, edge of the cerrado | 240 | 1,500 |
+| I-02 | cotton | north-west, 3.6 km | 250 | 1,600 |
+| I-03 | soybean | west, 1.9 km (forest 200 m north) | 230 | 1,200 |
+| I-04 | soybean | south, 2.5 km, beside a farm road | 240 | 1,400 |
+| I-05 | cotton | east, 2.8 km (forest 370 m past the east end) | 250 | 1,800 |
+
+Pay sits between the school (200–220/ha) and Level 1 (260+/ha). No power
+line, road, water, fence, prop or forest block lies in a field or its
+320 m run-in corridors (`test/beginner.test.mjs`). The fields are appended
+after the school's, so no id changes; every random tree stream draws as
+before (the beginner fields are left out of all placements) and the trees
+inside the talhões and their run-ins are removed at the end.
+
+### Spraying a little high, and continuing a job
+
+**A pass flown a little high still counts.** The 'Too high to spray'
+warning still shows above 8 m, and the losses above the ideal window (drift
+and evaporation, `sprayer.lost`) still count against the report's waste,
+pay and stars. The coverage map now takes what lands, at the strip's own
+dose, up to 20 m over the crop, fading out by 30 m. Before, a pass at
+10–20 m spread its reduced dose so thin (single-pass p80 dose 0.69–0.79
+against the 0.7 threshold) that the strip often did not mark. Measured
+in-browser (Ipanema, one pass over T-07, p80 dose): 5 m 0.86, 10 m 0.82,
+14 m 0.92, 20 m 0.87, 25 m 0.53.
+
+**Continue where you left off.** Coverage was already saved per contract
+in `localStorage` (every 15 s, on the menu, on hide). The save now also
+keeps the job in hand with its aircraft, fuel and hopper (`career.resume`).
+The title menu shows *Continuar de onde parou* (contract, % sprayed,
+registration). It restores the same aircraft and load at the strip nearest
+the job's fields that takes the aircraft, with the coverage as it was.
+Handing the job in clears it. Checked in-browser: 1.6 % sprayed, 333 L
+hopper and 111 L fuel, then a page reload and *Continuar*: the same
+figures, at the main base.
+
+### AgTruck geometry revision (reverse engineering from photos)
+
+The exterior was re-fitted to side photos of PR-AAQ and PR-AAI (scale from
+the 7.94 m length: 120.7 and 141.7 px/m) and checked against PT-IJO and a
+three-quarter shot. The model silhouette, pitched 7°, was laid over each
+photo and the stations were moved until cowl, roof, rear slope, spine, fin,
+belly and wheels lined up. Measured over the ground, before → after → photo:
+cowl top 1.97 → 2.14 → 2.15 m; axle to cowl top 1.65 → 1.83 → 1.82–1.84 m;
+fin top above the cowl 0.59 → 0.42 → 0.39–0.44 m. Triangle and mesh
+counts are unchanged (exterior 66,234 triangles in 84 meshes, small-part
+LOD 7,500 in 7, cockpit 27,551 in 112, measured in the running game).
+
+What changed (`src/aircraft/a188Model.js`, no global scaling):
+- **Nose / cowl** (`FWD_KEYS`): narrower lower cowl and chin, so the nose
+  reads less bulbous from the front; the flat top and the hopper
+  character are kept.
+- **Cabin**: the roof corners are crisper (`rT` 0.11) and the glass behind
+  the roof now drops at about 45° into a low spine, so the cabin reads
+  shorter and taller instead of one long rounded hump.
+- **Rear fuselage** (`AFT_KEYS`): lower spine and a progressive taper in
+  width and height from the cabin to the tail cone.
+- **Fin / rudder**: leading edge root moved aft to z −4.6 (about 27°
+  sweep), top lowered to 1.02 (`FIN_TOP_Y`), dorsal fillet shortened.
+- **Gear / stance**: main contacts 0.17 m lower (longer legs), tailwheel
+  0.12 m aft, so the nose stands higher; the parked attitude stays 7.2°.
+- **Paint**: the liveries are unchanged; heights on the rear fuselage are
+  remapped (`paintY`) so the bands keep their place on the lower spine.
+  The rear window is a painted triangle following the new slope.
+
+Anchors updated together (`src/config.js`, `src/aircraft/types.js`): gear
+contact points, fin hard point, work point, collision/wire points and the
+fin and gear bounds. The cockpit (`a188Cockpit.js`) is untouched: it takes
+its cab constants from the model, the cabin width, sill, windshield and
+eye point did not move, and no cockpit vertex lies behind z −2.24 where the
+new rear slope starts.
+
+Physics: mass, wing, engine and drag are unchanged. Because the gear
+contacts moved, the golden scenarios `plane.a188.calm` and
+`plane.a188.wind` were regenerated (lift-off 16.05 → 16.08 s and
+15.68 → 15.71 s); the other 26 scenarios are byte-identical.
+
+Checked in this container: `npm test` (all pass; parked height 2.49 m,
+pitch 7.2°), `test/a188ortho.mjs` (side, top, front, rear, cabin, chase,
+pilot views, both paints), `test/a188ground.mjs` (lowest point 0.002 m,
+three wheels down), photo overlay on PR-AAQ, cockpit view before/after.
+Not checked: real phones, Safari.
+
+## Aircraft 09 / 10 — Air Tractor AT-802A (PR-AWX) and AT-802AF Fire Boss (PR-FBS, premium)
+
+One airframe module (`src/aircraft/at802Model.js`) and two configurations
+with their own flight configs (`FLIGHT_AT802`, `FLIGHT_FIREBOSS` in
+`src/config.js`), equipment and systems. No other aircraft's model, physics
+or cockpit was changed; the additions to shared code are guarded so the
+other aircraft never reach them (see *Shared code touched*).
+
+**References.** The photographs sent with the brief: VH-LII side-on (the
+profile, measured at 88 px/m, spinner tip to rudder 10.9 m), PR-CUN, the
+NT-802 drawing, yellow 802s from the front, three-quarters and spraying,
+VH-NIZ from above; for the Fire Boss LX-AFF, 4O-EAB scooping, EC-KRT
+dropping, EC-JTZ and the Fire Boss on a wet runway from the front; five
+cockpit photographs for the cockpit.
+
+**Figures used.** AT-802A (Air Tractor): PT6A-65AG 1,295 shp; span 18.04 m;
+wing 37.29 m²; MTOW 7,257 kg; empty with spray equipment ≈ 3,062 kg; hopper
+3,028 L; fuel 961 L. Fire Boss (Fire Boss LLC): PT6A-67F 1,600 shp (the
+option chosen), Wipline 10000 amphibious floats, 3,104 L of water, MTOW 7,257
+kg on land, 5,216 kg from water, 7,257 kg while scooping, maximum cruise 150
+KIAS. **Estimated** (and marked so in the config): the Fire Boss empty mass
+with floats (3,800 kg), inertias, the aerodynamic derivatives, fuel flows,
+the float stations (no Wipline drawings were available), cabin and cowl
+widths.
+
+**Geometry.** Fuselage stations from the VH-LII profile converted from its
+three-point attitude to the body frame (10° ground angle): the long
+slab-sided PT6 nose with the exhaust stacks behind the prop and the chin
+inlet, the deep hopper section, the tall glasshouse (three-piece windshield,
+≈ 0.6 m of side glass under a 0.14 m roof), the fairing dropping onto a
+straight turtle deck, the tall fin with a long rudder, a strut-braced
+tailplane, an 18.04 m constant-chord wing with squared tips (closed upper
+and lower surfaces, flaps and ailerons on their hinge lines), a five-blade
+Hartzell with feathering. AT-802A: spring-steel main legs, tailwheel, booms
+with 30 nozzles a side, wind-driven pump. Fire Boss: two lofted Wipline
+hulls (V bottom, step aft of the CG, bows ≈ 0.8 m ahead of the spinner),
+N-struts and spreader bars, retractable wheels (nose pairs at the bows swing
+up over the deck, mains aft of the step swing up and aft), scoop probes,
+drop doors, fins on the stabiliser tips. Paint A: yellow with the green
+band between navy lines (green rudder and tip bands); paint B: the LX-AFF /
+4O-EAB Fire Boss scheme (red cheat line edged black, red rudder, FIRE BOSS
+on the floats).
+
+**Physics** (the fixed-wing flight model; new branches only run for an
+aircraft whose config has them):
+- *Turboprop*: the existing PT6 branch with each engine's figures.
+- *Retractable gear* (`g.retract`, `A.gearTime`): retracted wheels leave
+  the contact model; a squat switch keeps the gear down with weight on the
+  wheels.
+- *Floats on water* (`A.floats`): each hull cut into stations; at each, the
+  submerged V section gives buoyancy, a speed-dependent dynamic lift
+  (planing), heave damping, keel side force and water resistance as a share
+  of the weight the water carries (displacement drag, the hump near 17 kt,
+  planing drag, skin friction); water rudders at taxi speed. Touching the
+  water with the gear down crashes the aircraft; a hard touch damages it.
+- *Water systems* (`fireboss.js`): probes fill only on the water, gear up,
+  wings level, between 41 and 82 kt, up to what the 7,257 kg scooping limit
+  leaves, and the water taken in costs its momentum (ṁ·v drag); from rest
+  the floats will not plane above 5,216 kg; the drop door releases water
+  progressively (full or partial), and the mass and CG moment follow the
+  litres actually released.
+
+**Fire suppression test scenario** (`src/world/fires.js`, active only
+while the Fire Boss is flown): five fire spots on open ground west of a new
+reservoir (*Represa do Norte*, ≈ 1 km east–west, 4 km north of the base,
+built with the existing water system). Released water falls as packets
+with drag, lands on a footprint that grows with the fall time and is handed
+to the spots it covers (`applyWater(x, z, litres, radius)`); intensity falls
+with the water per burning area; the spots reignite two minutes after the
+last one is out. Not a mission system: no spread, no rewards.
+
+**Premium lock** (`src/game/expansions.js`). The Fire Boss belongs to the
+expansion `expansion.at802f-fireboss`. There is no payment, checkout,
+account or Pix code anywhere in this change; the platform's existing premium
+system installs an entitlement source with `setEntitlementSource(fn)`.
+**Testing phase: the lock is not enforced** — the Fire Boss is open to
+everyone while it is flown and tested (`setPremiumEnforced(false)`, the
+default). With `setPremiumEnforced(true)` and no entitlement, the Fire Boss
+is locked: its card shows the lock, and `selectAircraft` / `_activate`
+refuse it (not only the UI). In a browser
+game a client-side check can be bypassed; the authoritative check belongs
+to the server side of the premium system.
+
+**Controls.** `U` gear up / down, `T` scoop probes, the spray key (`C`)
+opens / closes the drop door (tap again for a partial drop). On the Fire
+Boss panel the gear handle and the probe and door switches can be clicked.
+
+**Cockpit** (`at802Cockpit.js`, textures and screens `at802Panel.js`), after
+the five cockpit photographs. Shared by both configurations:
+- the wide matte-black panel in three facets with real thickness and
+  cut-outs: the centre facet with the guidance unit under its hood, the two
+  wings turned 35° toward the pilot whose tops fall away outboard to rounded
+  corners; bolted seams and screws; the glareshield deck to the windshield;
+- left wing: an engine monitor (Ng, ITT, torque, Np arcs, fuel flow, fuel,
+  g, flight timer, alerts — the flight model's PT6 values; oil pressure and
+  temperature, fuel pressure, volts and OAT are not simulated and read
+  `---` N/S), master warning / caution lamps, boost pump switch, placards;
+- centre: the game's AGROWINGS NAV in a recessed housing with its four soft
+  keys (clickable) and the compass under it — the same unit and state as
+  the other cockpits, not a copy;
+- right wing: electronic attitude indicator, airspeed (knots, arcs from each
+  configuration's V-speeds), red LED readout, auxiliary display, altimeter,
+  vent;
+- the lower console with two labelled switch strips each side (toggles
+  instanced, the simulated ones animated), a Hobbs meter and the red
+  shut-off handle;
+- the stick (black column, Air Tractor grip), Air Tractor pedals, the yellow
+  hopper wall with the hopper sight in the footwell, PT6 quadrant on the left
+  wall, the spray / drop handle on the right, seat and harness, dark side
+  walls with the tube frame, black canopy frames inside.
+Configuration-specific: AT-802A — dispersal strip (valve switch clickable:
+the sprayer), flow monitor, LED = spray flow L/min, hopper sight in US gal;
+Fire Boss — water-system strip (gear handle, probe and door switches,
+clickable), gear lamps (green down, blue up, amber transit), probe / scoop /
+door / water-contact lamps, the water mission display (water, probes, door,
+gear, surface, nearest test fire), LED = water litres, hopper sight in
+litres of water.
+Optimisation: screens redraw only when their rounded values change, at most
+15 Hz and only in the cockpit view; small parts sit in a LOD level dropped
+beyond 25 m; static toggles and screws are instanced; the rest is merged per
+material.
+
+**Shared code touched (guarded).** `flightModel.js` (gear retraction, nose
+casters, the floats branch, an optional external force, a tailwheel-or-nose
+form of the three-point settle that is identical for tailwheels); `env.js`
+(water level query); `aircraft.js` (the water systems hook, water contact
+events, `placeOnWater`, extra fields in `instruments()`); `game.js`
+(premium guard, the AT-802 parking spots, fire field, keys, Fire Boss
+warnings); `input.js` (two actions); `layout.js` / `terrainData.js` /
+`vegetation.js` (the reservoir, with optional bank and tree parameters that
+default to the old behaviour); `screens.js` / `styles.css` (premium badge).
+
+**Measured** (run in this container; render times are SwiftShader on the
+CPU and do not represent a GPU — draw calls, triangles and tick times do):
+
+| check | result | reference |
+| --- | --- | --- |
+| model span / length | 18.04 m / 10.96 m | 18.04 / ≈ 10.9 |
+| AT-802A parked | three wheels, 10.5°, 3.47 m to the fin top | — |
+| PT6A-65AG full power | 1,293 shp, 1,700 rpm, 3,996 ft·lb, 429 L/h, 19.3 kN static | 1,295 shp |
+| stall at 7,257 kg | 91 kt clean, 76 kt flaps | 92 / 79 kt |
+| climb at 7,257 kg / 4,500 kg | 759 / 1,773 ft/min | ≈ 780 |
+| full power level at 5,500 kg | 163 kt | cruise 166 kt |
+| take-off roll 7,257 / 4,200 kg | 838 m / 227 m (flaps 1/3, 320 m field, the test's technique) | ≈ 610 m (sea level) |
+| Fire Boss level at 5,500 kg | 147 kt (AT-802A 163) | max cruise 150 KIAS |
+| Fire Boss afloat, 4,245 kg | 0.59 m draft, 3.3° nose up, water carries 100 % | — |
+| water take-off 4,300 / 5,216 kg | 285 m / 473 m | — |
+| water take-off from rest, 6,400 kg | not airborne (overload) | limit 5,216 kg |
+| scoop run | 2,966 L in, stops at the 7,257 kg limit; 2,603 L limit with full fuel | 3,104 L tank |
+| partial / full drop | 649 L in 0.5 s, mass down by the same; 3,000 L emptied | — |
+
+Tests: `node --test test/at802.test.mjs` (13 tests, part of `npm test`,
+155 pass); `test/at802e2e.mjs` in the browser, 12 / 12 (premium lock in
+card, `selectAircraft` and `_activate`; AT-802A spraying; Fire Boss afloat,
+scooping with T — 898 L in 4 s —, gear with U, a drop with C on test fire 2
+— 1,264 L on target, intensity 100 → 39 % —, the fleet parked without
+overlap, re-locked, no page errors); `test/at802cockpit.mjs` for both
+configurations (views, GPS soft keys by click from the pilot's view; looking
+down: Fire Boss gear / probes / door switches and the AT-802A spray valve by
+click); `test/fleetswitch.mjs` 180 switches, none failed;
+`test/at802ortho.mjs` orthographic views of both configurations.
+
+Performance, medium quality (`test/perf.mjs`, before = the build before the
+AT-802, Ipanema flown): load 45.1 → 48.7 s, heap 454 → 507 MB (the two
+AT-802 models in the fleet); base view 823 → 906 draw calls with both
+parked at the base (other views unchanged); tick times within run-to-run
+noise. With the AT-802A flown the cockpit interior is drawn only from the
+cockpit or a camera within 12 m: chase view 352 draw calls (Ipanema 391),
+cockpit view 405. The first entry into the cockpit view compiles its
+shaders (a 1–9 s stall under SwiftShader, once).
+
+**Not done / pending.**
+- Take-off roll at MTOW longer than the published figure (838 against
+  ≈ 610 m) at the game's 320 m field elevation with the test's rotation;
+  climb, stall and cruise match.
+- Oil pressure / temperature, fuel pressure, volts and OAT are not
+  simulated (shown `---` N/S).
+- The Fire Boss's mission switches sit on the lower console, below the
+  default view (look down to reach them); the gear lamps, water readout and
+  mission display are in view.
+- The sound is the existing turboprop profile with five blades; no
+  scooping / drop sounds.
+- There is no premium store in this repository: the entitlement source is
+  the integration point for the platform's existing system.
+
+## Aircraft 11 — Piper PA-36-300 Pawnee Brave (PR-PWB), phase 01: exterior and physics
+
+An eleventh aircraft with its own geometry (`src/aircraft/pa36Model.js`),
+flight figures (`FLIGHT_PA36`, `SPRAY_PA36` in `src/config.js`), its
+panel (`src/aircraft/pa36Panel.js`, rewritten in phase 02 below) and registry entry
+(`AIRCRAFT_TYPES.pa36`, after the AgTruck in the hangar list). PR-PWB is a
+fictional Brazilian registration. The detailed Brave 300 cockpit is the next
+phase (Prompt 02); this phase delivers the exterior, the physics, two
+paints, the integration and the cabin anchors.
+
+**References.** Only the images sent with the brief: the Earl Stahl Pawnee
+Brave plan (side and top views; the side view scaled to 68.3 px/m by an
+8.2 m spinner-to-rudder length), VH-SVO (white/red, rear three-quarter),
+N44523 (white/red, side, in flight), two front three-quarter views, and —
+viewed in the conversation, not on disk — HA-MJG and TC-ZH (yellow/blue)
+and N57886. No photograph is used as a texture.
+
+**Figures.** Lycoming IO-540-K1G5, 300 hp at 2,700 rpm, Hartzell two-blade
+constant-speed prop of 2.13 m; span 11.8 m; length 8.2 m; height 2.3 m;
+wing 20.9 m²; empty 1,039 kg; MTOW 1,996 kg (restricted category); fuel
+326 L; standard hopper 852 L (the 1,041 L option is not fitted), 862 kg
+structural limit. Like the AgTruck and the 203, the hopper's volume is not
+payload (`loadByWeight`): with full fuel the MTOW leaves 637 kg of product,
+and the load sheet shows an over-weight load in red instead of hiding it.
+`productLimit()` now also honours a hopper's own `maxHopperKg` (only the
+Brave defines one).
+
+**Geometry** (reference frame = the plan's: on three wheels, ground at
+y = −1.42; the model is pitched 9° nose-down into the body frame by its
+`stance` group, `pa36ToBody()` maps points):
+- fuselage lofted from its own sections (belly superellipse, straight side,
+  rounded top cap): the long flat-topped cowl and hopper, the cowl face
+  with the shaft high in it, two round inlets low and the oil cooler
+  opening, exhaust stacks, black hopper deck and lid;
+- single-seat cabin standing on the top longerons: raked windshield,
+  flat roof with tinted panel, side glass to the B-post, rear quarter
+  glass, door, frames; wire cutter on the windshield and the cable to the
+  fin top, whip and GPS antennas;
+- (rear fuselage and empennage rebuilt from the photographs — see "final
+  geometry correction" below) turtledeck falling steeply behind the
+  cabin, then the straight spine to the tail cone;
+- cantilever low wing: constant 1.75 m chord, the straight root glove
+  (0.35 m at the root, gone 1.9 m out), 6° dihedral, chord 10° to the
+  ground on three wheels (1° incidence), upswept tip caps, flaps
+  0.55–3.1 m and ailerons 3.15–5.65 m on hinge brackets, nav lights and
+  strobes, walkway, fuel fillers, pitot;
+- tall swept fin and the raked rudder cut from the same section
+  (flush at the hinge), strut-braced tailplane with elevators, beacon;
+- oleo main legs under the leading edge with the drag brace and brake
+  line (2.44 m track, 0.64 m tyres), the tail spring and steerable
+  tailwheel under the rudder;
+- booms 0.2 m under the trailing edge on four hangers a side, 17 nozzles a
+  side, the cross pipe and feed under the belly, the wind-driven pump
+  between the legs;
+- two-blade Hartzell (paddle blades, yellow tips) with a pointed spinner.
+Compared with the plan (`test/pa36ortho.mjs` writes the side view at
+144 px/m; the plan overlaid at the same scale on the spinner tip and
+thrust line): length, nose, fin, rudder, tailplane, belly and tailwheel
+coincide within a few centimetres. Deliberate departures: the cabin roof
+is ≈ 0.1 m higher and the ground line 0.11 m higher than on the plan
+(a rubber-model drawing), which keeps the published 2.3 m height with the
+cabin proportions of the photographs.
+
+**Paints** (same meshes; livery and wing canvases and a few colours change;
+title card Paint A / B, saved as `pa36Livery`):
+- **A — Classic red** (VH-SVO, N44523, N57886): white; a red cheatline from
+  the cowl widening behind the cabin, where the registration sits in white
+  (as on N44523), and running down to a red tail bottom; red pinstripes;
+  red fin cap, spinner, wing tips and the red flash over the wing roots;
+  BRAVE 300 badge on the cowl; RESTRICTED placard.
+- **B — Yellow & blue** (HA-MJG, TC-ZH): yellow; a broad blue band with dark
+  pinstripes, a blue sash on the fin, two blue stripes across each outer
+  wing, blue tips and spinner.
+The wing canvas has an upper and a lower half, so stripes and the root
+flash are on the upper surface only.
+
+**Physics** (`FLIGHT_PA36` on the existing piston / constant-speed branch;
+calibrated in `test/pa36.test.mjs`, not copied from another type): CD0
+0.0563 with the dispersal kit, of which `CDsprayKit` 0.021 is the kit's
+share (used only by the cruise check without it); oswald 0.78 (AR 6.7);
+inertia, the hopper just ahead of the CG (`hopperOffsetZ`), fuel in the
+wings (`fuelTankSpanY`), taildragger gear contacts and tail steering, hard
+points (tips, booms, prop, belly, tail, fin, roof). One opt-in addition to
+the shared engine branch: `radial.lapse` (only the Brave sets it) makes a
+normally aspirated engine lose manifold pressure with the ambient pressure
+and power with the density (Gagg–Ferrar). The other aircraft never reach
+it: their 28 golden physics traces are unchanged; the Brave's two were
+added (`plane.pa36.calm` / `.wind`).
+
+**Integration.** Hangar card and paint selector, settings and save,
+office name, the farm strips that take the AgTruck, its own parking spot
+(`parking9`, south-west corner of the apron, also at the secondary farms),
+service points and keep-out boxes for the hoses, collision / wire points,
+bounds, GPS theme, Portuguese strings. Sound: the existing IO-540 profile
+with its own two-blade 2.13 m prop and 600–2,700 rpm (the same engine
+family; no new sound system). Cameras: the existing chase / orbit /
+cockpit rig with the Brave's own distances.
+
+**Cockpit preparation** (`PA36_CABIN`, reference frame): eye (0, 0.66,
+−1.72), seat (0, −0.27, −1.75), panel centre (0, 0.22, −0.985), floor
+y −0.42, stick (0, −0.48, −1.24), pedals (±0.18, −0.44, −0.78), throttle
+(0.33, 0.10, −1.22), door (0.47, 0.6, −1.4), windshield (0, 0.7, −1.12),
+roof (0, 0.9, −1.64); sill 0.46, rail 0.80, windshield base z −0.93, roof
+front −1.33, rear frame −1.95, B-post −1.8. The provisional cockpit (shell,
+seat, stick, pedals, throttle, valve, light bar and a grey six-gauge
+panel redrawn at 15 Hz only in cockpit view) sits on these anchors.
+
+**Measured** (`node --test test/pa36.test.mjs`, in this container):
+
+| check | result |
+| --- | --- |
+| span / length / height (model) | 11.800 m / 8.200 m / 2.32 m |
+| product allowed by the MTOW | 637 kg with full fuel (hopper 852 L) |
+| parked | three wheels down, pitch 8.8°, height 2.28 m, drift 1.4 cm |
+| start | catches after 1.3 s, idle 600 rpm, 11.5 inHg |
+| full throttle, static, σ 0.963 | 2,700 rpm, 287 hp (300 hp at sea level), 27.9 inHg, 101 L/h, 5.72 kN |
+| take-off roll 1,210 / 1,996 kg | 135 m @ 55 kt / 385 m @ 65 kt |
+| climb at 72 kt, 1,350 / 1,996 kg / 1,996 kg at ≈ 8,000 ft | 1,124 / 533 / 149 ft/min |
+| cruise at 75 % power, 1,700 kg | 191 km/h TAS with the kit, 229 km/h without (published 190 / 228) |
+| cruise 75 %, 1,996 kg / at 5,000 ft | 181 / 195 km/h TAS |
+
+Browser checks (`test/pa36e2e.mjs`, Chromium + SwiftShader, all passed):
+hangar card and selection; paints A/B switch and persist; dimensions from
+the geometry on the ground (span 11.84 m with the tip lights, length
+8.19 m, height 2.38 m to the wire cutter); open faces / wrong winding (the
+model drawn double-sided and front-only from 12 directions at 960×540:
+18 stray pixels of ≈ 0.5 M silhouette pixels, ≤ 0.011 % per view, at
+sub-pixel cracks — the open tube ends and domes found by this check were
+closed); cabin (0.94 m between the walls at the shoulders, eye 0.24 m
+under the roof, 0.86 m from the panel); full flaps clear the boom by
+0.20 m, the compressed wheels clear the wing; tyre bottoms within 1 cm of
+the terrain; 10 s parked on the brake, drift 0.06 cm; blade tips on the
+shaft circle at every angle; 34 nozzles and spraying empties the hopper;
+cockpit eye 0.22 m from the nearest surface (near plane 0.05 m); the
+whole fleet parked with the Brave on `parking9`, no overlaps; no growth
+in geometries or textures over 15 aircraft switches and 10 paint changes;
+draw cost 122 meshes / 68 k triangles (AgTruck 203 / 101 k, Ipanema 203
+228 / 114 k); no page errors. Bundle: +42 kB (+12 kB gzip).
+
+**Not done / limits.**
+- (The provisional cockpit was replaced in phase 02, below.)
+- Temperature is not modelled anywhere in the shared physics: altitude
+  acts through density only; the lapse is the Brave's alone.
+- The 1,041 L hopper option, the Brave 375 and the 285 hp variant are not
+  modelled.
+- Frame time on a real desktop or phone GPU was not measured here; only
+  the static cost above (SwiftShader frame times are not representative).
+- The dimensional comparison is against a model-builder's plan and
+  photographs, not factory drawings: no exact fidelity is claimed.
+
+## Aircraft 11 — Pawnee Brave, phase 02: cockpit
+
+The provisional cabin is replaced by a cockpit built from the reference
+image (the Brave 300 panel seen from the pilot's seat):
+`src/aircraft/pa36Cockpit.js` (geometry, per-frame needles) and
+`src/aircraft/pa36Panel.js` (dial atlas, placards, panel textures, GPS).
+Everything is built in the model's reference frame on the `PA36_CABIN`
+anchors; no other aircraft, system or global module changed.
+
+**What is there.**
+- *Upper pod*: the raised black box with recessed instruments in a rim —
+  oil temperature, airspeed (MPH outside, knots inside), tachometer with
+  the hobbs, manifold pressure / fuel flow, fuel quantity — the oil-press
+  lamp and the red boost-pump rocker; the wet compass apart on its right
+  (a card turning with the heading, figures right to left).
+- *Padded band* under the windshield with its placards (take-off /
+  landing check list, maximum speed, crosswind, alternate static, operating
+  limitations, no smoking).
+- *Stepped lower panel*: clock (the game's time of day), oil pressure /
+  CHT, ammeter, magneto and master rockers, breakers, toggles, start
+  button, the radio with its LCD and the registration plate.
+- *Centre box*: the hopper sight window (frame, tunnel, glass, the product
+  level following the hopper).
+- *Controls*: the long stick with boot and ribbed grip (moves with pitch
+  and roll), the pedals with hinge tubes, arms and brake cylinders (move
+  with the rudder), the throttle on the left console (moves with the
+  power), the blue propeller lever and the white-knobbed lever on the
+  right wall (static: the constant-speed prop is governed by the flight
+  model; the white lever's function is not legible on the reference).
+- *Cabin*: floor with tread plates and wiring, side walls following the
+  fuselage, the right door with frame, red handle and EMERGENCY placard,
+  padded A-posts over the windshield frame, B-posts, sill pads, headliner
+  round the tinted roof panel, rear bulkhead, seat and harness.
+- *GPS*: the existing AGROWINGS unit (`createAgroNav`) in a compact housing
+  on a bracket beside the pod, its four soft keys picked by click / tap.
+
+**Data**: the needles are damped readings of `Aircraft.instruments()`
+(airspeed, rpm, manifold, fuel flow, oil temperature and pressure, CHT,
+fuel, heading, hopper); the panel texture is redrawn at 15 Hz only in the
+cockpit view (every 0.3 s when the camera is within 9 m outside).
+
+**Cost**: static parts merged per material; small hardware in an LOD level
+hidden beyond 18 m; the whole interior hidden beyond 30 m outside the
+cockpit view. Panel textures ≈ 4.5 Mpx.
+
+**Checks** (in this container, Chromium + SwiftShader):
+`test/pa36ckcheck.mjs` — flown through the game's own inputs (keyboard on
+a desktop page, touch controls and a tap on a phone-sized page), all
+passed: 1 parked, 2 engine start, 3 taxi (eye shake 1.3 mm RMS), 4 take-off,
+5 steady flight (needles within 4° of the data), 6 turns at ±40° bank,
+7 approach and landing, stick at full deflection clear of the panel and
+seat, 8 fixed camera, 9 free look (nearest surface 0.195 m, near plane
+0.05 m), cabin closed (back faces seen from the eye in 14 directions
+≤ 0.05 %), 10 outside ↔ inside, 11 GPS keys, 12 mobile controls; no page
+errors. `test/pa36cockpit.mjs` renders the reference-framed view (pitch
+−28°, vertical FOV 64°), the game's cockpit camera on the ground and in
+flight, close-ups, and outside views framed as the reference photographs.
+
+**Limits.**
+- Fidelity is to one reference image; placard texts are representative,
+  not copied.
+- The electrics are not simulated beyond master / engine state (ammeter,
+  lamps, radio LCD).
+- A few pixels (≤ 0.05 %) of grazing seams between the headliner and the
+  roof remain visible looking straight up.
+- Frame time on a real GPU was not measured here.
+
+## Aircraft 12 — Grumman G-164A Super Ag-Cat 450, radial (PR-GAC), phase 01: exterior and physics
+
+The radial Ag-Cat — Pratt & Whitney R-985 Wasp Jr, nine cylinders, 450 hp,
+direct drive, two-blade Hamilton Standard constant-speed prop — with its
+own geometry (`src/aircraft/agcatModel.js`), figures (`FLIGHT_AGCAT`,
+`SPRAY_AGCAT` in `src/config.js`), registry entry (`AIRCRAFT_TYPES.agcat`,
+after the Brave in the hangar list, parking spot `parking10`); its phase-01
+provisional flat panel was replaced by the cockpit of phase 02 below. Not a Turbo Ag-Cat,
+not a G-164B. PR-GAC is a fictional Brazilian registration. The cockpit
+here is only its structure on the final anchors (`AGCAT_CABIN`: eye, seat,
+floor, walls, panel space, stick, pedals, quadrant, GPS point); the real
+Ag-Cat cockpit is phase 02.
+
+**References.** Only the images sent with the brief (N7509V, TI-AYR, the
+PZ- radial, N8362K, N974H, N84PG, the Hellenic 1569, N8882H, a head-on
+view; the Garrett turbine N-48429 only as what not to copy). Proportions
+were measured against the R-985's 1.17 m diameter (fuselage depth under
+the sill ≈ 0.98 m, gap ≈ 1.9 m, wheel ≈ 0.72 m). No photograph is used as a
+texture.
+
+**Figures.** Span 10.95 m (upper), length 7.42 m, height ≈ 3.30 m, wing
+30.47 m² (both wings), empty equipped 1,220 kg, MTOW 2,041 kg, hopper
+1,136 L with a 907 kg structural limit, fuel 175 L, 450 hp at 2,300 rpm,
+no flaps, stall 67 mph (58 kt) at 4,500 lb, climb ≈ 1,080 ft/min. Volume is
+not payload: with full fuel the MTOW leaves 610 kg of product. Estimated
+(not published or not found): lower span 10.5 m, chords 1.42 m, gap 1.92 m,
+stagger 0.5 m, prop 2.59 m, CD0 0.062 and the biplane induced drag through
+Munk's span factor (k² ≈ 1.31, folded into `oswald`), inertias, fuel flow.
+
+**Geometry** (body frame, origin at the CG): exposed R-985 — nine finned
+cylinders (one cylinder built once and placed nine times, merged), black
+crankcase and nose case, push-rods, intake pipes, ignition harness,
+governor, magnetos on the accessory case, collector ring and the stack on
+the right — in a narrow ring cowl; slab-sided fuselage with the tan
+hopper lid ahead of a framed single-seat canopy (raked windshield, door
+post, rear pane, opaque roof) standing behind the upper wing's trailing
+edge; two wings built separately (upper flat with 1.5° incidence, lower
+at the fuselage bottom with 3° dihedral, 0.5 m aft), rounded trailing tip
+corners, fabric rib tapes in the bump map, ailerons on all four panels
+(the lower pair linked to the upper one); N interplane struts at 3.3 m,
+cabane N-struts from the hopper sides, doubled flying wires and landing
+wires; square-topped fin and rudder down to the fuselage's lower line,
+the tailplane on the fuselage with struts under it and wires to the fin;
+splayed spring main legs with drag braces (2.3 m track, 8.50-10 tyres),
+the tailwheel on its long leaf spring; booms under the lower wing's
+trailing edge on five hangers a side, 16 nozzles a side, the windmill
+pump under the belly; bare Hamilton Standard hub with counterweights.
+On three wheels it stands 12.0° nose-up, 3.04 m to the upper wing,
+3.25 m with a blade standing up.
+
+**Paints** (`agcatLivery`): A — classic yellow, dark metallic radial and
+ring, black prop with yellow tips; B — yellow and blue: a straight blue
+band with a navy pinstripe from the cowl to the rudder (straight in the
+side projection, whatever the taper), blue ring, blue fin bands, blue wing
+and tailplane tips, navy canopy frames.
+
+**Physics.** The radial / constant-speed branch of the flight model
+(`engineType: 'radial'`, direct drive `gear: 1`, normally aspirated
+`lapse`), `noFlaps` (the flap keys and the autopilot's flap calls do
+nothing on this type), contact points from the gear above. Measured in
+`test/agcat.test.mjs`: start 2 coughs, catch at 2.4 s, idle 520 rpm; full
+throttle 2,300 rpm, 431 hp at the field's density (σ 0.963, 431 expected),
+7.6 kN static thrust; stall 58.4 kt IAS at 2,041 kg in slow flight; climb
+at 64 kt 1,027 ft/min at 2,041 kg (field density, σ ≈ 0.92), 1,698 at
+1,450 kg, 556 at ≈ 8,000 ft; full-power level 108 kt; 241 hp → 85 kt
+(working speed); take-off roll 108 m light, 229 m at the MTOW. The golden
+physics traces of the other ten aircraft are unchanged (30 of 30
+identical); the Ag-Cat adds two.
+
+**Sound.** Its own `r985` profile on the radial layers: a crisper,
+higher bark than the Dromader's ASz-62, a faster idle lope, two-blade
+blade-pass with no reduction gear, a higher inertia-starter whine; the
+coughs and the catch of the radial start.
+
+**Integration.** Hangar card and selection, both paints, free flight,
+contracts (allowed on the same restricted strips as the Brave; nothing
+requires it), office, GPS theme, load sheet (ground roll fitted to the
+measured rolls), service points (badeco outboard of the main wheel; the
+upper wing is walked under), i18n.
+
+**Validation** (`test/agcate2e.mjs`, all pass): card and selection, paints
+A/B persist, dimensions from the vertices (10.954 / 7.44 / 3.04 m), wheels
+on the ground within 1 cm, parked 10 s drift 0.13 cm, open faces 0.035 %,
+clearances (compressed wheel 0.32 m under the lower wing, prop 0.53 m
+tail up, nozzles 0.48 m over the ground on three wheels), linked ailerons,
+no flaps, prop pivot, spraying, cockpit camera clear, fleet parked without
+overlaps, no geometry/texture growth over 15 switches and 10 paint
+changes, no page error. In the game, through the touch input
+(`input.virtual`): start, take-off (192 m, 64 kt), climb to 120 m, cruise
+96 kt at 2,300 rpm / 25.9 inHg, camera switches, spraying, landing
+(touchdown 51 kt, 1.9 m/s, stopped, no damage).
+
+## Aircraft 12 — Grumman G-164A Super Ag-Cat, phase 02: cockpit
+
+The real cockpit of the radial Ag-Cat (`src/aircraft/agcatCockpit.js`,
+instrument textures in `src/aircraft/agcatPanel.js`), built inside the
+phase-01 cabin on its anchors (`AGCAT_CABIN`, `AGCAT_CK`) in the same body
+frame — the exterior geometry was not changed to fit it. The arrangement
+follows the FSX reference sent with the brief, checked against the
+photographs of real G-164A cockpits (the Satloc cockpit, two in-flight
+views, the AgAir panel); where the simulator and the photographs differ the
+photographs win (the modern Satloc / Airvision screens of the photographs
+are replaced by the game's own GPS in a compact housing, the analog panel
+kept).
+
+**Geometry.** (1) The raised black POD under the windshield: thick rounded
+rim, recessed face, airspeed (mph, knots inside), the compass window (the
+heading card scrolls behind it), altimeter, the FUEL WARNING lamp with its
+placard and the red boost-pump switch; the white boom-pressure gauge on its
+own bracket at the pod's left; the guidance light bar on the pod's top.
+(2) The angular LOWER PANEL: two boards turned 25° toward the pilot with a
+cut outer corner — oil (pressure / temperature) and the tachometer with its
+hour meter on the left; manifold pressure, fuel quantity (white face) and
+cylinder-head temperature on the right — and the centre frame (top band,
+two straps, the perforated plate). (3) The hopper's sloped rear wall seen
+below the pod, translucent fibreglass with the GROUND / FLIGHT gallon scale
+and the product level behind it, down to the footwell. (4) The welded tube
+frame (longerons, posts, wall diagonals, the cross tubes, the V from the
+floor to the panel's corners) over painted skins. (5) The centre stick (floor
+pivot, boot, shaft, black grip with the spray trigger), the aluminium
+pedals on their hinge tube with the brake cylinders. (6) Left: the throttle
+quadrant on the wall (throttle, propeller, mixture), the magneto switch,
+the red hopper dump handle and its red V linkage; right wall: the
+electrical panel. (7) Floor plates, seat and harness. (8) AGROWINGS NAV
+(the game's GPS: navigation, AB lines, talhões, coverage, mission) in a
+compact housing on a bracket at the pod's right, its keys clickable /
+touchable.
+
+**Instruments** (every needle from `Aircraft.instruments()`, damped, only
+while the camera is in the cockpit or within 9 m): airspeed, altimeter (100 ft
+and 1,000 ft hands), compass card (heading), tachometer, manifold pressure,
+oil pressure and temperature, cylinder-head temperature, fuel (US gal of
+the 46-gal tank), the fuel lamp (under 15 % with the master on), the
+magneto key (off / both / start from the engine state). The boom-pressure
+gauge reads the sprayer's metered flow as a fraction of its full flow on a
+40 psi working pressure — the game has no pressure model, so this is the
+one gauge mapped rather than measured. Dial faces are drawn once into a
+2048×1024 atlas; needles are 3D meshes turned per frame (no texture redrawn
+per frame); the hopper level is redrawn only when it moves by 1 %.
+
+**Camera.** Eye (0, 0.90, −0.98): 0.30 m under the roof, 0.39 m over the
+sill, ≈ 0.85 m from the pod; default pitch −0.30 rad, 70° FOV, near plane
+0.05 m (the nearest structure is 0.34 m from the eye). The pod sits at 77 %
+of the frame's height, the horizon at 26 %, the upper wing at the top; the
+side views show both wings, the interplane N struts and the wires.
+
+**Measured** (`test/agcatcockpit.mjs`, all pass; Chromium + SwiftShader):
+needles within 0.2° of the value for each instrument; the four GPS keys
+answer a click on the screen; stick at full travel (±0.25 rad both axes)
+≥ 8.7 cm from every surface; pedals and throttle follow the controls; eye
+clear; fuel lamp; cockpit in / out ×10 with no geometry / texture growth;
+parked, its cockpit geometry and canvases are released and rebuilt on
+selection. Cockpit cost against the Brave's (same scene): 116 meshes vs
+133, 15.7 k triangles vs 36.3 k, 2.98 MPx of textures vs 5.15 MPx, 453 draw
+calls in the cockpit view vs 443; first cockpit frame after the selection
+32 ms (9 ms on the next entry).
+
+## Aircraft 12 — Grumman G-164A Super Ag-Cat, geometry correction and cockpit refit
+
+A surgical correction of the phase-01 exterior against the photographs
+TI-AYR, N84PG and N-48429, then the phase-02 cockpit moved into the corrected
+cabin as one block. Wings, struts and wires, gear, spray system, physics,
+menu / hangar and the optimisation path are unchanged.
+
+**What was wrong** (side and 3/4 comparisons with the photographs): the
+cabin stood 0.5 m too far forward, half under the upper wing, with a flat,
+box-like roof and a vertical rear pane; the fuselage bottom rose early, so
+the tail looked long and thin; the Townend ring (r 0.68) made the nose look
+heavier than on the photographs, where the R-985's cylinders stand in the
+air ahead of the baffle.
+
+**Exterior.** (1) Cabin moved aft: windshield foot −0.35 → −0.85 (behind the
+upper wing's trailing edge, as on the photographs), roof crest 1.235 at
+−1.6, window rear −2.22. (2) One shell from the windshield's foot to the fin
+(`CREST`, a monotone cubic through measured knots): raked windshield, a
+rounded roof crest (superellipse arch, no flat top), side windows to the door
+post and behind it, the rear edges curving down with the fairing, which falls
+in one curve into the turtledeck and on to the fin. Its quads are split by
+region into glass, roof (scheme colour) and painted turtledeck; a bulkhead
+closes the cabin behind the seat. (3) Under it a slab-sided box fuselage
+(`BOX` stations: straight sides under the longerons, superellipse belly)
+whose bottom line stays nearly straight to the tail post: the rear fuselage
+is 0.86 m deep at −3.0 and 0.58 m at −4.4 (was markedly shallower). (4) The
+forward stations square into the cabin's straight sides, with a collar at
+the windshield's foot. (5) No ring cowl: the nose baffle is cut to the
+fuselage's first section; steel engine mount ring behind the cylinders.
+(6) Rudder and hinge post down to the new tail bottom; hopper lid, latches
+and step re-placed on the longer forward deck.
+
+**Cockpit refit.** The cockpit (`AGCAT_CK`, its own frame) is placed
+`CK_DZ` = −0.5 m aft as a unit (`cockpit.position.z`), the pilot and eye with
+it: eye (0, 0.90, −1.48), 0.335 m under the roof, 0.39 m over the sill; the
+pod and boom gauge moved 1 cm aft for glass clearance; the inner side walls
+kept 1 cm in from the skin and 3 cm over the floor (where the belly curves
+in). Pedal animation now uses the cockpit-frame rest point. Roof collision /
+wire point moved to the new roof (z −1.6).
+
+**Measured** (Chromium + SwiftShader): `test/agcate2e.mjs` 16 / 16 (back
+faces 0.003 % worst view, was 0.084 % before the collar and baffle),
+`test/agcatcockpit.mjs` 8 / 8 (upper wing at 7 % of the frame's height,
+horizon 26 %, pod 78 %, nearest structure 0.333 m from the eye),
+`npm test` all pass; golden physics: only `plane.agcat.calm` changed (that
+scripted run ends in a ground contact touching the roof hard point, now on
+the roof), every other aircraft identical. Draw cost of the aircraft (same
+test): 198 meshes, 79.7 k triangles (was 198, 79.6 k), 7.98 MPx textures
+(unchanged).
+
+## Aircraft 13 — Embraer EMB-201A Ipanema (PR-IPC): exterior, physics and cockpit
+
+A new aircraft with its own geometry (`src/aircraft/e201Model.js`), cockpit
+(`e201Cockpit.js`, instrument textures `e201Panel.js`) and flight figures
+(`FLIGHT_E201`); nothing is taken from the EMB-202A or 203 models — only the
+shared machinery (lofting helpers, the dial-atlas technique, the game's GPS,
+the pilot figure).
+
+**References.** The blueprint's side view (axis level, scaled by the
+published 7.43 m length: spinner tip → windshield base 3.0 m, roof front
+3.37, roof rear 4.1, the rear fairing meets the dorsal at 4.67, fin LE root
+5.9 / top 6.5, rudder 7.32; main axle 2.03; roof 1.08 and dorsal 0.51 over
+the thrust line, fin top 1.45; ≈ 10° three-point); photographs PT-UCV, the
+yellow / blue 201 in flight, PT-UDY and the SAE orange 201; the yellow-cabin
+cockpit photograph; the EMB-202 cockpit video for the pilot's perspective
+only. Published figures: span 11.69 m, length 7.43 m, wing 19.94 m²,
+IO-540-K1J5D 300 hp, two-blade Hartzell 2.13 m, hopper 680 L, fuel 292 L,
+empty ≈ 1,011 kg, maximum 1,800 kg.
+
+**Exterior.** Slim cowl to a pointed spinner with two cooling inlets and the
+left exhaust stack; hopper lid with its loading box; the cabin a framed
+"doghouse" on the flat-topped fuselage — raked windshield with a centre
+strip, flat side windows leaning in, the roof with a small visor, a short
+convex fairing with the quarter window — then a straight dorsal at the
+hopper's height into the fin (one shell over a slab-sided box fuselage
+whose bottom line runs nearly straight to a 0.55 m deep tail post); tall fin
+with a straight 32° leading edge and flat top; rectangular tailplane on the
+cone; constant-chord wing with 7° dihedral and drooped tips (no winglets),
+flaps and ailerons; tubular V main legs, spring tailwheel under the rudder;
+booms on four hangers a side (18 nozzles each), wind-driven pump. Paint A —
+green with the Brazilian flag on the fin and a yellow/white cheat line;
+paint B — yellow-orange with the straight blue band widening over the tail
+cone, blue fin cap and tips (menu A/B, `e201Livery`).
+
+**Cockpit.** Grey panel (its own outline, the lower edge stepping down on
+the right) under a dark matte padded lip curved in plan; seven 3D
+instruments placed as on the photograph (CHT, oil, fuel and the digital hour
+meter on the left; altimeter over airspeed and tachometer on the right,
+manifold pressure lower right; dial legends assigned from the flight model's
+values, not read off the photograph), the magneto key, the low-fuel lamp,
+the switch / breaker row, dimmer, the control box with the spray lamp; the
+game's GPS in a housing left of the centre where the photograph's moving map
+sits, its page keys in the coloured row; the hopper's front wall with the
+round sight window and the live product level; light lower walls with frame
+ribs, floor plates, the bent-tube stick, pedals, the throttle / propeller /
+mixture quadrant on the left wall, the red dump handle, the brown leather
+seat, the grab handle. Eye (0, 0.88, −1.38), pitch −0.25 rad, 68° FOV.
+
+**Measured** (Chromium + SwiftShader): `test/e201.test.mjs` 7/7 (300 hp at
+2,700 rpm; full-power level 117 kt; climb 813 ft/min at 1,800 kg, 1,248 at
+1,400 kg; clean stall 60 kt at MTOW; take-off roll 127 m light, 294 m at
+MTOW; three-point 10.8°, 2.24 m); `test/e201e2e.mjs` and
+`test/e201cockpit.mjs` (see the report); golden physics: only the two new
+`plane.e201.*` scenarios added, every other aircraft unchanged.
+
+## Aircraft 14 — Air Tractor AT-401B (PR-ATR): exterior, physics and cockpit
+
+A new radial aircraft with its own geometry (`src/aircraft/at401Model.js`),
+cockpit (`at401Cockpit.js`, instrument textures `at401Panel.js`) and flight
+figures (`FLIGHT_AT401`, the existing radial branch of the flight model);
+nothing is taken from the AT-402 / 502 / 802 models or another cockpit.
+
+**The reference package (fsxat401.zip) was studied, not imported.** Its
+`aircraft.cfg` / `panel.cfg` only confirmed the layout (instrument list of
+the 2D panel, eyepoint, contact points); its MDL (FS2004 BGL/MDL8) could not
+be decoded with the tools available, so no geometry, UV, animation, texture,
+sound or `.air` data was used. Proportions come from the photographs
+(PR-DDD side view rotated to the 10.6° three-point attitude and scaled by
+the published 8.23 m length; N7317E; the low front views; the cockpit
+photographs) and the published figures: span 15.57 m, length 8.23 m, wing
+28.5 m², P&W R-1340 600 hp at 2,250 rpm, Hamilton Standard two-blade 2.63 m,
+hopper 1,514 L, fuel 477 L, MTOW 3,565 kg.
+
+**Exterior.** Round ring cowl with the nine R-1340 cylinders, collector ring
+and the low right exhaust stack; slab-sided hopper bay rising to a tall
+greenhouse canopy with a centre post, wire cutter and deflector cable to the
+fin; long tapering rear fuselage, tall swept fin, strut-braced tailplane;
+constant-chord wing with flaps and ailerons, squared tips, nav lights,
+walkway; spring main legs on big tyres, tailwheel; booms with 22 nozzles a
+side, wind-driven pump; bare-hub two-blade prop. Paint A — yellow with the
+blue band between black pinlines and a blue fin band; paint B — factory
+yellow, black cheat line, black fin band, blue tips (`at401Livery`). Parked
+on its own apron spot `parking12` (−490, −114), clear of the windbreak.
+
+**Cockpit.** Black panel whose top edge is the cabin's own section (inset),
+so it arches under the windshield, with the raised housing of three engine
+dials (MP, tachometer, fuel flow) and the magnetic compass on it; along the
+arch the turn coordinator at the centre, airspeed / altimeter / VSI to the
+right, oil P/T, CHT, fuel and hopper stepping down to the left; six
+push-button annunciators (fuel low, oil pressure, start, stall, park brake,
+spray); the game's GPS (AGROWINGS NAV) low in the centre, the big white
+spray-flow gauge low on the right, the yellow hour meter, magneto key,
+warning lamps, guarded boost-pump switch, switch / breaker panels; black
+coaming to the windshield base; yellow walls, floor and tube frame; left
+quadrant (throttle, propeller, mixture), right console with the spray valve
+lever, the floor flap lever (follows the flaps), stick with the black grip
+and red button, pedals, red mesh seat with harness. Every dial reads
+`Aircraft.instruments()`; nothing the simulator does not compute is shown
+(no volts / amps). Eye (0, 1.4, −1.4), pitch −0.22 rad, 68° FOV.
+
+**Measured** (Chromium + SwiftShader): `test/at401.test.mjs` 7/7 (574 hp
+static at 2,248 rpm; level 120 kt; climb 636 ft/min at 3,565 kg, 1,117 at
+2,600 kg; polar stall 67.7 kt at MTOW; take-off 151 m at 2,105 kg, 445 m
+at 3,565 kg; three-point 10.8°, 2.75 m); `test/at401e2e.mjs` 15/15
+(span 15.57, length 8.23, height 2.75; faces; clearances; 22 nozzles a side;
+parking; memory; 171 meshes / 99.6 k triangles, in line with the Dromader);
+`test/at401cockpit.mjs` 9/9 (needles ≤ 3°, GPS keys, controls and grip
+clearance, view, lamps / annunciators, containment of every cockpit vertex
+in the fuselage section, cockpit in/out ×10 and parked release with no
+growth); golden physics: only `plane.at401.*` added.
+
+## AT-802A / Fire Boss: paint B
+
+Both now offer paint A / B on the menu card (`at802Livery`, `fbLivery`). B
+follows the photographs N817RX, PR-CUN and the Croatian Fire Boss: yellow
+with a dark-blue cheat line edged in navy, blue rudder and wing / tailplane
+tip bands; the Fire Boss floats carry the blue stripe (FIRE BOSS lettering
+kept). Only the canvases and the accent colour change (`setLivery`): no
+geometry, physics or cockpit change.
+
+## World Expansion 2.0 — new landscapes inside the same map
+
+The map keeps its size (12 × 12 km) and every farm, strip, field, road,
+forest, lake, stream, spawn point, mission and system as it was; the new
+content fills the stretches that were visually empty.
+
+**Audit.** The map was cut into 576 cells of 500 m and each classified by
+what it holds (`fieldAt`, forests, water, surfaces, structure colliders,
+tree counts, relief range): 292 cells (51 %) had no field, forest, water or
+building and fewer than 30 tall trees. The largest empty stretches: the
+north-west between Dois Lagos and Horizonte, the north-east between Serra do
+Cedro and Ipê Amarelo, the east between Ipê Amarelo and Vale Verde, the
+west south of Mata Alta, and the south-east past the creek near Terra
+Vermelha. The outer ring already carries swells of ±20–30 m, so the new
+rivers follow its real valleys.
+
+**Plan (one region per empty stretch, each its own identity).**
+
+| Region | Biome / landform | Water | Strip |
+|---|---|---|---|
+| Cerrado do Chapéu (NW) | cerrado: drier grass, red latosol patches, crooked trees, macaúbas, ipê-roxo, termite mounds; low colinas; the Morro do Chapéu butte | — | A Pista do Cerrado (open, red earth, fenced pasture, sítio, road to the Horizonte road); F Pista Esquecida (remote, sand, stones only, no road) |
+| Serra das Pedras (NE) | Chapada das Pedras (52 m flat top, sandstone cliff, talus), a lower step, the Serra do Tatu ridge, the Morro do Frade butte; rock on the steep ground, sparse scrub, radio mast (landmark) | Rio das Pedras: Cachoeira do Véu (≈ 25 m) and Cachoeira da Grota (≈ 17 m), plunge pools, Lagoa das Pedras | E Pista da Grota (rough, gentle undulations, 3 % grade) |
+| Morros do Leste (E) | rounded hills (Morro Redondo), pasture with shade trees, capões on the hilltops | — | C Pista do Morro Redondo (2.2 % grade among the hills), sítio, road to the Vale Verde road |
+| Mata do Jatobá (W) | dense forest blocks with lobed edges, the transition thinning out through capoeira | Córrego da Mata and Rio Jatobá into the Lagoa do Jatobá (bridge on the track) | D Clareira do Jatobá (narrow, forest walls, narrow track to the Chapada road) |
+| Várzea do Taquaral (S) | lowland eased down, deep green wet ground, buriti groves and capões | Córrego do Taquaral into the Lagoa do Taquaral, two more lagoons | B Pista Velha do Taquaral (old worn grass, sítio, road to the south fields) |
+
+**Code.** `src/world/expansion.js` holds everything as pure data and
+functions (regions, landforms, strips, rivers, lagoons, roads, forest
+blocks, props, pastures, biome weights): the terrain grid
+(`terrainData.js`: landforms in `naturalHeight`, mesas with absolute flat
+tops, strip platforms in `rawHeight`, strip surfaces in `surfaceAt`), the
+flight model and the tests read the same functions. The new roads, forests,
+streams and lagoons join the shared lists flagged `exp: true`, so the roads
+(`roads.js`), water and bridges (`water.js`), forest crowns and the map are
+drawn by the existing systems. `expansionScenery.js` draws the strips,
+sítios, fences, rocks and waterfalls; `terrain.js` reads one 192 × 192
+biome texture. The strips are shown on the map (no GPS, mission or service
+change).
+
+**Keeping the old map exactly.** Every landform has compact support and
+sits away from the farms (test: no height change within 80 m of a farm,
+strip, field, original road, forest or water, none over 1 m within 150 m;
+9 % of the map's samples changed, all in the new regions). The original
+tree placements branch on the terrain, so they read it as it was before
+(`TerrainData.buildBaseline` re-evaluates only the nodes the expansion can
+reach, released after the vegetation is built): of the 56,953 original
+trees none moved; 142 were removed where the new strips, roads and water
+are. The biome texture is held at zero near every strip, apron and field;
+the ground shader's pond list stays the original one.
+
+**Performance.** Nothing new is built at start except data: a region's
+meshes are built when the camera comes within 2.0 km of its outline and
+released beyond 2.8 km (one region per scan; from the main base every
+outline is 2.85 km or more away, so nothing is built there); everything is merged per material;
+markers, fences and troughs are hidden beyond 2.5 km; the waterfalls are
+animated in their shaders (no CPU), their mist only within 450 m and not on
+the low profile; trees use the existing streamed instanced cells; colliders
+are plain boxes from the data.
+
+### Room past the map edge
+
+An aircraft is turned back only 600 m past the map edge (`EDGE_ROOM`, was
+100 m before it), so a balão at a field or strip near the edge fits. Past the
+edge the ground is the horizon ring exactly as drawn (`farRingHeight`, shared
+with the ring mesh), eased in over the first 200 m from the map's own edge
+height so there is no step (test: no 5 m step over 1.2 m, slopes under 8°).
+Checked in the browser: flying east from x 5,700 m the aircraft was turned
+back at x 6,599 m (before: 5,900 m), no page error.
+
+## EMB-201 Ipanema — exterior revision, paint C and cockpit rebuild
+
+**Exterior** (`e201Model.js`, visual only — FLIGHT_E201, gear points and
+hard points unchanged). After the green PT-UCJ photograph, the SAE orange
+201 and the BRSim Ipanema video (volumes only; nothing copied):
+- nose and body narrower (half width 0.485 → 0.46 m), belly shallower
+  (−0.49 → −0.46 m);
+- the cabin sill lowered (0.60 → 0.47 m): the side windows reach down to
+  the cheat-line height as on the real 201; the sill frame tube sits on the
+  sill line itself (it ran 10 cm above it);
+- the tail cone narrows from right behind the cabin (half width at −3.0 m
+  0.395 → 0.33, at −3.8 m 0.27 → 0.215);
+- the door handle that floated in the side glass (seen from outside as a
+  bar across the window) sits on the door under the glass;
+- the windshield's centre strip is a slim dark rod (r 6 mm); no winglets
+  (the drooped tips stay).
+
+**Paint C** — bright green with two dark-blue sweeping bands from the cowl
+under the windows and down the tail cone, the registration in blue under
+them, SERVIÇO AÉREO ESPECIALIZADO, the flag (on its own green) and IPANEMA on
+the fin; green wings and tips. Same geometry and UVs as A and B (only the
+canvases and colours change); hangar selector A / B / C.
+
+**Cockpit** (`e201Cockpit.js`, `e201Panel.js`), after the photograph of a
+real 201 cockpit:
+- the panel spans the cabin (±0.44 m): flight and engine dials in two rows
+  of three on the left (CHT, airspeed, altimeter / oil, tachometer, manifold
+  pressure), fuel gauge, hour meter and magneto key in the centre, the GPS
+  in its own raised box on the right with the page keys, the spray control
+  box under it, eyeball vents, switches and breakers along the bottom;
+- dark headliner under the roof, padded bow over the windshield with the
+  magnetic compass, window hinges and latch levers, brown scat ducts down
+  both walls, darker painted-aluminium walls;
+- eye 4 cm forward (z −1.38 → −1.34), cockpit FOV 68 → 64°.
+- **GPS**: the shared AGROWINGS NAV (`agroNav.js`, the same Guidance as every
+  aircraft). Its screen sat 3 mm behind the front of its own housing, so the
+  map was never visible in this cockpit; it is now in front (checked in the
+  browser: the map moves with the aircraft, the DEST page shows the bearing
+  to the base, the page keys switch pages).
+
+**Panel after real 201 panels (v48).** The face is three plates: light-grey
+left and right instrument plates and a dark centre plate set 15 mm back
+holding the GPS, with a slot and the AVGAS plate above it; the top edge
+arches with a thick padded hood (a rounded roll overhanging the dials,
+closing at both ends), the outer sides lean in toward the bottom, the lower
+corners are rounded, screws on each plate. Left plate: fuel and altimeter,
+the dimmer, tachometer and airspeed, the key and the switch / breaker strip;
+right plate: manifold pressure and the hour meter, oil and CHT, the spray
+box and the placards. **Cabin shape:** the cabin narrows as it rises (sides
+leaning in 26 % at the roof) and the turtledeck behind it is raised and
+rounded (crest +0.05–0.07 m, rounder section), the aft sides tapering.
+**Closed cabin:** the rear fairing's outside paint is single-sided, so
+looking back the cabin read as open to the sky; it is lined inside now (the
+quarter windows stay clear) and the bulkhead behind the seat is grey.
+
+Measured (Chromium + SwiftShader, same views): pilot view 410 → 410 draw
+calls, panel view 419 → 422, behind-the-seat view 411 → 423; triangles
++2.6–4.8 % (part of it the narrower FOV). `test/e201e2e.mjs`: all 16 checks
+pass, paints A/B/C switch and persist, no memory growth over 15 switches and
+10 paint changes, no page errors.
+
+## Premium Expansion 01 — Serra das Bananeiras (a separate map)
+
+A second, compact map: a mountain valley of banana country (mar de morros,
+forested ridges, a gorge down to a remote lowland) with three rustic strips.
+The main map (terrain, strips, farms, missions, spawn points, size, visuals)
+and every aircraft are untouched: with the main map active no line of the
+new data runs (measured below: identical counts).
+
+**Architecture — one map per page.** `src/world/activeMap.js` chooses the
+map ONCE when the page loads (stored choice `agrowings.map`; `?map=` and the
+`AGRO_MAP` environment variable for development and tests), before any world
+module evaluates. With the Serra active, `layout.js`, `expansion.js`,
+`terrainData.js` and the contract modules take their data from
+`src/world/serra.js` / `src/game/serraContracts.js` in the very shapes the
+engine already uses (runway, farm sites, fields, creek, streams, pond, roads,
+forest colliders, scenery props, biome weights) — so terrain grid, strips,
+service crews, farm offices, GPS/guidance, coverage, hand-in, weather,
+replay and streaming are the existing systems, not copies. Switching maps
+(Expansions → Maps) stores the choice and reloads the page: the two worlds
+are never in memory together. The career (money, histories, aircraft) is
+shared; each map's jobs are kept aside while the other map is flown
+(`Career.otherJobs`).
+
+**Premium.** `SERRA_EXPANSION` (`expansion.map-serra-das-bananeiras`) joins
+`EXPANSIONS` in `src/game/expansions.js`; the map is offered, loaded and
+flown only where `isUnlocked()` says so — the same entitlement source as the
+Fire Boss (the platform may install it before load as
+`globalThis.AGROWINGS_ENTITLEMENTS`, or later with `setEntitlementSource`).
+A locked map is not loaded at start-up (fallback to the main map), is shown
+as locked in the selector, and is left on entering a mode if access was
+withdrawn. No purchase, payment, login or account code was added or changed.
+As for the Fire Boss, enforcement is off during the testing phase
+(`setPremiumEnforced`), and a client-side check alone is not authoritative.
+
+**Dimensions.** Detailed terrain 6 × 6 km on the same 768² grid (7.8 m
+cells); playable area 4.6 × 4.6 km = 21.2 km², 14.7 % of the main map's
+144 km²; the far ring beyond is forested mountain. Heights −28 … 343 m.
+
+**Terrain (`serraNatural`).** A: the central valley (level floor, main strip
+and base); B: rolling banana hills round it (mamelons of 20–60 m, side
+valleys); C: the forested serra — a ridge along the north and the rim, with
+the Pedra dome; D: the Baixadão, a remote lowland 27 m below the valley,
+reached by the creek through a wooded gorge; E: the rugged south-west
+shoulder. Masks are products of smooth distances (no creases); strips sit on
+the engine's platforms.
+
+**Strips (three).** 01 Vale das Bananeiras — 720 × 20 m dirt, the base
+(hangar, service, crew); 02 Pista do Baixadão — 430 × 16 m grass and earth,
+level, forest on two sides; 03 Pista da Serra — 380 × 14 m rough earth, 3 %
+up-slope eastbound, small aircraft only.
+
+**Banana.** `growPlot` grows each plot from a seed over the terrain: bands
+60 m deep laid along the contour, each reaching as far as the ground stays
+near its height and workable — a plot is a stack of rectangles with stepped
+ends that follows its hillside (62 plots, 261 ha). 11 plots are contracts
+(35 bands as engine FIELDS: coverage, GPS, 3.4 m canopy for the terrain
+following and crop strikes); the rest are plantations of the same making
+(scenery). Plants (`src/world/serraScenery.js`): 3 variants of ~96
+triangles and a 28-triangle far model, instanced per 96 m cell, both LODs on
+one instance buffer, density and distances by graphics profile, cells built
+lazily (3 per frame) and released beyond the far distance (210 824 plants in
+593 cells; ~90–200 cells alive). Trees are kept 18 m from a talhão and out of
+the 70 m run-in at the ends of its rows.
+
+**Forest, water, rural.** Forest is a continuous density (`serraWild`):
+canopy mesh with the terrain's own outline, edge trees, emergents, ground
+tint and obstacle boxes all read it. One stream (Córrego das Bananeiras,
+down the gorge, the Poço do Baixadão, out to the south-east) on the existing
+water system. Seven red-earth tracks; five sítios found on level ground by
+the tracks (house, shed / water tank / corral) with the forest cleared round
+them.
+
+**Contracts.** 5 orders at the base, 3 requests at each farm office (banana
+talhões by plot, pay by relief), Portuguese and English.
+
+**Tests.** `npm test` (main map, 244) and `npm run test:serra` (10: size,
+strips, relief, plots, clearances, contracts, water, determinism, premium);
+`test/serrae2e.mjs` in the browser (25 checks: selector, switch both ways
+with the career kept, order → load → take-off → all bands sprayed → hand-in
+from each of the three strips, farm offices, edge of the map, no page
+errors, no untranslated text).
+
+**Measured (Chromium + SwiftShader, 1280 × 720; counts exact, times are CPU).**
+
+| | calls | triangles | geometries | textures | JS heap |
+|---|---|---|---|---|---|
+| Main map, base view — before | 1148 | 1 953 377 | 1127 | 153 | 635 MB |
+| Main map, base view — after | 1148 | 1 953 377 | 1127 | 153 | 594 MB |
+| Main map, high view — before / after | 1146 / 1146 | 1 983 280 / 1 983 280 | 1259 / 1259 | 154 / 154 | 591 / 591 MB |
+| Serra, LOW — aerial / valley / low pass | 1317 / 1310 / 656 | 2 095 946 / 1 762 426 / 1 610 439 | 1186–1346 | 141 | 493–514 MB |
+| Serra, MEDIUM — aerial / valley / low pass | 1380 / 1353 / 859 | 2 467 914 / 2 198 468 / 2 250 704 | 1188–1346 | 141 | 501–519 MB |
+
+Load to first frames: main 63.5 s before / 66.7 s after (one run each, same
+noise), Serra 60–61 s; map switch (store + reload + load) 62–75 s in this
+software-rendered container — real devices were not measured.
+
+**Known limits.** The test autopilot (`startAutopilot`, not a player
+feature) is written for the main base and the main map's open fields and is
+not supported on the Serra. The base reuses the main hangar and fleet
+apron. No waterfall mesh in the gorge. Not tested: real phones, Safari /
+Firefox, real GPUs.
+
+## Benchmark (performance work, phase 1)
+
+Reference for all optimisation: the tag **`ultra-original-v73`** (commit
+`aa84723`, the game as published in v73). Optimisations are developed only
+on the branch `perf/fase-2`; the Ultra look (`QUALITY.high`) must stay
+identical, and every change must be revertible by returning to the tag.
+(The tag could not be pushed from the build environment — HTTP 403 on tag
+refs — so the remote also has a branch `ultra-original-v73` at the same
+commit; re-push the tag from a normal machine:
+`git push origin ultra-original-v73`.)
+
+`src/core/bench.js` is loaded **only** with `?bench` in the URL
+(dynamic import in `main.js`); without it nothing runs and the game renders
+as before. It reuses the game's own pieces (`renderer.info`, the live loop,
+`performance.memory`) and the scene setups of `test/perf.mjs`, and it
+changes no setting, quality, rendering or physics.
+
+Per scenario (A hangar, B take-off, C low pass, D spraying, E Air Tractor
+cockpit, F strip approach, G1 R44, G2 Bell 206B, H weather / time changes,
+I long flight, J repeated aircraft / camera / menu changes — B, G and I are
+scripted proxies): frame time avg / P50 / P95 / P99 / max, FPS avg and 1 %
+low, frames over 33 and 50 ms, long tasks, draw calls, triangles,
+geometries, textures, JS heap, and the device (GPU string, pixel ratio,
+canvas, quality preset).
+
+- **Real PC / phone:** open `<game url>?bench&q=high` (`q=` fixes the
+  preset so the automatic quality check does not change it); tap *Run all*
+  (about two minutes, `&dur=10` seconds per scenario), then *Copy JSON*
+  (also kept in localStorage `agro-bench-last`). Use the same quality,
+  window size and power mode for before and after.
+- **Headless (this container, software renderer — frame times are NOT GPU
+  figures, only draw calls / triangles / heap are comparable):**
+  `AGRO_URL=http://localhost:5173/ node test/bench.mjs out.json high 10`
+  (optional 5th argument: scenarios, e.g. `A_hangar,E_cockpit`).
+- **Compare before / after:** `node test/benchcompare.mjs before.json
+  after.json [tolerance%]` — refuses results from different GPU, quality or
+  canvas size, flags frame-time / draw-call / long-task increases beyond the
+  tolerance as WORSE (exit code 1).
+
+Procedure for phase 2: run the benchmark on the tag's build and on the
+branch's build on the same device, compare, and compare screenshots at the
+same camera positions before merging anything.
+
+## Adaptive Performance System (performance work, phase 2)
+
+Graphics menu → **Graphics profile**: Automatic · Economy · Medium · High · **Ultra Original**.
+Code: `src/core/perfProfiles.js` (parameters), `capabilities.js` (feature detection),
+`adaptive.js` (pure controller), `perfManager.js` (glue to the game loop and settings).
+
+### Profiles
+
+| Profile | Quality object | Render scale | Particles | Dynamic-res floor | Pixel ceiling |
+|---|---|---|---|---|---|
+| Ultra Original | the very object `QUALITY.high` (v73 look) | `min(dpr,2) × 1.5` | 6000 | none when chosen manually (0.85 in Automatic) | none |
+| High | Ultra minus: scale 1.25, grass 68 m / density 0.9, tree crowns 470 m, rain 3200, clouds 40 (shadows 4096, crop shadows, near trees kept) | 1.25 | 5000 | 0.85 | 5.0 Mpx |
+| Medium | `QUALITY.medium` unchanged | as before | 3500 | 0.7 | 2.8 Mpx |
+| Economy | `QUALITY.low` unchanged | as before | 1800 | 0.6 | 1.4 Mpx |
+
+The "High" trims are predicted from pixel counts and ranges, **not measured on a GPU**
+(none was available); tune them in `perfProfiles.js`.
+
+### How Automatic decides
+
+* **Start**: feature-based (WebGL2, max texture size, MSAA samples, anisotropy, float
+  render targets, software-renderer GPU string, coarse pointer, DPR, cores, memory only as a
+  hint). No WebGL2 / software renderer / small textures / weak hints → Economy; strong desktop → High;
+  otherwise Medium. Automatic never *starts* above High; the last auto profile is saved (`autoLast`) and reused.
+* **Measure**: moving window of 3 s (2 s while calibrating the first 15 s) of real frame times against
+  the budget (60 Hz, or the FPS limit). Bad: mean > budget×1.25 or >25 % frames slower than 1.5×budget.
+  Good: mean < budget×0.72 and ≤2 % slow frames. In between = hysteresis, nothing changes.
+* **Act**: down needs 2 consecutive bad windows (1 while calibrating) and ≥4 s since the last change;
+  resolution first (steps of 0.05 down to the floor), then the next lower profile. Up needs 15 s of good
+  windows and ≥20 s since the last change, multiplied by a back-off.
+* **Protection**: a drop within 60 s of a rise doubles the back-off (max ×8) and a profile that failed after
+  a rise is barred for 5 min; frames >250 ms (loading, tab switch), hidden page and aircraft changes are ignored;
+  the controller costs ≈0.03 µs/frame in isolation (<1 µs in the page).
+* **Manual profiles** only use dynamic resolution (UI, text and GPS stay in CSS pixels; only the 3D canvas
+  resolution changes); **manual Ultra Original is inert**: no change at all.
+* **FPS limit** (Off/30/60) skips animation-frame callbacks; physics keeps its fixed 1/120 s step.
+* Saved settings: `profile`, `fpsLimit`, `autoLast` (plus the existing `showFps`). Old saves (`quality`,
+  `qualityAuto`) migrate automatically. Progress, accounts and purchases are untouched.
+  `?q=low|medium|high|economico|medio|alto|ultra` pins a profile and freezes the controller (benchmarks use it).
+
+### Rollback
+
+* Player: Graphics → *Restore graphics defaults*, or choose **Ultra Original**, or open with `?q=high`.
+* Code: `git revert` the phase-2 commit, or check out tag/branch `ultra-original-v73` (the original, untouched).
+
+### Tests
+
+`npm test` includes `test/adaptive.test.mjs` (Ultra identical to v73 numbers, controller behaviour on
+synthetic frame times) and `test/perfmanager.test.mjs`; `test/perfui.mjs` drives the menu in a browser.
+
+### Revision (2026-11): order of adaptation, flight gating, cockpit legibility
+
+* **Order.** Down: secondary effects first — the particle budgets of the
+  profile (spray mist, splash / spray, flames and smoke) halved; cheap,
+  nothing is rebuilt — then the resolution (steps of 0.05 to the floor),
+  then, in Automatic, one profile. Up: resolution, then the effects back,
+  then a profile. A profile change brings its own budgets back.
+* **No heavy change in the air.** A profile change rebuilds the vegetation /
+  crop caches (`world.setQuality`), so Automatic never climbs a profile while
+  airborne in a flight, and drops at most one profile per 2 minutes of flight;
+  effects and resolution keep adapting at any time. On the ground and in the
+  menu the rules above apply unchanged.
+* **Cockpit legibility.** In the cockpit view the 3D instruments and GPS are
+  drawn by the canvas: there it never goes under one device pixel per CSS
+  pixel (Economy on a 1× screen, or a low dynamic resolution, no longer blurs
+  them), still under the profile's pixel ceiling. Outside the cockpit the
+  profile's own ratio applies again. Ultra Original is unchanged (already ≥ 1).
+  HUD, buttons and text are HTML, never scaled.
+* The physics never depends on the graphics: same fixed 1/120 s step at every
+  profile (`test/agecheck.mjs` flies 10 s on Economy and Ultra: identical
+  positions and speed).
+* Tests: `npm test` (`adaptive.test.mjs`: order, recovery, gating, cockpit
+  floor) and `test/agecheck.mjs` (the same rules in the real game, frame times
+  fed to the game's PerfManager — in the software renderer every real frame is
+  a "stall" the controller ignores).
+
+### Memory at start-up (optimisation stage 1, 2026-11)
+
+`src/aircraft/aircraftMemory.js` + `assetManager.js`. The whole fleet still
+stands at the base, but only the flown aircraft keeps its full resources:
+
+* **Parked = light.** Right after it is built, a parked aircraft's cockpit,
+  pilot and panel canvases (instrument faces, placards, GPS) are released and
+  its cockpit / pilot geometry let go — a parked cockpit is hidden anyway
+  (`park()`). Its exterior paint keeps the device tier's resolution:
+  `low` ¼ (phones without a reported ≥ 6 GB, iOS), `mid` ½ (6 GB+ phones,
+  ≤ 4 GB computers), `high` full (other computers; the CPU copy goes once the
+  GPU has it). `?mem=low|mid|high` forces the tier.
+* **Selected = rebuilt in full** from its type (the same code as at start-up),
+  paint, kit and marks applied; the previous model is disposed. A locked
+  aircraft previewed in the menu is rebuilt in full while on show.
+* **One at a time.** The fleet is built aircraft by aircraft, the selected one
+  first, a pause between them (loading screen, GC): the full set of resources
+  is never in memory together.
+* **WebGL context restored** → every aircraft is rebuilt (one per task),
+  frozen / lightened as before; GPU objects of the lost context are not
+  deleted (no WebGL errors).
+
+Measured (Chromium + SwiftShader, mobile viewport 390×844 @3×, menu after
+load; canvas = CPU copies of every live canvas):
+
+| | before | low | mid | high (desktop 1600×900) |
+|---|---|---|---|---|
+| canvases (Mpx / MB) | 125.8 / 480 | 36.4 / 139 | 48.7 / 186 | 26.1 / 100 |
+| after visiting all 11 aircraft | 125.8 / 480 | 37.6 / 143 | 49.8 / 190 | 26.8 / 102 |
+
+JS heap ≈ 580 MB in both (≈ 300 MB of it geometry arrays: aircraft ≈ 190, world
+≈ 120 — not reduced yet). Switching aircraft: ≈ 0.15–0.25 s before, ≈ 0.4–0.7 s
+now in this software renderer (one model rebuilt). The flown aircraft is
+pixel-identical to before (cockpit and chase views of 6 aircraft, the apron with
+the parked fleet: < 0.3 % pixels differ, animation phase). Probes are in the
+session scratchpad (`memprobe`, `viscmp`, `ctxtest`).
+
+## World rendering optimisation (performance work, phase 3)
+
+Branch `perf/fase-3` (from `perf/fase-2`). Rule: the Ultra Original image does not
+change — every item below keeps the same geometry, materials and ranges and only
+removes CPU / draw-call work. Probes: `test/p3probe.mjs` (draw calls per scene
+group, slow), `test/p3cpu.mjs` (calls, triangles, JS time), `test/p3verify.mjs`
+(altitude sweep, terrain blocks on/off pixel diff).
+
+### Audit result (what was already optimised, and left alone)
+
+* Crop plants: already one instanced draw per crop variant, streamed in 4 m cells,
+  density thins and dissolves with distance (`cropPlants.js`) — no per-frame rebuild.
+* Trees: instanced in 500 m cells with near/far LOD (`vegetation.js`); grass and
+  forest crowns instanced; terrain already in 750 m chunks with 4 LOD levels and skirts.
+* Structures are already merged per material (`Builder`); the remaining draws are
+  animated parts (doors, windsocks, turbines) and per-farm groups. Aircraft, cockpits,
+  physics, missions and progression were not touched.
+
+### Changes
+
+| # | Technique | Where | Effect |
+|---|---|---|---|
+| 1 | Static subtrees skip the per-frame matrix update (compose + multiply of ~9000 forest nodes etc.) | `staticFreeze.js`, `world.js` | scene matrix update 2.5–2.7 → 0.8–0.9 ms/frame (JS) |
+| 2 | Road ribbons merged per 1.5 km region | `roads.js` | −19 … −54 draw calls |
+| 3 | Crop canopy surfaces and edge walls merged per crop and 2 km region (field limits, vertices, shading unchanged) | `crops.js` | −30 … −60 draw calls |
+| 4 | Far terrain chunks drawn in blocks (2×2 chunks at LOD 4, 4×4 at LOD 8) only where every chunk would show that same level anyway; same geometries merged | `terrain.js` | −40 … −220 draw calls; **pixel-identical** (diff 0 in 16 altitude/heading views) |
+
+Tried and dropped: merging far trees into 3×3-cell blocks — the far ring is too thin
+for a whole block to fit inside, no draw call saved (reverted).
+
+### Measured (software renderer; calls/triangles are exact, JS ms are this container's CPU)
+
+| View (Ultra, `?q=high`) | Draw calls before → after | Triangles before → after |
+|---|---|---|
+| Low pass over crops | 540 → 473 | 3.345 M → 3.376 M |
+| 250 m high | 443 → 392 | 0.744 M → 0.782 M |
+| Cockpit, low | 522 → 450 | 3.351 M → 3.385 M |
+| Strip approach | 909 → 690 | 4.688 M → 4.689 M |
+
+Triangles rise ≤ 5 % because merged crop regions are culled per region instead of per field.
+Frame time on a GPU was not measurable here (no GPU); `matrixWorld` update fell about 1.7 ms/frame.
+
+### Regressions / rollback
+
+Visual: terrain blocks are pixel-identical; static views differ from phase 2 by ≤ the build-to-build
+noise. Crop / road merging changes culling granularity and blend order of overlapping road pieces only.
+Rollback: `git revert` the phase-3 commit, or remove the calls in `world.js` (`freezeStatic`, `terrainMesh.update`);
+the tag / branch `ultra-original-v73` remains the untouched reference.
+
+### World optimisation engine (phase 3 revision, 2026-11)
+
+Second pass over the world with the same rule: the Ultra Original image does not change. A fresh
+diagnosis (`test/worldprobe.mjs`: draw calls / triangles per scene group, memory per group, screenshots;
+`test/worldhitch.mjs`: CPU of `world.update` per frame and per subsystem along five flight routes)
+showed that draw calls were already harvested by phases 3–5 and that what was left was **memory held
+for nothing** and **CPU spikes when new cells come into reach**:
+
+* the base's shadow pass (367 of 768 calls) is ~80 % the parked fleet (aircraft, not world — left alone);
+* crop plants and forest crowns pre-allocated their instance buffers at full capacity (14.3 + 5.1 MB, and
+  as much on the GPU) whether or not a field or forest was near;
+* terrain far blocks duplicated the vertices of the chunks they merge (2.7 MB);
+* the near and far copies of every tree cell held the same instance matrices twice;
+* the forest-crown cell cache never shrank; grass cells kept a 70-tuft scratch buffer alive each;
+* `crops.update` (6 fin patches at once), the grass row on entering a cell and the crop-plant ring on each
+  refill were the frames over 4 ms on low passes.
+
+| # | Change | Where | Look |
+|---|---|---|---|
+| 1 | Crop-plant instance buffers start at 2 048 per variant and grow (×2, up to the old cap) | `cropPlants.js` | same instances |
+| 2 | Forest-crown buffers start at 1 024 and grow; a refill only when the set of 80 m cells in reach changes | `forestCrowns.js` | same instances |
+| 3 | Bounded LRU caches (crowns: was unbounded; grass, crop plants: FIFO → LRU), grass cells exact-size | `lru.js`, `grass.js`, `cropPlants.js`, `forestCrowns.js` | — |
+| 4 | Grass and crop-plant cells ahead are generated a little per frame (1.2 ms) in a ring beyond the gathered one | `grass.js`, `cropPlants.js` | — |
+| 5 | Crop fin patches: the clearly visible ones (inside 0.8 r) as before (≤ 6 a frame); the faint outer ones only while the frame has spent < 4 ms | `crops.js` | outer fins (256–320 m, dissolving) may arrive a few frames later after a teleport on a busy CPU |
+| 6 | Tree cells: near and far copies share one instance-matrix buffer | `vegetation.js` | same matrices |
+| 7 | Tree cells: one-sided LOD hysteresis (30 m): never less detail than the plain distances, a cell only keeps its level a little longer — no flip at a boundary | `vegetation.js` (`cellLevel`) | at most more detail in a 30 m band |
+| 8 | Terrain blocks: the member chunks' level geometries are views (draw range) of the merged block | `terrain.js` | same triangles |
+
+Physics, colliders, `heightAt`, missions, fields / rows / spray / hectares, structures, strips and
+object positions are untouched; nothing is removed.
+
+**Measured** (Chromium + SwiftShader, no GPU: calls / triangles / memory are exact, CPU ms are this container):
+
+| Ultra (`?q=high`) | Before | After |
+|---|---|---|
+| Draw calls / triangles, 7 views (base, low pass, cockpit, 250 m, aerial 800 m, strip, forest) | 768 / 476 / 453 / 391 / 916 / 699 / 393 | identical (same triangles) |
+| Crop plants + crowns + tree instances + terrain blocks (start) | 23.6 MB | 1.9 MB |
+| JS heap after load (probe end) | 575 MB | 553 MB |
+| JS heap after the five routes (`worldhitch`) | 623 MB | 576 MB |
+| Frames with `world.update` > 8 ms / > 16 ms (5 routes, 14 700 frames) | 13 / 2 | 9 / 1 |
+| Subsystem calls > 4 ms (same routes) | 50 | 24 |
+| p99 `world.update` low pass / cockpit / forest | 3.3 / 3.2 / 3.6 ms | 2.4 / 2.1 / 1.7 ms |
+
+Economy (`?q=low`): same draw calls in the 7 views, heap 571 → 549 MB.
+
+**Visual check:** `worldprobe` screenshots of the 7 views with the random sequence seeded and the game
+clock reset. Two runs land in one of two simulation states depending on how many frames the game ran
+while loading (5 or 6, logged as `framesAtFreeze`) — with the same count, before vs after: 6 views
+identical (≤ 0.001 % of pixels over 8/255, the A/A level); the cockpit differs only by the camera shake,
+which draws `Math.random()` every frame (`cameras.js`) — with the shake off the cockpit view is
+identical too (max 3/255). Terrain blocks on / off (`test/p3verify.mjs`, 16 altitude/heading views):
+≤ 7 px of 230 400 differ, by ≤ 2/255. In-page state hashes (crop-plant, grass and crown instance data,
+crop fins, terrain blocks) are identical before / after at the base, on a low pass and over a native
+forest; tree cells differ only where the hysteresis kept the nearer level. Context loss / restore
+(`test/worldctx.mjs`): same draw calls, triangles and image changes as the previous build, no page error.
+
+Not done (measured, reasons): merging tree variants into one draw per cell needs `BatchedMesh` and a
+rewrite of the foliage shader (risk to the Ultra image); the parked fleet's shadow and the 142 MB of
+hidden original aircraft geometry kept beside the baked copies belong to the aircraft asset manager
+(phase 4) — see the report. Rollback: `git revert` the commit; each item is local to its module.
+
+## Aircraft asset management (performance work, phase 4)
+
+Branch `perf/fase-4` (from `perf/fase-3`). No model, cockpit, instrument, physics, camera or
+access rule was changed; all ten aircraft (Ipanema, AT-502, R44, M-18, Thrush, Bell 206B,
+EMB-203, AgTruck, AT-802, AT-802 Fire Boss) stay in the scene as before, parked ones visible
+(the locked Fire Boss included). The fleet is procedural (no glTF/GLB, no external textures),
+so Meshopt/Draco/KTX2 do not apply and nothing was converted.
+
+`src/aircraft/assetManager.js` (`game.assets`, wired in `game._activate`):
+
+* **Freeze (parked aircraft):** static, opaque, single-material meshes are baked into one mesh per
+  material (same geometry, materials, shadow flags, expressed in the aircraft's own frame); the
+  originals are hidden, not deleted. Node matrices stop being recomputed. Transparent, instanced,
+  multi-material, custom-depth and hidden (cockpit / pilot) meshes are left alone.
+* **GPU release:** geometries / textures that only that aircraft's cockpit or pilot use are
+  `dispose()`d on the GPU when it parks (three.js re-uploads them when drawn again); sources stay in memory.
+* **Thaw:** on selection, re-parking, livery / registration / spray-kit changes the originals are drawn
+  again (`refresh`), so the active aircraft is exactly the previous model.
+* Probes: `test/p4audit.mjs` (resources per aircraft), `test/p4verify.mjs` (frozen vs original pixel
+  diff; switching loop), `test/p4flow.mjs` (select → cockpit → engine start → cameras → title, twice, readings diffed
+  against the previous build). Unit tests: `test/phase4.test.mjs`.
+
+Measured (software renderer; Ultra `?q=high`): see the phase 4 report in the pull request / session.
+Known costs: the baked copies add ≈ 45 MB of JS heap (≈ 560 → 607 MB), and a baked aircraft is
+culled as one mesh. Rollback: `git revert` the phase-4 commit, or remove `this.assets` calls in `game.js`.
+
+
+### Aircraft performance engine (phase 04, 2026-11)
+
+Audit of the eleven registered aircraft (`AIRCRAFT_ORDER`: ipanema, at502, r44, m18, thrush, b206,
+e203, a188, pa36, at802, at802f) on top of phases 1–3. What was already right and kept: one flown
+aircraft built in full, the others parked *light* (cockpit / pilot / panel canvases released, paint
+at the device tier, rebuilt from the type when selected — memory stage 1) and *baked* (one mesh per
+material, phase 4); paint schemes swap material maps on the same geometry (no geometry copies); the
+catalogue uses light thumbnails. Probe: `test/p4baseline.mjs` (A opening, B first flight, C cockpit
+entry, D 12 consecutive switches; heap, peak heap, GPU counts, per-aircraft geometry drawn / hidden /
+baked).
+
+What the audit found: every parked aircraft kept its **hidden original meshes beside the baked copy**
+(47 MB of geometry at opening — the originals are never drawn again: a light aircraft is rebuilt
+from its type when selected), every switch **thawed and re-baked every parked aircraft**, and the
+first cockpit frame paid for **shader compiles and uploads**.
+
+| Change | Where |
+|---|---|
+| **Parked shell** state: a light, baked aircraft lets go of its hidden originals and of meshes already hidden at bake time (kit off, the other scheme's parts); LOD subtrees are left alone (a fine level hidden now shows up close); geometries any other mesh still uses are kept. Option changes on a shell rebuild it from its type | `assetManager.js` (`_shell`, `refresh`) |
+| Re-parking a shell (every switch re-parks the fleet) keeps its baked copy: soft thaw → `park()` → only the root's matrices recomputed | `assetManager.js` (`thaw`, `_refreeze`) |
+| The selected aircraft is prepared right after the selection: its programs compiled (`compileAsync`), its cockpit textures uploaded, one 32 px off-screen frame with the cockpit shown | `assetManager.prepareCockpit`, `game._activate` |
+| While the title is up, the scene's not-yet-drawn materials are compiled once | `game.js` |
+
+States (mapped onto the existing ones, nothing redundant added): *active* = live, full model (cockpit
+prepared after selection); *parked* = light + baked shell; *releasing* = `lighten` + `_shell` when an
+aircraft stops being flown; *preview* = the showroom's `ensureFull` + bake. Physics, colliders,
+paint schemes, premium rules, Fire Boss systems and helicopter rotors are untouched.
+
+**Measured** (SwiftShader, no GPU: memory / counts exact, times are this container's CPU):
+
+| | Before | After |
+|---|---|---|
+| A: JS heap at opening (after GC) | 538 MB | 499–503 MB |
+| A: hidden aircraft geometry (fleet) | 47.4 MB | 8.3 MB (LOD levels kept on purpose) |
+| D: heap after 12 switches / peak during them | 582 / 660 MB | 535–539 / 588–599 MB |
+| D: switch time (12 switches) | all 4.6–19 s (median 5.7 s) | 5 of 12 at 0.3–0.5 s (no rebuild, no re-bake), rest 4–17 s (median 5.3 s) |
+| C: first cockpit frame (2–3 s after selection) | 5.7 s, 4 programs compiled on that frame | 1.2–2.8 s, 0 programs (rest: finishing compiles and buffer uploads) |
+| GPU geometries / textures at opening | 821 / 115 | 821–830 / 115–119 |
+
+The opening **peak** varied 521–570 MB across three runs (568 MB before): no claim on it. The cockpit
+entry right after a switch (scenario C straight after B) is not faster yet on this renderer: the
+background compile takes 15–20 s here and had not finished; on a GPU with parallel compiles it does.
+
+**Checks:** parked fleet close (inside the fine-LOD range) and far, 15 views before / after: the
+aircraft are identical, differences only in wind-swayed trees and their shadows (state of the run);
+context loss / restore (`ctxtest`): the two builds give the same images (≤ 0.007 % of pixels over
+8/255), same 12 rebuilds, no page error; `pa36e2e` all PASS (memory flat over 15 switches and 10
+paint changes, draw cost, spray, paints); unit tests 206/206.
+
+Not done (and why): new aircraft LOD levels (the models already drop their fine group beyond
+90–110 m; more levels would change the approved look); geometry simplification (forbidden);
+instrument redraw throttling (several panels already skip redraws when the shown values are unchanged — `vKey` in the panel modules; not re-audited instrument by instrument in this phase);
+real mobile devices (none available here — measurements are desktop Chromium + SwiftShader).
+Rollback: `git revert` the commit; `_shell` / `prepareCockpit` can be disabled independently.
+
+## World streaming and memory (performance work, phase 5)
+
+Branch `perf/fase-5` (from `perf/fase-4`). The world stays one continuous coordinate system;
+physics, `terrain.heightAt`, tree / building colliders, missions, sites, strips and saves never
+depend on what is drawn — only GRAPHICS resources of far regions are created late and released early.
+
+`src/world/worldStreaming.js` (`world.streaming`, called from `World.update`) scans every 0.2 s
+(at once after a teleport / site change) for what is wanted, from **anchors**: the camera (needed now),
+a point ahead on the flight path (ground speed × 6 s) and two route-change points ±0.5 rad
+(prefetch), the current farm's strip and the active contract's first field (prefetch, only within 6 km).
+
+| Region | What streams | Rule |
+|---|---|---|
+| Forest cells (`vegetation.js`, 500 m cells) | the instanced meshes (near + far copy) of a cell | built when the cell can be drawn (≤ 1800 m + slack) — prefetch 3 cells / scan by distance, anything needed now at once; released > 800 m beyond reach |
+| Terrain finest level (`terrain.js`, 750 m chunks) | step-1 geometry (the bulk of terrain memory) | built when the LOD can pick it (+120 m) or ahead on the route (1 / scan); a placeholder draws nothing while far; released 700 m beyond. The 3 coarser levels and the far ring stay resident: the ground is visible from any altitude, no hole |
+
+Not streamed (measured, not worth it): crop plants (already streamed per 4 m cell, bounded cache),
+structures (merged per material, small), aircraft (phase 4), audio (procedural, no buffers),
+render targets (none created at run time). `hitTest` / `obstacleAt` / `treeHit` read data, not meshes.
+Probes: `test/p5verify.mjs` (streamed vs everything resident, same camera: pixel diff), `test/p5long.mjs`
+(long scripted session: heap, GPU counts, hole checks, listeners), `test/p5heap.mjs`, `test/p5audit.mjs`.
+Unit tests: `test/phase5.test.mjs`. Rollback: `git revert` the phase-5 commit, or set
+`world.streaming.enabled = false` and build all cells (as `p5verify` does).
+
+## Simulation performance and stability (performance work, phase 6)
+
+Branch `perf/fase-6` (from `perf/fase-5`). **No physics, aerodynamics, engine, mass, control, wind,
+helicopter, spraying or reward value was changed.** Audit: the simulation was already decoupled from the
+frame rate — `Aircraft.update` / `Helicopter.update` integrate with a fixed 1/120 s step from an
+accumulator (at most 24 sub-steps per frame, accumulator dropped if exceeded), the frame time is clamped
+to 0.1 s, pauses give dt = 0, and the render pose is interpolated between the last two steps. The spray
+**deposition** (`Sprayer.step`, coverage, hopper, on/off-target) runs inside that fixed step; only the
+visible mist (`Sprayer.emit`, per frame, limited by the graphics profile) is separate. So no integration
+change was made or needed.
+
+Optimisations (equal results by construction and by test):
+
+* `terrainData.surfaceAt` (called for every wheel at 120 Hz) tested every segment of every road; a
+  256 m grid now tests only the segments whose box covers the point (`onRoad`, test `phase6.test.mjs`
+  compares 60 000+ points with the original scan, identical answers).
+* `crops.update` skips its patch scan / sort / diff when the camera moved < 1.5 m with nothing waiting.
+
+Evidence (all run in this repository):
+
+* `test/p6golden.mjs` — 28 reproducible scenarios on the real flight / helicopter / spray code (loaded
+  take-offs of 8 aeroplanes with and without wind, short-field landings, 1500 m density altitude, climb /
+  hover / forward flight of R44 and Bell 206B in both power models, spraying with crosswind and coverage):
+  every trace and checksum is **identical on the v73 tag and on this branch** (Math.random of the stall
+  wobble is seeded in the test only).
+* `test/p6fps.mjs` — one spraying pass through the game's tick at 144 / 60 / 30 / 15 fps and with the mist
+  limited to 1800 / 6000 particles: dose, hopper, on / off-target **identical to the last digit**.
+* `test/p6fps2.mjs` — 20 s of flight of 6 aircraft (planes and helicopters) at 144 / 60 / 30 / 15 fps:
+  positions agree within 0.018 m once the stop time is aligned.
+* `test/p6prof.mjs` — CPU profile of the game logic per tick (no rendering); `test/p6audio.mjs` — audio
+  graph node counts while switching aircraft.
+
+## Mobile, browsers and lifecycle (performance work, phase 7)
+
+Branch `perf/fase-7` (from `perf/fase-6`). No physics, control mapping or Ultra Original setting changed.
+The three touch layouts (virtual stick / phone tilt / buttons) and their buttons are untouched; additions only:
+
+* `src/core/lifecycle.js` — page hidden / `pagehide` / `freeze`: progress saved, a running flight paused (pause
+  screen), audio suspended; back (`visible` / `pageshow` / `resume`): frame clock reset, controller held, audio
+  resumed (or on the next tap when the browser demands a gesture, incl. iOS `interrupted`). One debounced resize for
+  `resize`, `orientationchange`, `screen.orientation` and `visualViewport`. `webglcontextlost` pauses and stops the
+  loop; `webglcontextrestored` re-bakes the sky lighting (PMREM contents are lost) and resumes. Screen Wake Lock while
+  flying on a touch device (where the browser has it). iOS pinch-zoom gestures blocked. `report()` lists the browser's
+  features by feature detection, never by user agent.
+* Tilt: sensitivity setting (Settings → Flying → Tilt sensitivity, input scaling only), neutral pose re-taken when the
+  phone is rotated, and a fallback to the virtual stick when there is no sensor, the permission is refused or it never
+  answers (with a toast). The iOS permission still needs a tap.
+* CSS: portrait phones lift the control clusters above the readout strip; short landscape phones lift the trim pair;
+  `dvh` units for panels where supported.
+
+Auto quality was already feature-based (phase 2): no WebGL2 / software renderer → Economy; coarse pointer with
+dpr ≥ 3 and few cores → Economy; the live controller adjusts from measured frame times. Temperature and graphics
+memory are **not** read: browsers do not expose them reliably. `?q=high` / manual Ultra stays unrestricted on a phone
+(user's choice); Auto never starts above High.
+
+Tests (`test/p7mobile.mjs <out> layout|modes|life`, `test/p7perm.mjs`) use Chromium with device metrics and touch
+emulation. There is no Safari / WebKit / Firefox / real phone in the build environment: those are listed as untested.
+
+### Browser stability and release reliability (phase 05, 2026-11)
+
+Audit first: lifecycle handling (phase 7), adaptive quality and capability detection (phase 2), the
+FPS cap (`settings.fpsLimit`: off / 30 / 60), one audio context, the fixed physics step with the frame
+time clamped to 0.1 s and the tilt-sensor fallbacks were already in place and are kept. Gaps found:
+
+* no handler for uncaught errors or rejected promises; an exception inside the frame loop repeated
+  every frame behind a frozen image, with nothing shown to the player;
+* a WebGL context the browser never gives back left the game waiting forever;
+* career and settings were plain JSON: a damaged entry was silently replaced by defaults and then
+  overwritten on the next save;
+* on a reload the old page's JS heap and GPU context lingered until the browser collected them
+  (one measured peak of 971 MB right after a reload in this container, typically ~570 MB);
+* a manually forced Ultra on a GPU whose texture limit is under 4096 would ask for a larger shadow map
+  than it accepts.
+
+| Change | Where |
+|---|---|
+| Saves in a hashed envelope with the previous good copy kept as `<key>.bak`; a damaged entry is read from the backup; old plain-JSON saves still load. No purchase or permission is decided from it | `src/core/safeStore.js`, `contracts.js`, `game.js` |
+| Uncaught errors and unhandled rejections kept in a 30-entry ring (never sent anywhere) | `src/core/diagnostics.js` |
+| Frame guard: a failing frame is recorded and the next one runs; 30 failures in a row stop on a fail-safe screen with **Restart** — the page reloads only on that click, never by itself | `game.frame`, `diagnostics.failSafe` |
+| Lost WebGL context not restored within 20 s → the same fail-safe screen; it goes away if the context comes back | `lifecycle.js` |
+| A real unload (reload / Restart / tab closed, not the back-forward cache) stops the loop, closes audio and releases the WebGL context at once | `lifecycle.release` |
+| Shadow map size clamped to the GPU's `maxTextureSize` (unchanged wherever it fits) | `sky.js` |
+| Diagnostics panel, only with `?diag` on the URL (Ctrl+Shift+D): FPS, frame time, avg / p95 / p99, profile, internal resolution, draw calls, triangles, textures, geometries, JS heap, WebGL state, load time, last errors — "unavailable" when the browser does not expose a value; no sampling while closed | `diagnostics.js` |
+
+**Tests** (Chromium + SwiftShader in this container; unit tests in Node):
+
+* `test/stability.test.mjs` — saves: round trip, damaged / truncated entry → backup, legacy entries,
+  storage refusing reads / writes (5/5); full unit suite 211/211.
+* `test/p5stability.mjs` — 11/11: boot without page error (ready in ~34 s here, heap 505 MB, peak
+  531–562 MB); one game loop; damaged career save → backup, settings kept; 6 hide/show cycles in flight
+  (auto-paused, one loop, aircraft moved 0 m); one failing frame survived; diagnostics panel with real
+  values; cockpit ×10, 5 aircraft switches, 4 quality changes with no error (heap 505 → 516 MB);
+  canvas and camera aspect follow 16:9, 16:10, 21:9, phone landscape / portrait and 4:3; WebGL
+  context never restored → fail-safe after 20 s, no reload, cleared when restored; a frame loop that
+  keeps failing → fail-safe, no reload.
+* Peaks per operation (`probes`): title 509, flight 505, cockpit 505, aircraft switch 538–547, paint
+  change 557, quality change 522–526, back to menu 521 MB.
+* Regression: `pa36e2e` all PASS; context loss / restore (`ctxtest`) 12 rebuilds, no error;
+  `p5long` (every farm, cruise / low passes / reversals / high, ~16 000 updates): no hole, no error,
+  heap 535–629 MB, 546 MB at the end.
+
+**Not tested here** (no such hardware or browser in this container): real Android / iPhone / iPad
+devices, Safari / WebKit, Firefox, Samsung Internet, Edge, Brave, integrated / dedicated GPUs (all
+runs use a software renderer, so frame rates here say nothing about a real device). The reports of
+the game closing on phones could not be reproduced here; the most likely causes measured are memory
+(heap ~500 MB plus GPU memory on a phone that shares RAM) and the transient overlap on reloads. A
+computer switching itself off is not something a web page can cause by itself: check the system's
+event logs, temperatures and power supply separately, without repeating the session that triggered it.
+
+## Final validation and release (performance work, phase 8)
+
+See `docs/RELEASE_REPORT.md` (before/after, device matrix, known issues), `docs/EXPANSION_CHECKLIST.md`
+(mandatory procedure for new aircraft / farms / crops) and `docs/DEPLOY.md` (hosting). New continuous protection:
+`test/golden.test.mjs` (in `npm test`) fails if any recorded flight, helicopter or spray trace changes, or if a registered
+aircraft has no physics scenarios. Probes added: `test/p8startup.mjs` (start-up timing).
+
+## GPS of every aircraft on an active contract (audit and fixes)
+
+Audited on the 14 aircraft with an active contract, after sprayed passes:
+the legacy units (EMB-202A, AT-502B, M-18, R44, Thrush AG-NAV) draw the game's
+guidance and were coherent; the AGROWINGS NAV family (Bell 206B, EMB-203/201,
+AgTruck, Pawnee, Ag-Cat, AT-401B, AT-802 / Fire Boss) opened on MAPA even on
+the talhão, so the passes and coverage were one soft key away.
+
+Fixes (all in `src/spray/guidance.js` and `src/aircraft/agroNav.js`; physics,
+payments and progression untouched):
+- **The AgroNav unit follows the work**: COBERTURA on the talhão, MAPA when
+  ferrying, free flying or returning (sticky near the ferry limit); a key press
+  keeps its page until the situation changes.
+- **Job done → the target is the strip it was flown from** (the base, or the
+  farm's), for every unit, instead of staying on the talhão.
+- **Pass lines run where the talhões are** (per-pass extents): the stepped
+  bands of an irregular plot (Serra das Bananeiras) no longer show lines through
+  gaps; the autopilots and the map screen keep the union extent.
+- **Fire Boss**: an accepted fire order is the GPS target (nearest burning
+  spot, bearing, distance), the spots are on the map, and MISSÃO shows spots
+  out, time against the bonus limit, water and fuel; the AT-802 unit has its
+  own theme.
+- Test: `node test/gpsflow.mjs <out>` (browser; 13 aircraft × situations +
+  the Fire Boss order, 114 checks).
+
+## Replay: track off by default, last replay always kept; result when parked anywhere
+- The flown track and the talhão outline in the replay scene are **off by
+  default**; the **Trilha** button (or `T`) shows them and the choice is
+  remembered (`settings.replayTrail`).
+- **The last replay is always kept** — handed in or not (leaving the job, or
+  closing the page, saves the recording; also in localStorage). It opens from
+  the pause menu (Esc → *Último replay*) and with `L`; the flight in progress
+  is playable too. Hand-in replays keep their history entries as before.
+- **Result when parked**: with the job complete, stopping on the ground with
+  the engine cut brings up the result wherever that is, not only in the
+  loading zone. Tests: `test/replaylast.mjs`, `test/resultpark.mjs`.
+
+## Cabin seen from outside (no empty canopy, no stand-in)
+The AT-802 dropped its interior beyond 12 m, so from the chase camera the
+canopy looked empty. A first fix (v52) drew a dark box stand-in beyond 9.5 m;
+it showed through the windows as black blocks from some angles and was
+removed. Now one rule for every type (`src/aircraft/cockpitView.js`, applied
+each frame to the flown aircraft whatever the camera — chase, orbit, replay,
+title screen): the real interior is drawn from the cockpit view and from any
+camera within 30 m (kept to 34 m, no flicker); beyond that the canopy is a few
+pixels across and the interior is skipped. No extra geometry exists. The black
+panels on the AT-802 cowl top and the wing roots are its anti-glare panel and
+walkways (paint, as on the real aircraft). Test: `node test/cockpitview.mjs`.
+
+## Turboprop reverse (AT-502B, Thrush 510G, AT-802 / Fire Boss)
+Only the turboprops, only with a wheel on the ground (locked out in flight);
+pistons and radials unchanged.
+- **PC**: with the power at idle, tap Ctrl and press it again quickly (within
+  0.45 s) and hold — the lever runs behind the gate into reverse up to 100 %;
+  released, it stays where it is. Shift brings it back to idle first.
+- **Phone**: on the ground the power slider shows a REV range (the lowest
+  22 %, below a white idle mark); dragging into it reverses, deeper = more.
+- **Physics** (`flightModel.js`): behind the gate the lever schedules the gas
+  generator up again (to `reverseNg` of the forward range); reverse thrust ≈
+  42 % of the static thrust at that power (actuator disc). AT-502B from
+  28 m/s: roll 285 m in beta idle, 192 m in full reverse. Forward flight and
+  every other aircraft untouched (all 244 existing tests pass).
+- **Sound**: a deep, rough roar beating at the blade-pass rate plus a raspy
+  upper band and a louder, harsher prop buzz — the growl of a reversing PT6 —
+  rising with reverse and power. HUD reads *Reverso n %*.
+- Tests: `test/reverse.test.mjs` (in `npm test`), `node test/reverseflow.mjs`.
+
+## Premium Expansion 03 — Operation: Fireboss Frontier (a separate map)
+A third map built only for aerial firefighting: dry cerrado at the end of the
+dry season, two large lakes to scoop from, broken hills, a ridge and a basin
+where smoke lies. No crop work exists on it. The main map, the Serra das
+Bananeiras and every aircraft elsewhere are unchanged (`npm test` 247/247,
+`npm run test:serra` 10/10).
+
+**Architecture.** Same one-map-per-page scheme as the Serra
+(`src/world/activeMap.js`, id `frontier`, `?map=frontier` /
+`AGRO_MAP=frontier`); all map data lives in `src/world/frontier.js` in the
+engine's own shapes (runway, farm site, creek, stream, ponds, roads, props,
+biome weights, vegetation regions), read by `layout.js`, `terrainData.js`,
+`expansion.js`, `vegetation.js` and the terrain shader (`FRONT_MAP`: straw-gold
+grass, old burn scars in the fourth biome channel, dry savanna beyond the map).
+
+**Size and terrain.** 7.2 × 7.2 km detailed (9.4 m grid), 6 × 6 km playable
+(36 km², 25 % of the main map). A Chapadão do Capim — rolling plains (13 m of
+relief); B Morro Queimado — hills cut by corridors (93 m); E Serra da Brasa —
+the western ridge with elongated crests and spurs (152 m); D Baixada da
+Fumaça — a basin ≈ 20 m down; C the lakes. Smooth distances only (no
+cut-offs), checked for steps by the map test.
+
+**Water.** Lagoa Grande (1.17 km of open water east–west, 1 km north of the
+base, the main scooping lake) and Lagoa das Garças (0.97 km, turned, deeper in
+the map); irregular outlines (pond harmonics), ground easing to a level floor
+round them. A creek through the basin, a stream down a hill corridor into
+Lagoa Grande, a small dam by the auxiliary strip.
+
+**Bases.** BASE 01 Base Lagoa Grande (840 × 22 m compacted earth, hangar,
+service, fuel, water tanks); BASE 02 Pista do Retiro (560 × 18 m earth,
+remote); BASE 03 water point on Lagoa das Garças (shed, tank, drums).
+
+**Fire.** 19 spots in 9 sectors (`FRONT_SECTORS`), unlit until a mission
+lights them. Spots burn as areas or as fire LINES (a front `len` long, up to
+56 flames). One instanced flame draw, one char/ember draw, pooled smoke whose
+spawn rate falls with camera distance (full within 900 m, an eighth by 2.6 km,
+larger puffs far away), and one instanced draw of impostor smoke columns (a
+column per burning spot plus five distant fires beyond the map). Burnt ground:
+static old scars plus the char each extinguished spot leaves. Grass fires go
+out at 0.8 L/m² (coverage level ≈ 2; the main map's test zone keeps 1.6).
+`hazeAt()` gives the smoke held at a point (near the fire, along the downwind
+plume, thicker in the basin, capped at 0.85); the atmosphere thickens and warms
+the fog and dims the sun from it — only where there is smoke.
+
+**Missions** (`src/game/frontierMissions.js`, fire only): A initial attack ×2,
+B fireline containment, C ridge fire, D low visibility, E multi-sector, F lake
+district; B and E flare up (more spots) if the fire is not under control in
+time; a mission handed in clears its spots, a completed one is paid (+25 %
+bonus inside its time) and recorded.
+
+**Aircraft.** Only the Fire Boss (missions) and the AT-802 Bombeiros (PR-BMF:
+red with a white side band, BOMBEIROS, white fin with a red band and a generic
+fire-service badge, white wings with red tips; no booms, no water system —
+free flight and showcase). Only these two are built on this map.
+
+**Premium.** `FRONTIER_EXPANSION` (`expansion.map-fireboss-frontier`) in
+`src/game/expansions.js`; its package includes the Fire Boss on this map
+(`includes`). Same entitlement source, same testing-phase setting; no
+purchase, payment, login or account code was added or changed.
+
+**Tests.** `npm run test:frontier` (9: size, strips, terrain zones and
+continuity, lakes, sectors and missions, no crop work, aircraft, premium,
+fires/missions/flare-up headless); `node test/frontiere2e.mjs` (14 in the
+browser: selector, switch both ways with the career kept, the AT-802
+Bombeiros, the board, scooping on Lagoa Grande, side-by-side drops putting a
+fire out and paying it, the smoke haze, hand-in, no page errors).
+
+**Measured (Chromium + SwiftShader, 1280 × 720; counts exact; four fixed views:
+far plain, low over a fire line, the base, a high overview).**
+
+| map · profile | load | JS heap | geometries | textures | calls (4 views) | k triangles (4 views) |
+|---|---|---|---|---|---|---|
+| main · low | 67.5 s | 616 MB | 1241 | 153 | 588 / 561 / 710 / 1707 | 1455 / 1358 / 1755 / 3006 |
+| main · high | 80.6 s | 621 MB | 1262 | 153 | 588 / 561 / 738 / 1757 | 1473 / 1375 / 1874 / 3283 |
+| Serra · low | 66.0 s | 536 MB | 1224 | 137 | 692 / 526 / 951 / 2460 | 1308 / 1010 / 1930 / 4237 |
+| Serra · high | 75.9 s | 548 MB | 1227 | 137 | 786 / 594 / 1082 / 2589 | 1970 / 1427 / 3333 / 6772 |
+| Frontier · low (fire line burning) | 37.5 s | 188 MB | 739 | 70 | 327 / 282 / 474 / 1051 | 371 / 346 / 527 / 803 |
+| Frontier · high (fire line burning) | 44.1 s | 186 MB | 742 | 70 | 349 / 304 / 511 / 1118 | 417 / 392 / 603 / 942 |
+
+(Times are SwiftShader CPU rendering, not a GPU: compare them only between rows.)
+
+## Premium Expansion 04 — Mato Grosso Operations (a separate map)
+The agribusiness frontier of Mato Grosso: broad soy and corn blocks by the
+BR-163, brachiaria (capim) for desiccation, three centre-pivot circles,
+legal-reserve edges, red-earth farm roads and four short dirt strips. The
+main map, the Serra, the Frontier and every aircraft are unchanged (`npm
+test` 247/247, `test:serra` 10/10, `test:frontier` 9/9); the whole
+agricultural fleet flies here.
+
+**Architecture.** One map per page as before (`activeMap.js`, id
+`matogrosso`); data in `src/world/matogrosso.js` (terrain, strips, fields,
+pivots, roads, forests, water, props, biome), orders in
+`src/game/mtContracts.js`, premium id `expansion.map-mato-grosso-operations`
+(same entitlement source and testing-phase setting; no purchase, payment or
+account code changed).
+
+**Size and terrain.** 8 × 8 km detailed (10.4 m grid), 6.8 × 6.8 km playable
+(46 km², a third of the main map). Gently rolling chapadão: −14 … +13 m,
+steepest 6.4 % off the creek banks, the land rising a little to the north,
+shallow creek valleys; the base and the sede on level ground.
+
+**Strips.** Fazenda Santa Fé (base, 700 × 20 m dirt); Pista do Pivô
+(540 × 16 m red clay, +1.5 % eastbound); Pista do Capim (470 × 14 m rough
+earth, +2.2 %); Pista da Reserva (500 × 15 m, −1.2 % with a cross slope, by
+the BR).
+
+**Land.** Zones A (BR front: big soy/corn blocks both sides of the highway),
+B (pivot district), C (capim sector, drawn as thick wind-combed brachiaria),
+D (reserve edge: straight forest edges against the crops), E (backlands:
+narrow crooked roads). Stubble, fallow and pasture complete the mosaic.
+
+**Centre pivots.** Fields may now be round (`circle` on the field): the disc
+is the field for `fieldAt`, coverage (a cell mask; P-01 = 55.4 ha exactly),
+the GPS passes (chords of the disc), the canopy (grid pulled onto the rim),
+the edge walls, the row fins, the 3D plants, the terrain shader (disc + soil
+rings under the towers) and the maps. The machines (`src/world/pivots.js`):
+centre tower, arched pipeline on A-frame towers with tyres, truss, drop hoses,
+overhang and end gun — all three pivots in two draw calls. The arm is an
+obstacle at the height of its pipe (≈ 4.1–4.9 m): at work height a pass
+must hop over it; 7.5 m up or beside it is clear.
+
+**BR-163.** A paved ribbon (asphalt, white edge lines, dashed yellow centre
+line, red gravel shoulder) draped on the terrain, its own material in the
+road system (other roads unchanged).
+
+**Orders.** 8 at the base (soy, corn, the long runs), pivot requests at the
+pivot strip (pivot discs + a corn block), desiccation at the capim strip,
+reserve-edge fields at the reserve strip; pt-BR and English.
+
+**Tests.** `npm run test:mt` (7: size, gentle relief, strips and grades, land
+use and clearances, pivots — round field, coverage, chords, arm at work
+height —, orders, premium); `node test/mte2e.mjs` (11 in the browser:
+selector, switch both ways with the career kept, board, the arm as an
+obstacle, a pivot sprayed to completion hopping the arm, a crash into the
+arm at work height, a capim desiccation to completion, no page errors).
+
+**Measured (Chromium + SwiftShader, 1280 × 720; same four views as the Frontier table above).**
+
+| map · profile | load | JS heap | geometries | textures | calls (4 views) | k triangles (4 views) |
+|---|---|---|---|---|---|---|
+| Mato Grosso · low | 61.8 s | 511 MB | 1249 | 155 | 617 / 580 / 716 / 1686 | 1293 / 1195 / 1525 / 2539 |
+| Mato Grosso · high | 71.8 s | 513 MB | 1249 | 155 | 623 / 586 / 731 / 1722 | 1316 / 1218 / 1553 / 2582 |
+
+(The main map in the same views: 616–621 MB, 561–1757 calls, 1358–3283 k triangles.)
+
+## Swath-guidance light bar (physical bar on the cowl + HUD bar)
+
+One LED pattern for every display (`src/aircraft/lightbar.js`): on the pass line the
+centre lights green; off it, a run of LEDs grows from the centre toward the side to
+steer to — amber near the line, red far off it (square-root scale: the first metres
+move the light most; one side is full at 15 m). Turning toward the next pass only the
+centre glows dimly; with no pass to fly the bar is dark. The pattern is reduced to an
+integer key and every display repaints only when the key changes.
+
+- **Physical bar** (`createLightbar`): dark housing with a short visor over the LED
+  window on two light steel brackets, 25 square LEDs facing the pilot, unlit material
+  (no bloom, no light, no shader). Two draw calls: housing + brackets merged with
+  vertex colours, LEDs in one `InstancedMesh` whose colours are written only on a
+  pattern change. Fitted on the **Ipanema 203** (cowl crown ahead of the windshield)
+  and the **Ipanema 202** (hopper deck aft of the lid), replacing their old cockpit
+  bars; it is exterior equipment, part of the airframe in every view. The other
+  aircraft keep their cockpit bars, now driven by the same pattern.
+- **HUD bar**: 25 small dots at the top centre while a job is flown (airborne, a pass
+  to fly). Settings → *Spray assistance*: *Light bar on the screen* on/off (default
+  on), *intensity* low / medium / high. DOM classes change only with the pattern.
+
+Measured (Chromium + SwiftShader, main map, beginner job, on a pass, before = v60
+`1bb2845`, after = this build; calls and triangles exact):
+
+| Aircraft | View | Calls before → after | Triangles before → after |
+|---|---|---|---|
+| Ipanema 202 | cockpit | 420 → 406 | 1 373 153 → 1 372 821 |
+| Ipanema 202 | chase | 446 → 432 | 1 321 964 → 1 321 632 |
+| Ipanema 203 | cockpit | 487 → 472 | 1 399 702 → 1 399 358 |
+| Ipanema 203 | chase | 555 → 540 | 1 344 594 → 1 344 250 |
+| AT-502B | both | unchanged | unchanged |
+
+Light bar logic per frame (Node micro-benchmark, 200 000 frames on a pass): 1.91 µs
+before (15 colour writes every frame) → 0.064 µs (key compare; 1 repaint). Heap within
+run-to-run noise (601–616 MB both builds). Frame times under SwiftShader varied by
+hundreds of ms between identical runs and are not a usable comparison. Not tested on
+real phones, Safari / Firefox or real GPUs. Unit tests: `test/lightbar.test.mjs`.
+
+## Jettison (alijamento) and the Fire Boss drop
+
+- **Jettison — key Y (PC; rebindable in Settings → Keys).** Agricultural aircraft:
+  the hopper's dump gate under the belly opens wide; the load goes in ≈ 5–7 s (the
+  flow falls with the head of liquid over the gate; Ipanema 203: 1 050 L in 6.7 s,
+  2 344 → 1 294 kg), the mass and CG follow every step, press Y again to close the
+  gate and keep the rest. The spray valve closes; nothing jettisoned counts as
+  application. A dense white curtain leaves the gate with the aircraft's speed and is
+  slowed by the air (shared dust particle pool, ≈ 150 particles/s only while the gate
+  is open). HUD: blinking *JETTISON — n L left*. Helicopters and the Frontier's
+  AT-802 Bombeiros (no hopper) have no gate. **Fire Boss:** Y opens the drop door
+  fully and holds it open to the last litre (3 000 L in 2.4 s).
+- **Drop physics kept:** the water leaves with the aircraft's velocity, the air slows
+  it toward the wind, gravity pulls it down (one shared step, `fallStep`): from 30 m
+  at 52 m/s it lands ≈ 71 m ahead after 2.6 s.
+- **Knock-down (easier, still physical):** a flame soaked to under 30 % of its fuel
+  goes out (wet fuel cannot hold); a spot down to 10 % of its fire is controlled; the
+  footprint of the falling water is 7 m + 5 m per second of fall; the main map's
+  brush needs 1.0 L/m² (was 1.6), the Frontier's grass 0.8 L/m². Headless, one full
+  load centred on an 18 m spot: before 11–13 % left burning, now out; a 200 m fire
+  line takes about two loads (≈ 30 % left after one).
+- **Drop sight** (Settings → Spray assistance, on by default): an outline on the
+  ground of where the load would land if the door opened now — from the first
+  impact along the ground track for the load's length, as wide as the footprint;
+  green when a burning spot is in its middle. One unlit ribbon, predicted 10× a
+  second, only with water on board near a burning spot. Opening the door on green
+  put the test spot out with one load (577 L on target).
+
+Not tested on real phones, Safari / Firefox or real GPUs; touch has no jettison button
+yet (PC first, as asked). Unit tests: `test/jettison.test.mjs`.
+
+## Badeco 2.0 — ground crew, service points, ladder, rare remarks
+
+An evolution of the existing service (truck with hybrid A*, walking planner around the
+aircraft rectangles, Verlet hoses with keep-out boxes — all reused), not a second system.
+
+- **Crew model** (`src/crew/badeco.js`): rounded, stylised farm worker — cap with a
+  neck flap, long-sleeved work shirt with reflective bands, work trousers, rubber
+  gloves, boots — from lathed and capsule shapes, one vertex-coloured mesh per body
+  segment on **one shared material: 14 meshes (was 31), no textures**. Procedural
+  poses: idle, walk, carry, reach, reach low / crouch, reach up, hold, climb, thumbs.
+- **Service point registry** (`src/crew/servicePoints.js`): per aircraft and per
+  service, the port is the model's own filler / coupler (`fuelFiller`, `hopperPort`),
+  the stand the type's `service.local` F / P, all aircraft-local (they follow the
+  parked aircraft). Heights measured on the pad (m above the ground):
+
+  | Type | Fuel filler | Hopper coupler | Ladder |
+  |---|---|---|---|
+  | Ipanema 202 / 203 / EMB-201 | 1.22 / 1.32 / 1.16 | 1.01 / 1.07 / 1.06 | — |
+  | AT-502 / AT-401 / AT-802 | 1.13 / 1.17 / 1.51 | 0.94 / 1.11 / 1.20 | — |
+  | Dromader / Thrush / AgTruck / Brave | 1.17 / 1.08 / 1.19 / 1.10 | 1.03 / 0.94 / 1.18 / 1.02 | — |
+  | Ag-Cat | **3.01** (upper wing centre) | 1.38 | fuel: beside the forward fuselage, top step 1.06 m, reaching up |
+  | Fire Boss | **2.81** | **2.74** | both: behind the wing trailing edge, outboard of the float; on the wing walkway to the filler / to the coupler by the root, top step 2.67 m |
+  | R44 / Bell 206 | 1.92 / 1.46 | 0.29 / 0.33 | — |
+
+  Anything else above 1.95 m gets a ladder at its stand point automatically.
+- **Ladder** (`src/crew/ladder.js`): light aluminium A-frame, one merged mesh, built for
+  the height needed, set up, climbed, folded and taken away; never left standing
+  (a new service is refused while the crew is still clearing).
+- **Cap**: the filler / coupler cap swings open on its hinge while connected and shuts
+  after (one small lid, shown only then).
+- **Status** on the crew card: BADECO — A CAMINHO / PREPARANDO ATENDIMENTO / SERVIÇO EM
+  ANDAMENTO / FINALIZANDO / SERVIÇO CONCLUÍDO / ATENDIMENTO INTERROMPIDO. The service
+  key (E, or the prompt on touch) **cancels** while he works: hose off, cap shut, down
+  from the wing / ladder, ladder folded, everything stowed.
+- **Remarks** (`src/crew/dialogue.js`): short captions in the voice of a Brazilian ag
+  ground hand, PT/EN, no audio — never two within 6 min, a spontaneous one only after
+  9 quiet minutes (20 % chance a minute), events (service done, job handed in) 35 %;
+  never in menus, far away or over a warning. Simulated 4 h near the crew: 20 remarks.
+
+Measured (Chromium + SwiftShader, main map, Ipanema at the pad; v62 `9fba9d3` → this
+build): draw calls with the crew in view 1 363 → 1 356, during a fuel service 1 413 →
+1 391; crew idle and the aircraft far away: service update 12 → 5 µs/frame (the crew is
+not animated far from the camera); heap after GC 589 → 594 MB (noise). Every aircraft
+(14) serviced to completion in the browser with no page error; cancel on the Fire Boss
+wing and an aircraft change mid-climb leave nothing behind. Not tested on real phones,
+Safari / Firefox or real GPUs. Unit tests: `test/badeco2.test.mjs`.
+
+## Hopper sight liquid (moves with the aircraft)
+
+The product seen through each aircraft's hopper sight window is no longer a
+flat band redrawn when the level changed: it moves like a liquid in the tank.
+
+**Model** (`src/aircraft/hopperLiquid.js`, `HopperSlosh`): two damped
+oscillators, lateral and fore-aft tilt of the surface relative to the tank.
+Each is driven towards the equilibrium where the surface stands perpendicular
+to the specific force felt in the aircraft's frame: gravity plus
+accelerations from the velocity change, filtered at 80 ms because physics
+steps and frames are not in phase. Consequences:
+
+* A slip, a skid, a turn on the ground or a wing down on the ground tilts the
+  surface. In a coordinated turn the force stays along the seat, so the
+  surface settles level with the tank, as in a real hopper.
+* Nose up (on the tailwheel, climbing, slowing) runs the product aft, and the
+  rear-wall sight reads higher. Accelerating does the same; braking runs it
+  forward. This is the effect the Ag-Cat's and EMB-203's two scales (ground
+  and flight) already account for.
+* When the tank rolls or pitches quickly the liquid lags behind (70 % of the
+  rotation), then sloshes back.
+* Frequency is the first sloshing mode, ω² = (gπ/L)·tanh(πd/L), with tank
+  length L ≈ 1.05·∛(capacity) and depth d from the fill. Damping ζ = 0.07.
+* Ripples come from the engine (with throttle), rolling on the ground, the
+  slosh itself and bumps.
+
+The level falls as the hopper empties. An empty hopper shows nothing.
+
+**Drawing** (`sightLiquid`): the surface line, the gradient and the meniscus
+are added to the fragment shader of the sight's existing material. On canvas
+sights they are drawn over the window of the canvas texture, which now keeps
+only the wall and its marks, drawn once. On the AT-802 / Fire Boss, PA-36 and
+Thrush the liquid sheet stays at full height and is cut at the surface. Each
+frame only uniforms change: no canvas redraw, no texture upload (the old
+sights uploaded up to 1.3 MB per level change), and no extra mesh or draw
+call. The slosh runs only while the cockpit is shown (measured: 0.43 µs a frame in Node).
+
+| Aircraft | Sight | Window |
+|---|---|---|
+| EMB-202 Ipanema | panel window, hopper wall with litre marks | `IPA_SIGHT_LIQUID` (panel.js) |
+| AT-502B | panel window | `AT_SIGHT_LIQUID` (atPanel.js) |
+| M-18 Dromader | hopper back wall | `M18_SIGHT_LIQUID` (dromaderPanel.js) |
+| Ag-Cat | translucent hopper wall, ground / flight scales | `AGCAT_SIGHT_LIQUID` (agcatPanel.js) |
+| EMB-201 | round window | `E201_SIGHT_LIQUID` (e201Panel.js) |
+| EMB-203 | painted upper wall + lower slot, non-linear scale (`h = (L/cap)^0.72`) | `E203_SIGHT_LIQUID` (e203Panel.js) |
+| PA-36, Thrush, AT-802 / Fire Boss | liquid sheet behind the window | in their cockpit files |
+
+The AT-401, AgTruck and helicopters have hopper gauges with needles only and
+no liquid window.
+
+Tests: `test/hopperLiquid.test.mjs` covers:
+
+* rest;
+* static bank;
+* nose up;
+* acceleration and braking;
+* roll-in slosh and settling;
+* ripples;
+* reset after a teleport.
+
+## FPS limit 60 by default
+
+An unlimited loop on a 120–240 Hz display keeps the GPU at full load all the
+time. Settings → FPS limit now defaults to **60**. Saves from before, which
+held the untouched 0, move to 60 once (`fpsV`). "Off" is still available.
+
+The limiter now keeps its deadlines on a grid. The old "time since the last
+frame" test gave 48 FPS on a 144 Hz display and 55 on 165 Hz. A callback up to
+half a display interval early counts as on time, so a limit at or above the
+display's rate never drops a frame. Tests (`test/perfmanager.test.mjs`): 60
+on 60/75/120/144/165/240 Hz, with ±1.5 ms jitter, and no catch-up burst after
+a stall.

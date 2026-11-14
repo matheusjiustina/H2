@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+const [, , query = '', out = 'dbg.png', script = ''] = process.argv;
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const logs = [];
+page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
+page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+await page.goto('http://localhost:5173/?' + query, { waitUntil: 'load' });
+await page.waitForFunction(() => window.__agro && window.__agro.frames > 3, null, { timeout: 120000 });
+if (script) console.log(await page.evaluate(script));
+await page.waitForTimeout(1500);
+await page.screenshot({ path: out });
+for (const l of logs.slice(-30)) console.log(l);
+await browser.close();
