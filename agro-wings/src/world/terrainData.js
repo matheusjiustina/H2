@@ -3,6 +3,7 @@
 import { fbm, smoothstep, lerp, segDist, clamp } from '../core/math.js';
 import { reliefAt, ringReliefAt } from './relief.js';
 import { SERRA, FRONTIER, MATOGROSSO } from './activeMap.js';
+import { fieldSd } from './fieldShape.js';
 import { serraNatural } from './serra.js';
 import { frontierNatural } from './frontier.js';
 import { mtNatural } from './matogrosso.js';
@@ -396,7 +397,8 @@ export class TerrainData {
     // Carreadores: 8 m dirt ring around every field.
     for (const g of FIELDS) {
       const dx = Math.max(g.x0 - x, 0, x - g.x1), dz = Math.max(g.z0 - z, 0, z - g.z1);
-      if (dx + dz > 0 && Math.max(dx, dz) < 8) return 'dirt';
+      if (dx + dz > 0 && Math.max(dx, dz) < 8 && !(g.circle || g.outline)) return 'dirt';
+      if ((g.circle || g.outline) && Math.max(dx, dz) < 8) { const sd = fieldSd(g, x, z); if (sd > 0 && sd < 8) return 'dirt'; }
     }
     return 'grass';
   }

@@ -4,6 +4,7 @@
 // inside the field boundary. Also tracks off-target and overdose waste.
 import { SPRAY } from '../config.js';
 import { CROPS, cropHeight } from '../world/layout.js';
+import { polySpans } from '../world/fieldShape.js';
 
 export class FieldCoverage {
   constructor(field) {
@@ -16,14 +17,27 @@ export class FieldCoverage {
     this.cellArea = this.cell * this.cell;
     // A centre-pivot field (Mato Grosso Operations): only the cells of the
     // disc are the field (mask 1); the square's corners are outside it.
+    // An irregular talhão (`outline`, Mato Grosso refinement 2.0) the same:
+    // only the cells inside its polygon (forest inlets are not crop).
     this.mask = null;
-    if (field.circle) {
-      const C = field.circle;
+    if (field.circle || field.outline) {
       this.mask = new Uint8Array(this.nx * this.nz);
       let n = 0;
-      for (let iz = 0; iz < this.nz; iz++) for (let ix = 0; ix < this.nx; ix++) {
-        const x = field.x0 + (ix + 0.5) * this.cell, z = field.z0 + (iz + 0.5) * this.cell;
-        if (Math.hypot(x - C.x, z - C.z) <= C.r) { this.mask[iz * this.nx + ix] = 1; n++; }
+      if (field.circle) {
+        const C = field.circle;
+        for (let iz = 0; iz < this.nz; iz++) for (let ix = 0; ix < this.nx; ix++) {
+          const x = field.x0 + (ix + 0.5) * this.cell, z = field.z0 + (iz + 0.5) * this.cell;
+          if (Math.hypot(x - C.x, z - C.z) <= C.r) { this.mask[iz * this.nx + ix] = 1; n++; }
+        }
+      } else {
+        // Scanline: each row of cells from the polygon's crossings.
+        for (let iz = 0; iz < this.nz; iz++) {
+          const z = field.z0 + (iz + 0.5) * this.cell;
+          for (const [a, b] of polySpans(field.outline, true, z)) {
+            const i0 = Math.max(0, Math.ceil((a - field.x0) / this.cell - 0.5)), i1 = Math.min(this.nx - 1, Math.floor((b - field.x0) / this.cell - 0.5));
+            for (let ix = i0; ix <= i1; ix++) if (!this.mask[iz * this.nx + ix]) { this.mask[iz * this.nx + ix] = 1; n++; }
+          }
+        }
       }
       this.cells = n;
       this.area = n * this.cellArea;

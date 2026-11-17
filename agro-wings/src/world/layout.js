@@ -16,6 +16,7 @@ import * as SB from './serra.js';
 import * as FB from './frontier.js';
 // Premium map expansion 04 (Mato Grosso Operations): from src/world/matogrosso.js.
 import * as MT from './matogrosso.js';
+import { fieldInside } from './fieldShape.js';
 const swap = (list, items) => { list.length = 0; list.push(...items); };
 
 export const WORLD_HALF = SERRA ? SB.SERRA_WORLD_HALF : FRONTIER ? FB.FRONT_WORLD_HALF : MATOGROSSO ? MT.MT_WORLD_HALF : 6000;
@@ -255,7 +256,7 @@ FIELDS.push(
 );
 if (SERRA) { fid = 0; swap(FIELDS, SB.SERRA_FIELDS.map((f) => field(f.name, 'banana', f.x0, f.x1, f.z0, f.z1, f.growth ?? 1, f.rowAxis ?? 'x', f.extra ?? {}))); }
 // (Fireboss Frontier: no crops — only the sítios' pastures, rural clearings.)
-if (MATOGROSSO) { fid = 0; swap(FIELDS, MT.MT_FIELDS.map((f) => ({ ...field(f.name, f.crop, f.x0, f.x1, f.z0, f.z1, f.growth, f.rowAxis, f.extra), ...(f.circle ? { circle: f.circle } : {}) }))); }
+if (MATOGROSSO) { fid = 0; swap(FIELDS, MT.MT_FIELDS.map((f) => ({ ...field(f.name, f.crop, f.x0, f.x1, f.z0, f.z1, f.growth, f.rowAxis, f.extra), ...(f.circle ? { circle: f.circle } : {}), ...(f.outline ? { outline: f.outline } : {}) }))); }
 if (FRONTIER) { fid = 0; swap(FIELDS, FB.FRONT_PASTURES.map(([x0, x1, z0, z1], i) => field(`P-0${i + 1}`, 'pasture', x0, x1, z0, z1, 1, 'x'))); }
 for (const f of FIELDS) f.level ??= 1;
 
@@ -507,14 +508,14 @@ function pasture(x0, x1, z0, z1, gateSide, gateAt) {
   return Object.entries(sides).map(([k, pts]) => (k === gateSide ? { pts, gateAt } : { pts }));
 }
 
-// Inside a field (m: margin). A centre-pivot field (`circle`, Mato Grosso
-// Operations) is the disc inside its square.
-export const inFieldShape = (f, x, z, m = 0) => x >= f.x0 - m && x <= f.x1 + m && z >= f.z0 - m && z <= f.z1 + m
-  && (!f.circle || Math.hypot(x - f.circle.x, z - f.circle.z) <= f.circle.r + m);
+// Inside a field (m: margin). A centre-pivot field (`circle`) is the disc
+// inside its square, an irregular talhão (`outline`) its polygon (Mato
+// Grosso Operations; src/world/fieldShape.js).
+export const inFieldShape = (f, x, z, m = 0) => fieldInside(f, x, z, m);
 
 export function fieldAt(x, z) {
   for (const f of FIELDS) {
-    if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && (!f.circle || Math.hypot(x - f.circle.x, z - f.circle.z) <= f.circle.r)) return f;
+    if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && (!(f.circle || f.outline) || fieldInside(f, x, z))) return f;
   }
   return null;
 }

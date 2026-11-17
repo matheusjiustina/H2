@@ -4,8 +4,9 @@
 // reserve strip). One order per field; pay follows the work.
 import { t } from '../i18n/index.js';
 import { MT_FIELDS } from '../world/matogrosso.js';
+import { fieldArea } from '../world/fieldShape.js';
 
-const ha = (f) => (f.circle ? Math.PI * f.circle.r ** 2 : (f.x1 - f.x0) * (f.z1 - f.z0)) / 1e4;
+const ha = (f) => fieldArea(f) / 1e4; // (the disc, the outline or the rectangle)
 const CROP_PT = { soy: 'Soja', corn: 'Milho', capim: 'Capim' };
 const CLIENTS = { main: 'Fazenda Santa Fé', pivo: 'Fazenda Santa Fé · Pivôs', capim: 'Fazenda Santa Fé · Retiro do Capim', reserva: 'Fazenda Santa Fé · Reserva' };
 const BRIEF = {

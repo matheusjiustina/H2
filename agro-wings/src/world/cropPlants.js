@@ -29,6 +29,7 @@ import { CUT_U, CUT_GLSL, CROP_U } from './cutState.js';
 import { canvas, canvasTexture } from '../core/textures.js';
 import { rng } from '../core/math.js';
 import { lruGet, lruTrim } from './lru.js';
+import { pointInPoly } from './fieldShape.js';
 
 const KINDS = ['soy', 'corn', 'cotton'];
 // Model height (m) at full growth; along-row spacing of the plant clumps.
@@ -588,6 +589,7 @@ export function createCropPlants(scene, terrain, quality) {
           const cc = c + (hB - 0.5) * sp * 0.12;
           const x = alongX ? l : cc, z = alongX ? cc : l;
           if (f.circle && Math.hypot(x - f.circle.x, z - f.circle.z) > f.circle.r - 0.3) continue; // (pivot: the disc only)
+          if (f.outline && !pointInPoly(f.outline, x, z)) continue; // (irregular talhão: inside its outline)
           const vi = hB < 0.5 ? 0 : 1; // the full plant's variant
           let rec = out.get(k + vi);
           if (!rec) { rec = { slot: slotOf(k, vi), a: [], b: [] }; out.set(k + vi, rec); }

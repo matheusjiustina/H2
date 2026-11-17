@@ -14,6 +14,7 @@ import { makeCropCard, makeCanopyTop } from '../core/textures.js';
 import { fbm } from '../core/math.js';
 import { ATMO_U } from './atmosphere.js';
 import { CUT_U, CUT_GLSL, CROP_U } from './cutState.js';
+import { fieldSpans, pointInPoly, polyEdgeDist, polyClosest } from './fieldShape.js';
 
 const CANOPY = 0.78; // canopy surface relative to crop height
 const FIN_LO = 0.42, FIN_HI = 1.04;
@@ -283,6 +284,12 @@ function buildCanopy(f, h, terrain, mat) {
       let x = Math.min(f.x1, f.x0 + i * step), z = Math.min(f.z1, f.z0 + j * step);
       const k = j * nx + i;
       let edge = Math.min(x - f.x0, f.x1 - x, z - f.z0, f.z1 - z);
+      // An irregular talhão: points outside the outline are pulled onto it
+      // (only the cells inside are drawn, below).
+      if (f.outline) {
+        if (pointInPoly(f.outline, x, z)) edge = polyEdgeDist(f.outline, x, z);
+        else { const q = polyClosest(f.outline, x, z); x = q[0]; z = q[1]; edge = 0; }
+      }
       // A centre-pivot field (Mato Grosso Operations): the grid's points
       // outside the disc are pulled onto its rim (a round canopy).
       if (f.circle) {
@@ -310,6 +317,8 @@ function buildCanopy(f, h, terrain, mat) {
   }
   const idx = [];
   for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    // (Irregular talhão: the cells whose centre is inside its outline.)
+    if (f.outline && !pointInPoly(f.outline, Math.min(f.x1, f.x0 + (i + 0.5) * step), Math.min(f.z1, f.z0 + (j + 0.5) * step))) continue;
     const a = j * nx + i, d = a + 1, b = a + nx, c = b + 1;
     idx.push(a, b, d, b, c, d);
   }
@@ -350,7 +359,11 @@ function buildEdges(f, h, terrain, mat) {
       idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
     }
   };
-  if (f.circle) {
+  if (f.outline) {
+    // Irregular talhão: the wall follows its outline.
+    const P = f.outline;
+    for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; side(a[0], a[1], b[0], b[1]); }
+  } else if (f.circle) {
     // Round field: the wall follows the rim.
     const C = f.circle, N = Math.max(24, Math.ceil((2 * Math.PI * C.r) / 24));
     for (let i = 0; i < N; i++) {
@@ -396,15 +409,17 @@ function buildFins(f, x0, x1, z0, z1, terrain) {
   const tramPhase = (f.id * 7.3) % 27;
   for (let k = k0; k <= k1; k++) {
     const c = (k + 0.5) * sp;
-    // (A pivot field: the row runs only across the disc.)
-    let rl0 = l0, rl1 = l1;
+    // (A pivot field: the row runs only across the disc; an irregular
+    // talhão: along each stretch of the row inside its outline.)
+    let spans = [[l0, l1]];
     if (f.circle) {
       const C = f.circle, off = c - (alongX ? C.z : C.x), hh = C.r * C.r - off * off;
       if (hh <= 0) continue;
       const half = Math.sqrt(hh) - 0.5, mid = alongX ? C.x : C.z;
-      rl0 = Math.max(l0, mid - half); rl1 = Math.min(l1, mid + half);
-      if (rl1 - rl0 < 1) continue;
-    }
+      spans = [[Math.max(l0, mid - half), Math.min(l1, mid + half)]];
+    } else if (f.outline) spans = fieldSpans(f, alongX, c).map(([a, b]) => [Math.max(l0, a + 0.5), Math.min(l1, b - 0.5)]);
+    for (const [rl0, rl1] of spans) {
+    if (rl1 - rl0 < 1) continue;
     const n = Math.max(1, Math.ceil((rl1 - rl0) / seg));
     // Rows under the ground sprayer's wheel tracks are flattened (matches the
     // tramlines drawn on the canopy from the air).
@@ -435,6 +450,7 @@ function buildFins(f, x0, x1, z0, z1, terrain) {
     for (let i = 0; i < n; i++) {
       const a = start + i * 3;
       idx.push(a, a + 3, a + 1, a + 1, a + 3, a + 4, a + 1, a + 4, a + 2, a + 2, a + 4, a + 5);
+    }
     }
   }
   if (!idx.length) return null;

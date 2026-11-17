@@ -9,6 +9,7 @@ import { reliefPatch } from '../ui/maps.js';
 import { UNITS } from '../config.js';
 import { FIELDS, SITES, siteById } from '../world/layout.js';
 import { lightbarKey, lightbarFill } from '../aircraft/lightbar.js';
+import { fieldSpans, fieldPath } from '../world/fieldShape.js';
 
 // Cockpit LED colours by light bar state (lit meshes behind the panel glass).
 const LEGACY_COL = [0x1c1c1c, 0x223a28, 0x33ff66, 0xffaa22, 0xff3322];
@@ -74,6 +75,14 @@ export class Guidance {
           if (hh <= 0) continue;
           const half = Math.sqrt(hh), mid = axis === 'x' ? C.x : C.z;
           e0 = Math.min(e0, mid - half); e1 = Math.max(e1, mid + half);
+          continue;
+        }
+        if (f.outline) {
+          // An irregular talhão: from where its crop first starts to where it
+          // last ends within the pass's band (lines across the band and the
+          // outline's own corners inside it).
+          for (const q of [c0 + 0.5, (c0 + c) / 2, c, (c + c1) / 2, c1 - 0.5]) for (const [a, b] of fieldSpans(f, axis === 'x', q)) { e0 = Math.min(e0, a); e1 = Math.max(e1, b); }
+          for (const [px, pz] of f.outline) { const pc = axis === 'x' ? pz : px; if (pc > c0 && pc < c1) { const pl = axis === 'x' ? px : pz; e0 = Math.min(e0, pl); e1 = Math.max(e1, pl); } }
           continue;
         }
         e0 = Math.min(e0, axis === 'x' ? f.x0 : f.z0); e1 = Math.max(e1, axis === 'x' ? f.x1 : f.z1);
@@ -294,7 +303,7 @@ export class Guidance {
       }
       g.strokeStyle = P.edge;
       g.lineWidth = 2 / scale;
-      if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r, 0, Math.PI * 2); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
+      if (f.circle || f.outline) { fieldPath(g, f); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
     }
     // Flight track: thin grey where the boom was off, bright where spraying.
     if (this.trackN > 1) {
@@ -394,7 +403,7 @@ export class Guidance {
       g.strokeStyle = mine ? P.next : f.contract ? P.edge : P.dim;
       g.globalAlpha = mine ? 1 : 0.6;
       g.lineWidth = (mine ? 2.2 : 1) / scale;
-      if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r, 0, Math.PI * 2); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
+      if (f.circle || f.outline) { fieldPath(g, f); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
     }
     g.globalAlpha = 1;
     // Fire order (Fire Boss): the spots, burning or out.

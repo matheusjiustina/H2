@@ -89,6 +89,7 @@ function termiteMound(seed) {
 
 import { SERRA, FRONTIER } from './activeMap.js';
 import { FRONT_VEG_REGIONS, frontierCleared, frontierRunwayClear } from './frontier.js';
+import { fieldInside } from './fieldShape.js';
 import { serraForestBoxes, SERRA_WORLD_HALF } from './serra.js';
 import { serraCanopy } from './serraScenery.js';
 
@@ -117,7 +118,7 @@ export function createVegetation(terrain, quality) {
     // (The original apron: the random streams draw against it; the main
     // base's larger apron is cleared afterwards, see onMainApron.)
     if (x > APRON0.x0 - 30 && x < APRON0.x1 + 30 && z > APRON0.z0 - 50 && z < 30) return true;
-    for (const f of FIELDS0) if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
+    for (const f of FIELDS0) if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m && (!f.outline || fieldInside(f, x, z, m))) return true;
     for (const rd of ROADS0) for (let i = 0; i < rd.pts.length - 1; i++) {
       if (segDist(x, z, rd.pts[i][0], rd.pts[i][1], rd.pts[i + 1][0], rd.pts[i + 1][1]) < rd.w / 2 + 3) return true;
     }
@@ -173,9 +174,10 @@ export function createVegetation(terrain, quality) {
     }
     for (const p of PROPS) if (Math.abs(x - p.x) < p.r && Math.abs(z - p.z) < p.r) return true;
     for (const f of FIELDS2) {
-      if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m) return true;
-      // Talhões cut out of the forest keep the forest up to their edges.
-      if (!tall || !f.contract || (f.farm && siteById(f.farm).farm?.tight)) continue;
+      if (x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m && (!f.outline || fieldInside(f, x, z, m))) return true;
+      // Talhões cut out of the forest keep the forest up to their edges (an
+      // irregular talhão of Mato Grosso too: the trees stand at its ends).
+      if (!tall || !f.contract || f.outline || (f.farm && siteById(f.farm).farm?.tight)) continue;
       const along = f.rowAxis === 'x';
       const a = along ? x : z, c = along ? z : x;
       const a0 = along ? f.x0 : f.z0, a1 = along ? f.x1 : f.z1, c0 = along ? f.z0 : f.x0, c1 = along ? f.z1 : f.x1;
@@ -514,7 +516,7 @@ export function createVegetation(terrain, quality) {
     }
   };
   const openGround = (x, z, m) => inRing(x, z) && !inForest(x, z, m) && !cleared(x, z, true, m) && !fieldNear(x, z, m);
-  const fieldNear = (x, z, m) => FIELDS_R.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m);
+  const fieldNear = (x, z, m) => FIELDS_R.some((f) => x > f.x0 - m && x < f.x1 + m && z > f.z0 - m && z < f.z1 + m && (!f.outline || fieldInside(f, x, z, m)));
   for (let i = 0; i < 230; i++) {
     const [x, z] = ringPt();
     if (!openGround(x, z, 25)) continue;

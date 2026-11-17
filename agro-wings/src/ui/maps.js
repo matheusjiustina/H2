@@ -4,6 +4,7 @@ import { rawHeight } from '../world/terrainData.js';
 import { AUX_STRIPS } from '../world/expansion.js';
 import { FRONTIER, MATOGROSSO } from '../world/activeMap.js';
 import { FRONT_BASE_NAME } from '../world/frontier.js';
+import { fieldPath } from '../world/fieldShape.js';
 
 const EXT = WORLD_HALF - 100; // half extent of the base map (m)
 const CROP_COL = { soy: '#3f8f2c', corn: '#2f7224', cotton: '#5f8f4a', stubble: '#b79a5a', fallow: '#9a3a1c', pasture: '#6f9a3a', banana: '#2f7d32', capim: '#93ad3c' };
@@ -82,7 +83,11 @@ export function buildBaseMap(size = 1024) {
     g.fillRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
   }
   // (A centre-pivot field is drawn as its disc.)
-  const fieldFill = (f, pad) => { if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r + pad, 0, Math.PI * 2); g.fill(); } else g.fillRect(f.x0 - pad, f.z0 - pad, f.x1 - f.x0 + pad * 2, f.z1 - f.z0 + pad * 2); };
+  const fieldFill = (f, pad) => {
+    if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r + pad, 0, Math.PI * 2); g.fill(); }
+    else if (f.outline) { fieldPath(g, f); g.fill(); if (pad > 0) { const lw = g.lineWidth, lj = g.lineJoin, ss = g.strokeStyle; g.lineWidth = pad * 2; g.lineJoin = 'round'; g.strokeStyle = g.fillStyle; g.stroke(); g.lineWidth = lw; g.lineJoin = lj; g.strokeStyle = ss; } }
+    else g.fillRect(f.x0 - pad, f.z0 - pad, f.x1 - f.x0 + pad * 2, f.z1 - f.z0 + pad * 2);
+  };
   for (const f of FIELDS) {
     g.fillStyle = '#9a3a1c';
     fieldFill(f, 7);
@@ -184,7 +189,7 @@ export function drawMap(g, w, h, base, game, view) {
       g.globalAlpha = 1;
       g.strokeStyle = '#ffe14a';
       g.lineWidth = 3 / scale;
-      if (f.circle) { g.beginPath(); g.arc(f.circle.x, f.circle.z, f.circle.r, 0, Math.PI * 2); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
+      if (f.circle || f.outline) { fieldPath(g, f); g.stroke(); } else g.strokeRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
     }
     const gd = game.guidance;
     if (gd.next) {

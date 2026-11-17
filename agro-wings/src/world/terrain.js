@@ -12,6 +12,7 @@ import {
 import { biomeWeights } from './expansion.js';
 import { rawHeight, farRingVertex, FAR_STEP } from './terrainData.js';
 import { SERRA, FRONTIER } from './activeMap.js';
+import { polySpans } from './fieldShape.js';
 import { makeGroundDetail } from '../core/textures.js';
 import { CUT_U, NCUT, CROP_U } from './cutState.js';
 
@@ -26,6 +27,13 @@ uniform vec4 uFieldRect[NF];
 uniform vec4 uFieldInfo[NF];
 #ifdef NPIV
 uniform vec4 uPivot[NPIV]; // centre-pivot fields: centre x, z, radius, field index
+#endif
+#ifdef NPOLY
+// Irregular talhões (Mato Grosso refinement 2.0): signed distance to the
+// nearest outline (r, m, negative inside, ±24 m band) and that field's
+// index (g), baked once over the box they cover (buildPolySdf).
+uniform sampler2D uPolySdf;
+uniform vec4 uPolyBox; // x0, z0, 1/width, 1/depth
 #endif
 uniform vec4 uRoadSeg[NR];
 uniform float uRoadW[NR];
@@ -363,6 +371,19 @@ vec3 terrainColor(vec2 p, out float rough) {
     if (d < dmin) { dmin = d; imin = int(pv.w + 0.5); pivR = pv.z; pivC = pv.xy; }
   }
 #endif
+#ifdef NPOLY
+  {
+    vec2 uvp = (p - uPolyBox.xy) * uPolyBox.zw;
+    if (uvp.x > 0.0 && uvp.y > 0.0 && uvp.x < 1.0 && uvp.y < 1.0) {
+      float d = texture2D(uPolySdf, uvp).r;
+      if (d < dmin) {
+        dmin = d;
+        ivec2 ts = textureSize(uPolySdf, 0);
+        imin = int(texelFetch(uPolySdf, clamp(ivec2(uvp * vec2(ts)), ivec2(0), ts - 1), 0).g + 0.5);
+      }
+    }
+  }
+#endif
   if (dmin < 14.0) {
     vec4 info = uFieldInfo[imin];
     float inField = 1.0 - aaStep(-0.4, dmin);
@@ -518,6 +539,62 @@ function biomeTexture() {
 // margins come from the biome texture), so its cost stays as it was.
 const PONDS0 = WATER.ponds.filter((q) => !q.exp);
 
+// Irregular talhões (fields with an `outline`): their signed distance field
+// for the ground shader, baked once. Inside a field −24 m, outside +24 m,
+// exact within 24 m of an outline (the carreador and verge need 0…11 m);
+// channel g: the shader index (SF order) of the field the distance belongs
+// to. Half-float RG, about 4.5 m a texel (bilinear: straight and gently
+// curved edges are exact; a corner rounds off by a texel). Null without any.
+const POLY_BAND = 24;
+function buildPolySdf(SF) {
+  const list = SF.map((f, i) => [f, i]).filter(([f]) => f.outline);
+  if (!list.length) return null;
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const [f] of list) { x0 = Math.min(x0, f.x0); x1 = Math.max(x1, f.x1); z0 = Math.min(z0, f.z0); z1 = Math.max(z1, f.z1); }
+  x0 -= POLY_BAND + 8; z0 -= POLY_BAND + 8; x1 += POLY_BAND + 8; z1 += POLY_BAND + 8;
+  const cell = Math.max(3, Math.max(x1 - x0, z1 - z0) / 1100);
+  const W = Math.ceil((x1 - x0) / cell), H = Math.ceil((z1 - z0) / cell);
+  const d = new Float32Array(W * H).fill(POLY_BAND), id = new Float32Array(W * H).fill(list[0][1]);
+  // Inside: scanlines.
+  for (const [f, si] of list) {
+    const r0 = Math.max(0, Math.floor((f.z0 - z0) / cell)), r1 = Math.min(H - 1, Math.ceil((f.z1 - z0) / cell));
+    for (let r = r0; r <= r1; r++) {
+      const z = z0 + (r + 0.5) * cell;
+      for (const [a, b] of polySpans(f.outline, true, z)) {
+        const c0 = Math.max(0, Math.ceil((a - x0) / cell - 0.5)), c1 = Math.min(W - 1, Math.floor((b - x0) / cell - 0.5));
+        for (let c = c0; c <= c1; c++) { d[r * W + c] = -POLY_BAND; id[r * W + c] = si; }
+      }
+    }
+  }
+  // The band: exact distance to each edge nearby.
+  for (const [f, si] of list) {
+    const P = f.outline;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+      const [ax, az] = P[j], [bx, bz] = P[i];
+      const ex = bx - ax, ez = bz - az, l2 = ex * ex + ez * ez || 1;
+      const c0 = Math.max(0, Math.floor((Math.min(ax, bx) - POLY_BAND - x0) / cell)), c1 = Math.min(W - 1, Math.ceil((Math.max(ax, bx) + POLY_BAND - x0) / cell));
+      const r0 = Math.max(0, Math.floor((Math.min(az, bz) - POLY_BAND - z0) / cell)), r1 = Math.min(H - 1, Math.ceil((Math.max(az, bz) + POLY_BAND - z0) / cell));
+      for (let r = r0; r <= r1; r++) {
+        const z = z0 + (r + 0.5) * cell;
+        for (let c = c0; c <= c1; c++) {
+          const x = x0 + (c + 0.5) * cell, k = r * W + c;
+          const t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / l2));
+          const q = Math.hypot(x - ax - ex * t, z - az - ez * t);
+          if (q < Math.abs(d[k])) { d[k] = d[k] < 0 ? -q : q; id[k] = si; }
+        }
+      }
+    }
+  }
+  const data = new Uint16Array(W * H * 2);
+  for (let k = 0; k < W * H; k++) { data[k * 2] = THREE.DataUtils.toHalfFloat(d[k]); data[k * 2 + 1] = THREE.DataUtils.toHalfFloat(id[k]); }
+  const tex = new THREE.DataTexture(data, W, H, THREE.RGFormat, THREE.HalfFloatType);
+  tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.flipY = false;
+  tex.needsUpdate = true;
+  return { tex, box: new THREE.Vector4(x0, z0, 1 / (W * cell), 1 / (H * cell)), W, H, cell };
+}
+
 export function createTerrainMaterial(noiseTex, detailTex) {
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0.0 });
   const nf = FIELDS.length;
@@ -529,6 +606,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   const inOnly = FIELDS.filter((f) => touchesIn(f) && !touchesOut(f)), both = FIELDS.filter((f) => touchesIn(f) && touchesOut(f)), outOnly = FIELDS.filter((f) => !touchesIn(f));
   const SF = [...inOnly, ...both, ...outOnly];
   const PIV = SF.filter((f) => f.circle);
+  const POLY = buildPolySdf(SF);
   const nsIn = FARM_SITES.filter((st) => !st.farm.ring).length;
   const segs = [];
   for (const r of ROADS) if (!r.mesh) for (let i = 0; i < r.pts.length - 1; i++) segs.push({ a: r.pts[i], b: r.pts[i + 1], w: r.w });
@@ -539,6 +617,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     ...(SERRA ? { SERRA_MAP: 1 } : {}),
     ...(FRONTIER ? { FRONT_MAP: 1 } : {}),
     ...(PIV.length ? { NPIV: PIV.length, PIV_SPAN: '52.0' } : {}),
+    ...(POLY ? { NPOLY: 1 } : {}),
     NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: PONDS0.length,
     RING_IN: RING_IN.toFixed(1), NF_IN1: inOnly.length + both.length, NF_RING0: inOnly.length, NS_IN: nsIn,
   };
@@ -548,7 +627,8 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uPad: { value: new THREE.Vector2(BASE.pad.x, BASE.pad.z) },
     uFuel: { value: new THREE.Vector2(BASE.fuelTank.x, BASE.fuelTank.z) },
     // (A centre-pivot field's square is moved out of reach: its disc is drawn from uPivot.)
-    uFieldRect: { value: SF.map((f) => (f.circle ? new THREE.Vector4(-1e7, -1e7, -1e7 + 1, -1e7 + 1) : new THREE.Vector4(f.x0, f.z0, f.x1, f.z1))) },
+    // (An irregular talhão's too: its outline comes from uPolySdf.)
+    uFieldRect: { value: SF.map((f) => (f.circle || f.outline ? new THREE.Vector4(-1e7, -1e7, -1e7 + 1, -1e7 + 1) : new THREE.Vector4(f.x0, f.z0, f.x1, f.z1))) },
     uFieldInfo: {
       value: SF.map((f) => {
         const sp = { soy: 0.5, corn: 0.8, cotton: 0.9, stubble: 0.5, fallow: 0.9, pasture: 0, banana: 3, capim: 0 }[f.crop];
@@ -577,6 +657,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
     uWet: ATMO_U.wet,
     uBiome: { value: biomeTexture() },
     ...(PIV.length ? { uPivot: { value: PIV.map((f) => new THREE.Vector4(f.circle.x, f.circle.z, f.circle.r, SF.indexOf(f))) } } : {}),
+    ...(POLY ? { uPolySdf: { value: POLY.tex }, uPolyBox: { value: POLY.box } } : {}),
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -591,7 +672,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : FRONTIER ? 'terrain-v7-frontier' : PIV.length ? 'terrain-v7-pivot' : 'terrain-v7');
+  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : FRONTIER ? 'terrain-v7-frontier' : PIV.length ? (POLY ? 'terrain-v7-pivot-poly' : 'terrain-v7-pivot') : 'terrain-v7');
   return mat;
 }
 
