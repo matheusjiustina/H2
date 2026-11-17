@@ -888,7 +888,10 @@ export function createVegetation(terrain, quality) {
     for (const c of canopyParts) { if (!regions.has(c.key)) regions.set(c.key, []); regions.get(c.key).push(c.g); }
     for (const [key, parts] of regions) {
       const cm = new THREE.Mesh(mergeGeometries(parts), cmat);
-      cm.receiveShadow = true;
+      // (Mato Grosso, where the roof covers most of the land: no shadow on
+      // it — inside the sun's shadow box it came out uniformly darker, a
+      // sharp-edged square following the aircraft over the forest.)
+      cm.receiveShadow = !(MATOGROSSO && key.startsWith('mt '));
       cm.name = 'forestCanopy ' + key;
       group.add(cm);
     }
