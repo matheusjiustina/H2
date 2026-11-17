@@ -375,7 +375,8 @@ export function mtWild(x, z) {
   const dRiver = polyD(MT_RIVER.points, x, z) - MT_RIVER.width / 2, dCreek = polyD(MT_CREEK.points, x, z) - 4;
   if (dRiver < 3) return 0; // the water
   const dc = clearDist(x, z);
-  let w = smoothstep(6, 34, dc + 14 * n + 5 * n2);
+  // (A gap narrower than ~30 m between two clearings stays a grass verge.)
+  let w = smoothstep(14, 42, dc + 14 * n + 5 * n2);
   // Gallery forest: closed along the banks through the open land (not over
   // talhões, roads or strips: those clear it as everywhere).
   const gallery = Math.max(1 - smoothstep(120, 210, dRiver + 40 * n), 1 - smoothstep(30, 70, dCreek + 15 * n));
