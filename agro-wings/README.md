@@ -5162,3 +5162,111 @@ half a display interval early counts as on time, so a limit at or above the
 display's rate never drops a frame. Tests (`test/perfmanager.test.mjs`): 60
 on 60/75/120/144/165/240 Hz, with ±1.5 ms jitter, and no catch-up burst after
 a stall.
+
+## Mato Grosso map refinement 2.0 (premium map 04)
+
+The Mato Grosso map was reworked on the same structure: smaller in extent and
+closer to the agricultural north of Mato Grosso as seen from the air. That
+means big talhões of irregular outline cut out of the native forest, forest
+corridors and reserves between them, a wide river with gallery forest,
+centre pivots, red-earth roads, isolated castanheiras, and dirt strips walled
+by forest. Aircraft, cockpits, flight physics, spraying, the crew, UI,
+weather, economy rules, saves and the other maps are unchanged.
+
+| | Before (v65) | After |
+|---|---|---|
+| Playable area | 6.8 × 6.8 km | 4.8 × 4.8 km (−29 % in extent) |
+| Terrain | 8 × 8 km, 10.4 m grid | 6 × 6 km, 7.8 m grid (same vertex count) |
+| Talhões | 24 (21 rectangles, 3 pivots) | 27 (20 irregular, 4 pivots, 3 rectangles) |
+| Cropland / under contract | 1,769 / 1,331 ha | 797 / 699 ha |
+| Orders | 17 | 20 (the 17 ids kept; P-04, K-01, K-02 new) |
+| Strips | 4 | 5 (the four kept; Pista das Castanheiras new) |
+| Forest | 4 rectangular reserve blocks | continuous native forest over everything not cleared (≈ 34 % of the playable land, closed beyond it) |
+| Water | a 5 m creek, a stream, the dam | a 105 m wide river (inspired by the Teles Pires), the creek, the stream, the dam |
+
+Object sizes did not change. Aircraft, strips, trees and buildings keep their
+real size: the sectors were moved together and the empty land removed.
+
+**Sectors.**
+
+* A, Grandes lavouras recortadas (north): A-01 (96 ha) with a forest tongue
+  reaching into it, a spear-shaped A-02, the long A-03 pinched in the middle
+  by the creek, A-04 with a deep forest inlet. The capim clearings and their
+  strip sit in the north-west.
+* B, Distrito dos Pivôs (north-east): P-01…P-03 at their old sizes (420,
+  320, 300 m), the new P-04 (230 m), the rectangles between them, the dam.
+* C, Beira-rio (south-west): the riverside A-05 with a forest tongue coming
+  up from the river, D-01 along the creek, the reserve strip by the BR-163,
+  which now runs north–south along the west.
+* D, Castanhal (south-east): open green land with castanheiras down to the
+  river, bare red soil in H-02 with castanheiras standing in it, and K-01,
+  soy with three castanheiras preserved in the talhão.
+
+**Irregular talhões (engine support).** A field may carry `outline`, a
+polygon, next to the existing `circle`. Rectangles and pivots keep their code
+paths. The helpers live in `src/world/fieldShape.js`. Outlines are made from
+a control polygon by `organicOutline`: Chaikin smoothing where the forest was
+left, sharp corners where the machines cut straight. Each system uses the
+outline:
+
+* Ground: a signed-distance texture baked once at load, half-float RG,
+  about 4.5 m a texel, ±24 m band. The terrain shader reads it with one
+  lookup, behind a define that only this map sets.
+* Crop: the canopy, edge walls, rows and near plants are clipped to the
+  outline.
+* Coverage: cells outside the polygon are masked, so a forest inlet is
+  never sprayable area.
+* GPS passes: each pass spans the outline's extent within its band.
+* Maps, contract area and vegetation clearing follow the shape.
+
+**Forest.** `mtWild` gives a density from the distance to everything cleared:
+
+* talhões and their carreadores, roads, strips with their approach funnels
+  (60 → 110 m wide over 450 m), the base, the open land, the props and the
+  water;
+* an irregular edge, and grass verges in gaps under ~30 m;
+* gallery forest along the river and the creek, even through open land;
+* forest islands left in the pastures;
+* closed forest beyond the playable area, except the BR and the strip
+  approaches.
+
+It is sampled once on a 20 m grid. The roof reuses the Serra's canopy builder
+(`canopyFromGrid`, 23–31 m high) and does not receive shadows here: inside
+the shadow box it showed as a dark square following the aircraft. Edge trees
+and emergent castanheiras are GPU-instanced in the existing 500 m LOD cells.
+Collision comes from 60 m forest boxes and edge-tree colliders. Beyond the
+map the horizon is forest, with a few far talhões.
+
+**Castanheira.** `castanheiraTree` in foliage.js: three variants, each a hi
+and lo pair, built only on this map. A straight trunk of 24–28 m without
+branches, a few thick limbs and a broad flat crown about 26 m across; 33–39 m
+tall in all. There are 30 isolated ones: pasture, bare soil, three in K-01,
+by roads and at forest edges, never in a runway approach. Their collider is
+the crown.
+
+**Pista das Castanheiras.** 560 × 18 m of red earth with two staggered rows of
+tall trees (eucalyptus with some native) along its south side, 26 m from the
+centreline: 14 m clear of an AT-802's wingtip. The trees run from end to end
+of the runway only, so the approaches stay open.
+
+**Saves.** Contract ids are kept, so history and completed orders stay. A
+partial coverage saved on a field whose size changed is discarded by the
+existing size check, and the order restarts from zero.
+
+**Tests.**
+
+* `test/mtlayout.test.mjs` checks:
+  * the size;
+  * irregular fields dominate;
+  * no field overlaps another field, a runway, an apron, water or a road;
+  * castanheiras stay clear of runways, approaches and roads;
+  * the tree line clears the wing;
+  * no forest on runways, approaches or fields;
+  * closed forest at the edge and gallery forest along the river;
+  * every order is kept;
+  * covered area equals polygon area and row spans equal polygon area;
+  * a forest inlet takes no spray.
+* `test/matogrosso.maptest.mjs` (`npm run test:mt`) is updated to the
+  refined layout.
+* `test/mte2e.mjs` adds an irregular talhão sprayed along its outline.
+* `test/mtprobe.mjs` measures the same views on any build of the map.

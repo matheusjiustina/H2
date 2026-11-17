@@ -10,7 +10,10 @@ import fs from 'node:fs';
 const outDir = process.argv[2] || 'mt-out';
 fs.mkdirSync(outDir, { recursive: true });
 const url = process.env.AGRO_URL || 'http://localhost:5173/';
+// (AGRO_CHROME: a Chromium binary when the project's Playwright does not
+// match the browsers installed on the machine.)
 const browser = await chromium.launch({
+  ...(process.env.AGRO_CHROME ? { executablePath: process.env.AGRO_CHROME } : {}),
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-precise-memory-info'],
 });
 const results = [];
