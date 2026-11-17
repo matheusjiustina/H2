@@ -159,7 +159,7 @@ const F = [
   { name: 'C-03', crop: 'capim', rowAxis: 'x', contract: 'mt-c03', site: 'capim', seed: 9,
     ctrl: [[-2200, -480, 1], [-1620, -500], [-1580, -650], [-1760, -760, 1], [-1640, -880], [-1660, -990], [-2200, -1000, 1]] },
   { name: 'C-04', crop: 'capim', rowAxis: 'z', seed: 10,
-    ctrl: [[-1790, -1320], [-1580, -1300], [-1560, -1560], [-1600, -1790], [-1780, -1760]] },
+    ctrl: [[-1750, -1320], [-1580, -1300], [-1560, -1560], [-1600, -1790], [-1745, -1760]] },
   // ---- B — Distrito dos Pivôs (the north-east) ---------------------------
   { name: 'P-01', crop: 'soy', rowAxis: 'x', contract: 'mt-p01', site: 'pivo', circle: { x: 1500, z: -350, r: 420 } },
   { name: 'P-02', crop: 'corn', rowAxis: 'x', contract: 'mt-p02', site: 'pivo', circle: { x: 2000, z: -1250, r: 320 } },
@@ -171,7 +171,7 @@ const F = [
     ctrl: [[1010, -1720], [1380, -1700, 1], [1400, -2310, 1], [1020, -2320], [960, -2000]] },
   { name: 'E-02', crop: 'corn', rowAxis: 'z', rect: [1990, 2340, -790, -230] },
   { name: 'A-06', crop: 'soy', rowAxis: 'z', contract: 'mt-a06', seed: 12,
-    ctrl: [[1990, -120, 1], [2340, -120, 1], [2360, 300], [2250, 560], [2050, 520], [1980, 250]] },
+    ctrl: [[1990, -120, 1], [2340, -120, 1], [2360, 250], [2280, 450], [2080, 440], [1980, 250]] },
   // ---- C — Beira-rio (the south-west) ------------------------------------
   // A-05: the big riverside block; its south edge follows the gallery forest.
   { name: 'A-05', crop: 'soy', rowAxis: 'x', contract: 'mt-a05', seed: 13,
@@ -189,7 +189,7 @@ const F = [
   // preserved standing in it (MT_CASTANHEIRAS).
   { name: 'K-01', crop: 'soy', rowAxis: 'x', contract: 'mt-k01', site: 'castanha', seed: 18,
     ctrl: [[1180, 1075, 1], [2050, 1075, 1], [2200, 1180], [2150, 1380], [1900, 1460], [1500, 1420], [1250, 1450], [1150, 1300]] },
-  { name: 'K-02', crop: 'corn', rowAxis: 'z', contract: 'mt-k02', site: 'castanha', rect: [1820, 2300, 450, 800] },
+  { name: 'K-02', crop: 'corn', rowAxis: 'z', contract: 'mt-k02', site: 'castanha', rect: [1820, 2300, 600, 880] },
   // Bare red soil, just harvested, castanheiras standing in it.
   { name: 'H-02', crop: 'fallow', rowAxis: 'x', seed: 19,
     ctrl: [[860, 1140], [1100, 1120], [1120, 1440], [940, 1520], [840, 1360]] },
@@ -246,7 +246,7 @@ export const MT_ROADS = [
   track(7, [-900, -165], [-1450, -150], [-1900, -120], [-2295, -110]),
   // North trunk road between the blocks, and the cross road.
   track(6, [-980, -165], [-990, -700], [-985, -1290], [-990, -2400]),
-  track(5, [-1450, -1290], [-985, -1290], [-120, -1290], [560, -1290], [960, -1295]),
+  track(5, [-985, -1290], [-120, -1290], [560, -1290], [960, -1295]),
   // Base east to the pivots, north past them to the dam.
   track(6, [-445, -150], [300, -185], [1010, -170]),
   track(5, [1010, -170], [1015, -850], [970, -1295], [960, -2400]),
@@ -262,7 +262,7 @@ export const MT_ROADS = [
   track(5, [-830, 900], [-1180, 930], [-1600, 990], [-1980, 1000]),
   track(5, [-1980, 1000], [-2300, 1040]),
   // Capim: from the BR into the capim clearings.
-  track(5, [-2290, -700], [-2000, -1050], [-1990, -1250], [-1860, -1820]),
+  track(5, [-2290, -1240], [-2050, -1250], [-1800, -1270], [-1800, -1840]),
 ];
 
 // Forest that is not a canopy: the base's eucalyptus windbreak.
@@ -298,9 +298,9 @@ const OPEN = [
 ];
 // Forest islands left standing in the open land (ilhas de mata).
 const ISLANDS = [
-  organicOutline([[1880, 1150], [1990, 1120], [2010, 1230], [1900, 1260]], { iter: 3, wobble: 4, seed: 41 }),
-  organicOutline([[500, 1000], [620, 960], [660, 1060], [540, 1110]], { iter: 3, wobble: 4, seed: 42 }),
-  organicOutline([[2140, 640], [2240, 610], [2270, 700], [2170, 730]], { iter: 3, wobble: 4, seed: 43 }),
+  organicOutline([[2270, 1150], [2360, 1130], [2380, 1240], [2290, 1270]], { iter: 3, wobble: 4, seed: 41 }),
+  organicOutline([[1550, 560], [1660, 540], [1690, 640], [1580, 670]], { iter: 3, wobble: 4, seed: 42 }),
+  organicOutline([[1240, 590], [1330, 570], [1360, 660], [1270, 690]], { iter: 3, wobble: 4, seed: 43 }),
 ];
 
 // Isolated castanheiras (Bertholletia excelsa): emergent trees left standing
@@ -314,7 +314,7 @@ export const MT_CASTANHEIRAS = [
   // Inside talhão K-01 (preserved): obstacles on the passes.
   [1420, 1230, 1.06], [1760, 1300, 1.0], [2000, 1200, 0.95],
   // Around the castanha strip and the pivot strip (clear of their approaches).
-  [1250, 760, 1.04], [1600, 720, 0.97], [2050, 960, 1.08], [930, 520, 0.92], [1400, 1530, 1.0],
+  [1250, 760, 1.04], [1600, 720, 0.97], [2340, 990, 1.08], [930, 520, 0.92], [1400, 1530, 1.0],
   // By the base (seen from the pad), clear of the runway's approaches.
   [-250, 280, 1.02], [150, 330, 0.95], [620, -330, 1.0], [-700, -330, 0.97],
   // Field edges in the north.
@@ -395,7 +395,7 @@ export function mtWild(x, z) {
   const rr = Math.max(Math.abs(x), Math.abs(z));
   if (rr > MT_PLAY_HALF - 100) {
     const brD = polyD(BR_163, x, z) - 20;
-    w = Math.max(w, smoothstep(MT_PLAY_HALF - 100, MT_PLAY_HALF + 150, rr + 80 * n) * smoothstep(0, 30, brD) * smoothstep(3, 14, dRiver));
+    w = Math.max(w, smoothstep(MT_PLAY_HALF - 100, MT_PLAY_HALF + 150, rr + 80 * n) * smoothstep(0, 30, brD) * smoothstep(3, 14, dRiver) * smoothstep(6, 34, stripClear(x, z)) * smoothstep(0, 30, dc));
   }
   return Math.max(0, Math.min(1, w));
 }
