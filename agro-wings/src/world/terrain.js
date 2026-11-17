@@ -11,7 +11,7 @@ import {
 } from './layout.js';
 import { biomeWeights } from './expansion.js';
 import { rawHeight, farRingVertex, FAR_STEP } from './terrainData.js';
-import { SERRA, FRONTIER } from './activeMap.js';
+import { SERRA, FRONTIER, MATOGROSSO } from './activeMap.js';
 import { polySpans } from './fieldShape.js';
 import { makeGroundDetail } from '../core/textures.js';
 import { CUT_U, NCUT, CROP_U } from './cutState.js';
@@ -301,6 +301,15 @@ vec3 terrainColor(vec2 p, out float rough) {
     vec3 c = mix(vec3(0.30, 0.25, 0.12), vec3(0.20, 0.18, 0.08), smoothstep(0.35, 0.7, nA.g));
     c = mix(c, vec3(0.08, 0.10, 0.045), smoothstep(0.62, 0.8, nA.r) * 0.7);
     return mix(c, vec3(0.07, 0.06, 0.05), smoothstep(0.78, 0.9, nA.b) * 0.6) * (0.86 + 0.28 * nB.r);
+  }
+#elif defined(MT_MAP)
+  // Mato Grosso: the native forest continues past the map; far out, a
+  // few green talhões of other farms open in it (the horizon of the region).
+  if (abs(p.x) > uWorldHalf - 2.0 || abs(p.y) > uWorldHalf - 2.0) {
+    vec3 c = vec3(0.040, 0.085, 0.036) * (0.78 + 0.4 * nA.g) * (0.86 + 0.28 * nB.r);
+    float beyond = max(abs(p.x), abs(p.y)) - uWorldHalf;
+    float fld = smoothstep(0.6, 0.64, nA.r) * smoothstep(1400.0, 2200.0, beyond);
+    return mix(c, vec3(0.10, 0.165, 0.05) * (0.9 + 0.2 * nB.g), fld);
   }
 #else
   if (abs(p.x) > uWorldHalf - 2.0 || abs(p.y) > uWorldHalf - 2.0) return farPatchwork(p, nA, nB, nC, nD, rough);
@@ -616,6 +625,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
   mat.defines = {
     ...(SERRA ? { SERRA_MAP: 1 } : {}),
     ...(FRONTIER ? { FRONT_MAP: 1 } : {}),
+    ...(MATOGROSSO ? { MT_MAP: 1 } : {}),
     ...(PIV.length ? { NPIV: PIV.length, PIV_SPAN: '52.0' } : {}),
     ...(POLY ? { NPOLY: 1 } : {}),
     NF: nf, NR: nr, NC: nc, NS: FARM_SITES.length, NCUT, NSTP: stp.length, NPOND: PONDS0.length,
@@ -672,7 +682,7 @@ export function createTerrainMaterial(noiseTex, detailTex) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = terrainBump(-vViewPosition, normal, faceDirection);');
   };
-  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : FRONTIER ? 'terrain-v7-frontier' : PIV.length ? (POLY ? 'terrain-v7-pivot-poly' : 'terrain-v7-pivot') : 'terrain-v7');
+  mat.customProgramCacheKey = () => (SERRA ? 'terrain-v7-serra' : FRONTIER ? 'terrain-v7-frontier' : MATOGROSSO ? 'terrain-v7-mt' : PIV.length ? (POLY ? 'terrain-v7-pivot-poly' : 'terrain-v7-pivot') : 'terrain-v7');
   return mat;
 }
 

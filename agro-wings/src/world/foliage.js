@@ -547,7 +547,7 @@ export function eucalyptusTree(hi, seed) {
 // region's forest, left standing alone when the land is cleared — a tall,
 // slender, straight trunk without branches for most of its height, then a
 // few thick limbs opening into a broad, flattened, irregular crown (a dark
-// umbrella well above anything around it). ~32–38 m tall, crown ~22 m across.
+// umbrella well above anything around it). ~33–39 m tall, crown ~26 m across.
 export function castanheiraTree(hi, seed) {
   const B = new PlantBuilder(seed);
   const r = B.r;
@@ -557,15 +557,15 @@ export function castanheiraTree(hi, seed) {
   // Limbs: four or five thick ones, rising and spreading.
   const nL = hi ? 5 : 4, tips = [];
   for (let i = 0; i < nL; i++) {
-    const a = (i / nL) * Math.PI * 2 + r() * 0.7, d = 4.5 + r() * 3.0;
+    const a = (i / nL) * Math.PI * 2 + r() * 0.7, d = 6.0 + r() * 3.0;
     const tip = [top[0] + Math.cos(a) * d, H + 3.2 + r() * 2.2, top[2] + Math.sin(a) * d];
     tips.push(tip);
     B.limb(top, tip, 0.3, 0.14, hi ? 5 : 3, tileRect(TILES.bark), C(0.78, 0.74, 0.7));
   }
   // Crown: flat dense clumps over the limb tips and the centre.
   const tint = C(0.86, 0.94, 0.8), tiles = [TILES.broad[0], TILES.broad[3], TILES.mango];
-  for (const t of tips) B.clump(t[0], t[1] + 1.0, t[2], 4.6 + r() * 1.4, 2.4, 4.6 + r() * 1.4, hi ? 46 : 9, hi ? 2.2 : 4.6, tiles, tint, H + 1.5, H + 9);
-  B.clump(top[0], H + 6.0, top[2], 5.5, 2.6, 5.5, hi ? 40 : 8, hi ? 2.2 : 4.8, tiles, tint, H + 1.5, H + 9);
+  for (const t of tips) B.clump(t[0], t[1] + 1.2, t[2], 5.8 + r() * 1.6, 2.8, 5.8 + r() * 1.6, hi ? 54 : 10, hi ? 2.4 : 5.0, tiles, tint, H + 1.5, H + 10);
+  B.clump(top[0], H + 6.5, top[2], 7.0, 3.0, 7.0, hi ? 48 : 9, hi ? 2.4 : 5.2, tiles, tint, H + 1.5, H + 10);
   return B.geometry();
 }
 
