@@ -195,7 +195,7 @@ const F = [
     ctrl: [[860, 1140], [1100, 1120], [1120, 1440], [940, 1520], [840, 1360]] },
   // The castanhal's pasture: open land, castanheiras and palms.
   { name: 'H-04', crop: 'pasture', rowAxis: 'x', seed: 20,
-    ctrl: [[300, 1180], [780, 1160], [800, 1520], [560, 1640], [330, 1520]] },
+    ctrl: [[300, 1180], [740, 1160], [760, 1500], [560, 1640], [330, 1520]] },
 ];
 export const MT_FIELDS = F.map((d) => {
   let x0, x1, z0, z1, outline = null;
@@ -254,7 +254,7 @@ export const MT_ROADS = [
   // To the pivot strip and on to the castanhal and the river landing.
   track(5, [1010, -170], [1060, 120], [1100, 260]),
   track(5, [1100, 260], [1080, 620], [1040, 860]),
-  track(4, [1040, 860], [860, 1080], [820, 1500], [880, 1800]),
+  track(4, [1040, 860], [850, 1050], [805, 1250], [805, 1500], [880, 1800]),
   track(5, [1250, 900], [1800, 900], [2380, 920]),
   // South-west: base round the runway's west end to the riverside blocks,
   // the reserve strip and the BR.

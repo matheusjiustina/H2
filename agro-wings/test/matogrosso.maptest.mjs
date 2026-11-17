@@ -6,7 +6,7 @@ import { MAP_ID, MATOGROSSO, MAPS, mapAllowed } from '../src/world/activeMap.js'
 import { WORLD_HALF, PLAY_HALF, RUNWAY, FARMS, FARM_SITES, FIELDS, ROADS, WATER, CREEK, FORESTS, CROPS, fieldAt, inFieldShape, cropHeight } from '../src/world/layout.js';
 import { rawHeight, TerrainData } from '../src/world/terrainData.js';
 import { segDist } from '../src/core/math.js';
-import { MT_PIVOTS, pivotArmAt, BR_163 } from '../src/world/matogrosso.js';
+import { MT_PIVOTS, pivotArmAt, BR_163, mtWild } from '../src/world/matogrosso.js';
 import { CONTRACTS } from '../src/game/contracts.js';
 import { FARM_CONTRACTS } from '../src/game/farmContracts.js';
 import { FieldCoverage } from '../src/spray/coverage.js';
@@ -19,9 +19,10 @@ test('this process runs Mato Grosso Operations', () => {
   assert.equal(MAP_ID, 'matogrosso'); assert.ok(MATOGROSSO);
   assert.equal(MAPS.matogrosso.premium, MATOGROSSO_EXPANSION.id);
   assert.ok(EXPANSIONS.includes(MATOGROSSO_EXPANSION));
+  // (Map refinement 2.0: 4.8 × 4.8 km playable on 6 × 6 km of terrain.)
   const share = (2 * PLAY_HALF) ** 2 / 12000 ** 2;
-  assert.ok(share > 0.25 && share < 0.4, String(share));
-  assert.equal(WORLD_HALF, 4000);
+  assert.ok(share > 0.12 && share < 0.2, String(share));
+  assert.equal(WORLD_HALF, 3000);
 });
 
 test('gently rolling: no mountains, slopes under 8 % off the creek banks, but not flat', () => {
@@ -37,8 +38,8 @@ test('gently rolling: no mountains, slopes under 8 % off the creek banks, but no
   assert.ok(maxS < 0.08);
 });
 
-test('four short dirt strips (the base and three farm strips), level or evenly graded', () => {
-  assert.equal(1 + FARMS.length, 4);
+test('five short dirt strips (the base and four farm strips), level or evenly graded', () => {
+  assert.equal(1 + FARMS.length, 5);
   for (let x = RUNWAY.x0; x <= RUNWAY.x1; x += 20) assert.ok(Math.abs(rawHeight(x, RUNWAY.z) - rawHeight(RUNWAY.x0, RUNWAY.z)) < 0.05);
   for (const s of FARM_SITES) {
     const f = s.farm, x0 = -400 + f.dx;
@@ -53,18 +54,24 @@ test('the land: soy, corn, capim, stubble, pasture, reserves; roads, water and f
   const crops = new Set(FIELDS.map((f) => f.crop));
   for (const c of ['soy', 'corn', 'capim', 'stubble', 'pasture']) assert.ok(crops.has(c), c);
   assert.equal(CROPS.capim.height, 0.6);
-  assert.ok(FORESTS.filter((f) => f.kind === 'mata').length >= 3);
+  // The native forest (refinement 2.0): a density over everything not
+  // cleared — between a third and two thirds of the playable land.
+  let wood = 0, n = 0;
+  for (let z = -PLAY_HALF; z < PLAY_HALF; z += 80) for (let x = -PLAY_HALF; x < PLAY_HALF; x += 80) { n++; if (mtWild(x, z) > 0.5) wood++; }
+  console.log(`  closed forest: ${((100 * wood) / n).toFixed(0)} % of the playable land`);
+  assert.ok(wood / n > 0.3 && wood / n < 0.7);
+  assert.ok(FORESTS.every((f) => f.kind !== 'mata'), 'no rectangular forest blocks left');
   for (const r of ROADS) for (const f of FIELDS) for (const [x, z] of r.pts) assert.ok(!inFieldShape(f, x, z, r.w / 2 + 2), `${r.name ?? 'road'} in ${f.name}`);
   for (const w of [CREEK, ...WATER.streams]) for (const [x, z] of w.points) for (const f of FIELDS) assert.ok(!inFieldShape(f, x, z, 20), `water in ${f.name}`);
-  // The BR-163: paved, crossing the whole map east–west.
+  // The BR-163: paved, crossing the whole map north–south along its west side.
   const br = ROADS.find((r) => r.paved);
-  assert.ok(br && br.w >= 12 && br.pts[0][0] <= -3900 && br.pts.at(-1)[0] >= 3900);
+  assert.ok(br && br.w >= 12 && br.pts[0][1] <= -2900 && br.pts.at(-1)[1] >= 2900);
   assert.equal(BR_163.length > 5, true);
 });
 
 test('centre pivots: round fields (GPS, coverage, ground) and the arm as an obstacle', () => {
   const piv = FIELDS.filter((f) => f.circle);
-  assert.equal(piv.length, 3);
+  assert.equal(piv.length, 4);
   const P = piv.find((f) => f.name === 'P-01'), C = P.circle;
   assert.equal(fieldAt(C.x, C.z), P);
   assert.equal(fieldAt(C.x + C.r * 0.8, C.z + C.r * 0.8), null, 'the square\'s corner is not the field');
@@ -86,7 +93,7 @@ test('centre pivots: round fields (GPS, coverage, ground) and the arm as an obst
 test('orders: soy, corn, desiccation, pivots; every order on its fields; the farm strips have requests', () => {
   assert.ok(CONTRACTS.length >= 6);
   for (const c of [...CONTRACTS, ...FARM_CONTRACTS]) for (const n of c.fields) assert.ok(FIELDS.some((f) => f.name === n && f.contract === c.id), `${c.id} ${n}`);
-  for (const site of ['pivo', 'capim', 'reserva']) assert.ok(FARM_CONTRACTS.filter((c) => c.farm === site).length >= 2, site);
+  for (const site of ['pivo', 'capim', 'reserva', 'castanha']) assert.ok(FARM_CONTRACTS.filter((c) => c.farm === site).length >= 2, site);
   assert.ok(FARM_CONTRACTS.some((c) => /Pivot|Pivô/.test(c.title)));
   assert.ok([...CONTRACTS, ...FARM_CONTRACTS].some((c) => FIELDS.find((f) => f.name === c.fields[0]).crop === 'capim'));
   assert.ok(AIRCRAFT_ORDER.length >= 13, 'the agricultural fleet flies here');

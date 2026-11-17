@@ -56,7 +56,7 @@ test('no talhão overlaps another, a runway, an apron, the water or a road', () 
       assert.ok(polyD(MT.MT_CREEK.points, x, z) > 30, `${f.name} in the creek at ${x},${z}`);
     }
   }
-  for (const r of L.ROADS) for (const [x, z] of r.pts) for (const f of F) assert.ok(!S.fieldInside(f, x, z, -(r.w / 2 + 3)), `road through ${f.name} at ${x},${z}`);
+  for (const r of L.ROADS) for (const [x, z] of r.pts) for (const f of F) assert.ok(!S.fieldInside(f, x, z, r.w / 2 + 2), `road through ${f.name} at ${x},${z}`);
 });
 
 test('castanheiras: clear of runways, approaches and roads; inside a talhão only where meant (K-01)', () => {
