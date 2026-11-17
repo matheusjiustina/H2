@@ -543,6 +543,32 @@ export function eucalyptusTree(hi, seed) {
   return B.geometry();
 }
 
+// Castanheira (Brazil-nut tree, Bertholletia excelsa): the emergent of the
+// region's forest, left standing alone when the land is cleared — a tall,
+// slender, straight trunk without branches for most of its height, then a
+// few thick limbs opening into a broad, flattened, irregular crown (a dark
+// umbrella well above anything around it). ~32–38 m tall, crown ~22 m across.
+export function castanheiraTree(hi, seed) {
+  const B = new PlantBuilder(seed);
+  const r = B.r;
+  const H = 24 + r() * 4; // to the first limbs
+  const top = [(r() - 0.5) * 0.8, H, (r() - 0.5) * 0.8];
+  B.limb([0, -0.4, 0], top, 0.62, 0.38, hi ? 8 : 4, tileRect(TILES.bark), C(0.78, 0.74, 0.7));
+  // Limbs: four or five thick ones, rising and spreading.
+  const nL = hi ? 5 : 4, tips = [];
+  for (let i = 0; i < nL; i++) {
+    const a = (i / nL) * Math.PI * 2 + r() * 0.7, d = 4.5 + r() * 3.0;
+    const tip = [top[0] + Math.cos(a) * d, H + 3.2 + r() * 2.2, top[2] + Math.sin(a) * d];
+    tips.push(tip);
+    B.limb(top, tip, 0.3, 0.14, hi ? 5 : 3, tileRect(TILES.bark), C(0.78, 0.74, 0.7));
+  }
+  // Crown: flat dense clumps over the limb tips and the centre.
+  const tint = C(0.86, 0.94, 0.8), tiles = [TILES.broad[0], TILES.broad[3], TILES.mango];
+  for (const t of tips) B.clump(t[0], t[1] + 1.0, t[2], 4.6 + r() * 1.4, 2.4, 4.6 + r() * 1.4, hi ? 46 : 9, hi ? 2.2 : 4.6, tiles, tint, H + 1.5, H + 9);
+  B.clump(top[0], H + 6.0, top[2], 5.5, 2.6, 5.5, hi ? 40 : 8, hi ? 2.2 : 4.8, tiles, tint, H + 1.5, H + 9);
+  return B.geometry();
+}
+
 // Buriti palm: smooth column, fan fronds radiating from the crown.
 export function buritiPalm(hi, seed) {
   const B = new PlantBuilder(seed);

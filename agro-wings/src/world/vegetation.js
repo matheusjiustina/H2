@@ -12,7 +12,7 @@ import { EXP_REGIONS, EXP_PROPS, EXP_BOXES, inStripCorridor, biomeWeights } from
 import { rng, fbm, segDist } from '../core/math.js';
 import {
   makeFoliageAtlas, makeCanopyTexture, foliageMaterial, tileRect, TILES,
-  broadTree, mangoTree, ipeTree, eucalyptusTree, buritiPalm, shrub, cerradoTree, macaubaPalm, deadTree,
+  broadTree, mangoTree, ipeTree, eucalyptusTree, buritiPalm, shrub, cerradoTree, macaubaPalm, deadTree, castanheiraTree,
 } from './foliage.js';
 
 const C = (r, g, b) => new THREE.Color(r, g, b);
@@ -58,6 +58,7 @@ function buildVariants() {
       pair((hi) => cerradoTree(hi, 102, { tiles: [TILES.cerrado, TILES.redFlush, TILES.fine[0]], tint: C(1.0, 0.96, 0.92) })),
     ],
     macauba: [0, 1].map((i) => pair((hi) => macaubaPalm(hi, 111 + i))),
+    ...(MATOGROSSO ? { castanha: [0, 1, 2].map((i) => pair((hi) => castanheiraTree(hi, 121 + i))) } : {}),
     ipeRoxo: [pair((hi) => ipeTree(hi, 121, TILES.ipeRoxo))],
     snag: [pair((hi) => deadTree(hi, 131))],
     mound: [(() => { const g = termiteMound(95); return [g, g]; })()],
@@ -87,11 +88,12 @@ function termiteMound(seed) {
   return g;
 }
 
-import { SERRA, FRONTIER } from './activeMap.js';
+import { SERRA, FRONTIER, MATOGROSSO } from './activeMap.js';
 import { FRONT_VEG_REGIONS, frontierCleared, frontierRunwayClear } from './frontier.js';
 import { fieldInside } from './fieldShape.js';
 import { serraForestBoxes, SERRA_WORLD_HALF } from './serra.js';
-import { serraCanopy } from './serraScenery.js';
+import { serraCanopy, canopyFromGrid } from './serraScenery.js';
+import { mtForest, mtForestNodes, mtForestBoxes, MT_CASTANHEIRAS, MT_PALMS, MT_STRIPS, MT_WORLD_HALF } from './matogrosso.js';
 
 export function createVegetation(terrain, quality) {
   const group = new THREE.Group();
@@ -646,7 +648,7 @@ export function createVegetation(terrain, quality) {
         // (the others' loops skip it), so overlaps never double the density.
         const own = reg.biome === 'cerrado' ? cer : reg.biome === 'varzea' ? wet : reg.biome === 'mata' ? lush : reg.biome === 'serra' ? rock : Math.max(lush, cer * 0.9);
         if (own < Math.max(cer, wet, lush, rock) * 0.999 && reg.biome !== 'morros') continue;
-        if (!openE(px, pz, 8) || (FRONTIER && frontierCleared(px, pz))) continue;
+        if (!openE(px, pz, 8) || (FRONTIER && frontierCleared(px, pz)) || (MATOGROSSO && mtForest(px, pz) > 0.05)) continue;
         const sl = slopeAt(px, pz);
         if (reg.biome === 'cerrado') {
           if (k < 0.075 * cer) {
@@ -756,6 +758,59 @@ export function createVegetation(terrain, quality) {
     });
     for (let i = trees.length - 1; i >= 0; i--) if (isTall(trees[i].kind) && byTalhao(trees[i].x, trees[i].z)) trees.splice(i, 1);
     for (let i = colliders.length - 1; i >= 0; i--) if (!colliders[i].box && byTalhao(colliders[i].x, colliders[i].z)) colliders.splice(i, 1);
+  }
+
+  // --- Mato Grosso (refinement 2.0): the native forest over everything not
+  // cleared (canopy with an organic outline, trees along its edge, emergent
+  // castanheiras over the roof), the isolated castanheiras and palms of the
+  // open land, and the line of tall trees along the castanhal's strip ---------
+  if (MATOGROSSO) {
+    const { parts } = canopyFromGrid(terrain, mtForestNodes(), 'mt', { full: (big, lump) => 23 + 5 * big + 3.5 * lump });
+    canopyParts.push(...parts);
+    const rm = rng(20261117), H = MT_WORLD_HALF - 30, castH = (s) => 34 * s;
+    for (let z = -H; z < H; z += 10) for (let x = -H; x < H; x += 10) {
+      const px = x + rm() * 10, pz = z + rm() * 10, d = mtForest(px, pz), k = rm();
+      if (d <= 0.03) continue;
+      if (d < 0.5) {
+        // The edge: a wall of crowns of mixed sizes, a palm here and there.
+        if (k >= 0.42) continue;
+        const q = rm(), kind = q < 0.05 ? 'macauba' : q < 0.08 ? 'buriti' : q < 0.11 ? 'castanha' : 'mata';
+        const sc = kind === 'castanha' ? 0.85 + rm() * 0.2 : 0.85 + rm() * 0.55;
+        trees.push({ kind, v: Math.floor(rm() * variants[kind].length), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
+        colliders.push({ x: px, z: pz, r: kind === 'castanha' ? 8 * sc : 3, top: terrain.heightAt(px, pz) + (kind === 'castanha' ? castH(sc) : 19 * sc) });
+      } else if (k < 0.008) {
+        // Inside: only the emergents show over the roof — castanheiras.
+        const sc = 0.92 + rm() * 0.22;
+        trees.push({ kind: 'castanha', v: Math.floor(rm() * variants.castanha.length), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
+        colliders.push({ x: px, z: pz, r: 8 * sc, top: terrain.heightAt(px, pz) + castH(sc) });
+      }
+    }
+    for (const b of mtForestBoxes()) colliders.push({ box: b, top: 26 });
+    // Isolated castanheiras (their crowns are the obstacle) and palms.
+    for (const [x, z, sc] of MT_CASTANHEIRAS) {
+      trees.push({ kind: 'castanha', v: Math.floor(rm() * variants.castanha.length), x, z, s: sc, rot: rm() * Math.PI * 2 });
+      colliders.push({ x, z, r: 8 * sc, top: terrain.heightAt(x, z) + castH(sc) });
+    }
+    for (const [x, z] of MT_PALMS) {
+      const sc = 0.85 + rm() * 0.3;
+      trees.push({ kind: 'macauba', v: Math.floor(rm() * variants.macauba.length), x, z, s: sc, rot: rm() * Math.PI * 2 });
+      colliders.push({ x, z, r: 2, top: terrain.heightAt(x, z) + 14 * sc });
+    }
+    // The strip's tree line: two staggered rows of tall trees along one side,
+    // from end to end of the runway only (the approaches stay open), outside
+    // the strip's protected width.
+    for (const st of MT_STRIPS) {
+      if (!st.treeLine) continue;
+      const { side, offset } = st.treeLine;
+      for (let row = 0; row < 2; row++) {
+        for (let x = st.x0 + 8 + row * 3.5; x < st.x1 - 8; x += 7) {
+          const zz = st.z + side * (offset + row * 6 + (rm() - 0.5) * 1.6), xx = x + (rm() - 0.5) * 1.5;
+          const kind = rm() < 0.8 ? 'euca' : 'mata', sc = kind === 'euca' ? 0.88 + rm() * 0.28 : 1.15 + rm() * 0.3;
+          trees.push({ kind, v: Math.floor(rm() * variants[kind].length), x: xx, z: zz, s: sc, rot: rm() * Math.PI * 2 });
+          colliders.push({ x: xx, z: zz, r: kind === 'euca' ? 2.5 : 3, top: terrain.heightAt(xx, zz) + (kind === 'euca' ? 27 : 19) * sc });
+        }
+      }
+    }
   }
 
   // --- build instanced cells ----------------------------------------------

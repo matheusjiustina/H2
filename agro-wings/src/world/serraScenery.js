@@ -24,12 +24,18 @@ export function serraCanopy(terrain) {
   const hOf = (x, z) => terrain.heightAt(x, z);
   const w = new Float32Array(N * N);
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) w[j * N + i] = serraWild(-H + i * S, -H + j * S, hOf);
+  return canopyFromGrid(terrain, { S, H, N, w }, 'serra');
+}
+// The same roof over any density grid (Mato Grosso's forest too). `o.full`:
+// height of the closed canopy from two noises (Serra's by default).
+export function canopyFromGrid(terrain, { S, H, N, w }, tag, o = {}) {
   const at = (x, z) => { const i = Math.round((x + H) / S), j = Math.round((z + H) / S); return i < 0 || j < 0 || i >= N || j >= N ? 0 : w[j * N + i]; };
+  const fullOf = o.full ?? ((big, lump) => 17 + 4 * big + 3.2 * lump);
   const TILE = 1000, tiles = new Map();
   const vert = (i, j) => {
     const x = -H + i * S, z = -H + j * S, d = w[j * N + i];
     const lump = fbm(x / 16, z / 16, 3), big = fbm(x / 120 + 4, z / 120, 2);
-    const full = 17 + 4 * big + 3.2 * lump;
+    const full = fullOf(big, lump);
     const up = smoothstep(0.03, 0.6, d);
     const k = 0.72 + 0.3 * (lump * 0.5 + 0.5) + 0.1 * big, tint = fbm(x / 60, z / 60 + 9, 2), dry = fbm(x / 200 - 3, z / 200 + 1, 2);
     const shade = lerp(0.72, 1, smoothstep(0.02, 0.4, d));
@@ -54,7 +60,7 @@ export function serraCanopy(terrain) {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(t.uv, 2));
     g.setAttribute('aMix', new THREE.Float32BufferAttribute(t.mix, 1));
     g.computeVertexNormals();
-    parts.push({ g, key: 'serra ' + key });
+    parts.push({ g, key: tag + ' ' + key });
   }
   return { parts, density: at };
 }
