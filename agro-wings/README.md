@@ -5181,7 +5181,7 @@ weather, economy rules, saves and the other maps are unchanged.
 | Cropland / under contract | 1,769 / 1,331 ha | 797 / 699 ha |
 | Orders | 17 | 20 (the 17 ids kept; P-04, K-01, K-02 new) |
 | Strips | 4 | 5 (the four kept; Pista das Castanheiras new) |
-| Forest | 4 rectangular reserve blocks | continuous native forest over everything not cleared (≈ 34 % of the playable land, closed beyond it) |
+| Forest | 4 rectangular reserve blocks | native forest in organic reserves, gallery forest, islands and beyond the map (≈ 15 % of the playable land); open pasture with isolated trees elsewhere |
 | Water | a 5 m creek, a stream, the dam | a 105 m wide river (inspired by the Teles Pires), the creek, the stream, the dam |
 
 Object sizes did not change. Aircraft, strips, trees and buildings keep their
@@ -5298,3 +5298,43 @@ field. Several steps held the cost down:
 * farm service areas drawn from 1.5 km on this compact map.
 
 Not tested: real GPUs, phones, Safari or Firefox.
+
+**Revision 2 (lighter forest, after play feedback).** In v66 the forest
+filled everything not cleared. It came out too dense, against every talhão,
+and in square blocks shaped by the roads and fields. The forest now stands
+only in these places:
+
+* organic reserves: the bay in A-01, the south-west legal reserve, a strip
+  by the capim, the reserve south of the river;
+* the gallery forest of the river and the creek, which is wider and
+  irregular;
+* islands in the pastures;
+* beyond the map.
+
+That is ≈ 15 % of the land, down from 34 %. 22 of the 27 talhões have
+pasture around them and 5 meet the forest, ~30 m from the crop. On the open
+land, isolated trees stand in loose clumps, 45 m clear of any talhão and out
+of the runway approaches. They use the kinds the forest already draws, so
+they add no draw calls. The generic scatter is off on this map.
+
+The forest edge is now drawn by trees. Edge crowns grow from small to
+full-size towards the inside. The roof starts inside (density 0.35), lower
+(16–24 m), lumpier, and rises over the outer ~40 m instead of a 25 m wall.
+Cells of roof that would sit under the ground are not built.
+
+The forest density grid is built in 0.43 s, down from 2.7 s in v66, because
+each reserve, island and open-land polygon is skipped far from its box.
+
+Measured as above (draw calls):
+
+| View | v65 | v66 | rev. 2 |
+|---|---|---|---|
+| Pad | 840 | 838 | 798 |
+| Low pass | 418 | 462 | 429 |
+| Same, cockpit | 391 | 440 | 406 |
+| Pivot | 336 | 363 | 321 |
+| Aerial 800 m | 1,114 | 1,151 | 1,126 |
+| Whole map from above | 1,251 | 1,304 | 1,273 |
+
+The JS heap is 487 / 500 / 491 MB. Instanced trees are 22,748 / 19,307 /
+17,720.
