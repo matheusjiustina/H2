@@ -5176,7 +5176,7 @@ weather, economy rules, saves and the other maps are unchanged.
 | | Before (v65) | After |
 |---|---|---|
 | Playable area | 6.8 × 6.8 km | 4.8 × 4.8 km (−29 % in extent) |
-| Terrain | 8 × 8 km, 10.4 m grid | 6 × 6 km, 7.8 m grid (same vertex count) |
+| Terrain | 8 × 8 km, 10.4 m grid | 6 × 6 km, 10.4 m grid (576² cells instead of 768²: chunks keep their 500 m) |
 | Talhões | 24 (21 rectangles, 3 pivots) | 27 (20 irregular, 4 pivots, 3 rectangles) |
 | Cropland / under contract | 1,769 / 1,331 ha | 797 / 699 ha |
 | Orders | 17 | 20 (the 17 ids kept; P-04, K-01, K-02 new) |

@@ -770,9 +770,11 @@ export function createVegetation(terrain, quality) {
     const { parts } = canopyFromGrid(terrain, mtForestNodes(), 'mt', { full: (big, lump) => 23 + 5 * big + 3.5 * lump });
     canopyParts.push(...parts);
     const rm = rng(20261117), H = MT_WORLD_HALF - 30, castH = (s) => 34 * s;
-    // Variants: two per kind (one palm) — every kind:variant in a 500 m cell
-    // is a draw call, and the forest's edges are everywhere on this map; the
-    // per-instance size, turn and tone keep the trees from repeating.
+    // Variants: every kind:variant in a 500 m cell is a draw call, and the
+    // forest's edges are everywhere on this map — the forest uses two of the
+    // mata and one castanheira (the isolated ones two), the palms stand only
+    // in the open; the per-instance size, turn and tone keep the trees from
+    // repeating.
     const vMT = (kind) => (kind === 'macauba' ? 0 : Math.floor(rm() * Math.min(2, variants[kind].length)));
     // A castanheira's obstacle: the bare trunk (thin) and the crown, which
     // starts about 22 m up (a wing passes beside the trunk under it).
@@ -787,14 +789,14 @@ export function createVegetation(terrain, quality) {
       if (d < 0.5) {
         // The edge: a wall of crowns of mixed sizes, a palm here and there.
         if (k >= 0.42) continue;
-        const q = rm(), kind = q < 0.07 ? 'macauba' : q < 0.1 ? 'castanha' : 'mata';
+        const kind = rm() < 0.03 ? 'castanha' : 'mata';
         const sc = kind === 'castanha' ? 0.85 + rm() * 0.2 : 0.85 + rm() * 0.55;
-        trees.push({ kind, v: vMT(kind), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
+        trees.push({ kind, v: kind === 'castanha' ? 0 : vMT(kind), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
         if (kind === 'castanha') castCol(px, pz, sc); else colliders.push({ x: px, z: pz, r: 3, top: terrain.heightAt(px, pz) + 19 * sc });
       } else if (k < 0.008) {
         // Inside: only the emergents show over the roof — castanheiras.
         const sc = 0.92 + rm() * 0.22;
-        trees.push({ kind: 'castanha', v: vMT('castanha'), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
+        trees.push({ kind: 'castanha', v: 0, x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
         castCol(px, pz, sc);
       }
     }

@@ -11,8 +11,8 @@
 // map; no other map reads it.
 //
 // Map refinement 2.0 (2026-11): compacted from 6.8 × 6.8 km playable
-// (8 × 8 km of terrain) to 4.8 × 4.8 km playable (6 × 6 km of terrain, a
-// finer 7.8 m terrain grid for the same cost). Objects keep their real size;
+// (8 × 8 km of terrain) to 4.8 × 4.8 km playable (6 × 6 km of terrain, the
+// same 10.4 m terrain grid). Objects keep their real size;
 // the sectors were moved together and the empty land between them removed.
 // Axes as the main map: x east, z south (north is −z), metres.
 //
@@ -28,7 +28,7 @@
 import { valueNoise, smoothstep, segDist } from '../core/math.js';
 import { organicOutline, outlineBox, fieldSd, polySd, pointInPoly } from './fieldShape.js';
 
-export const MT_WORLD_HALF = 3000; // detailed terrain (7.8 m grid)
+export const MT_WORLD_HALF = 3000; // detailed terrain (10.4 m grid: terrainData GRID_N)
 export const MT_PLAY_HALF = 2400;
 export const MT_BASE_NAME = 'Fazenda Santa Fé';
 

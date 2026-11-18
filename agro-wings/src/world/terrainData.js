@@ -19,7 +19,9 @@ import {
 // Slope exaggeration of the shading normals (visual only).
 export const RELIEF_SHADE = 1.9;
 
-export const GRID_N = 768; // cells per side
+// (Mato Grosso, a 6 km world: 576 cells — 10.4 m, as the map had at 8 km;
+// its terrain chunks keep their size, so as many are drawn as before.)
+export const GRID_N = MATOGROSSO ? 576 : 768; // cells per side
 export const CELL = (WORLD_HALF * 2) / GRID_N; // 15.625 m
 
 function creekDist(x, z) {
