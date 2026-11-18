@@ -357,7 +357,9 @@ function stripClear(x, z) {
 }
 function clearDist(x, z) {
   let d = 1e9;
-  for (const b of FIELD_BOX) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) d = Math.min(d, fieldSd(b.f, x, z) - 10);
+  // (Talhões: the carreador and a grass margin before the trees — about
+  // 30 m from the crop to the forest, never under ~18 m.)
+  for (const b of FIELD_BOX) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) d = Math.min(d, fieldSd(b.f, x, z) - 16);
   for (const b of ROAD_BOX) {
     if (x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) continue;
     d = Math.min(d, polyD(b.r.pts, x, z) - b.r.w / 2 - 7);
@@ -376,13 +378,13 @@ export function mtWild(x, z) {
   if (dRiver < 3) return 0; // the water
   const dc = clearDist(x, z);
   // (A gap narrower than ~30 m between two clearings stays a grass verge.)
-  let w = smoothstep(14, 42, dc + 14 * n + 5 * n2);
+  let w = smoothstep(14, 42, dc + 8 * n + 4 * n2);
   // Gallery forest: closed along the banks through the open land (not over
   // talhões, roads or strips: those clear it as everywhere).
   const gallery = Math.max(1 - smoothstep(120, 210, dRiver + 40 * n), 1 - smoothstep(30, 70, dCreek + 15 * n));
   if (gallery > 0) {
     let hard = 1e9;
-    for (const b of FIELD_BOX) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) hard = Math.min(hard, fieldSd(b.f, x, z) - 10);
+    for (const b of FIELD_BOX) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) hard = Math.min(hard, fieldSd(b.f, x, z) - 16);
     for (const b of ROAD_BOX) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) hard = Math.min(hard, polyD(b.r.pts, x, z) - b.r.w / 2 - 7);
     hard = Math.min(hard, stripClear(x, z));
     for (const [, px, pz] of MT_PROPS) hard = Math.min(hard, Math.hypot(x - px, z - pz) - 45);

@@ -1,6 +1,7 @@
 // Contracts (service orders), job state, scoring and persistence.
 import { CONTRACT_FIELDS, CROPS } from '../world/layout.js';
 import { FieldCoverage } from '../spray/coverage.js';
+import { fieldArea } from '../world/fieldShape.js';
 import { GAME, SPRAY } from '../config.js';
 import { readSafe, writeSafe } from '../core/safeStore.js';
 import { t } from '../i18n/index.js';
@@ -352,7 +353,9 @@ export class Job {
     this.c = contract;
     this.fields = contract.fields.map((n) => CONTRACT_FIELDS.find((f) => f.name === n));
     this.coverages = this.fields.map((f) => new FieldCoverage(f));
-    this.ha = this.fields.reduce((s, f) => s + ((f.x1 - f.x0) * (f.z1 - f.z0)) / 10000, 0);
+    // (An irregular talhão counts its outline's area, not its box: the
+    // forest in its inlets is not paid for. Rectangles and pivots as before.)
+    this.ha = this.fields.reduce((s, f) => s + (f.outline ? fieldArea(f) : (f.x1 - f.x0) * (f.z1 - f.z0)) / 10000, 0);
     this.started = false;
     this.sorties = 0;
     this.sprayed = 0; this.offTarget = 0; this.lost = 0;
