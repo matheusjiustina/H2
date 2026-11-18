@@ -404,7 +404,7 @@ export function mtWild(x, z) {
   // carreadores and the roads; a gap narrower than ~30 m stays a grass verge.
   let res = 0;
   for (const R of RES_BOX) { if (x < R.x0 || x > R.x1 || z < R.z0 || z > R.z1) continue; const sd = polySd(R.P, x, z); if (sd < 120) res = Math.max(res, 1 - smoothstep(-35, 25, sd + 30 * n)); }
-  let w = res * smoothstep(14, 42, dc + 8 * n + 4 * n2);
+  let w = res * smoothstep(14, 60, dc + 8 * n + 4 * n2);
   // Gallery forest: closed along the banks through the open land (not over
   // talhões, roads or strips: those clear it as everywhere).
   const gallery = Math.max(1 - smoothstep(120, 210, dRiver + 40 * n), 1 - smoothstep(40, 95, dCreek + 32 * n + 10 * n2));
@@ -414,7 +414,7 @@ export function mtWild(x, z) {
     for (const b of ROAD_BOX) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) hard = Math.min(hard, polyD(b.r.pts, x, z) - b.r.w / 2 - 7);
     hard = Math.min(hard, stripClear(x, z));
     for (const [, px, pz] of MT_PROPS) hard = Math.min(hard, Math.hypot(x - px, z - pz) - 45);
-    w = Math.max(w, gallery * smoothstep(6, 30, hard + 10 * n2));
+    w = Math.max(w, gallery * smoothstep(8, 48, hard + 10 * n2));
   }
   // Ilhas de mata in the open land.
   for (const R of ISL_BOX) { if (x < R.x0 || x > R.x1 || z < R.z0 || z > R.z1) continue; const s = polySd(R.P, x, z); if (s < 30) w = Math.max(w, (1 - smoothstep(-25, 15, s + 10 * n2)) * smoothstep(0, 30, dc + 25)); }

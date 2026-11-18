@@ -766,7 +766,14 @@ export function createVegetation(terrain, quality) {
   // castanheiras over the roof), the isolated castanheiras and palms of the
   // open land, and the line of tall trees along the castanhal's strip ---------
   if (MATOGROSSO) {
-    const { parts } = canopyFromGrid(terrain, mtForestNodes(), 'mt', { full: (big, lump) => 23 + 5 * big + 3.5 * lump });
+    // The roof starts inside the forest (density 0.35) and rises over its
+    // outer 40 m or so, lower and lumpier than a wall: the edge itself is
+    // drawn by the edge trees (real crowns of mixed sizes), not by the roof.
+    const { parts } = canopyFromGrid(terrain, mtForestNodes(), 'mt', {
+      full: (big, lump) => 16 + 4.5 * big + 3.5 * lump,
+      up: (d) => (d <= 0.35 ? 0 : Math.pow(smoothstep(0.35, 0.95, d), 0.8)),
+      minD: 0.3,
+    });
     canopyParts.push(...parts);
     const rm = rng(20261117), H = MT_WORLD_HALF - 30, castH = (s) => 34 * s;
     // Variants: every kind:variant in a 500 m cell is a draw call, and the
@@ -788,9 +795,10 @@ export function createVegetation(terrain, quality) {
       if (d < 0.5) {
         // The edge: crowns of mixed sizes, spaced (gaps between them), a
         // castanheira here and there.
-        if (k >= 0.3) continue;
+        if (k >= 0.36) continue;
         const kind = rm() < 0.035 ? 'castanha' : 'mata';
-        const sc = kind === 'castanha' ? 0.85 + rm() * 0.2 : 0.7 + rm() * 0.8;
+        // (Smaller where the forest begins, full-grown towards the roof.)
+        const sc = kind === 'castanha' ? 0.85 + rm() * 0.2 : (0.65 + 0.5 * smoothstep(0.03, 0.5, d)) * (0.8 + rm() * 0.5);
         trees.push({ kind, v: kind === 'castanha' ? 0 : vMT(kind), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
         if (kind === 'castanha') castCol(px, pz, sc); else colliders.push({ x: px, z: pz, r: 3, top: terrain.heightAt(px, pz) + 19 * sc });
       } else if (k < 0.006) {
