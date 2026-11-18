@@ -5270,3 +5270,31 @@ existing size check, and the order restarts from zero.
   refined layout.
 * `test/mte2e.mjs` adds an irregular talhão sprayed along its outline.
 * `test/mtprobe.mjs` measures the same views on any build of the map.
+
+**Performance.** Measured with `test/mtprobe.mjs` (high profile, Chromium
+with SwiftShader in the build container) on v65 and on this version, with the
+same views placed from the map's own data. The figures are draw calls.
+
+| View | v65 | 2.0 |
+|---|---|---|
+| Pad (chase) | 840 | 838 |
+| Low pass over A-01 | 418 | 462 |
+| Same, cockpit | 391 | 440 |
+| Pivot P-01, 60 m | 336 | 363 |
+| Aerial, 800 m | 1,114 | 1,151 |
+| Whole map from above | 1,251 | 1,304 |
+
+The JS heap went from 487 to 500 MB and GPU geometries from 1,432 to 1,377.
+There are 22,748 → 19,307 instanced trees and 5,680 → 16,713 colliders in a
+50 m hash grid.
+
+The extra calls in the low views are the forest, which now surrounds every
+field. Several steps held the cost down:
+
+* two variants of the mata and one castanheira per 500 m cell;
+* far tree copies to 1.3 km here, since the canopy draws the forest beyond;
+* the 10.4 m terrain grid kept, so chunks keep their size: terrain went
+  from 81 to 44 calls at the pad;
+* farm service areas drawn from 1.5 km on this compact map.
+
+Not tested: real GPUs, phones, Safari or Firefox.
