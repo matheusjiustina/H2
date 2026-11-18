@@ -85,7 +85,7 @@ const sprayJob = () => page.evaluate(async () => {
       while (dir > 0 ? a < a1 : a > a0) {
         const x = ax ? a : c, z = ax ? c : a;
         // Near the pivot arm: up and over it (the pilot's hop), spray off.
-        const nearArm = !!g.world.pivots && [-12, -9, -6, -3, 0, 3, 6, 9, 12, 15].some((d) => g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(x, z) + 4.6, ax ? z : z + d * dir) === 'center pivot');
+        const nearArm = !!g.world.pivots && [-12, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12, 14, 16].some((d) => g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(x, z) + 4.6, ax ? z : z + d * dir) === 'center pivot');
         // Trees ahead at work height (the forest at the end of the pass, a
         // castanheira in the talhão): the pilot pulls up, spray off.
         // (Along the nose and both wingtips.)
