@@ -59,8 +59,12 @@ const sprayJob = () => page.evaluate(async () => {
   const { fieldSpans } = await import('/src/world/fieldShape.js');
   const PV = (await import('/src/world/matogrosso.js')).MT_PIVOTS;
   let k = 0, hops = 0, runs = 0, pulls = 0, crashes = 0; const log = []; A.damage = 0; A.crashReason = null;
+  const { cropHeight } = await import('/src/world/layout.js');
   for (const f of g.job.fields) {
     const ax = f.rowAxis === 'x', C = f.circle;
+    // Work height: about 3.4 m over the crop (4 m over soy and capim, as
+    // before; higher over the corn's tassels).
+    const workAgl = Math.max(4, cropHeight(f) + 3.4);
     const across0 = ax ? f.z0 : f.x0, across1 = ax ? f.z1 : f.x1;
     for (let c = across0 + W / 2; c < across1 + W * 0.3; c += W, k++) {
       // The stretches of this pass over the crop (a pilot follows the
@@ -93,7 +97,7 @@ const sprayJob = () => page.evaluate(async () => {
         A.fm.hopper = Math.max(A.fm.hopper, 300);
         // (Over the centre tower: higher than over the arm.)
         const nearTower = PV.some((q) => Math.hypot(x - q.x, z - q.z) < 30);
-        A.placeAirborne(x, z, hdg, nearArm ? (nearTower ? 18 : 9) : 0.8 + 3.2, sp);
+        A.placeAirborne(x, z, hdg, nearArm ? (nearTower ? 18 : 9) : workAgl, sp);
         if (nearArm) hops++;
         const dt = 0.2;
         g.sprayer.on = !nearArm; g.simulate(dt, 1 / 30);
