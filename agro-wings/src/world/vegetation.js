@@ -911,7 +911,10 @@ export function createVegetation(terrain, quality) {
   }
 
   let near = quality.treeNear;
-  const far = 1800;
+  // (Mato Grosso: the forest — and so its edge trees — is everywhere; past
+  // ~1.3 km the roof alone draws its silhouette and an edge tree is a pixel
+  // or two, so the far copies stop there: fewer cells, fewer draw calls.)
+  const far = MATOGROSSO ? 1300 : 1800;
   const vis = { built: 0, released: 0 };
   const lastCam = new THREE.Vector3(1e9, 0, 1e9);
   return {
