@@ -309,6 +309,8 @@ const RESERVES = [
   organicOutline([[-2290, 1300], [-1700, 1290], [-1480, 1450], [-1500, 1800], [-1600, 2150], [-1900, 2380], [-2290, 2400]], { iter: 3, wobble: 14, seed: 52 }),
   // A wooded strip between the capim and the BR, north of the sítio.
   organicOutline([[-2290, -1820], [-2240, -1800], [-2250, -1350], [-2240, -1100], [-2290, -1050]], { iter: 3, wobble: 6, seed: 53 }),
+  // South of the river: the reserve across the water from the castanhal.
+  organicOutline([[-700, 2330], [-200, 2080], [350, 2260], [900, 2180], [1500, 1950], [2050, 1900], [2400, 1760], [2420, 2420], [-700, 2420]], { iter: 3, wobble: 22, seed: 54 }),
 ];
 // Forest islands left standing in the open land (ilhas de mata).
 const ISLANDS = [
@@ -360,6 +362,9 @@ const ROAD_BOX = MT_ROADS.map((r) => {
   return { r, x0: Math.min(...xs) - 60, x1: Math.max(...xs) + 60, z0: Math.min(...zs) - 60, z1: Math.max(...zs) + 60 };
 });
 const BASE_CLEAR = { x0: -760, x1: 420, z0: -300, z1: 90 }; // apron, hangar, sede
+// Boxes of the reserves (60 m past them: their noisy edge) and islands.
+const boxOf = (P, m) => { const b = outlineBox(P); return { P, x0: b.x0 - m, x1: b.x1 + m, z0: b.z0 - m, z1: b.z1 + m }; };
+const RES_BOX = RESERVES.map((P) => boxOf(P, 60)), ISL_BOX = ISLANDS.map((P) => boxOf(P, 30)), OPEN_BOX = OPEN.map((P) => boxOf(P, 60));
 function stripClear(x, z) {
   // A runway and its approaches: open 60 m each side along it, a funnel
   // widening to 110 m 450 m out past each end.
@@ -385,7 +390,7 @@ function clearDist(x, z) {
   d = Math.min(d, stripClear(x, z));
   const bx = Math.max(BASE_CLEAR.x0 - x, x - BASE_CLEAR.x1, 0), bz = Math.max(BASE_CLEAR.z0 - z, z - BASE_CLEAR.z1, 0);
   d = Math.min(d, Math.hypot(bx, bz) - 40);
-  for (const P of OPEN) d = Math.min(d, polySd(P, x, z));
+  for (const R of OPEN_BOX) if (x > R.x0 && x < R.x1 && z > R.z0 && z < R.z1) d = Math.min(d, polySd(R.P, x, z));
   for (const [, px, pz] of MT_PROPS) d = Math.min(d, Math.hypot(x - px, z - pz) - 45);
   for (const p of MT_PONDS) d = Math.min(d, Math.hypot(x - p.x, z - p.z) - p.r - 25);
   return d;
@@ -398,11 +403,11 @@ export function mtWild(x, z) {
   // The reserves (and the A-01 bay): forest up to ~30 m from the crop, the
   // carreadores and the roads; a gap narrower than ~30 m stays a grass verge.
   let res = 0;
-  for (const P of RESERVES) { const sd = polySd(P, x, z); if (sd < 120) res = Math.max(res, 1 - smoothstep(-35, 25, sd + 30 * n)); }
+  for (const R of RES_BOX) { if (x < R.x0 || x > R.x1 || z < R.z0 || z > R.z1) continue; const sd = polySd(R.P, x, z); if (sd < 120) res = Math.max(res, 1 - smoothstep(-35, 25, sd + 30 * n)); }
   let w = res * smoothstep(14, 42, dc + 8 * n + 4 * n2);
   // Gallery forest: closed along the banks through the open land (not over
   // talhões, roads or strips: those clear it as everywhere).
-  const gallery = Math.max(1 - smoothstep(120, 210, dRiver + 40 * n), 1 - smoothstep(30, 70, dCreek + 15 * n));
+  const gallery = Math.max(1 - smoothstep(120, 210, dRiver + 40 * n), 1 - smoothstep(40, 95, dCreek + 32 * n + 10 * n2));
   if (gallery > 0) {
     let hard = 1e9;
     for (const b of FIELD_BOX) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) hard = Math.min(hard, fieldSd(b.f, x, z) - 16);
@@ -412,7 +417,7 @@ export function mtWild(x, z) {
     w = Math.max(w, gallery * smoothstep(6, 30, hard + 10 * n2));
   }
   // Ilhas de mata in the open land.
-  for (const P of ISLANDS) { const s = polySd(P, x, z); if (s < 30) w = Math.max(w, (1 - smoothstep(-25, 15, s + 10 * n2)) * smoothstep(0, 30, dc + 25)); }
+  for (const R of ISL_BOX) { if (x < R.x0 || x > R.x1 || z < R.z0 || z > R.z1) continue; const s = polySd(R.P, x, z); if (s < 30) w = Math.max(w, (1 - smoothstep(-25, 15, s + 10 * n2)) * smoothstep(0, 30, dc + 25)); }
   // Gently thinner and lower right at the river's edge (sand and shrubs).
   if (dRiver < 14) w *= smoothstep(3, 14, dRiver);
   // Beyond the playable area: continuous (the BR and the river still open).
