@@ -84,7 +84,11 @@ const sprayJob = () => page.evaluate(async () => {
         const nearArm = !!g.world.pivots && [-12, -9, -6, -3, 0, 3, 6, 9, 12, 15].some((d) => g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(x, z) + 4.6, ax ? z : z + d * dir) === 'center pivot');
         // Trees ahead at work height (the forest at the end of the pass, a
         // castanheira in the talhão): the pilot pulls up, spray off.
-        const treesAhead = [8, 16, 24].some((d) => /tree/.test(g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(ax ? x + d * dir : x, ax ? z : z + d * dir) + 5, ax ? z : z + d * dir) ?? ''));
+        // (Along the nose and both wingtips.)
+        const treesAhead = [6, 12, 18, 24].some((d) => [-6, 0, 6].some((w) => {
+          const px = ax ? x + d * dir : x + w, pz = ax ? z + w : z + d * dir;
+          return /tree/.test(g.world.obstacleAt(px, T.heightAt(px, pz) + 5, pz) ?? '');
+        }));
         if (treesAhead) { g.sprayer.on = false; A.placeAirborne(x, z, hdg, 45, sp); g.simulate(0.2, 1 / 30); pulls++; if (A.state !== 'ok') { crashes++; if (log.length < 6) log.push(`${A.crashReason}@${Math.round(x)},${Math.round(z)} up`); A.repair?.(); } a += dir * sp * 0.2; continue; }
         A.fm.hopper = Math.max(A.fm.hopper, 300);
         // (Over the centre tower: higher than over the arm.)
