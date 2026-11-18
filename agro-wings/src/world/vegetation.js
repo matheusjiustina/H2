@@ -93,7 +93,7 @@ import { FRONT_VEG_REGIONS, frontierCleared, frontierRunwayClear } from './front
 import { fieldInside } from './fieldShape.js';
 import { serraForestBoxes, SERRA_WORLD_HALF } from './serra.js';
 import { serraCanopy, canopyFromGrid } from './serraScenery.js';
-import { mtForest, mtForestNodes, mtForestBoxes, MT_CASTANHEIRAS, MT_PALMS, MT_STRIPS, MT_WORLD_HALF } from './matogrosso.js';
+import { mtForest, mtForestNodes, mtForestBoxes, mtOpen, MT_CASTANHEIRAS, MT_PALMS, MT_STRIPS, MT_WORLD_HALF } from './matogrosso.js';
 
 export function createVegetation(terrain, quality) {
   const group = new THREE.Group();
@@ -648,7 +648,9 @@ export function createVegetation(terrain, quality) {
         // (the others' loops skip it), so overlaps never double the density.
         const own = reg.biome === 'cerrado' ? cer : reg.biome === 'varzea' ? wet : reg.biome === 'mata' ? lush : reg.biome === 'serra' ? rock : Math.max(lush, cer * 0.9);
         if (own < Math.max(cer, wet, lush, rock) * 0.999 && reg.biome !== 'morros') continue;
-        if (!openE(px, pz, 8) || (FRONTIER && frontierCleared(px, pz)) || (MATOGROSSO && mtForest(px, pz) > 0.05)) continue;
+        // (Mato Grosso: only on its open pastures, 40 m clear of any talhão —
+        // never in the margin a pilot pulls up over at the end of a pass.)
+        if (!openE(px, pz, 8) || (FRONTIER && frontierCleared(px, pz)) || (MATOGROSSO && (mtForest(px, pz) > 0.05 || !mtOpen(px, pz) || fieldNear(px, pz, 40)))) continue;
         const sl = slopeAt(px, pz);
         if (reg.biome === 'cerrado') {
           if (k < 0.075 * cer) {

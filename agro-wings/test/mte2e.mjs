@@ -57,7 +57,7 @@ check('pivot arm: hit at work height, clear 7.5 m up and beside it', r.low === '
 const sprayJob = () => page.evaluate(async () => {
   const g = window.__agro, A = g.aircraft, sp = 46 * (A.A.assistSpeedScale ?? 1), W = A.type.spray.swath * 0.85, T = g.world.terrain;
   const { fieldSpans } = await import('/src/world/fieldShape.js');
-  let k = 0, hops = 0, runs = 0, pulls = 0, crashes = 0; A.damage = 0; A.crashReason = null;
+  let k = 0, hops = 0, runs = 0, pulls = 0, crashes = 0; const log = []; A.damage = 0; A.crashReason = null;
   for (const f of g.job.fields) {
     const ax = f.rowAxis === 'x', C = f.circle;
     const across0 = ax ? f.z0 : f.x0, across1 = ax ? f.z1 : f.x1;
@@ -83,21 +83,21 @@ const sprayJob = () => page.evaluate(async () => {
         const nearArm = g.world.pivots && g.world.obstacleAt(x, T.heightAt(x, z) + 4.6, z) === 'center pivot' || [-12, 12].some((d) => g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(x, z) + 4.6, ax ? z : z + d * dir) === 'center pivot');
         // Trees ahead at work height (the forest at the end of the pass, a
         // castanheira in the talhão): the pilot pulls up, spray off.
-        const treesAhead = [15, 30, 45, 60].some((d) => /tree/.test(g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(ax ? x + d * dir : x, ax ? z : z + d * dir) + 5, ax ? z : z + d * dir) ?? ''));
-        if (treesAhead) { g.sprayer.on = false; A.placeAirborne(x, z, hdg, 45, sp); g.simulate(0.2, 1 / 30); pulls++; if (A.state !== 'ok') { crashes++; A.repair?.(); } a += dir * sp * 0.2; continue; }
+        const treesAhead = [8, 16, 24].some((d) => /tree/.test(g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(ax ? x + d * dir : x, ax ? z : z + d * dir) + 5, ax ? z : z + d * dir) ?? ''));
+        if (treesAhead) { g.sprayer.on = false; A.placeAirborne(x, z, hdg, 45, sp); g.simulate(0.2, 1 / 30); pulls++; if (A.state !== 'ok') { crashes++; if (log.length < 6) log.push(`${A.crashReason}@${Math.round(x)},${Math.round(z)} up`); A.repair?.(); } a += dir * sp * 0.2; continue; }
         A.fm.hopper = Math.max(A.fm.hopper, 300);
         A.placeAirborne(x, z, hdg, nearArm ? 9 : 0.8 + 3.2, sp);
         if (nearArm) hops++;
         const dt = 0.2;
         g.sprayer.on = !nearArm; g.simulate(dt, 1 / 30);
-        if (A.state !== 'ok') { crashes++; A.repair?.(); }
+        if (A.state !== 'ok') { crashes++; if (log.length < 6) log.push(`${A.crashReason}@${Math.round(x)},${Math.round(z)}${nearArm ? ' hop' : ''}`); A.repair?.(); }
         a += dir * sp * dt;
       }
       g.sprayer.on = false;
       }
     }
   }
-  return { cov: +g.job.stats().coverage.toFixed(3), done: g.job.complete(), passes: k, runs, hops, pulls, crashes, state: A.state, why: A.crashReason ?? null };
+  return { cov: +g.job.stats().coverage.toFixed(3), done: g.job.complete(), passes: k, runs, hops, pulls, crashes, log, state: A.state };
 });
 r = await page.evaluate(() => { const g = window.__agro; g.selectContract('mt-p01'); g.screens.close(); return { job: g.job?.c.id, ha: +g.job?.ha?.toFixed(1), field: g.job?.fields[0].name, circle: !!g.job?.fields[0].circle, passes: g.guidance.passes.length, chord: g.guidance.passes.map((p) => Math.round(p.e1 - p.e0)) }; });
 check('pivot order taken: a round field, passes as chords of the disc', r.job === 'mt-p01' && r.circle && r.passes > 10 && r.chord[0] < r.chord[Math.floor(r.chord.length / 2)], JSON.stringify({ ...r, chord: r.chord.slice(0, 4) }));
