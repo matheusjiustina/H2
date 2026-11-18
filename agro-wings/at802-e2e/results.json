@@ -1,0 +1,53 @@
+{
+ "catalogue: AT-802A and Fire Boss cards": {
+  "pass": true,
+  "info": "Expansão premium"
+ },
+ "testing phase: Fire Boss card open": {
+  "pass": true
+ },
+ "premium enforced: Fire Boss refused (selectAircraft, _activate)": {
+  "pass": true,
+  "info": "{\"sel\":false,\"after\":\"ipanema\"}"
+ },
+ "AT-802A selected and on the pad": {
+  "pass": true,
+  "info": "{\"id\":\"at802\",\"wheels\":3}"
+ },
+ "spraying works on the AT-802A (flow, hopper going down)": {
+  "pass": true,
+  "info": "{\"on\":true,\"flow\":8.4,\"hopper\":1483.2000000000153,\"mass\":5109.854636926418}"
+ },
+ "Fire Boss unlocked → selectable, fire test field active": {
+  "pass": true,
+  "info": "{\"id\":\"at802f\",\"fires\":true,\"wheels\":4}"
+ },
+ "Fire Boss afloat on the reservoir (gear up)": {
+  "pass": true,
+  "info": "{\"ok\":true,\"onWater\":true,\"gear\":0,\"draft\":0.5860959137159778}"
+ },
+ "scooping by key (T): water in, mass up": {
+  "pass": true,
+  "info": "{\"probes\":true,\"h0\":0,\"h1\":898.3333333333384,\"mass\":5142.199652142612,\"onWater\":true,\"kt\":67.85441988757842,\"scooping\":true}"
+ },
+ "gear key (U) in flight: gear comes down": {
+  "pass": true,
+  "info": "{\"cmd\":true,\"pos\":0.11111111111111124}"
+ },
+ "drop by key (C): water released, fire intensity down": {
+  "pass": true,
+  "info": "{\"i0\":1,\"x\":-736.0516984402693,\"fx\":-880,\"i1\":0.3903032319135644,\"state\":\"burning\",\"hopper\":0,\"impacts\":49,\"onTarget\":1264}"
+ },
+ "fleet parked with the AT-802s, no overlapping spans": {
+  "pass": true,
+  "info": "[]"
+ },
+ "re-locked: Fire Boss refused again": {
+  "pass": true,
+  "info": "{\"sel\":false,\"id\":\"at802\"}"
+ },
+ "no page errors": {
+  "pass": true,
+  "info": "[]"
+ }
+}
