@@ -58,7 +58,7 @@ function buildVariants() {
       pair((hi) => cerradoTree(hi, 102, { tiles: [TILES.cerrado, TILES.redFlush, TILES.fine[0]], tint: C(1.0, 0.96, 0.92) })),
     ],
     macauba: [0, 1].map((i) => pair((hi) => macaubaPalm(hi, 111 + i))),
-    ...(MATOGROSSO ? { castanha: [0, 1, 2].map((i) => pair((hi) => castanheiraTree(hi, 121 + i))) } : {}),
+    ...(MATOGROSSO ? { castanha: [0, 1].map((i) => pair((hi) => castanheiraTree(hi, 121 + i))) } : {}),
     ipeRoxo: [pair((hi) => ipeTree(hi, 121, TILES.ipeRoxo))],
     snag: [pair((hi) => deadTree(hi, 131))],
     mound: [(() => { const g = termiteMound(95); return [g, g]; })()],
@@ -770,6 +770,10 @@ export function createVegetation(terrain, quality) {
     const { parts } = canopyFromGrid(terrain, mtForestNodes(), 'mt', { full: (big, lump) => 23 + 5 * big + 3.5 * lump });
     canopyParts.push(...parts);
     const rm = rng(20261117), H = MT_WORLD_HALF - 30, castH = (s) => 34 * s;
+    // Variants: two per kind (one palm) — every kind:variant in a 500 m cell
+    // is a draw call, and the forest's edges are everywhere on this map; the
+    // per-instance size, turn and tone keep the trees from repeating.
+    const vMT = (kind) => (kind === 'macauba' ? 0 : Math.floor(rm() * Math.min(2, variants[kind].length)));
     // A castanheira's obstacle: the bare trunk (thin) and the crown, which
     // starts about 22 m up (a wing passes beside the trunk under it).
     const castCol = (x, z, sc) => {
@@ -783,26 +787,26 @@ export function createVegetation(terrain, quality) {
       if (d < 0.5) {
         // The edge: a wall of crowns of mixed sizes, a palm here and there.
         if (k >= 0.42) continue;
-        const q = rm(), kind = q < 0.05 ? 'macauba' : q < 0.08 ? 'buriti' : q < 0.11 ? 'castanha' : 'mata';
+        const q = rm(), kind = q < 0.07 ? 'macauba' : q < 0.1 ? 'castanha' : 'mata';
         const sc = kind === 'castanha' ? 0.85 + rm() * 0.2 : 0.85 + rm() * 0.55;
-        trees.push({ kind, v: Math.floor(rm() * variants[kind].length), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
+        trees.push({ kind, v: vMT(kind), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
         if (kind === 'castanha') castCol(px, pz, sc); else colliders.push({ x: px, z: pz, r: 3, top: terrain.heightAt(px, pz) + 19 * sc });
       } else if (k < 0.008) {
         // Inside: only the emergents show over the roof — castanheiras.
         const sc = 0.92 + rm() * 0.22;
-        trees.push({ kind: 'castanha', v: Math.floor(rm() * variants.castanha.length), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
+        trees.push({ kind: 'castanha', v: vMT('castanha'), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
         castCol(px, pz, sc);
       }
     }
     for (const b of mtForestBoxes()) colliders.push({ box: b, top: 26 });
     // Isolated castanheiras (their crowns are the obstacle) and palms.
     for (const [x, z, sc] of MT_CASTANHEIRAS) {
-      trees.push({ kind: 'castanha', v: Math.floor(rm() * variants.castanha.length), x, z, s: sc, rot: rm() * Math.PI * 2 });
+      trees.push({ kind: 'castanha', v: vMT('castanha'), x, z, s: sc, rot: rm() * Math.PI * 2 });
       castCol(x, z, sc);
     }
     for (const [x, z] of MT_PALMS) {
       const sc = 0.85 + rm() * 0.3;
-      trees.push({ kind: 'macauba', v: Math.floor(rm() * variants.macauba.length), x, z, s: sc, rot: rm() * Math.PI * 2 });
+      trees.push({ kind: 'macauba', v: vMT('macauba'), x, z, s: sc, rot: rm() * Math.PI * 2 });
       colliders.push({ x, z, r: 2, top: terrain.heightAt(x, z) + 14 * sc });
     }
     // The strip's tree line: two staggered rows of tall trees along one side,
@@ -815,7 +819,7 @@ export function createVegetation(terrain, quality) {
         for (let x = st.x0 + 8 + row * 3.5; x < st.x1 - 8; x += 7) {
           const zz = st.z + side * (offset + row * 6 + (rm() - 0.5) * 1.6), xx = x + (rm() - 0.5) * 1.5;
           const kind = rm() < 0.8 ? 'euca' : 'mata', sc = kind === 'euca' ? 0.88 + rm() * 0.28 : 1.15 + rm() * 0.3;
-          trees.push({ kind, v: Math.floor(rm() * variants[kind].length), x: xx, z: zz, s: sc, rot: rm() * Math.PI * 2 });
+          trees.push({ kind, v: vMT(kind), x: xx, z: zz, s: sc, rot: rm() * Math.PI * 2 });
           colliders.push({ x: xx, z: zz, r: kind === 'euca' ? 2.5 : 3, top: terrain.heightAt(xx, zz) + (kind === 'euca' ? 27 : 19) * sc });
         }
       }

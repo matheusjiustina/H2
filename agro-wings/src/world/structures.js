@@ -1,13 +1,14 @@
 // Buildings, base equipment, vehicles, fences, strip markings, windsocks,
 // power line and creek water. Static parts are merged per material.
 import * as THREE from 'three';
-import { SERRA, FRONTIER } from './activeMap.js';
+import { SERRA, FRONTIER, MATOGROSSO } from './activeMap.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BASE, APRON0, HANGAR0, RUNWAY, HQ, GRAIN_POINTS, FENCES, POWERLINE, CREEK, FARM_SITES, WATER } from './layout.js';
 import { canvas, canvasTexture, makeLabel } from '../core/textures.js';
 import { grainSilo, grainDryer, grainStore } from './grain.js';
 import { rng } from '../core/math.js';
 import { pickup, tractor, sprayer, harvester, ibc, drumPallet, officeContainer } from './vehicles.js';
+const SITE_DRAW = MATOGROSSO ? 1500 : 2200;
 
 // ---------------------------------------------------------------------------
 // Materials
@@ -209,11 +210,14 @@ export function createStructures(terrain, scene) {
       for (const ws of dyn.windsocks) if (ws.root?.visible !== false) ws.update(dt, time, wind);
       for (const tb of dyn.turbines) if (tb.root.visible) tb.rotor.rotation.z += dt * tb.rpm * (0.7 + 0.3 * Math.min(1.6, Math.hypot(wind.x, wind.z) / 5));
       // A farm's service area is a few pixels beyond ~2.2 km: not drawn (the
-      // tall wind turbines stay in sight out to 6 km).
+      // tall wind turbines stay in sight out to 6 km). On the compact Mato
+      // Grosso map (its strips 1.4–2.3 km apart) from 1.5 km: there a shed is
+      // already a few pixels, and three farms would otherwise be drawn from
+      // every strip.
       if (ctx?.cam) {
         for (const s of dyn.sites) {
           const d = Math.hypot(ctx.cam.x - s.x, ctx.cam.z - s.z);
-          s.group.visible = d < 2200;
+          s.group.visible = d < SITE_DRAW;
           if (s.far) s.far.visible = d < 6000;
         }
       }
