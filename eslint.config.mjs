@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone Vite game project (has its own tooling):
+    "game/**",
   ]),
 ]);
 

@@ -64,3 +64,13 @@ src/
 ## Observação importante
 
 Os produtos em `src/data/products.ts` são **fictícios**, usados apenas para validar o layout (preços, condição, disponibilidade e fotos ilustrativas). Substitua pelo catálogo real antes de divulgar o site.
+
+## Jogo: Everyone Against Trump (`game/`)
+
+A pasta [`game/`](game/README.md) contém um projeto independente (Vite + TypeScript + Three.js): um jogo 3D de mundo aberto satírico que roda no navegador. Ele não interfere no site — tem `package.json`, build e dependências próprios.
+
+```bash
+cd game
+npm install
+npm run dev
+```
