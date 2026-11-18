@@ -87,7 +87,8 @@ test('the forest: nothing on runways, approaches or talhões; closed beyond the 
   }
   for (const f of F) for (const [x, z] of samples(f, 60)) assert.ok(MT.mtWild(x, z) < 0.05, `forest in ${f.name} at ${x},${z}`);
   let closed = 0, n = 0;
-  for (let a = 0; a < Math.PI * 2; a += 0.2) { n++; if (MT.mtWild(Math.cos(a) * 2850, Math.sin(a) * 2850) > 0.8) closed++; }
+  // (Along the square 450 m past the playable edge.)
+  for (let t = -2850; t < 2850; t += 150) for (const [x, z] of [[t, -2850], [t, 2850], [-2850, t], [2850, t]]) { n++; if (MT.mtWild(x, z) > 0.8) closed++; }
   assert.ok(closed / n > 0.7, `${closed}/${n}`);
   // Gallery forest along the river.
   let gal = 0, m = 0;
@@ -116,4 +117,21 @@ test('coverage and rows follow the outline: the sprayable area is the polygon, n
     for (let z = f.z0 + 5; z < f.z1 && !inlet; z += 10) for (let x = f.x0 + 5; x < f.x1 && !inlet; x += 10) if (!S.fieldInside(f, x, z, 30)) inlet = [x, z];
     if (inlet) { assert.equal(L.fieldAt(inlet[0], inlet[1])?.name === f.name, false); assert.equal(cov.deposit(inlet[0], inlet[1], 1), -1); }
   }
+});
+
+test('most talhões have open pasture around them; some meet the forest', () => {
+  let open = 0, wooded = 0;
+  for (const f of F) {
+    // Ring 60 m outside the outline: the share of it under forest.
+    const P = S.fieldOutline(f), pts = [];
+    for (let i = 0; i < P.length; i += 2) {
+      const [ax, az] = P[i], [bx, bz] = P[(i + 1) % P.length], tx = bx - ax, tz = bz - az, l = Math.hypot(tx, tz) || 1;
+      for (const sgn of [1, -1]) { const x = ax + (tz / l) * 60 * sgn, z = az - (tx / l) * 60 * sgn; if (!S.fieldInside(f, x, z, 30)) pts.push([x, z]); }
+    }
+    const share = pts.filter(([x, z]) => MT.mtWild(x, z) > 0.5).length / Math.max(1, pts.length);
+    if (share < 0.3) open++; else wooded++;
+  }
+  console.log(`  talhões with open land around: ${open}, against the forest: ${wooded}`);
+  assert.ok(open > F.length * 0.6, `${open} open of ${F.length}`);
+  assert.ok(wooded >= 3, `${wooded} against the forest`);
 });

@@ -9,7 +9,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { FORESTS, CREEK, FIELDS, HQ, BASE, APRON0, ROADS, RUNWAY, FARM_SITES, WATER, pondRadius, siteById } from './layout.js';
 import { reliefWeights, RING } from './relief.js';
 import { EXP_REGIONS, EXP_PROPS, EXP_BOXES, inStripCorridor, biomeWeights } from './expansion.js';
-import { rng, fbm, segDist } from '../core/math.js';
+import { rng, fbm, segDist, smoothstep } from '../core/math.js';
 import {
   makeFoliageAtlas, makeCanopyTexture, foliageMaterial, tileRect, TILES,
   broadTree, mangoTree, ipeTree, eucalyptusTree, buritiPalm, shrub, cerradoTree, macaubaPalm, deadTree, castanheiraTree,
@@ -93,7 +93,7 @@ import { FRONT_VEG_REGIONS, frontierCleared, frontierRunwayClear } from './front
 import { fieldInside } from './fieldShape.js';
 import { serraForestBoxes, SERRA_WORLD_HALF } from './serra.js';
 import { serraCanopy, canopyFromGrid } from './serraScenery.js';
-import { mtForest, mtForestNodes, mtForestBoxes, mtOpen, MT_CASTANHEIRAS, MT_PALMS, MT_STRIPS, MT_WORLD_HALF } from './matogrosso.js';
+import { mtForest, mtForestNodes, mtForestBoxes, mtScatterOk, MT_CASTANHEIRAS, MT_PALMS, MT_STRIPS, MT_WORLD_HALF, MT_PLAY_HALF } from './matogrosso.js';
 
 export function createVegetation(terrain, quality) {
   const group = new THREE.Group();
@@ -648,9 +648,8 @@ export function createVegetation(terrain, quality) {
         // (the others' loops skip it), so overlaps never double the density.
         const own = reg.biome === 'cerrado' ? cer : reg.biome === 'varzea' ? wet : reg.biome === 'mata' ? lush : reg.biome === 'serra' ? rock : Math.max(lush, cer * 0.9);
         if (own < Math.max(cer, wet, lush, rock) * 0.999 && reg.biome !== 'morros') continue;
-        // (Mato Grosso: only on its open pastures, 40 m clear of any talhão —
-        // never in the margin a pilot pulls up over at the end of a pass.)
-        if (!openE(px, pz, 8) || (FRONTIER && frontierCleared(px, pz)) || (MATOGROSSO && (mtForest(px, pz) > 0.05 || !mtOpen(px, pz) || fieldNear(px, pz, 40)))) continue;
+        // (Mato Grosso scatters its own isolated trees: see its block below.)
+        if (MATOGROSSO || !openE(px, pz, 8) || (FRONTIER && frontierCleared(px, pz))) continue;
         const sl = slopeAt(px, pz);
         if (reg.biome === 'cerrado') {
           if (k < 0.075 * cer) {
@@ -787,13 +786,14 @@ export function createVegetation(terrain, quality) {
       const px = x + rm() * 10, pz = z + rm() * 10, d = mtForest(px, pz), k = rm();
       if (d <= 0.03) continue;
       if (d < 0.5) {
-        // The edge: a wall of crowns of mixed sizes, a palm here and there.
-        if (k >= 0.42) continue;
-        const kind = rm() < 0.03 ? 'castanha' : 'mata';
-        const sc = kind === 'castanha' ? 0.85 + rm() * 0.2 : 0.85 + rm() * 0.55;
+        // The edge: crowns of mixed sizes, spaced (gaps between them), a
+        // castanheira here and there.
+        if (k >= 0.3) continue;
+        const kind = rm() < 0.035 ? 'castanha' : 'mata';
+        const sc = kind === 'castanha' ? 0.85 + rm() * 0.2 : 0.7 + rm() * 0.8;
         trees.push({ kind, v: kind === 'castanha' ? 0 : vMT(kind), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
         if (kind === 'castanha') castCol(px, pz, sc); else colliders.push({ x: px, z: pz, r: 3, top: terrain.heightAt(px, pz) + 19 * sc });
-      } else if (k < 0.008) {
+      } else if (k < 0.006) {
         // Inside: only the emergents show over the roof — castanheiras.
         const sc = 0.92 + rm() * 0.22;
         trees.push({ kind: 'castanha', v: 0, x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
@@ -801,6 +801,20 @@ export function createVegetation(terrain, quality) {
       }
     }
     for (const b of mtForestBoxes()) colliders.push({ box: b, top: 26 });
+    // Isolated trees on the open pasture, in loose clumps (a few hundred
+    // over the map), of the kinds the forest already draws (no extra draw
+    // calls): broad native trees, now and then a castanheira.
+    {
+      const P = MT_PLAY_HALF, G = 55;
+      for (let z = -P; z < P; z += G) for (let x = -P; x < P; x += G) {
+        const px = x + rm() * G, pz = z + rm() * G, k = rm();
+        const clump = smoothstep(0.35, 0.75, fbm(px / 420 + 3.3, pz / 420 - 1.7, 2) * 0.5 + 0.5);
+        if (k > 0.05 + 0.3 * clump || mtForest(px, pz) > 0.02 || !mtScatterOk(px, pz)) continue;
+        const kind = rm() < 0.12 ? 'castanha' : 'mata', sc = kind === 'castanha' ? 0.88 + rm() * 0.22 : 0.9 + rm() * 0.6;
+        trees.push({ kind, v: kind === 'castanha' ? vMT('castanha') : vMT('mata'), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
+        if (kind === 'castanha') castCol(px, pz, sc); else colliders.push({ x: px, z: pz, r: 3, top: terrain.heightAt(px, pz) + 19 * sc });
+      }
+    }
     // Isolated castanheiras (their crowns are the obstacle) and palms.
     for (const [x, z, sc] of MT_CASTANHEIRAS) {
       trees.push({ kind: 'castanha', v: vMT('castanha'), x, z, s: sc, rot: rm() * Math.PI * 2 });

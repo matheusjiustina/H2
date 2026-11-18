@@ -296,8 +296,25 @@ const OPEN = [
   // The sítio in the north-west and the farm gate on the BR.
   organicOutline([[-2240, -460], [-1700, -430], [-1650, -120], [-2240, -60]], { iter: 3, wobble: 6, seed: 33 }),
 ];
+// Legal reserves and the forest left in the talhões' bays: organic blocks
+// where the native forest stands (elsewhere the land was opened to pasture;
+// only the gallery forest, the islands and the forest beyond the map stand
+// out there). Refinement 2.0 rev. 2: the forest is kept to these — most
+// talhões have open pasture around them, some meet the forest.
+const RESERVES = [
+  // The forest tongue reaching into A-01 from the corridor to its north.
+  organicOutline([[-120, -1315], [330, -1315], [310, -1120], [240, -930], [160, -850], [80, -940], [10, -1110]], { iter: 3, wobble: 6, seed: 51 }),
+  // Reserva legal in the south-west: between the reserve strip, the creek,
+  // the river and the BR.
+  organicOutline([[-2290, 1300], [-1700, 1290], [-1480, 1450], [-1500, 1800], [-1600, 2150], [-1900, 2380], [-2290, 2400]], { iter: 3, wobble: 14, seed: 52 }),
+  // A wooded strip between the capim and the BR, north of the sítio.
+  organicOutline([[-2290, -1820], [-2240, -1800], [-2250, -1350], [-2240, -1100], [-2290, -1050]], { iter: 3, wobble: 6, seed: 53 }),
+];
 // Forest islands left standing in the open land (ilhas de mata).
 const ISLANDS = [
+  organicOutline([[-650, 330], [-520, 310], [-480, 420], [-610, 450]], { iter: 3, wobble: 5, seed: 44 }),
+  organicOutline([[-1760, 20], [-1640, 0], [-1600, 110], [-1720, 140]], { iter: 3, wobble: 5, seed: 45 }),
+  organicOutline([[640, -380], [760, -400], [790, -300], [670, -270]], { iter: 3, wobble: 5, seed: 46 }),
   organicOutline([[2270, 1150], [2360, 1130], [2380, 1240], [2290, 1270]], { iter: 3, wobble: 4, seed: 41 }),
   organicOutline([[1550, 560], [1660, 540], [1690, 640], [1580, 670]], { iter: 3, wobble: 4, seed: 42 }),
   organicOutline([[1240, 590], [1330, 570], [1360, 660], [1270, 690]], { iter: 3, wobble: 4, seed: 43 }),
@@ -329,13 +346,14 @@ export const MT_PALMS = [
 ];
 
 // ---------------------------------------------------------------------------
-// The forest. Wherever nothing was opened, the native forest stands: a
-// density 0…1 (1 = closed forest) over the whole terrain, from the distance
-// to what was cleared (talhões and their carreadores, roads, strips and their
-// approaches, the base, the open land, the water), with an irregular edge;
-// gallery forest along the river and the creek even through open land; ilhas
-// left in the pastures; continuous beyond the playable area. Sampled once on
-// a 20 m grid (mtForest), read everywhere else from there.
+// The forest: a density 0…1 (1 = closed forest) over the whole terrain. It
+// stands in the reserves (RESERVES: organic blocks, the A-01 bay), as gallery
+// forest along the river and the creek, as islands in the pastures and
+// continuous beyond the playable area — always clear of what was opened
+// (talhões and their carreadores, roads, strips and their approaches, the
+// base, the props, the water), with an irregular edge. The rest of the land
+// is open pasture with isolated trees. Sampled once on a 20 m grid
+// (mtForest), read everywhere else from there.
 const FIELD_BOX = MT_FIELDS.map((f) => ({ f, x0: f.x0 - 60, x1: f.x1 + 60, z0: f.z0 - 60, z1: f.z1 + 60 }));
 const ROAD_BOX = MT_ROADS.map((r) => {
   const xs = r.pts.map((p) => p[0]), zs = r.pts.map((p) => p[1]);
@@ -377,8 +395,11 @@ export function mtWild(x, z) {
   const dRiver = polyD(MT_RIVER.points, x, z) - MT_RIVER.width / 2, dCreek = polyD(MT_CREEK.points, x, z) - 4;
   if (dRiver < 3) return 0; // the water
   const dc = clearDist(x, z);
-  // (A gap narrower than ~30 m between two clearings stays a grass verge.)
-  let w = smoothstep(14, 42, dc + 8 * n + 4 * n2);
+  // The reserves (and the A-01 bay): forest up to ~30 m from the crop, the
+  // carreadores and the roads; a gap narrower than ~30 m stays a grass verge.
+  let res = 0;
+  for (const P of RESERVES) { const sd = polySd(P, x, z); if (sd < 120) res = Math.max(res, 1 - smoothstep(-35, 25, sd + 30 * n)); }
+  let w = res * smoothstep(14, 42, dc + 8 * n + 4 * n2);
   // Gallery forest: closed along the banks through the open land (not over
   // talhões, roads or strips: those clear it as everywhere).
   const gallery = Math.max(1 - smoothstep(120, 210, dRiver + 40 * n), 1 - smoothstep(30, 70, dCreek + 15 * n));
@@ -391,7 +412,7 @@ export function mtWild(x, z) {
     w = Math.max(w, gallery * smoothstep(6, 30, hard + 10 * n2));
   }
   // Ilhas de mata in the open land.
-  for (const P of ISLANDS) { const s = polySd(P, x, z); if (s < 30) w = Math.max(w, 1 - smoothstep(-25, 15, s + 10 * n2)); }
+  for (const P of ISLANDS) { const s = polySd(P, x, z); if (s < 30) w = Math.max(w, (1 - smoothstep(-25, 15, s + 10 * n2)) * smoothstep(0, 30, dc + 25)); }
   // Gently thinner and lower right at the river's edge (sand and shrubs).
   if (dRiver < 14) w *= smoothstep(3, 14, dRiver);
   // Beyond the playable area: continuous (the BR and the river still open).
@@ -446,6 +467,21 @@ export function mtForestBoxes() {
 // Open ground where trees may be scattered (the castanheiras and palms are
 // placed by hand; this keeps the generic scatter off talhões and roads).
 export const mtOpen = (x, z) => OPEN.some((P) => pointInPoly(P, x, z));
+// Where an isolated tree may stand on the open land: off the forest, 45 m
+// clear of any talhão (the pilot's pull-up at the end of a pass), off roads,
+// runways and their approaches, the base, the props and the water.
+export function mtScatterOk(x, z) {
+  if (Math.max(Math.abs(x), Math.abs(z)) > MT_PLAY_HALF - 60) return false;
+  for (const b of FIELD_BOX) if (x > b.x0 - 40 && x < b.x1 + 40 && z > b.z0 - 40 && z < b.z1 + 40 && fieldSd(b.f, x, z) < 45) return false;
+  for (const b of ROAD_BOX) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && polyD(b.r.pts, x, z) < b.r.w / 2 + 12) return false;
+  if (stripClear(x, z) < 45) return false;
+  if (x > BASE_CLEAR.x0 - 60 && x < BASE_CLEAR.x1 + 60 && z > BASE_CLEAR.z0 - 60 && z < BASE_CLEAR.z1 + 60) return false;
+  for (const [, px, pz] of MT_PROPS) if (Math.hypot(x - px, z - pz) < 50) return false;
+  for (const p of MT_PONDS) if (Math.hypot(x - p.x, z - p.z) < p.r + 30) return false;
+  if (polyD(MT_RIVER.points, x, z) < MT_RIVER.width / 2 + 25 || polyD(MT_CREEK.points, x, z) < 15) return false;
+  if (polyD(BR_163, x, z) < 25) return false;
+  return true;
+}
 
 // Ground tint weights [cerrado, wet, forest floor, rock]: green pasture,
 // wet along the water, forest floor under the canopy.

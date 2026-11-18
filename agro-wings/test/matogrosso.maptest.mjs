@@ -54,12 +54,12 @@ test('the land: soy, corn, capim, stubble, pasture, reserves; roads, water and f
   const crops = new Set(FIELDS.map((f) => f.crop));
   for (const c of ['soy', 'corn', 'capim', 'stubble', 'pasture']) assert.ok(crops.has(c), c);
   assert.equal(CROPS.capim.height, 0.6);
-  // The native forest (refinement 2.0): a density over everything not
-  // cleared — between a third and two thirds of the playable land.
+  // The native forest (refinement 2.0, rev. 2): reserves, gallery forest,
+  // islands — a minority of the land; most talhões have pasture around them.
   let wood = 0, n = 0;
   for (let z = -PLAY_HALF; z < PLAY_HALF; z += 80) for (let x = -PLAY_HALF; x < PLAY_HALF; x += 80) { n++; if (mtWild(x, z) > 0.5) wood++; }
   console.log(`  closed forest: ${((100 * wood) / n).toFixed(0)} % of the playable land`);
-  assert.ok(wood / n > 0.3 && wood / n < 0.7);
+  assert.ok(wood / n > 0.06 && wood / n < 0.22);
   assert.ok(FORESTS.every((f) => f.kind !== 'mata'), 'no rectangular forest blocks left');
   for (const r of ROADS) for (const f of FIELDS) for (const [x, z] of r.pts) assert.ok(!inFieldShape(f, x, z, r.w / 2 + 2), `${r.name ?? 'road'} in ${f.name}`);
   for (const w of [CREEK, ...WATER.streams]) for (const [x, z] of w.points) for (const f of FIELDS) assert.ok(!inFieldShape(f, x, z, 20), `water in ${f.name}`);
