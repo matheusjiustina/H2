@@ -57,6 +57,7 @@ check('pivot arm: hit at work height, clear 7.5 m up and beside it', r.low === '
 const sprayJob = () => page.evaluate(async () => {
   const g = window.__agro, A = g.aircraft, sp = 46 * (A.A.assistSpeedScale ?? 1), W = A.type.spray.swath * 0.85, T = g.world.terrain;
   const { fieldSpans } = await import('/src/world/fieldShape.js');
+  const PV = (await import('/src/world/matogrosso.js')).MT_PIVOTS;
   let k = 0, hops = 0, runs = 0, pulls = 0, crashes = 0; const log = []; A.damage = 0; A.crashReason = null;
   for (const f of g.job.fields) {
     const ax = f.rowAxis === 'x', C = f.circle;
@@ -80,13 +81,15 @@ const sprayJob = () => page.evaluate(async () => {
       while (dir > 0 ? a < a1 : a > a0) {
         const x = ax ? a : c, z = ax ? c : a;
         // Near the pivot arm: up and over it (the pilot's hop), spray off.
-        const nearArm = g.world.pivots && g.world.obstacleAt(x, T.heightAt(x, z) + 4.6, z) === 'center pivot' || [-12, 12].some((d) => g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(x, z) + 4.6, ax ? z : z + d * dir) === 'center pivot');
+        const nearArm = !!g.world.pivots && [-12, -9, -6, -3, 0, 3, 6, 9, 12, 15].some((d) => g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(x, z) + 4.6, ax ? z : z + d * dir) === 'center pivot');
         // Trees ahead at work height (the forest at the end of the pass, a
         // castanheira in the talhão): the pilot pulls up, spray off.
         const treesAhead = [8, 16, 24].some((d) => /tree/.test(g.world.obstacleAt(ax ? x + d * dir : x, T.heightAt(ax ? x + d * dir : x, ax ? z : z + d * dir) + 5, ax ? z : z + d * dir) ?? ''));
         if (treesAhead) { g.sprayer.on = false; A.placeAirborne(x, z, hdg, 45, sp); g.simulate(0.2, 1 / 30); pulls++; if (A.state !== 'ok') { crashes++; if (log.length < 6) log.push(`${A.crashReason}@${Math.round(x)},${Math.round(z)} up`); A.repair?.(); } a += dir * sp * 0.2; continue; }
         A.fm.hopper = Math.max(A.fm.hopper, 300);
-        A.placeAirborne(x, z, hdg, nearArm ? 9 : 0.8 + 3.2, sp);
+        // (Over the centre tower: higher than over the arm.)
+        const nearTower = PV.some((q) => Math.hypot(x - q.x, z - q.z) < 30);
+        A.placeAirborne(x, z, hdg, nearArm ? (nearTower ? 18 : 9) : 0.8 + 3.2, sp);
         if (nearArm) hops++;
         const dt = 0.2;
         g.sprayer.on = !nearArm; g.simulate(dt, 1 / 30);
@@ -141,7 +144,18 @@ r = await page.evaluate(async () => {
   let x0 = null, z0 = null;
   for (let z = f.z0 + 5; z < f.z1 && x0 === null; z += 8) for (let x = f.x0 + 5; x < f.x1; x += 8) if (!S.fieldInside(f, x, z, 30)) { x0 = x; z0 = z; break; }
   const ix = Math.floor((x0 - f.x0) / cov.cell), iz = Math.floor((z0 - f.z0) / cov.cell);
-  return { inlet: [Math.round(x0), Math.round(z0)], dose: cov.dose[iz * cov.nx + ix], masked: !cov.mask[iz * cov.nx + ix] };
+  // Where the crop is still short of dose (when not complete): by distance
+  // to the outline, and the worst 40 m bands across the passes.
+  const lo = 0.8, byEdge = [0, 0, 0], bands = {};
+  for (let j = 0; j < cov.nz; j++) for (let i = 0; i < cov.nx; i++) {
+    const k = j * cov.nx + i;
+    if (!cov.mask[k] || cov.dose[k] >= lo) continue;
+    const x = f.x0 + (i + 0.5) * cov.cell, z = f.z0 + (j + 0.5) * cov.cell, e = -S.fieldSd(f, x, z);
+    byEdge[e < 10 ? 0 : e < 30 ? 1 : 2]++;
+    const b = Math.floor(z / 40) * 40; bands[b] = (bands[b] ?? 0) + 1;
+  }
+  const worst = Object.entries(bands).sort((p, q) => q[1] - p[1]).slice(0, 4);
+  return { inlet: [Math.round(x0), Math.round(z0)], dose: cov.dose[iz * cov.nx + ix], masked: !cov.mask[iz * cov.nx + ix], short: { byEdge, worst, cells: cov.cells } };
 });
 check('nothing counted in the forest inlet', r.masked && r.dose === 0, JSON.stringify(r));
 await page.evaluate(() => { const g = window.__agro, A = g.aircraft; A.placeAirborne(-200, -1150, -0.4, 120, 46); g.cameraMode = 'chase'; g.rig.setMode('chase', A); g.simulate(1, 1 / 30); });

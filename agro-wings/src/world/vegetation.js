@@ -770,6 +770,13 @@ export function createVegetation(terrain, quality) {
     const { parts } = canopyFromGrid(terrain, mtForestNodes(), 'mt', { full: (big, lump) => 23 + 5 * big + 3.5 * lump });
     canopyParts.push(...parts);
     const rm = rng(20261117), H = MT_WORLD_HALF - 30, castH = (s) => 34 * s;
+    // A castanheira's obstacle: the bare trunk (thin) and the crown, which
+    // starts about 22 m up (a wing passes beside the trunk under it).
+    const castCol = (x, z, sc) => {
+      const h = terrain.heightAt(x, z);
+      colliders.push({ x, z, r: 1 + 0.4 * sc, top: h + 25 * sc });
+      colliders.push({ x, z, r: 8.5 * sc, bottom: h + 21 * sc, top: h + castH(sc) });
+    };
     for (let z = -H; z < H; z += 10) for (let x = -H; x < H; x += 10) {
       const px = x + rm() * 10, pz = z + rm() * 10, d = mtForest(px, pz), k = rm();
       if (d <= 0.03) continue;
@@ -779,19 +786,19 @@ export function createVegetation(terrain, quality) {
         const q = rm(), kind = q < 0.05 ? 'macauba' : q < 0.08 ? 'buriti' : q < 0.11 ? 'castanha' : 'mata';
         const sc = kind === 'castanha' ? 0.85 + rm() * 0.2 : 0.85 + rm() * 0.55;
         trees.push({ kind, v: Math.floor(rm() * variants[kind].length), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
-        colliders.push({ x: px, z: pz, r: kind === 'castanha' ? 8 * sc : 3, top: terrain.heightAt(px, pz) + (kind === 'castanha' ? castH(sc) : 19 * sc) });
+        if (kind === 'castanha') castCol(px, pz, sc); else colliders.push({ x: px, z: pz, r: 3, top: terrain.heightAt(px, pz) + 19 * sc });
       } else if (k < 0.008) {
         // Inside: only the emergents show over the roof — castanheiras.
         const sc = 0.92 + rm() * 0.22;
         trees.push({ kind: 'castanha', v: Math.floor(rm() * variants.castanha.length), x: px, z: pz, s: sc, rot: rm() * Math.PI * 2 });
-        colliders.push({ x: px, z: pz, r: 8 * sc, top: terrain.heightAt(px, pz) + castH(sc) });
+        castCol(px, pz, sc);
       }
     }
     for (const b of mtForestBoxes()) colliders.push({ box: b, top: 26 });
     // Isolated castanheiras (their crowns are the obstacle) and palms.
     for (const [x, z, sc] of MT_CASTANHEIRAS) {
       trees.push({ kind: 'castanha', v: Math.floor(rm() * variants.castanha.length), x, z, s: sc, rot: rm() * Math.PI * 2 });
-      colliders.push({ x, z, r: 8 * sc, top: terrain.heightAt(x, z) + castH(sc) });
+      castCol(x, z, sc);
     }
     for (const [x, z] of MT_PALMS) {
       const sc = 0.85 + rm() * 0.3;
@@ -1024,7 +1031,7 @@ export function makeTreeCollider(veg) {
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
       const l = grid.get(gx + i + ',' + (gz + j));
       if (!l) continue;
-      for (const c of l) if (y < c.top && Math.hypot(x - c.x, z - c.z) < c.r) return 'tree';
+      for (const c of l) if (y < c.top && !(y < c.bottom) && Math.hypot(x - c.x, z - c.z) < c.r) return 'tree'; // (bottom: a crown high on a bare trunk)
     }
     return null;
   };
